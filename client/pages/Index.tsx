@@ -502,11 +502,8 @@ export default function Index() {
                     {...item}
                     name={item.name || ''}
                     summary={item.summary || ''}
-                    onView={() => console.log('View resume:', item.id)}
-                    onEdit={() => console.log('Edit resume:', item.id)}
-                    onDownload={() => console.log('Download resume:', item.id)}
-                    onShare={() => console.log('Share resume:', item.id)}
-                    onDelete={() => console.log('Delete resume:', item.id)}
+                    onView={() => handleView(item)}
+                    onActions={() => handleOpenActions(item)}
                   />
                 )
               ))}
