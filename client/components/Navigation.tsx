@@ -138,13 +138,23 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
                 <Link
                   to="/pricing"
-                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
+                  className={cn(
+                    "transition-colors font-medium",
+                    location.pathname === "/pricing"
+                      ? "text-primary"
+                      : "text-foreground/70 hover:text-foreground"
+                  )}
                 >
                   Pricing
                 </Link>
                 <Link
                   to="/about"
-                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
+                  className={cn(
+                    "transition-colors font-medium",
+                    location.pathname === "/about"
+                      ? "text-primary"
+                      : "text-foreground/70 hover:text-foreground"
+                  )}
                 >
                   About
                 </Link>
