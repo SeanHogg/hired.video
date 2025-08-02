@@ -1,0 +1,674 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import Navigation from '@/components/Navigation';
+import Sidebar from '@/components/Sidebar';
+import Footer from '@/components/Footer';
+import ResumeViewer from '@/components/ResumeViewer';
+import { useAuth } from '@/lib/auth';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { Resume, ResumeData } from '@/types/resume';
+import {
+  ArrowLeft,
+  Edit,
+  Play,
+  Calendar,
+  MapPin,
+  Mail,
+  Phone,
+  ExternalLink,
+  Building,
+  GraduationCap,
+  Heart,
+  Award,
+  Share2,
+  Download,
+  ChevronRight,
+  User,
+  Target,
+  Globe,
+  Users,
+  Lock,
+  Star
+} from 'lucide-react';
+
+interface TimelineItemProps {
+  title: string;
+  subtitle: string;
+  startDate: string;
+  endDate: string;
+  description?: string;
+  highlights?: string[];
+  icon: React.ComponentType<any>;
+  isLast?: boolean;
+}
+
+function TimelineItem({ title, subtitle, startDate, endDate, description, highlights, icon: Icon, isLast = false }: TimelineItemProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const formatDate = (dateString: string) => {
+    if (dateString === 'Present') return 'Present';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short'
+    });
+  };
+
+  return (
+    <div className="relative">
+      {!isLast && <div className="absolute left-6 top-12 w-0.5 h-full bg-gradient-to-b from-primary to-primary/20" />}
+      
+      <div className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center relative z-10">
+          <Icon className="w-6 h-6 text-primary" />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg leading-tight">{title}</h3>
+              <p className="text-primary font-medium">{subtitle}</p>
+            </div>
+            <div className="text-right">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                <span>{formatDate(startDate)} - {formatDate(endDate)}</span>
+              </div>
+              <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            </div>
+          </div>
+          
+          {description && (
+            <p className="text-muted-foreground mt-2">{description}</p>
+          )}
+          
+          {expanded && highlights && highlights.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Key Achievements</h4>
+              <ul className="space-y-2">
+                {highlights.map((highlight, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm">
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                    <span>{highlight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ResumeDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const { isAuthenticated, user } = useAuth();
+  
+  const [resume, setResume] = useState<Resume | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+
+  // Mock data - in real app this would come from API
+  const mockResumeData: ResumeData = {
+    "Basics": {
+        "Name": "Sean Hogg",
+        "Label": "CTO and Technology Leader",
+        "Image": "",
+        "Email": "seanhogg@gmail.com",
+        "Phone": "2488250176",
+        "Url": "",
+        "Summary": "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams. Expert in aligning technical goals with business objectives, optimizing scalable cloud-native solutions, and fostering a collaborative team environment. Passionate about culture, customer experience, and delivering robust, distributed systems across multiple industries, while championing strategic initiatives and advanced AI & Machine Learning solutions.",
+        "Location": null
+    },
+    "Work": [
+        {
+            "Name": "RelatedNews.ca",
+            "Position": "Founder",
+            "Summary": "",
+            "StartDate": "1999-01-01",
+            "EndDate": "2005-01-01",
+            "Highlights": [
+                "Founded and sold RelatedNews.ca, a startup for custom websites with unique CMS solutions.",
+                "Architected Just-A-Click CMS, utilizing .Net, VB, C#, JavaScript, Java, and PHP."
+            ],
+            "Url": ""
+        },
+        {
+            "Name": "Alliance Inspection Management",
+            "Position": "VP of Technology/CIO",
+            "Summary": "",
+            "StartDate": "2021-08-01",
+            "EndDate": "2024-01-01",
+            "Highlights": [
+                "Reduced operating costs by $1.79M through IT process modernization and contract renegotiation.",
+                "Lowered attrition by 90% by fostering a performance-based, people-first culture.",
+                "Increased ticket completion by 92%, enhancing IT support and customer satisfaction by 30.",
+                "Boosted product delivery efficiency, improving story completion from 57.45% to 84.8%."
+            ],
+            "Url": ""
+        },
+        {
+            "Name": "OnTheClock",
+            "Position": "Site Reliability DevOps / Full Stack Engineer / Dev. Manager / CTO / Architect / Agile Practitioner",
+            "Summary": "",
+            "StartDate": "2024-04-01",
+            "EndDate": "2024-11-01",
+            "Highlights": [
+                "Led onshore/offshore product engineering web & mobile teams and multiple vendor partners to deliver over 200 features in 8 months.",
+                "Modernized all engineering processes by teaching Scrum and establishing metrics/scorecard by launching Jira.",
+                "Transformed Release Management into DevSecOps + GitOps + Jira enabling the teams transition from manual 'ad hoc' to monthly delivery.",
+                "Automated manual builds reducing cycle time and increasing deployment frequency.",
+                "Transformed the Production release process to use SYMLINKS for near zero downtime deployments/rollbacks."
+            ],
+            "Url": ""
+        }
+    ],
+    "Volunteer": [
+        {
+            "Organization": "Mentors in Tech (MinT)",
+            "Position": "Mentor",
+            "Summary": "",
+            "StartDate": "2023-01-01",
+            "EndDate": "Present",
+            "Highlights": null,
+            "Url": ""
+        },
+        {
+            "Organization": "Micromentor",
+            "Position": "Mentor",
+            "Summary": "",
+            "StartDate": "2022-12-01",
+            "EndDate": "Present",
+            "Highlights": null,
+            "Url": ""
+        }
+    ],
+    "Education": [
+        {
+            "Institution": "University of Windsor",
+            "Area": "Psychology",
+            "StudyType": "Bachelor",
+            "StartDate": "1999-01-01",
+            "EndDate": "2004-12-01",
+            "Score": "",
+            "Courses": null,
+            "Url": ""
+        },
+        {
+            "Institution": "University of Windsor",
+            "Area": "Computer Science",
+            "StudyType": "Bachelor",
+            "StartDate": "1999-01-01",
+            "EndDate": "2004-12-01",
+            "Score": "",
+            "Courses": null,
+            "Url": ""
+        }
+    ],
+    "Awards": [],
+    "Certificates": [],
+    "Publications": [],
+    "Skills": [],
+    "Languages": [],
+    "Interests": [],
+    "References": [],
+    "Projects": []
+  };
+
+  useEffect(() => {
+    const loadResume = async () => {
+      setLoading(true);
+      try {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const mockResume: Resume = {
+          id: id || 'resume_3',
+          name: 'Sean Hogg - CTO Resume',
+          data: mockResumeData,
+          privacy: 'public',
+          isMaster: false,
+          isActive: true,
+          parentId: 'resume_1',
+          createdAt: '2024-01-25T11:30:00Z',
+          updatedAt: '2024-01-25T15:20:00Z',
+          views: 47,
+          userId: user?.id || 'user_1'
+        };
+        
+        setResume(mockResume);
+      } catch (error) {
+        console.error('Failed to load resume:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadResume();
+    }
+  }, [id, user]);
+
+  const handleUpdateResume = (updateData: any) => {
+    if (resume) {
+      setResume({ ...resume, ...updateData });
+    }
+  };
+
+  const isOwner = user?.id === resume?.userId;
+
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return <Globe className="w-4 h-4" />;
+      case 'recruiter_only': return <Users className="w-4 h-4" />;
+      case 'private': return <Lock className="w-4 h-4" />;
+      default: return <Lock className="w-4 h-4" />;
+    }
+  };
+
+  const getPrivacyText = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return 'Public';
+      case 'recruiter_only': return 'Recruiter Only';
+      case 'private': return 'Private';
+      default: return 'Private';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar 
+          isOpen={sidebarOpen} 
+          onClose={closeSidebar} 
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation 
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16 p-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="animate-pulse space-y-6">
+                <div className="h-8 bg-muted rounded w-1/3"></div>
+                <div className="h-64 bg-muted rounded"></div>
+                <div className="space-y-4">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!resume) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar 
+          isOpen={sidebarOpen} 
+          onClose={closeSidebar} 
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation 
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16 p-6">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
+              <p className="text-muted-foreground mb-6">The resume you're looking for doesn't exist or has been removed.</p>
+              <Button onClick={() => navigate('/resumes')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Resumes
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isEditing) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar 
+          isOpen={sidebarOpen} 
+          onClose={closeSidebar} 
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation 
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16 p-6">
+            <ResumeViewer
+              resume={resume}
+              onUpdate={handleUpdateResume}
+              canEdit={isOwner}
+            />
+            <div className="max-w-4xl mx-auto mt-6">
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to View Mode
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={closeSidebar} 
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation 
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+        
+        <div className="pt-16">
+          {/* Header with Video */}
+          <div className="relative bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground">
+            <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />
+            <div className="relative max-w-6xl mx-auto px-6 py-12">
+              {/* Navigation */}
+              <div className="flex items-center justify-between mb-8">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/resumes')}
+                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Resumes
+                </Button>
+                
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {resume.isActive && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        <Target className="w-3 h-3 mr-1" />
+                        Active
+                      </Badge>
+                    )}
+                    {resume.isMaster && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                        <Star className="w-3 h-3 mr-1" />
+                        Master
+                      </Badge>
+                    )}
+                    <Badge variant="secondary" className="bg-white/20 text-primary-foreground">
+                      {getPrivacyIcon(resume.privacy)}
+                      <span className="ml-1">{getPrivacyText(resume.privacy)}</span>
+                    </Badge>
+                  </div>
+                  
+                  {isOwner && (
+                    <Button 
+                      variant="secondary"
+                      onClick={() => setIsEditing(true)}
+                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Resume
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="secondary"
+                    className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share
+                  </Button>
+                </div>
+              </div>
+
+              {/* Video Resume Header */}
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-20 h-20 border-4 border-white/30">
+                      <AvatarImage src={resume.data.Basics.Image} />
+                      <AvatarFallback className="text-2xl bg-white/20">
+                        {resume.data.Basics.Name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h1 className="text-4xl font-bold">{resume.data.Basics.Name}</h1>
+                      <p className="text-xl opacity-90">{resume.data.Basics.Label}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-4 text-sm opacity-80">
+                    {resume.data.Basics.Email && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-4 h-4" />
+                        {resume.data.Basics.Email}
+                      </div>
+                    )}
+                    {resume.data.Basics.Phone && (
+                      <div className="flex items-center gap-1">
+                        <Phone className="w-4 h-4" />
+                        {resume.data.Basics.Phone}
+                      </div>
+                    )}
+                    {resume.data.Basics.Url && (
+                      <div className="flex items-center gap-1">
+                        <ExternalLink className="w-4 h-4" />
+                        <a href={resume.data.Basics.Url} target="_blank" rel="noopener noreferrer">
+                          Portfolio
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="text-lg leading-relaxed opacity-95">
+                    {resume.data.Basics.Summary}
+                  </p>
+                </div>
+                
+                {/* Video Preview */}
+                <div className="relative">
+                  <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <div className="aspect-video bg-black/20 rounded-lg flex items-center justify-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+                        <Dialog open={showVideo} onOpenChange={setShowVideo}>
+                          <DialogTrigger asChild>
+                            <Button size="lg" variant="secondary" className="relative z-10">
+                              <Play className="w-6 h-6 mr-2" />
+                              Play Video Resume
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl">
+                            <DialogHeader>
+                              <DialogTitle>Video Resume - {resume.data.Basics.Name}</DialogTitle>
+                            </DialogHeader>
+                            <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
+                              <div className="text-center">
+                                <Play className="w-16 h-16 mx-auto mb-4 text-white/60" />
+                                <p className="text-white/80">AI-Generated Video Resume</p>
+                                <p className="text-white/60 text-sm">Video would be generated and displayed here</p>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                      <p className="text-center mt-4 text-sm opacity-80">
+                        AI-Generated Video Resume • 2:15 duration
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
+            {/* Work Experience Timeline */}
+            {resume.data.Work.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Building className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Work Experience</h2>
+                </div>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Work
+                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
+                        .map((work, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={work.Position}
+                          subtitle={work.Name}
+                          startDate={work.StartDate}
+                          endDate={work.EndDate || 'Present'}
+                          description={work.Summary}
+                          highlights={work.Highlights}
+                          icon={Building}
+                          isLast={index === resume.data.Work.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Education Timeline */}
+            {resume.data.Education.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Education</h2>
+                </div>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Education
+                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
+                        .map((edu, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={`${edu.StudyType} in ${edu.Area}`}
+                          subtitle={edu.Institution}
+                          startDate={edu.StartDate}
+                          endDate={edu.EndDate}
+                          description={edu.Score ? `GPA: ${edu.Score}` : undefined}
+                          icon={GraduationCap}
+                          isLast={index === resume.data.Education.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Volunteer Experience Timeline */}
+            {resume.data.Volunteer.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Volunteer Experience</h2>
+                </div>
+                
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Volunteer
+                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
+                        .map((volunteer, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={volunteer.Position}
+                          subtitle={volunteer.Organization}
+                          startDate={volunteer.StartDate}
+                          endDate={volunteer.EndDate || 'Present'}
+                          description={volunteer.Summary}
+                          highlights={volunteer.Highlights || undefined}
+                          icon={Heart}
+                          isLast={index === resume.data.Volunteer.length - 1}
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Resume Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resume Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-2">{resume.views}</div>
+                    <p className="text-sm text-muted-foreground">Total Views</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-2">
+                      {new Date(resume.createdAt).toLocaleDateString()}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Created</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-2">
+                      {new Date(resume.updatedAt).toLocaleDateString()}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Last Updated</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-2">
+                      {resume.privacy === 'public' ? 'Public' : 
+                       resume.privacy === 'recruiter_only' ? 'Recruiters' : 'Private'}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Visibility</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Footer />
+        </div>
+      </div>
+    </div>
+  );
+}
