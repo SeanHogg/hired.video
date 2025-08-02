@@ -16,10 +16,7 @@ interface ResumeCardProps {
   createdAt: string;
   views?: number;
   onView?: () => void;
-  onEdit?: () => void;
-  onDownload?: () => void;
-  onShare?: () => void;
-  onDelete?: () => void;
+  onActions?: () => void;
 }
 
 export default function ResumeCard({
