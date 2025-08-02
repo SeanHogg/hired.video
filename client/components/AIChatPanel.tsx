@@ -114,7 +114,7 @@ export default function AIChatPanel() {
     handleSendMessage(suggestion);
   };
 
-  if (!isOpen) return null;
+  if (!isAIChatOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
