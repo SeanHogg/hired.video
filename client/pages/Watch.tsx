@@ -190,7 +190,20 @@ export default function Watch() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="min-h-screen bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={() => setSidebarOpen(true)}
+          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        <div className="pt-16 px-4 py-6 container mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
@@ -280,6 +293,9 @@ export default function Watch() {
           </TabsContent>
         ))}
       </Tabs>
+        </div>
+        <Footer />
+      </div>
     </div>
   );
 }
