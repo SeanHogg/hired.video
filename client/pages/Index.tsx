@@ -68,6 +68,7 @@ export default function Index() {
       profession: "Software Engineer",
       company: "Tech Startup",
       createdAt: "2024-01-15",
+      ownerId: "user456", // Different user
     },
     {
       id: "1a",
@@ -80,6 +81,7 @@ export default function Index() {
       profession: "IT Recruiter",
       company: "Recruiting Agency",
       createdAt: "2025-01-03",
+      ownerId: "user123", // Current user owns this
     },
     {
       id: "2",
