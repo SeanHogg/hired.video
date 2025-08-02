@@ -256,53 +256,69 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
               </nav>
             </div>
 
-            <Separator />
+            {!collapsed && <Separator />}
 
-            {/* Categories */}
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Categories
-              </h3>
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <Link
-                    key={category.name}
-                    to={`/category/${category.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
-                    className="flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    onClick={onClose}
-                  >
-                    <span>{category.name}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {category.count}
-                    </Badge>
-                  </Link>
-                ))}
+            {/* Categories - Show only in expanded state */}
+            {!collapsed && (
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Categories
+                </h3>
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <Link
+                      key={category.name}
+                      to={`/category/${category.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                      className="flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      onClick={onClose}
+                    >
+                      <span>{category.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {category.count}
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <Separator />
+            {!collapsed && <Separator />}
 
             {/* Quick Actions */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Quick Actions
-              </h3>
+              {!collapsed && (
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Quick Actions
+                </h3>
+              )}
               <div className="space-y-2">
                 <Button
                   variant="ghost"
-                  className="w-full justify-start gap-3 h-auto py-2"
+                  className={cn(
+                    "h-auto py-2",
+                    collapsed
+                      ? "w-10 justify-center px-2"
+                      : "w-full justify-start gap-3"
+                  )}
                   onClick={onClose}
+                  title={collapsed ? "Post Job Description" : undefined}
                 >
                   <Briefcase className="h-4 w-4" />
-                  Post Job Description
+                  {!collapsed && "Post Job Description"}
                 </Button>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start gap-3 h-auto py-2"
+                  className={cn(
+                    "h-auto py-2",
+                    collapsed
+                      ? "w-10 justify-center px-2"
+                      : "w-full justify-start gap-3"
+                  )}
                   onClick={onClose}
+                  title={collapsed ? "Schedule Interview" : undefined}
                 >
                   <Calendar className="h-4 w-4" />
-                  Schedule Interview
+                  {!collapsed && "Schedule Interview"}
                 </Button>
               </div>
             </div>
