@@ -570,17 +570,13 @@ export default function Index() {
       />
 
       {/* Floating AI Button */}
-      {typeof FloatingAIButton !== 'undefined' && (
-        <FloatingAIButton onClick={() => setIsAIChatOpen(true)} />
-      )}
+      <FloatingAIButton onClick={() => setIsAIChatOpen(true)} />
 
       {/* AI Chat Panel */}
-      {typeof AIChatPanel !== 'undefined' && (
-        <AIChatPanel
-          isOpen={isAIChatOpen}
-          onClose={() => setIsAIChatOpen(false)}
-        />
-      )}
+      <AIChatPanel
+        isOpen={isAIChatOpen}
+        onClose={() => setIsAIChatOpen(false)}
+      />
     </div>
   );
 }
