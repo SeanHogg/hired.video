@@ -43,7 +43,9 @@ import {
   ChevronRight,
   Calendar,
   Globe,
-  Lock
+  Lock,
+  Target,
+  Power
 } from "lucide-react";
 
 export default function Resumes() {
