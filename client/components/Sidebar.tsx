@@ -39,7 +39,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
   const [dragActive, setDragActive] = useState(false);
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: Home, current: true },
+    { name: "Dashboard", href: "/", icon: Home, current: true },
     { name: "Resumes", href: "/resumes", icon: FileText, current: false },
     { name: "Jobs", href: "/jobs", icon: Briefcase, current: false },
     { name: "Companies", href: "/companies", icon: Building2, current: false },
