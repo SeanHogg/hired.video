@@ -128,7 +128,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
       />
       
       {/* Panel */}
-      <div className="w-96 bg-background border-l shadow-2xl flex flex-col">
+      <div className="w-[60%] bg-background border-l shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10">
           <div className="flex items-center gap-3">
