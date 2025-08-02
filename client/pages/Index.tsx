@@ -9,8 +9,7 @@ import Footer from "@/components/Footer";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
-import FloatingAIButton from "@/components/FloatingAIButton";
-import AIChatPanel from "@/components/AIChatPanel";
+
 import {
   Search,
   Filter,
