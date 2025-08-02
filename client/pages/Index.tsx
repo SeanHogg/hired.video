@@ -497,6 +497,8 @@ export default function Index() {
                     description={item.description || ''}
                     thumbnail={item.thumbnail || ''}
                     duration={item.duration || ''}
+                    onView={() => handleView(item)}
+                    onActions={() => handleOpenActions(item)}
                   />
                 ) : (
                   <ResumeCard
