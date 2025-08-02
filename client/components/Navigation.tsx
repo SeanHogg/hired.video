@@ -233,14 +233,14 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                           );
                         })}
                         <Link
-                          to="/features"
+                          to="/pricing"
                           className="flex items-center gap-2 p-2 text-sm font-medium text-primary"
                           onClick={() => {
                             setIsMenuOpen(false);
                             setIsFeaturesOpen(false);
                           }}
                         >
-                          View All Features
+                          View All Features & Pricing
                         </Link>
                       </div>
                     )}
