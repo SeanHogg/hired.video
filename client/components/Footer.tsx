@@ -18,10 +18,10 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-muted-foreground mb-4 max-w-md">
-              Transform your career with AI-powered video resumes. Connect with top employers and showcase your unique talents in ways traditional resumes can't.
+              All-in-one HR platform with employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.
             </p>
             <p className="text-sm text-muted-foreground">
-              Empowering job seekers, recruiters, and businesses worldwide.
+              Empowering the future of talent acquisition and workforce management.
             </p>
           </div>
 
