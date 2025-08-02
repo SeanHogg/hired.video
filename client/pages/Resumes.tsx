@@ -38,7 +38,9 @@ import {
   Grid,
   List,
   Copy,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 
 export default function Resumes() {
@@ -56,6 +58,7 @@ export default function Resumes() {
   const [filters, setFilters] = useState<ResumeSearchFilters>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [expandedMasters, setExpandedMasters] = useState<Set<string>>(new Set());
 
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
@@ -293,6 +296,29 @@ export default function Resumes() {
     }
     return true;
   });
+
+  // Group resumes by master/child relationship for tree view
+  const getResumeTree = () => {
+    const masterResumes = filteredResumes.filter(resume => resume.isMaster || !resume.parentId);
+    const variations = filteredResumes.filter(resume => !resume.isMaster && resume.parentId);
+
+    return masterResumes.map(master => ({
+      ...master,
+      children: variations.filter(variation => variation.parentId === master.id)
+    }));
+  };
+
+  const resumeTree = getResumeTree();
+
+  const toggleMasterExpansion = (masterId: string) => {
+    const newExpanded = new Set(expandedMasters);
+    if (newExpanded.has(masterId)) {
+      newExpanded.delete(masterId);
+    } else {
+      newExpanded.add(masterId);
+    }
+    setExpandedMasters(newExpanded);
+  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -735,28 +761,196 @@ export default function Resumes() {
                     <p className="text-muted-foreground mt-4">Loading resumes...</p>
                   </div>
                 ) : filteredResumes.length > 0 ? (
-                  <div className={`grid gap-6 ${
-                    viewMode === 'grid'
-                      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                      : 'grid-cols-1'
-                  }`}>
-                    {filteredResumes.map((resume) => (
-                      <ResumeCard
-                        key={resume.id}
-                        id={resume.id}
-                        name={resume.name}
-                        title={resume.title}
-                        summary={resume.summary}
-                        createdAt={resume.createdAt}
-                        views={resume.views}
-                        privacy={resume.privacy}
-                        isMaster={resume.isMaster}
-                        parentId={resume.parentId}
-                        onView={() => handleResumeView(resume.id)}
-                        onActions={() => handleOpenActions(resume.id)}
-                      />
-                    ))}
-                  </div>
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredResumes.map((resume) => (
+                        <ResumeCard
+                          key={resume.id}
+                          id={resume.id}
+                          name={resume.name}
+                          title={resume.title}
+                          summary={resume.summary}
+                          createdAt={resume.createdAt}
+                          views={resume.views}
+                          privacy={resume.privacy}
+                          isMaster={resume.isMaster}
+                          parentId={resume.parentId}
+                          onView={() => handleResumeView(resume.id)}
+                          onActions={() => handleOpenActions(resume.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {resumeTree.map((masterResume) => (
+                        <div key={masterResume.id} className="border rounded-lg overflow-hidden">
+                          {/* Master Resume */}
+                          <div className="bg-muted/30">
+                            <div className="flex items-center p-4">
+                              {masterResume.children.length > 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleMasterExpansion(masterResume.id)}
+                                  className="mr-3 p-1 h-6 w-6"
+                                >
+                                  {expandedMasters.has(masterResume.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              {masterResume.children.length === 0 && (
+                                <div className="mr-3 w-6" />
+                              )}
+
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div>
+                                      <h3 className="font-semibold text-lg">{masterResume.name}</h3>
+                                      {masterResume.title && (
+                                        <p className="text-sm text-muted-foreground">{masterResume.title}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {masterResume.isMaster && (
+                                        <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                                          <Star className="w-3 h-3 mr-1" />
+                                          Master
+                                        </Badge>
+                                      )}
+                                      <Badge className={`text-xs ${
+                                        masterResume.privacy === 'public' ? 'bg-green-100 text-green-800' :
+                                        masterResume.privacy === 'recruiter_only' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {masterResume.privacy === 'public' && <Globe className="w-3 h-3 mr-1" />}
+                                        {masterResume.privacy === 'recruiter_only' && <Users className="w-3 h-3 mr-1" />}
+                                        {masterResume.privacy === 'private' && <Lock className="w-3 h-3 mr-1" />}
+                                        {masterResume.privacy === 'public' ? 'Public' :
+                                         masterResume.privacy === 'recruiter_only' ? 'Recruiter Only' : 'Private'}
+                                      </Badge>
+                                      {masterResume.children.length > 0 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {masterResume.children.length} variation{masterResume.children.length !== 1 ? 's' : ''}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Eye className="w-3 h-3" />
+                                      {masterResume.views}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Calendar className="w-3 h-3" />
+                                      {new Date(masterResume.createdAt).toLocaleDateString()}
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleResumeView(masterResume.id)}
+                                    >
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenActions(masterResume.id)}
+                                    >
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                  {masterResume.summary}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Child Variations */}
+                          {expandedMasters.has(masterResume.id) && masterResume.children.length > 0 && (
+                            <div className="bg-background border-t">
+                              {masterResume.children.map((variation, index) => (
+                                <div
+                                  key={variation.id}
+                                  className={`flex items-center p-4 pl-12 ${
+                                    index < masterResume.children.length - 1 ? 'border-b border-muted' : ''
+                                  }`}
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <div>
+                                          <h4 className="font-medium">{variation.name}</h4>
+                                          {variation.title && (
+                                            <p className="text-sm text-muted-foreground">{variation.title}</p>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Badge variant="outline" className="text-xs">
+                                            <Copy className="w-3 h-3 mr-1" />
+                                            Variation
+                                          </Badge>
+                                          <Badge className={`text-xs ${
+                                            variation.privacy === 'public' ? 'bg-green-100 text-green-800' :
+                                            variation.privacy === 'recruiter_only' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
+                                          }`}>
+                                            {variation.privacy === 'public' && <Globe className="w-3 h-3 mr-1" />}
+                                            {variation.privacy === 'recruiter_only' && <Users className="w-3 h-3 mr-1" />}
+                                            {variation.privacy === 'private' && <Lock className="w-3 h-3 mr-1" />}
+                                            {variation.privacy === 'public' ? 'Public' :
+                                             variation.privacy === 'recruiter_only' ? 'Recruiter Only' : 'Private'}
+                                          </Badge>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Eye className="w-3 h-3" />
+                                          {variation.views}
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                          <Calendar className="w-3 h-3" />
+                                          {new Date(variation.createdAt).toLocaleDateString()}
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleResumeView(variation.id)}
+                                        >
+                                          <Eye className="w-4 h-4 mr-2" />
+                                          View
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleOpenActions(variation.id)}
+                                        >
+                                          <MoreHorizontal className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                      {variation.summary}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
                   <Card>
                     <CardContent className="p-12 text-center">
