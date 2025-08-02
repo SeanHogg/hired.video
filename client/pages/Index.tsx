@@ -242,6 +242,18 @@ export default function Index() {
                   {category.label}
                 </Button>
               ))}
+
+              {/* Advanced Filter Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="gap-2"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                Advanced
+                <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+              </Button>
             </div>
           </div>
         </div>
