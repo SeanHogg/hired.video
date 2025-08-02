@@ -548,14 +548,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-background border-t border-border">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-muted-foreground">
-            &copy; 2024 MyVideoResume. Powered by AI to transform how we showcase talent and opportunities.
-          </p>
-        </div>
-      </footer>
+      <Footer />
       </div>
 
       {/* Actions Modal */}
