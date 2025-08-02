@@ -79,16 +79,29 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link to="/login">
-              <Button variant="ghost" className="font-medium">
-                Sign In
-              </Button>
-            </Link>
-            <Link to="/signup">
-              <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                Get Started Free
-              </Button>
-            </Link>
+            {!isAuthenticated ? (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" className="font-medium">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/signup">
+                  <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
+                    Get Started Free
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <span className="text-sm text-muted-foreground">
+                  Welcome, {user?.name}
+                </span>
+                <Button variant="ghost" onClick={logout} className="font-medium">
+                  Sign Out
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
