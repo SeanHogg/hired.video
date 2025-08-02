@@ -343,30 +343,93 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
 
           {/* Footer */}
           <div className="border-t border-border p-4 space-y-2">
-            <Link
-              to="/settings"
-              className={cn(
-                "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
-              )}
-              onClick={onClose}
-              title={collapsed ? "Settings" : undefined}
-            >
-              <Settings className="h-4 w-4" />
-              {!collapsed && "Settings"}
-            </Link>
-            <Link
-              to="/help"
-              className={cn(
-                "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
-              )}
-              onClick={onClose}
-              title={collapsed ? "Help & Support" : undefined}
-            >
-              <HelpCircle className="h-4 w-4" />
-              {!collapsed && "Help & Support"}
-            </Link>
+            {isAuthenticated && user ? (
+              <>
+                {/* User Profile Section */}
+                <Link
+                  to="/profile"
+                  className={cn(
+                    "flex items-center text-sm hover:bg-accent rounded-md transition-colors p-2",
+                    collapsed ? "justify-center" : "gap-3"
+                  )}
+                  onClick={onClose}
+                  title={collapsed ? `Profile: ${user.name}` : undefined}
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatar} />
+                    <AvatarFallback className="text-xs">
+                      {user.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  {!collapsed && (
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate capitalize">
+                        {user.role?.replace('_', ' ')}
+                      </p>
+                    </div>
+                  )}
+                </Link>
+
+                {/* Settings */}
+                <Link
+                  to="/settings"
+                  className={cn(
+                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                  )}
+                  onClick={onClose}
+                  title={collapsed ? "Settings" : undefined}
+                >
+                  <Settings className="h-4 w-4" />
+                  {!collapsed && "Settings"}
+                </Link>
+
+                {/* Sign Out */}
+                <button
+                  onClick={() => {
+                    logout();
+                    onClose();
+                  }}
+                  className={cn(
+                    "w-full flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                  )}
+                  title={collapsed ? "Sign Out" : undefined}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {!collapsed && "Sign Out"}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Non-authenticated users see Settings and Help */}
+                <Link
+                  to="/settings"
+                  className={cn(
+                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                  )}
+                  onClick={onClose}
+                  title={collapsed ? "Settings" : undefined}
+                >
+                  <Settings className="h-4 w-4" />
+                  {!collapsed && "Settings"}
+                </Link>
+                <Link
+                  to="/help"
+                  className={cn(
+                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                  )}
+                  onClick={onClose}
+                  title={collapsed ? "Help & Support" : undefined}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  {!collapsed && "Help & Support"}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
