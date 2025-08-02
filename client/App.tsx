@@ -23,6 +23,8 @@ import Tasks from "./pages/Tasks";
 import Outreach from "./pages/Outreach";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import PersonaSelection from "./pages/PersonaSelection";
 
 const queryClient = new QueryClient();
 
