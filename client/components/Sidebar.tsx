@@ -126,43 +126,56 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
 
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Resume Upload Section */}
-            <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Upload className="h-5 w-5" />
-                  Upload Resume
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div
-                  className={cn(
-                    "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
-                    dragActive
-                      ? "border-primary bg-primary/10"
-                      : "border-muted-foreground/30 hover:border-primary/50"
-                  )}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
+            {collapsed ? (
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5"
+                  title="Upload Resume"
                 >
-                  <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm font-medium mb-1">
-                    Drop your resume here
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    PDF, DOC, or DOCX files
-                  </p>
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Browse Files
-                  </Button>
-                </div>
-                <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                  Generate AI Video
+                  <Upload className="h-5 w-5" />
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+            ) : (
+              <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Upload className="h-5 w-5" />
+                    Upload Resume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+                      dragActive
+                        ? "border-primary bg-primary/10"
+                        : "border-muted-foreground/30 hover:border-primary/50"
+                    )}
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                  >
+                    <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm font-medium mb-1">
+                      Drop your resume here
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      PDF, DOC, or DOCX files
+                    </p>
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Browse Files
+                    </Button>
+                  </div>
+                  <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                    Generate AI Video
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Navigation */}
             <div>
