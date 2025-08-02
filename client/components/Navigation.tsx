@@ -81,12 +81,58 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
           <div className="hidden md:flex items-center space-x-8">
             {!isAuthenticated && (
               <>
-                <Link
-                  to="/features"
-                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
-                >
-                  Features
-                </Link>
+                {/* Features Mega Menu */}
+                <div className="relative" ref={featuresRef}>
+                  <button
+                    onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
+                    onMouseEnter={() => setIsFeaturesOpen(true)}
+                    className="flex items-center gap-1 text-foreground/70 hover:text-foreground transition-colors font-medium"
+                  >
+                    Features
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isFeaturesOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isFeaturesOpen && (
+                    <div
+                      className="absolute top-full left-0 mt-2 w-96 bg-background border border-border rounded-lg shadow-lg p-6 z-50"
+                      onMouseLeave={() => setIsFeaturesOpen(false)}
+                    >
+                      <div className="grid gap-3">
+                        {navigationItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent transition-colors group"
+                              onClick={() => setIsFeaturesOpen(false)}
+                            >
+                              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                <Icon className="h-5 w-5 text-primary" />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm text-foreground">{item.name}</h4>
+                                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+
+                      <div className="border-t border-border mt-4 pt-4">
+                        <Link
+                          to="/features"
+                          className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                          onClick={() => setIsFeaturesOpen(false)}
+                        >
+                          View All Features
+                          <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <Link
                   to="/pricing"
                   className="text-foreground/70 hover:text-foreground transition-colors font-medium"
