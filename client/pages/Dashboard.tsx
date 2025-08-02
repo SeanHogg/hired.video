@@ -335,7 +335,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground mt-1">{dashboardData.description}</p>
               </div>
               <Badge variant="secondary" className="capitalize">
-                {user.persona.replace('_', ' ')}
+                {user.role?.replace('_', ' ')}
               </Badge>
             </div>
 
