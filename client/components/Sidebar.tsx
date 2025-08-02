@@ -108,9 +108,11 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
           <div className="flex items-center justify-between p-4 border-b border-border">
             <Link to="/" className="flex items-center space-x-2">
               <Video className="h-6 w-6 text-primary" />
-              <span className="font-bold text-lg bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                MyVideoResume
-              </span>
+              {!collapsed && (
+                <span className="font-bold text-lg bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                  MyVideoResume
+                </span>
+              )}
             </Link>
             <Button
               variant="ghost"
