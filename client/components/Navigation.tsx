@@ -12,7 +12,33 @@ interface NavigationProps {
 
 export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollapsed }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
   const { isAuthenticated, logout, user } = useAuth();
+  const featuresRef = useRef<HTMLDivElement>(null);
+
+  const navigationItems = [
+    { name: "Video Resumes", href: "/resumes", icon: FileText, description: "Create AI-powered video resumes" },
+    { name: "Smart Jobs", href: "/jobs", icon: Briefcase, description: "Find jobs with AI matching" },
+    { name: "For Companies", href: "/companies", icon: Building2, description: "Hire top talent efficiently" },
+    { name: "Professional Network", href: "/people", icon: Users, description: "Connect with professionals" },
+    { name: "AI Tools", href: "/tools", icon: Wrench, description: "Career enhancement tools" },
+    { name: "Task Management", href: "/tasks", icon: CheckSquare, description: "Organize your career journey" },
+    { name: "Smart Outreach", href: "/outreach", icon: Send, description: "Intelligent networking" },
+    { name: "Dashboard", href: "/dashboard", icon: TrendingUp, description: "Track your progress" },
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (featuresRef.current && !featuresRef.current.contains(event.target as Node)) {
+        setIsFeaturesOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
