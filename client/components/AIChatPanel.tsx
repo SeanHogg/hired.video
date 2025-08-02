@@ -16,6 +16,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAI } from "@/lib/ai-context";
 
 interface Message {
   id: string;
@@ -25,12 +26,8 @@ interface Message {
   type?: "text" | "suggestion";
 }
 
-interface AIChatPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
+export default function AIChatPanel() {
+  const { isAIChatOpen, closeAIChat } = useAI();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
