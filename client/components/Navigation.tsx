@@ -16,6 +16,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
   const { isAuthenticated, logout, user } = useAuth();
+  const location = useLocation();
   const featuresRef = useRef<HTMLDivElement>(null);
 
   const navigationItems = [
