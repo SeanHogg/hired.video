@@ -36,13 +36,19 @@ export default function Dashboard() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Navigation
-          onMenuClick={() => setSidebarOpen(true)}
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          sidebarCollapsed={sidebarCollapsed}
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
         />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={() => setSidebarOpen(true)}
+            onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            sidebarCollapsed={sidebarCollapsed}
+          />
 
-        <div className="pt-16">
+          <div className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">
@@ -207,6 +213,7 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+        </div>
         </div>
       </div>
     );
