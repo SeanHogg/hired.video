@@ -40,7 +40,10 @@ import {
   Copy,
   MoreHorizontal,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Calendar,
+  Globe,
+  Lock
 } from "lucide-react";
 
 export default function Resumes() {
