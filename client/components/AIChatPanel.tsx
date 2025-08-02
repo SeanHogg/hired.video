@@ -137,7 +137,7 @@ export default function AIChatPanel() {
               <p className="text-xs text-muted-foreground">Always here to help</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={closeAIChat}>
             <X className="h-4 w-4" />
           </Button>
         </div>
