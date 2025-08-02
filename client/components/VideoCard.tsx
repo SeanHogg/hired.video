@@ -122,6 +122,33 @@ export default function VideoCard({
             </div>
           </div>
         </div>
+
+        {/* Actions Footer */}
+        <div className="p-4 flex items-center justify-between bg-background border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView?.();
+            }}
+            className="gap-2"
+          >
+            <Eye className="w-4 h-4" />
+            View
+          </Button>
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onActions?.();
+            }}
+          >
+            Actions
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
