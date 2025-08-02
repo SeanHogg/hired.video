@@ -94,10 +94,10 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
                   {isFeaturesOpen && (
                     <div
-                      className="absolute top-full left-0 mt-2 w-96 bg-background border border-border rounded-lg shadow-lg p-6 z-50"
+                      className="absolute top-full left-0 mt-2 w-[600px] bg-background border border-border rounded-lg shadow-lg p-6 z-50"
                       onMouseLeave={() => setIsFeaturesOpen(false)}
                     >
-                      <div className="grid gap-3">
+                      <div className="grid grid-cols-2 gap-4">
                         {navigationItems.map((item) => {
                           const Icon = item.icon;
                           return (
