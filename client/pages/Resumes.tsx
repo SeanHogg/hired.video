@@ -935,6 +935,12 @@ export default function Resumes() {
                                           )}
                                         </div>
                                         <div className="flex items-center gap-2">
+                                          {variation.isActive && (
+                                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                              <Target className="w-3 h-3 mr-1" />
+                                              Active
+                                            </Badge>
+                                          )}
                                           <Badge variant="outline" className="text-xs">
                                             <Copy className="w-3 h-3 mr-1" />
                                             Variation
