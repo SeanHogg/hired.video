@@ -179,24 +179,28 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
 
             {/* Navigation */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Navigate
-              </h3>
+              {!collapsed && (
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Navigate
+                </h3>
+              )}
               <nav className="space-y-1">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
                     className={cn(
-                      "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      "flex items-center text-sm font-medium rounded-md transition-colors",
+                      collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                       item.current
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
                     onClick={onClose}
+                    title={collapsed ? item.name : undefined}
                   >
-                    <item.icon className="mr-3 h-4 w-4" />
-                    {item.name}
+                    <item.icon className={cn("h-4 w-4", !collapsed && "mr-3")} />
+                    {!collapsed && item.name}
                   </Link>
                 ))}
               </nav>
