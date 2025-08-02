@@ -278,7 +278,7 @@ export default function Dashboard() {
       { id: "verification", title: "Verify your email", completed: true },
     ];
 
-    switch (user.persona) {
+    switch (user.role) {
       case "job_seeker":
         return [
           ...baseTasks,
