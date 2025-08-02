@@ -700,7 +700,20 @@ export default function Resumes() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <h1 className="text-3xl font-bold">Your Resumes</h1>
-                    <p className="text-muted-foreground">Manage and track your resumes.</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-muted-foreground">Manage and track your resumes.</p>
+                      {getActiveResume() && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          <Target className="w-3 h-3 mr-1" />
+                          Active: {getActiveResume()?.name}
+                        </Badge>
+                      )}
+                      {!getActiveResume() && (
+                        <Badge variant="outline" className="text-orange-600 border-orange-200">
+                          No active resume
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button onClick={() => setView('upload')} variant="outline">
