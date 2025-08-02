@@ -242,10 +242,16 @@ export default function Pricing() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
+                      {/* Core Platform Features */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Core Platform
+                        </td>
+                      </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          Applicant Tracking System
+                          Applicant Tracking System (ATS)
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
@@ -272,8 +278,31 @@ export default function Pricing() {
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Performance Management
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Admin Users
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">1</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Unlimited</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Applicants & Contacts
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Limited</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Unlimited</td>
+                      </tr>
+
+                      {/* Video Resume Features */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Video Resume Features
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground" />
+                          AI Video Script Generation
                         </td>
                         <td className="text-center p-4">
                           <span className="text-muted-foreground">—</span>
@@ -284,8 +313,318 @@ export default function Pricing() {
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground" />
+                          Video Resume Creation
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced + Templates</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          Video Analytics & Performance
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          Resume Optimization
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Powered</td>
+                      </tr>
+
+                      {/* AI-Powered Tools */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          AI-Powered Tools
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
                           <Brain className="h-4 w-4 text-muted-foreground" />
                           Generative AI
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          Smart Job Matching
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Enhanced</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          Interview Simulator
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          Resume Scoring & Feedback
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          Salary Calculator
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+
+                      {/* Recruitment & CRM */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Recruitment & CRM
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Recruiting & Sales CRM
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Handshake className="h-4 w-4 text-muted-foreground" />
+                          Hiring & Onboarding
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          Interview Scheduling
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced + Automation</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          Performance Management
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+
+                      {/* Communication & Outreach */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Communication & Outreach
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Send className="h-4 w-4 text-muted-foreground" />
+                          Smart Outreach Campaigns
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          AI Message Personalization
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          Automated Follow-ups
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Employee Community
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+
+                      {/* Analytics & Reporting */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Analytics & Reporting
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          Dashboard Analytics
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced + Insights</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          Career Progress Tracking
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          Hiring Success Metrics
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          Time-to-hire Analytics
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+
+                      {/* Productivity Features */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Productivity & Organization
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                          Task Management
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced + Automation</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          Calendar Integration
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-muted-foreground" />
+                          Smart Notifications
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Powered + Prioritized</td>
+                      </tr>
+
+                      {/* Support & Security */}
+                      <tr className="bg-muted/20">
+                        <td className="p-4 font-semibold text-sm uppercase tracking-wide" colSpan={3}>
+                          Support & Security
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          Data Security & Privacy
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          Customer Support
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Email</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Priority + Live Chat</td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          API Access
                         </td>
                         <td className="text-center p-4">
                           <span className="text-muted-foreground">—</span>
