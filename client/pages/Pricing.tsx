@@ -24,6 +24,14 @@ import {
   Clock,
   Target,
   Brain,
+  Video,
+  CheckSquare,
+  Send,
+  Calendar,
+  Bell,
+  Globe,
+  TrendingUp,
+  Handshake,
 } from "lucide-react";
 
 export default function Pricing() {
@@ -627,7 +635,7 @@ export default function Pricing() {
                           API Access
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">��</span>
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
