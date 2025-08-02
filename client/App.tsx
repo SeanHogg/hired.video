@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import PersonaSelection from "./pages/PersonaSelection";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
