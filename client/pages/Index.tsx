@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import VideoCard from "@/components/VideoCard";
+import ResumeCard from "@/components/ResumeCard";
 import {
   Search,
   Filter,
