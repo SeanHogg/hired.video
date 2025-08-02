@@ -19,6 +19,7 @@ import {
 export default function Index() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Mock data for AI-generated videos
   const videos = [
