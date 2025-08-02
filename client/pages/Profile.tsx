@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
@@ -15,24 +17,23 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import {
   User,
   Mail,
+  Phone,
   MapPin,
   Calendar,
-  Briefcase,
-  Star,
   Edit,
-  Camera,
   Save,
-  X,
-  Settings,
-  Shield,
-  Bell,
-  Globe,
+  Camera,
   Eye,
-  FileText,
-  Video,
-  BarChart3,
-  Users,
+  Star,
+  TrendingUp,
+  Clock,
+  Settings,
   Building2,
+  Briefcase,
+  FileText,
+  Download,
+  Share,
+  ExternalLink,
 } from "lucide-react";
 
 export default function Profile() {
@@ -40,7 +41,48 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const { user, isAuthenticated } = useAuth();
 
-  // Redirect to login if not authenticated
+  // Form state for editing
+  const [formData, setFormData] = useState({
+    firstName: user?.name?.split(' ')[0] || '',
+    lastName: user?.name?.split(' ')[1] || '',
+    email: user?.email || '',
+    phone: '',
+    role: user?.role || 'job_seeker',
+    location: 'San Francisco, CA',
+    bio: `Passionate ${user?.role?.replace('_', ' ')} focused on building meaningful connections and driving career growth through innovative technology.`,
+    company: '',
+    title: '',
+    website: '',
+  });
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = () => {
+    // Here you would typically save to your backend
+    console.log('Saving profile data:', formData);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    // Reset form data to original values
+    setFormData({
+      firstName: user?.name?.split(' ')[0] || '',
+      lastName: user?.name?.split(' ')[1] || '',
+      email: user?.email || '',
+      phone: '',
+      role: user?.role || 'job_seeker',
+      location: 'San Francisco, CA',
+      bio: `Passionate ${user?.role?.replace('_', ' ')} focused on building meaningful connections and driving career growth through innovative technology.`,
+      company: '',
+      title: '',
+      website: '',
+    });
+    setIsEditing(false);
+  };
+
+  // If user is not authenticated, redirect to login
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-background">
@@ -56,30 +98,23 @@ export default function Profile() {
             sidebarCollapsed={sidebarCollapsed}
           />
           
-          <div className="pt-16 min-h-screen flex items-center justify-center">
-            <Card className="max-w-md">
-              <CardHeader className="text-center">
-                <CardTitle>Access Denied</CardTitle>
-                <CardDescription>Please log in to view your profile</CardDescription>
-              </CardHeader>
-              <CardContent className="text-center">
-                <Link to="/login">
-                  <Button>Sign In</Button>
-                </Link>
-              </CardContent>
-            </Card>
+          <div className="pt-16 p-6">
+            <div className="max-w-4xl mx-auto text-center py-16">
+              <User className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
+              <p className="text-muted-foreground mb-6">
+                Please sign in to view and edit your profile.
+              </p>
+              <Button asChild>
+                <Link to="/login">Sign In</Link>
+              </Button>
+            </div>
           </div>
+          <Footer />
         </div>
       </div>
     );
   }
-
-  const userStats = {
-    profileViews: 1247,
-    connections: 156,
-    resumeViews: 2847,
-    jobApplications: 45,
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -97,7 +132,6 @@ export default function Profile() {
         
         <div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            
             {/* Profile Header */}
             <Card>
               <CardContent className="p-6">
@@ -106,87 +140,207 @@ export default function Profile() {
                     <Avatar className="w-24 h-24">
                       <AvatarImage src={user.avatar} />
                       <AvatarFallback className="text-2xl">
-                        {user.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        {(formData.firstName[0] || '') + (formData.lastName[0] || '')}
                       </AvatarFallback>
                     </Avatar>
-                    <Button size="icon" className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full">
-                      <Camera className="h-4 w-4" />
-                    </Button>
+                    {isEditing && (
+                      <Button size="icon" className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full">
+                        <Camera className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                   
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <h1 className="text-2xl font-bold">{user.name}</h1>
-                      <Button
-                        variant={isEditing ? "default" : "outline"}
-                        onClick={() => setIsEditing(!isEditing)}
-                        className="flex items-center gap-2"
-                      >
+                      <h1 className="text-2xl font-bold">
+                        {isEditing ? `${formData.firstName} ${formData.lastName}` : user.name}
+                      </h1>
+                      <div className="flex items-center gap-2">
                         {isEditing ? (
                           <>
-                            <Save className="h-4 w-4" />
-                            Save Changes
+                            <Button variant="outline" onClick={handleCancel}>
+                              Cancel
+                            </Button>
+                            <Button onClick={handleSave} className="flex items-center gap-2">
+                              <Save className="h-4 w-4" />
+                              Save Changes
+                            </Button>
                           </>
                         ) : (
-                          <>
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditing(true)}
+                            className="flex items-center gap-2"
+                          >
                             <Edit className="h-4 w-4" />
                             Edit Profile
-                          </>
+                          </Button>
                         )}
-                      </Button>
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="outline" className="capitalize">
-                        {user.role?.replace('_', ' ')}
+                        {formData.role.replace('_', ' ')}
                       </Badge>
                       <Badge variant="secondary">
                         Pro Member
                       </Badge>
                     </div>
                     
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        {user.email}
+                    {!isEditing ? (
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          {formData.email}
+                        </div>
+                        {formData.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4" />
+                            {formData.phone}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          {formData.location}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Joined December 2024
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        San Francisco, CA
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Joined December 2024
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
                 
                 {isEditing ? (
-                  <div className="mt-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Full Name</Label>
-                        <Input defaultValue={user.name} />
-                      </div>
-                      <div>
-                        <Label>Email</Label>
-                        <Input defaultValue={user.email} />
+                  <div className="mt-6 space-y-6">
+                    {/* Personal Information */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Personal Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName">First Name</Label>
+                          <Input 
+                            id="firstName"
+                            value={formData.firstName}
+                            onChange={(e) => handleInputChange('firstName', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName">Last Name</Label>
+                          <Input 
+                            id="lastName"
+                            value={formData.lastName}
+                            onChange={(e) => handleInputChange('lastName', e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Contact Information */}
                     <div>
-                      <Label>Bio</Label>
-                      <textarea 
-                        className="w-full p-3 border rounded-md resize-none"
-                        rows={3}
-                        placeholder="Tell us about yourself..."
-                      />
+                      <h3 className="text-lg font-medium mb-4">Contact Information</h3>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address</Label>
+                          <Input 
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone Number</Label>
+                          <Input 
+                            id="phone"
+                            type="tel"
+                            placeholder="+1 (555) 123-4567"
+                            value={formData.phone}
+                            onChange={(e) => handleInputChange('phone', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="location">Location</Label>
+                          <Input 
+                            id="location"
+                            placeholder="City, State, Country"
+                            value={formData.location}
+                            onChange={(e) => handleInputChange('location', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Professional Information */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Professional Information</h3>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="role">Professional Role</Label>
+                          <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="job_seeker">Job Seeker</SelectItem>
+                              <SelectItem value="recruiter">Recruiter</SelectItem>
+                              <SelectItem value="business">Business</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="title">Job Title</Label>
+                          <Input 
+                            id="title"
+                            placeholder="e.g. Senior Software Engineer"
+                            value={formData.title}
+                            onChange={(e) => handleInputChange('title', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="company">Company</Label>
+                          <Input 
+                            id="company"
+                            placeholder="e.g. Tech Corp"
+                            value={formData.company}
+                            onChange={(e) => handleInputChange('company', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="website">Website</Label>
+                          <Input 
+                            id="website"
+                            type="url"
+                            placeholder="https://yourwebsite.com"
+                            value={formData.website}
+                            onChange={(e) => handleInputChange('website', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bio */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Bio</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="bio">About You</Label>
+                        <Textarea 
+                          id="bio"
+                          placeholder="Tell us about yourself, your experience, and what you're looking for..."
+                          rows={4}
+                          value={formData.bio}
+                          onChange={(e) => handleInputChange('bio', e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="mt-6">
-                    <p className="text-muted-foreground">
-                      Passionate {user.role?.replace('_', ' ')} focused on building meaningful connections and driving career growth through innovative technology.
+                    <h3 className="text-lg font-medium mb-3">About</h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {formData.bio}
                     </p>
                   </div>
                 )}
@@ -198,110 +352,32 @@ export default function Profile() {
               <Card>
                 <CardContent className="p-4 text-center">
                   <Eye className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">{userStats.profileViews.toLocaleString()}</div>
+                  <div className="text-2xl font-bold">2,847</div>
                   <div className="text-sm text-muted-foreground">Profile Views</div>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardContent className="p-4 text-center">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">{userStats.connections}</div>
-                  <div className="text-sm text-muted-foreground">Connections</div>
+                  <Star className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+                  <div className="text-2xl font-bold">4.9</div>
+                  <div className="text-sm text-muted-foreground">Rating</div>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardContent className="p-4 text-center">
-                  <FileText className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">{userStats.resumeViews.toLocaleString()}</div>
-                  <div className="text-sm text-muted-foreground">Resume Views</div>
+                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                  <div className="text-2xl font-bold">+12%</div>
+                  <div className="text-sm text-muted-foreground">Growth</div>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardContent className="p-4 text-center">
-                  <Briefcase className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">{userStats.jobApplications}</div>
-                  <div className="text-sm text-muted-foreground">Applications</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Profile Sections */}
-            <div className="grid md:grid-cols-2 gap-6">
-              
-              {/* Activity & Achievements */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5" />
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
-                    <div>
-                      <p className="text-sm font-medium">Profile viewed by Google recruiter</p>
-                      <p className="text-xs text-muted-foreground">2 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
-                    <div>
-                      <p className="text-sm font-medium">Connected with Sarah Johnson</p>
-                      <p className="text-xs text-muted-foreground">5 hours ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
-                    <div>
-                      <p className="text-sm font-medium">Updated video resume</p>
-                      <p className="text-xs text-muted-foreground">1 day ago</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Account Settings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Account Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Bell className="h-4 w-4" />
-                      <span className="text-sm">Email Notifications</span>
-                    </div>
-                    <Badge variant="secondary">Enabled</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" />
-                      <span className="text-sm">Profile Visibility</span>
-                    </div>
-                    <Badge variant="secondary">Public</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      <span className="text-sm">Two-Factor Auth</span>
-                    </div>
-                    <Badge variant="outline">Setup</Badge>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <Button variant="outline" className="w-full">
-                    Manage Account Settings
-                  </Button>
+                  <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                  <div className="text-2xl font-bold">24h</div>
+                  <div className="text-sm text-muted-foreground">Response Time</div>
                 </CardContent>
               </Card>
             </div>
@@ -310,25 +386,82 @@ export default function Profile() {
             <Card>
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>
+                  Manage your profile and career activities
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-4 gap-4">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Video className="h-4 w-4" />
-                    Update Video Resume
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Button variant="outline" className="h-auto p-4 flex flex-col gap-2">
+                    <FileText className="h-6 w-6" />
+                    <span className="font-medium">Update Resume</span>
+                    <span className="text-xs text-muted-foreground">Last updated 2 days ago</span>
                   </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Download Resume
+                  
+                  <Button variant="outline" className="h-auto p-4 flex flex-col gap-2">
+                    <Briefcase className="h-6 w-6" />
+                    <span className="font-medium">Job Applications</span>
+                    <span className="text-xs text-muted-foreground">5 active applications</span>
                   </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    View Analytics
+                  
+                  <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                    <Link to="/settings">
+                      <Settings className="h-6 w-6" />
+                      <span className="font-medium">Account Settings</span>
+                      <span className="text-xs text-muted-foreground">Privacy & preferences</span>
+                    </Link>
                   </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Find Connections
+                  
+                  <Button variant="outline" className="h-auto p-4 flex flex-col gap-2">
+                    <Share className="h-6 w-6" />
+                    <span className="font-medium">Share Profile</span>
+                    <span className="text-xs text-muted-foreground">Get your profile link</span>
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>
+                  Your latest profile and career activities
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Profile updated</p>
+                      <p className="text-xs text-muted-foreground">You updated your professional information • 2 hours ago</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Resume viewed</p>
+                      <p className="text-xs text-muted-foreground">Your resume was viewed by Google • 5 hours ago</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Application submitted</p>
+                      <p className="text-xs text-muted-foreground">Applied to Senior Developer at Meta • 1 day ago</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Profile view</p>
+                      <p className="text-xs text-muted-foreground">Your profile was viewed 15 times • 2 days ago</p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
