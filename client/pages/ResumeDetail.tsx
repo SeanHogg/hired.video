@@ -463,27 +463,48 @@ export default function ResumeDetail() {
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-4 text-sm opacity-80">
+                  <div className="flex flex-wrap gap-3">
                     {resume.data.Basics.Email && (
-                      <div className="flex items-center gap-1">
-                        <Mail className="w-4 h-4" />
-                        {resume.data.Basics.Email}
-                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.open(`mailto:${resume.data.Basics.Email}`)}
+                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Email
+                      </Button>
                     )}
                     {resume.data.Basics.Phone && (
-                      <div className="flex items-center gap-1">
-                        <Phone className="w-4 h-4" />
-                        {resume.data.Basics.Phone}
-                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.open(`tel:${resume.data.Basics.Phone}`)}
+                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                      >
+                        <Phone className="w-4 h-4 mr-2" />
+                        Call
+                      </Button>
                     )}
                     {resume.data.Basics.Url && (
-                      <div className="flex items-center gap-1">
-                        <ExternalLink className="w-4 h-4" />
-                        <a href={resume.data.Basics.Url} target="_blank" rel="noopener noreferrer">
-                          Portfolio
-                        </a>
-                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.open(resume.data.Basics.Url, '_blank')}
+                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Portfolio
+                      </Button>
                     )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download PDF
+                    </Button>
                   </div>
                   
                   <p className="text-lg leading-relaxed opacity-95">
