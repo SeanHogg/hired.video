@@ -34,33 +34,39 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/persona-selection" element={<PersonaSelection />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/features" element={<Navigate to="/pricing" replace />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/for-recruiters" element={<ForRecruiters />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/resumes" element={<Resumes />} />
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/people" element={<People />} />
-            <Route path="/tools" element={<Tools />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/outreach" element={<Outreach />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AIProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/persona-selection" element={<PersonaSelection />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/features" element={<Navigate to="/pricing" replace />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/for-recruiters" element={<ForRecruiters />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/resumes" element={<Resumes />} />
+              <Route path="/jobs" element={<Jobs />} />
+              <Route path="/companies" element={<Companies />} />
+              <Route path="/people" element={<People />} />
+              <Route path="/tools" element={<Tools />} />
+              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/outreach" element={<Outreach />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+
+            {/* Global AI Components - Available on all pages */}
+            <FloatingAIButton />
+            <AIChatPanel />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AIProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
