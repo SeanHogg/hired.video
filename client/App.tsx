@@ -11,6 +11,13 @@ import Features from "./pages/Features";
 import Pricing from "./pages/Pricing";
 import ForRecruiters from "./pages/ForRecruiters";
 import About from "./pages/About";
+import Resumes from "./pages/Resumes";
+import Jobs from "./pages/Jobs";
+import Companies from "./pages/Companies";
+import People from "./pages/People";
+import Tools from "./pages/Tools";
+import Tasks from "./pages/Tasks";
+import Outreach from "./pages/Outreach";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
