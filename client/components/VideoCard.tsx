@@ -28,6 +28,8 @@ export default function VideoCard({
   profession,
   company,
   createdAt,
+  onView,
+  onActions,
 }: VideoCardProps) {
   const formatViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
