@@ -14,6 +14,8 @@ interface VideoCardProps {
   profession?: string;
   company?: string;
   createdAt: string;
+  onView?: () => void;
+  onActions?: () => void;
 }
 
 export default function VideoCard({
