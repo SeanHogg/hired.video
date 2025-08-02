@@ -134,7 +134,10 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className={cn(
+            "flex-1 p-4 space-y-6",
+            collapsed ? "overflow-hidden" : "overflow-y-auto"
+          )}>
             {/* Resume Upload Section */}
             {collapsed ? (
               <div className="flex justify-center">
