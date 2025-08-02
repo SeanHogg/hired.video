@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
 import VideoCard from "@/components/VideoCard";
 import {
   Search,
