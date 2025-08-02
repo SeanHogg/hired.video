@@ -10,7 +10,8 @@ import {
   Globe,
   Users,
   Lock,
-  Copy
+  Copy,
+  Target
 } from "lucide-react";
 
 interface ResumeCardProps {
