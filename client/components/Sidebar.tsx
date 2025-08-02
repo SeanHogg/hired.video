@@ -115,27 +115,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
             "flex-1 p-4 space-y-6",
             collapsed ? "overflow-hidden" : "overflow-y-auto"
           )}>
-            {/* Quick Upload Button */}
-            {collapsed ? (
-              <div className="flex justify-center">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5"
-                  title="Upload Resume"
-                >
-                  <Upload className="h-5 w-5" />
-                </Button>
-              </div>
-            ) : (
-              <Button
-                className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 gap-2"
-                size="lg"
-              >
-                <Upload className="h-4 w-4" />
-                Upload Resume
-              </Button>
-            )}
+
 
             {/* Navigation */}
             <div>
