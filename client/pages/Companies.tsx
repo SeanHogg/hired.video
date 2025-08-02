@@ -28,8 +28,7 @@ import {
 } from "lucide-react";
 
 export default function Companies() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   // If user is not authenticated, show marketing page
