@@ -121,14 +121,16 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
+      const resumeMetadata = sampleResumes.find(r => r.id === resumeId);
       const mockResume: Resume = {
         id: resumeId,
-        name: 'Software Engineer Resume',
-        privacy: 'private',
-        isMaster: true,
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-20T14:30:00Z',
-        views: 45,
+        name: resumeMetadata?.name || 'Software Engineer Resume',
+        privacy: resumeMetadata?.privacy || 'private',
+        isMaster: resumeMetadata?.isMaster || true,
+        parentId: resumeMetadata?.parentId,
+        createdAt: resumeMetadata?.createdAt || '2024-01-15T10:00:00Z',
+        updatedAt: resumeMetadata?.updatedAt || '2024-01-20T14:30:00Z',
+        views: resumeMetadata?.views || 45,
         userId: user?.id || '',
         data: {
           Basics: {
