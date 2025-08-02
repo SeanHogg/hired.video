@@ -248,7 +248,7 @@ export default function Index() {
               </div>
               <div className="flex items-center gap-1">
                 <Sparkles className="w-4 h-4" />
-                <span>{videos.length} AI videos</span>
+                <span>{contentItems.length} items</span>
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
