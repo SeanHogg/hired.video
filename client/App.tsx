@@ -24,6 +24,7 @@ import People from "./pages/People";
 import Tools from "./pages/Tools";
 import Tasks from "./pages/Tasks";
 import Outreach from "./pages/Outreach";
+import Watch from "./pages/Watch";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
