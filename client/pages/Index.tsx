@@ -37,8 +37,8 @@ export default function Index() {
     datePosted: "all"
   });
 
-  // Mock data for AI-generated videos
-  const videos = [
+  // Mock data for AI-generated videos and resumes
+  const contentItems = [
     {
       id: "1",
       title: "Software Engineer Resume - Full Stack Developer with 5 Years Experience",
