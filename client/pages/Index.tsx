@@ -134,6 +134,7 @@ export default function Index() {
       profession: "Data Scientist",
       company: "Tech Company",
       createdAt: "2024-12-20",
+      ownerId: "user456", // Different user
     },
     {
       id: "4",
