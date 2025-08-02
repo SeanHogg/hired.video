@@ -95,6 +95,7 @@ export default function Index() {
       profession: "Product Manager",
       company: "Google",
       createdAt: "2024-01-14",
+      ownerId: "company789", // Company owns this
     },
     {
       id: "2a",
@@ -107,6 +108,7 @@ export default function Index() {
       profession: "UX Designer",
       company: "Design Studio",
       createdAt: "2024-12-28",
+      ownerId: "user789", // Different user
     },
     {
       id: "3",
