@@ -35,6 +35,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import PersonaSelection from "./pages/PersonaSelection";
 import Profile from "./pages/Profile";
+import ResumeDetail from "./pages/ResumeDetail";
 
 const queryClient = new QueryClient();
 
