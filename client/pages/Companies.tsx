@@ -35,15 +35,15 @@ export default function Companies() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
-            onMenuClick={() => setSidebarOpen(true)}
-            onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
           
