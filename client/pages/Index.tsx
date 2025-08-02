@@ -187,17 +187,18 @@ export default function Index() {
     { id: "job_description", label: "Jobs", icon: Briefcase },
   ];
 
-  const filteredVideos = videos.filter((video) => {
-    const matchesCategory = selectedCategory === "all" || video.type === selectedCategory;
-    const matchesSearch = searchQuery === "" || 
-      video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      video.profession?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      video.company?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+  const filteredItems = contentItems.filter((item) => {
+    const matchesCategory = selectedCategory === "all" || item.type === selectedCategory;
+    const matchesSearch = searchQuery === "" ||
+      (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.profession && item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.company && item.company.toLowerCase().includes(searchQuery.toLowerCase()));
+
     return matchesCategory && matchesSearch;
   });
 
-  const totalViews = videos.reduce((sum, video) => sum + video.views, 0);
+  const totalViews = contentItems.reduce((sum, item) => sum + (item.views || 0), 0);
   const formatTotalViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
