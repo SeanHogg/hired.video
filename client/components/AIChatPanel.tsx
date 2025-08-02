@@ -119,9 +119,9 @@ export default function AIChatPanel() {
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
-      <div 
-        className="flex-1 bg-black/20 backdrop-blur-sm" 
-        onClick={onClose}
+      <div
+        className="flex-1 bg-black/20 backdrop-blur-sm"
+        onClick={closeAIChat}
       />
       
       {/* Panel */}
