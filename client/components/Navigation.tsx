@@ -31,12 +31,11 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
             {/* Desktop Sidebar Collapse Toggle */}
             <Button
               variant="ghost"
-              size="icon"
               onClick={onSidebarToggle}
-              className="hidden lg:flex h-12 w-12 -ml-2"
+              className="hidden lg:flex h-10 w-10 px-2 py-2 justify-center -ml-4"
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-4 w-4" />
             </Button>
 
             <Link to="/" className="flex items-center space-x-2">
