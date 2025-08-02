@@ -125,6 +125,7 @@ export interface Resume {
   data: ResumeData;
   privacy: ResumePrivacy;
   isMaster: boolean;
+  isActive: boolean; // Only one resume can be active per user
   parentId?: string; // For variations
   createdAt: string;
   updatedAt: string;
@@ -137,6 +138,7 @@ export interface ResumeMetadata {
   name: string;
   privacy: ResumePrivacy;
   isMaster: boolean;
+  isActive: boolean;
   parentId?: string;
   createdAt: string;
   updatedAt: string;
@@ -150,6 +152,7 @@ export interface CreateResumeRequest {
   data: ResumeData;
   privacy?: ResumePrivacy;
   isMaster?: boolean;
+  isActive?: boolean;
   parentId?: string;
 }
 
@@ -158,6 +161,7 @@ export interface UpdateResumeRequest {
   data?: ResumeData;
   privacy?: ResumePrivacy;
   isMaster?: boolean;
+  isActive?: boolean;
 }
 
 export interface UploadResumeRequest {
