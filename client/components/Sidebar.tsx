@@ -41,17 +41,18 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarProps) {
   const [dragActive, setDragActive] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
+  const location = useLocation();
 
   const navigation = [
-    { name: "Home", href: "/", icon: Home, current: true },
-    { name: "Dashboard", href: "/dashboard", icon: TrendingUp, current: false },
-    { name: "Resumes", href: "/resumes", icon: FileText, current: false },
-    { name: "Jobs", href: "/jobs", icon: Briefcase, current: false },
-    { name: "Companies", href: "/companies", icon: Building2, current: false },
-    { name: "People", href: "/people", icon: Users, current: false },
-    { name: "Tools", href: "/tools", icon: Wrench, current: false },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare, current: false },
-    { name: "Outreach", href: "/outreach", icon: Send, current: false },
+    { name: "Home", href: "/", icon: Home },
+    { name: "Dashboard", href: "/dashboard", icon: TrendingUp },
+    { name: "Resumes", href: "/resumes", icon: FileText },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Companies", href: "/companies", icon: Building2 },
+    { name: "People", href: "/people", icon: Users },
+    { name: "Tools", href: "/tools", icon: Wrench },
+    { name: "Tasks", href: "/tasks", icon: CheckSquare },
+    { name: "Outreach", href: "/outreach", icon: Send },
   ];
 
   const library = [
