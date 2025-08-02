@@ -687,7 +687,7 @@ export default function Pricing() {
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
               <h3 className="text-2xl font-bold mb-4">Trusted by thousands of companies</h3>
               <p className="text-muted-foreground mb-6">
-                Join the growing community of businesses transforming their hiring process
+                Join the growing community of businesses revolutionizing their talent management with our comprehensive HR platform
               </p>
               <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
