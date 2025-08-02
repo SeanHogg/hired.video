@@ -105,35 +105,16 @@ export default function ResumeCard({
             View
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="default" size="sm" className="gap-2">
-                Actions
-                <ChevronDown className="w-3 h-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => onEdit?.()} className="gap-2">
-                <Edit className="w-4 h-4" />
-                Edit Resume
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDownload?.()} className="gap-2">
-                <Download className="w-4 h-4" />
-                Download PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onShare?.()} className="gap-2">
-                <Share2 className="w-4 h-4" />
-                Share Resume
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onDelete?.()} 
-                className="gap-2 text-destructive focus:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Resume
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onActions?.();
+            }}
+          >
+            Actions
+          </Button>
         </div>
       </CardContent>
     </Card>
