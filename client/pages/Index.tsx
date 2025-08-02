@@ -423,7 +423,7 @@ export default function Index() {
                selectedCategory === "resume" ? "Resumes" : "Jobs"}
             </h2>
             <p className="text-muted-foreground">
-              {filteredVideos.length} videos found
+              {filteredItems.length} items found
               {searchQuery && ` for "${searchQuery}"`}
             </p>
           </div>
