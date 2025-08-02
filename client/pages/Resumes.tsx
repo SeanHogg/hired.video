@@ -14,6 +14,7 @@ import ResumeUpload from "@/components/ResumeUpload";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
+import ActionsModal from "@/components/ActionsModal";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters } from "@/types/resume";
@@ -55,6 +56,15 @@ export default function Resumes() {
   const [filters, setFilters] = useState<ResumeSearchFilters>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Actions modal state
+  const [actionsModal, setActionsModal] = useState<{
+    isOpen: boolean;
+    item: any | null;
+  }>({
+    isOpen: false,
+    item: null,
+  });
 
   // Sample data - replace with API calls
   const sampleResumes: ResumeMetadata[] = [
@@ -220,6 +230,54 @@ export default function Resumes() {
   const handleCreateVariation = (parentId: string) => {
     // Load parent resume data and pre-populate builder
     setView('builder');
+  };
+
+  // Action handlers for ActionsModal
+  const handleOpenActions = (resumeId: string) => {
+    const resume = resumes.find(r => r.id === resumeId);
+    if (resume) {
+      const item = {
+        id: resume.id,
+        ownerId: user?.id,
+        type: 'resume' as const,
+        contentType: 'text' as const,
+        ...resume
+      };
+      setActionsModal({ isOpen: true, item });
+    }
+  };
+
+  const handleCloseActions = () => {
+    setActionsModal({ isOpen: false, item: null });
+  };
+
+  const handleShare = (item: any) => {
+    const shareUrl = `${window.location.origin}/resumes/${item.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    setSuccessMessage('Resume link copied to clipboard!');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleEdit = (item: any) => {
+    navigate(`/resumes/${item.id}`);
+  };
+
+  const handleDownload = (item: any) => {
+    // Simulate download
+    setSuccessMessage('Resume download started!');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleDelete = (item: any) => {
+    // Remove from local state (in real app, this would be an API call)
+    setResumes(resumes.filter(r => r.id !== item.id));
+    setSuccessMessage('Resume deleted successfully!');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleTrack = (item: any) => {
+    setSuccessMessage('Candidate added to tracking list!');
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const filteredResumes = resumes.filter(resume => {
@@ -695,7 +753,7 @@ export default function Resumes() {
                         isMaster={resume.isMaster}
                         parentId={resume.parentId}
                         onView={() => handleResumeView(resume.id)}
-                        onActions={() => handleResumeView(resume.id)}
+                        onActions={() => handleOpenActions(resume.id)}
                       />
                     ))}
                   </div>
@@ -731,6 +789,24 @@ export default function Resumes() {
         </div>
         <Footer />
       </div>
+
+      {/* Actions Modal */}
+      <ActionsModal
+        isOpen={actionsModal.isOpen}
+        onClose={handleCloseActions}
+        item={actionsModal.item}
+        user={user ? {
+          id: user.id,
+          isAuthenticated: true,
+          role: user.role || 'job_seeker'
+        } : null}
+        onView={() => actionsModal.item && handleResumeView(actionsModal.item.id)}
+        onShare={() => actionsModal.item && handleShare(actionsModal.item)}
+        onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
+        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
+        onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
+        onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+      />
     </div>
   );
 }
