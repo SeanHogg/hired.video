@@ -32,16 +32,7 @@ export default function FloatingAIButton({ onClick, className }: FloatingAIButto
         
         {/* Floating animation rings */}
         <div className="absolute inset-0 rounded-full">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-brand-purple/30 to-brand-blue/30 animate-ping" />
-          <div 
-            className={cn(
-              "absolute inset-0 rounded-full bg-gradient-to-r from-brand-purple/20 to-brand-blue/20 transition-transform duration-1000",
-              isHovered ? "scale-125" : "scale-110"
-            )}
-            style={{
-              animation: isHovered ? "pulse 1.5s ease-in-out infinite" : "pulse 2s ease-in-out infinite"
-            }}
-          />
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-brand-purple/20 to-brand-blue/20 animate-pulse" />
         </div>
       </Button>
       
