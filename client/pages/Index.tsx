@@ -39,11 +39,7 @@ export default function Index() {
   });
 
   // Mock user state - in real app this would come from auth context
-  const [currentUser] = useState({
-    id: "user123",
-    isAuthenticated: true,
-    role: "recruiter" as const, // Change to 'job_seeker', 'recruiter', or 'employer' to test different roles
-  });
+  const [currentUser] = useState(null);
 
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
