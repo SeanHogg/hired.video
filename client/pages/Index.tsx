@@ -123,9 +123,9 @@ export default function Index() {
   ];
 
   const categories = [
-    { id: "all", label: "All Videos", icon: TrendingUp },
-    { id: "resume", label: "Resume Videos", icon: User },
-    { id: "job_description", label: "Job Descriptions", icon: Briefcase },
+    { id: "all", label: "All", icon: TrendingUp },
+    { id: "resume", label: "Resumes", icon: User },
+    { id: "job_description", label: "Jobs", icon: Briefcase },
   ];
 
   const filteredVideos = videos.filter((video) => {
