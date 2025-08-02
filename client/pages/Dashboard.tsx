@@ -444,7 +444,7 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {user.persona === "job_seeker" && (
+                  {user.role === "job_seeker" && (
                     <>
                       <Button className="w-full justify-start gap-3" variant="outline">
                         <FileText className="h-4 w-4" />
@@ -460,7 +460,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.persona === "recruiter" && (
+                  {user.role === "recruiter" && (
                     <>
                       <Button className="w-full justify-start gap-3" variant="outline">
                         <Briefcase className="h-4 w-4" />
@@ -476,7 +476,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.persona === "business" && (
+                  {user.role === "business" && (
                     <>
                       <Button className="w-full justify-start gap-3" variant="outline">
                         <Building2 className="h-4 w-4" />
