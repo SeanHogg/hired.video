@@ -272,7 +272,7 @@ export default function Onboarding() {
           <Card className="mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <steps[currentStep].icon className="h-5 w-5" />
+                {React.createElement(steps[currentStep].icon, { className: "h-5 w-5" })}
                 {steps[currentStep].title}
               </CardTitle>
               <CardDescription>{steps[currentStep].description}</CardDescription>
