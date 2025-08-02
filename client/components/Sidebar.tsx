@@ -328,19 +328,27 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
           <div className="border-t border-border p-4 space-y-2">
             <Link
               to="/settings"
-              className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors"
+              className={cn(
+                "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+              )}
               onClick={onClose}
+              title={collapsed ? "Settings" : undefined}
             >
               <Settings className="h-4 w-4" />
-              Settings
+              {!collapsed && "Settings"}
             </Link>
             <Link
               to="/help"
-              className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors"
+              className={cn(
+                "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
+                collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+              )}
               onClick={onClose}
+              title={collapsed ? "Help & Support" : undefined}
             >
               <HelpCircle className="h-4 w-4" />
-              Help & Support
+              {!collapsed && "Help & Support"}
             </Link>
           </div>
         </div>
