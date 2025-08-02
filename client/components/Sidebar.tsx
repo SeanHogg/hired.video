@@ -54,10 +54,10 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
   ];
 
   const library = [
-    { name: "My Videos", href: "/my-videos", icon: User, count: 3 },
-    { name: "Watch Later", href: "/watch-later", icon: Clock, count: 12 },
-    { name: "Favorites", href: "/favorites", icon: Star, count: 8 },
-    { name: "Recently Viewed", href: "/recent", icon: Eye, count: 24 },
+    { name: "My Content", href: "/watch?filter=my-content", icon: User, count: 3 },
+    { name: "Watch Later", href: "/watch?filter=watch-later", icon: Clock, count: 12 },
+    { name: "Favorites", href: "/watch?filter=favorites", icon: Star, count: 8 },
+    { name: "Recently Viewed", href: "/watch?filter=recent", icon: Eye, count: 24 },
   ];
 
   const categories = [
