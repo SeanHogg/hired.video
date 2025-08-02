@@ -428,11 +428,32 @@ export default function Index() {
             </p>
           </div>
 
-          {/* Video Grid */}
-          {filteredVideos.length > 0 ? (
+          {/* Content Grid */}
+          {filteredItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredVideos.map((video) => (
-                <VideoCard key={video.id} {...video} />
+              {filteredItems.map((item) => (
+                item.contentType === "video" ? (
+                  <VideoCard
+                    key={item.id}
+                    {...item}
+                    title={item.title || ''}
+                    description={item.description || ''}
+                    thumbnail={item.thumbnail || ''}
+                    duration={item.duration || ''}
+                  />
+                ) : (
+                  <ResumeCard
+                    key={item.id}
+                    {...item}
+                    name={item.name || ''}
+                    summary={item.summary || ''}
+                    onView={() => console.log('View resume:', item.id)}
+                    onEdit={() => console.log('Edit resume:', item.id)}
+                    onDownload={() => console.log('Download resume:', item.id)}
+                    onShare={() => console.log('Share resume:', item.id)}
+                    onDelete={() => console.log('Delete resume:', item.id)}
+                  />
+                )
               ))}
             </div>
           ) : (
