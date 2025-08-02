@@ -66,8 +66,8 @@ export default function Resumes() {
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-20T14:30:00Z',
       views: 45,
-      summary: 'Experienced software engineer with 5+ years in full-stack development...',
-      title: 'Senior Software Engineer'
+      summary: 'CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams. Expert in aligning technical goals with business objectives.',
+      title: 'CTO and Technology Leader'
     },
     {
       id: 'resume_2',
@@ -78,8 +78,20 @@ export default function Resumes() {
       createdAt: '2024-01-22T09:15:00Z',
       updatedAt: '2024-01-22T16:45:00Z',
       views: 23,
-      summary: 'Frontend specialist with expertise in React, TypeScript, and modern web technologies...',
+      summary: 'Frontend specialist with expertise in React, TypeScript, and modern web technologies. Focused on creating amazing user experiences and scalable applications.',
       title: 'Senior Frontend Developer'
+    },
+    {
+      id: 'resume_3',
+      name: 'DevOps Engineer Resume',
+      privacy: 'recruiter_only',
+      isMaster: false,
+      parentId: 'resume_1',
+      createdAt: '2024-01-25T11:30:00Z',
+      updatedAt: '2024-01-25T15:20:00Z',
+      views: 12,
+      summary: 'DevOps specialist with extensive experience in cloud infrastructure, CI/CD pipelines, and container orchestration. Passionate about automation and reliability.',
+      title: 'Senior DevOps Engineer'
     }
   ];
 
@@ -677,6 +689,9 @@ export default function Resumes() {
                         summary={resume.summary}
                         createdAt={resume.createdAt}
                         views={resume.views}
+                        privacy={resume.privacy}
+                        isMaster={resume.isMaster}
+                        parentId={resume.parentId}
                         onView={() => handleResumeView(resume.id)}
                         onActions={() => handleResumeView(resume.id)}
                       />
