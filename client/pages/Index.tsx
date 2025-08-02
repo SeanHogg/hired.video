@@ -14,6 +14,12 @@ import {
   Briefcase,
   Clock,
   Eye,
+  SlidersHorizontal,
+  MapPin,
+  GraduationCap,
+  Calendar,
+  X,
+  ChevronDown,
 } from "lucide-react";
 
 export default function Index() {
