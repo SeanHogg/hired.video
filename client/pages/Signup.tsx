@@ -7,8 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useSidebar } from '@/hooks/use-sidebar';
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
+import Footer from '@/components/Footer';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -19,9 +21,8 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+
   const { signup } = useAuth();
   const navigate = useNavigate();
 
