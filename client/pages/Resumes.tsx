@@ -798,6 +798,7 @@ export default function Resumes() {
                           views={resume.views}
                           privacy={resume.privacy}
                           isMaster={resume.isMaster}
+                          isActive={resume.isActive}
                           parentId={resume.parentId}
                           onView={() => handleResumeView(resume.id)}
                           onActions={() => handleOpenActions(resume.id)}
