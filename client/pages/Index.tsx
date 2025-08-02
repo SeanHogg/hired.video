@@ -10,6 +10,7 @@ import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
+import { useSidebar } from "@/hooks/use-sidebar";
 
 import {
   Search,
