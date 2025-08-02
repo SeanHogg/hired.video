@@ -79,6 +79,7 @@ export default function Resumes() {
       name: 'Software Engineer Resume',
       privacy: 'private',
       isMaster: true,
+      isActive: false,
       createdAt: '2024-01-15T10:00:00Z',
       updatedAt: '2024-01-20T14:30:00Z',
       views: 45,
@@ -90,6 +91,7 @@ export default function Resumes() {
       name: 'Frontend Developer - React Specialist',
       privacy: 'public',
       isMaster: false,
+      isActive: true,
       parentId: 'resume_1',
       createdAt: '2024-01-22T09:15:00Z',
       updatedAt: '2024-01-22T16:45:00Z',
@@ -102,6 +104,7 @@ export default function Resumes() {
       name: 'DevOps Engineer Resume',
       privacy: 'recruiter_only',
       isMaster: false,
+      isActive: false,
       parentId: 'resume_1',
       createdAt: '2024-01-25T11:30:00Z',
       updatedAt: '2024-01-25T15:20:00Z',
@@ -143,6 +146,7 @@ export default function Resumes() {
         name: resumeMetadata?.name || 'Software Engineer Resume',
         privacy: resumeMetadata?.privacy || 'private',
         isMaster: resumeMetadata?.isMaster || true,
+        isActive: resumeMetadata?.isActive || false,
         parentId: resumeMetadata?.parentId,
         createdAt: resumeMetadata?.createdAt || '2024-01-15T10:00:00Z',
         updatedAt: resumeMetadata?.updatedAt || '2024-01-20T14:30:00Z',
@@ -284,6 +288,21 @@ export default function Resumes() {
   const handleTrack = (item: any) => {
     setSuccessMessage('Candidate added to tracking list!');
     setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleSetActive = (resumeId: string) => {
+    // Set the selected resume as active and all others as inactive
+    const updatedResumes = resumes.map(resume => ({
+      ...resume,
+      isActive: resume.id === resumeId
+    }));
+    setResumes(updatedResumes);
+    setSuccessMessage('Resume set as active!');
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const getActiveResume = () => {
+    return resumes.find(resume => resume.isActive);
   };
 
   const filteredResumes = resumes.filter(resume => {
