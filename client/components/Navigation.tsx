@@ -5,6 +5,8 @@ import { useState } from "react";
 
 interface NavigationProps {
   onMenuClick?: () => void;
+  onSidebarToggle?: () => void;
+  sidebarCollapsed?: boolean;
 }
 
 export default function Navigation({ onMenuClick }: NavigationProps) {
