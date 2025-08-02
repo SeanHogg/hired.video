@@ -147,7 +147,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        <div className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
           <div className="space-y-4">
             {messages.map((message) => (
               <div
@@ -195,7 +195,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Quick Suggestions */}
         {messages.length <= 1 && (
