@@ -36,6 +36,7 @@ export default function ResumeCard({
   views = 0,
   privacy = 'private',
   isMaster = false,
+  isActive = false,
   parentId,
   onView,
   onActions,
