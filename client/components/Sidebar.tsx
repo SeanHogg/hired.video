@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  collapsed?: boolean;
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
