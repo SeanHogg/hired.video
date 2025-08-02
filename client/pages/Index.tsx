@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
+import ActionsModal from "@/components/ActionsModal";
 import {
   Search,
   Filter,
