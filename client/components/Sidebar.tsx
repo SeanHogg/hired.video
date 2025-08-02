@@ -30,7 +30,7 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarProps) {
   const [dragActive, setDragActive] = useState(false);
 
   const navigation = [
