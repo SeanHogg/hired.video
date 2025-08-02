@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/auth";
+import { useSidebar } from "@/hooks/use-sidebar";
 import {
   FileText,
   Video,
@@ -24,8 +25,7 @@ import {
 } from "lucide-react";
 
 export default function Resumes() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   // If user is not authenticated, show marketing page
