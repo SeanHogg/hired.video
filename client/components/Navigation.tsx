@@ -121,11 +121,11 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
                       <div className="border-t border-border mt-4 pt-4">
                         <Link
-                          to="/features"
+                          to="/pricing"
                           className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                           onClick={() => setIsFeaturesOpen(false)}
                         >
-                          View All Features
+                          View All Features & Pricing
                           <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
                         </Link>
                       </div>
