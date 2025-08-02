@@ -21,6 +21,11 @@ import {
   FileText,
   Plus,
   X,
+  Building2,
+  Users,
+  Wrench,
+  CheckSquare,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
