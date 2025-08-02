@@ -206,29 +206,50 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
               </nav>
             </div>
 
-            <Separator />
+            {!collapsed && <Separator />}
 
             {/* Library */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Your Library
-              </h3>
+              {!collapsed && (
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Your Library
+                </h3>
+              )}
               <nav className="space-y-1">
                 {library.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
-                    className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    className={cn(
+                      "flex items-center text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                      collapsed ? "px-2 py-2 justify-center" : "px-3 py-2 justify-between"
+                    )}
                     onClick={onClose}
+                    title={collapsed ? `${item.name} (${item.count})` : undefined}
                   >
-                    <div className="flex items-center">
-                      <item.icon className="mr-3 h-4 w-4" />
-                      {item.name}
-                    </div>
-                    {item.count && (
-                      <Badge variant="secondary" className="text-xs">
-                        {item.count}
-                      </Badge>
+                    {collapsed ? (
+                      <div className="relative">
+                        <item.icon className="h-4 w-4" />
+                        {item.count && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
+                            <span className="text-[8px] text-primary-foreground font-bold">
+                              {item.count > 9 ? "9+" : item.count}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center">
+                          <item.icon className="mr-3 h-4 w-4" />
+                          {item.name}
+                        </div>
+                        {item.count && (
+                          <Badge variant="secondary" className="text-xs">
+                            {item.count}
+                          </Badge>
+                        )}
+                      </>
                     )}
                   </Link>
                 ))}
