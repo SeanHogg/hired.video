@@ -9,7 +9,7 @@ interface NavigationProps {
   sidebarCollapsed?: boolean;
 }
 
-export default function Navigation({ onMenuClick }: NavigationProps) {
+export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollapsed }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
