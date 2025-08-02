@@ -124,45 +124,65 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-border bg-background/95 backdrop-blur-md">
             <div className="flex flex-col space-y-4">
-              <Link
-                to="/features"
-                className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Features
-              </Link>
-              <Link
-                to="/pricing"
-                className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-              <Link
-                to="/for-recruiters"
-                className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                For Recruiters
-              </Link>
-              <Link
-                to="/about"
-                className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                About
-              </Link>
+              {!isAuthenticated && (
+                <>
+                  <Link
+                    to="/features"
+                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Features
+                  </Link>
+                  <Link
+                    to="/pricing"
+                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    to="/about"
+                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    About
+                  </Link>
+                </>
+              )}
               <div className="flex flex-col space-y-2 pt-4 border-t border-border">
-                <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full justify-start font-medium">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link to="/signup" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                    Get Started Free
-                  </Button>
-                </Link>
+                {!isAuthenticated ? (
+                  <>
+                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start font-medium">
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link to="/signup" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
+                        Get Started Free
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <div className="px-2 py-1">
+                      <p className="text-sm font-medium">Welcome, {user?.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {user?.role?.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        logout();
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full justify-start font-medium"
+                    >
+                      Sign Out
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
