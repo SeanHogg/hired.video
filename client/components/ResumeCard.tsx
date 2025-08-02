@@ -26,10 +26,7 @@ export default function ResumeCard({
   createdAt,
   views = 0,
   onView,
-  onEdit,
-  onDownload,
-  onShare,
-  onDelete,
+  onActions,
 }: ResumeCardProps) {
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
