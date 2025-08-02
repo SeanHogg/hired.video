@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -19,8 +19,7 @@ import {
   Star,
   Clock,
   Eye,
-  FileText,
-  Plus,
+
   X,
   Building2,
   Users,
@@ -39,7 +38,6 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarProps) {
-  const [dragActive, setDragActive] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
 
@@ -71,33 +69,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
     { name: "Sales", count: 67 },
   ];
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
-
-  const handleFiles = (files: FileList) => {
-    const file = files[0];
-    if (file && (file.type === "application/pdf" || file.type.includes("word"))) {
-      console.log("Resume uploaded:", file.name);
-      // Here you would handle the file upload
-    }
-  };
 
   return (
     <>
