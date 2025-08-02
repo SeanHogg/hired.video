@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Menu, X, Video, Sparkles, ChevronDown, Home, TrendingUp, FileText, Briefcase, Building2, Users, Wrench, CheckSquare, Send } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
