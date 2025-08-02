@@ -53,30 +53,28 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link
-              to="/features"
-              className="text-foreground/70 hover:text-foreground transition-colors font-medium"
-            >
-              Features
-            </Link>
-            <Link
-              to="/pricing"
-              className="text-foreground/70 hover:text-foreground transition-colors font-medium"
-            >
-              Pricing
-            </Link>
-            <Link
-              to="/for-recruiters"
-              className="text-foreground/70 hover:text-foreground transition-colors font-medium"
-            >
-              For Recruiters
-            </Link>
-            <Link
-              to="/about"
-              className="text-foreground/70 hover:text-foreground transition-colors font-medium"
-            >
-              About
-            </Link>
+            {!isAuthenticated && (
+              <>
+                <Link
+                  to="/features"
+                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
+                >
+                  Features
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
+                >
+                  Pricing
+                </Link>
+                <Link
+                  to="/about"
+                  className="text-foreground/70 hover:text-foreground transition-colors font-medium"
+                >
+                  About
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Desktop CTA Buttons */}
