@@ -107,8 +107,8 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out overflow-y-auto",
-          collapsed ? "w-16" : "w-80",
+          "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out",
+          collapsed ? "w-16 overflow-hidden" : "w-80 overflow-y-auto",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0 lg:fixed lg:z-auto"
         )}
