@@ -60,6 +60,7 @@ const App = () => (
               <Route path="/tools" element={<Tools />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/outreach" element={<Outreach />} />
+              <Route path="/watch" element={<Watch />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
