@@ -307,8 +307,11 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                 <Link
                   to="/settings"
                   className={cn(
-                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                    "flex items-center text-sm rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
+                    location.pathname === "/settings"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   onClick={onClose}
                   title={collapsed ? "Settings" : undefined}
@@ -339,8 +342,11 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                 <Link
                   to="/settings"
                   className={cn(
-                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                    "flex items-center text-sm rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
+                    location.pathname === "/settings"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   onClick={onClose}
                   title={collapsed ? "Settings" : undefined}
@@ -351,8 +357,11 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                 <Link
                   to="/help"
                   className={cn(
-                    "flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                    "flex items-center text-sm rounded-md transition-colors",
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
+                    location.pathname === "/help"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   onClick={onClose}
                   title={collapsed ? "Help & Support" : undefined}
