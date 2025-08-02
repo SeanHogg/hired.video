@@ -552,6 +552,20 @@ export default function Index() {
         </div>
       </footer>
       </div>
+
+      {/* Actions Modal */}
+      <ActionsModal
+        isOpen={actionsModal.isOpen}
+        onClose={handleCloseActions}
+        item={actionsModal.item}
+        user={currentUser}
+        onView={() => actionsModal.item && handleView(actionsModal.item)}
+        onShare={() => actionsModal.item && handleShare(actionsModal.item)}
+        onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
+        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
+        onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
+        onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+      />
     </div>
   );
 }
