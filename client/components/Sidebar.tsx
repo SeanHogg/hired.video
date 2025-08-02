@@ -98,7 +98,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         className={cn(
           "fixed top-0 left-0 h-full w-80 bg-background border-r border-border z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0 lg:static lg:z-auto"
+          "lg:translate-x-0 lg:fixed lg:z-auto"
         )}
       >
         <div className="flex flex-col h-full">
