@@ -38,6 +38,22 @@ export default function Index() {
     datePosted: "all"
   });
 
+  // Mock user state - in real app this would come from auth context
+  const [currentUser] = useState({
+    id: "user123",
+    isAuthenticated: true,
+    role: "recruiter" as const, // Change to 'job_seeker', 'recruiter', or 'employer' to test different roles
+  });
+
+  // Actions modal state
+  const [actionsModal, setActionsModal] = useState<{
+    isOpen: boolean;
+    item: any | null;
+  }>({
+    isOpen: false,
+    item: null,
+  });
+
   // Mock data for AI-generated videos and resumes
   const contentItems = [
     {
