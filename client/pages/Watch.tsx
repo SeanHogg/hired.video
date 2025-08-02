@@ -71,8 +71,7 @@ export default function Watch() {
   const [selectedContentType, setSelectedContentType] = useState("videos");
   const [selectedFilter, setSelectedFilter] = useState("my-content");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   // Get initial filter from URL params
   useEffect(() => {
