@@ -116,7 +116,7 @@ export default function ActionsModal({
     }
 
     // Recruiter actions (for resumes they don't own)
-    if (isRecruiter && !isOwner && item.type === 'resume') {
+    if (isRecruiter && !isOwner && item && item.type === 'resume') {
       actions.push({
         id: 'download',
         label: 'Download Resume',
