@@ -27,6 +27,8 @@ import Outreach from "./pages/Outreach";
 import Watch from "./pages/Watch";
 import Settings from "./pages/Settings";
 import Help from "./pages/Help";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
