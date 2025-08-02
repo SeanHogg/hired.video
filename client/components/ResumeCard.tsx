@@ -6,6 +6,11 @@ import {
   Calendar,
   User,
   FileText,
+  Star,
+  Globe,
+  Users,
+  Lock,
+  Copy
 } from "lucide-react";
 
 interface ResumeCardProps {
@@ -15,6 +20,9 @@ interface ResumeCardProps {
   summary: string;
   createdAt: string;
   views?: number;
+  privacy?: 'public' | 'recruiter_only' | 'private';
+  isMaster?: boolean;
+  parentId?: string;
   onView?: () => void;
   onActions?: () => void;
 }
@@ -25,6 +33,9 @@ export default function ResumeCard({
   summary,
   createdAt,
   views = 0,
+  privacy = 'private',
+  isMaster = false,
+  parentId,
   onView,
   onActions,
 }: ResumeCardProps) {
@@ -40,6 +51,33 @@ export default function ResumeCard({
     onView?.();
   };
 
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return <Globe className="w-3 h-3" />;
+      case 'recruiter_only': return <Users className="w-3 h-3" />;
+      case 'private': return <Lock className="w-3 h-3" />;
+      default: return <Lock className="w-3 h-3" />;
+    }
+  };
+
+  const getPrivacyText = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return 'Public';
+      case 'recruiter_only': return 'Recruiter Only';
+      case 'private': return 'Private';
+      default: return 'Private';
+    }
+  };
+
+  const getPrivacyColor = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return 'bg-green-100 text-green-800';
+      case 'recruiter_only': return 'bg-blue-100 text-blue-800';
+      case 'private': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300 border hover:border-primary/30 overflow-hidden">
       <CardContent className="p-0">
@@ -53,6 +91,26 @@ export default function ResumeCard({
                 {title && (
                   <p className="text-sm text-muted-foreground mt-1">{title}</p>
                 )}
+
+                {/* Status badges */}
+                <div className="flex items-center gap-2 mt-2">
+                  {isMaster && (
+                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                      <Star className="w-3 h-3 mr-1" />
+                      Master
+                    </Badge>
+                  )}
+                  {parentId && (
+                    <Badge variant="outline" className="text-xs">
+                      <Copy className="w-3 h-3 mr-1" />
+                      Variation
+                    </Badge>
+                  )}
+                  <Badge className={`text-xs ${getPrivacyColor(privacy)}`}>
+                    {getPrivacyIcon(privacy)}
+                    <span className="ml-1">{getPrivacyText(privacy)}</span>
+                  </Badge>
+                </div>
               </div>
               <Badge variant="secondary" className="text-xs">
                 <FileText className="w-3 h-3 mr-1" />
@@ -60,30 +118,31 @@ export default function ResumeCard({
               </Badge>
             </div>
             
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>CREATION</span>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  <span>CREATED</span>
+                </div>
+                <span className="font-medium text-foreground">{formatDate(createdAt)}</span>
               </div>
-              <span className="font-medium text-foreground">{formatDate(createdAt)}</span>
+
+              {views > 0 && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Eye className="w-3 h-3" />
+                  <span>{views} views</span>
+                </div>
+              )}
             </div>
-            
-            {views > 0 && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Eye className="w-3 h-3" />
-                <span>{views} views</span>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Details Section */}
         <div className="p-4 bg-primary text-primary-foreground" onClick={handleCardClick}>
           <div className="space-y-3">
-            <h4 className="font-bold text-lg">Details</h4>
+            <h4 className="font-bold text-lg">Professional Summary</h4>
             <div>
-              <p className="text-xs font-medium opacity-80 uppercase tracking-wide mb-2">SUMMARY</p>
-              <p className="text-sm leading-relaxed opacity-95">
+              <p className="text-sm leading-relaxed opacity-95 line-clamp-3">
                 {summary}
               </p>
             </div>
