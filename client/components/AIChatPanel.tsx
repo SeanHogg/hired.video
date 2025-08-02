@@ -186,9 +186,9 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
                     <span className="text-xs font-medium text-primary">AI Assistant</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
+                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
                   </div>
                 </div>
               </div>
