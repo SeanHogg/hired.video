@@ -48,7 +48,7 @@ export default function ActionsModal({
   onDelete,
   onTrack,
 }: ActionsModalProps) {
-  const isOwner = user?.isAuthenticated && user.id === item.ownerId;
+  const isOwner = user?.isAuthenticated && item && user.id === item.ownerId;
   const isRecruiter = user?.isAuthenticated && user.role === 'recruiter';
   const isAuthenticated = user?.isAuthenticated;
 
