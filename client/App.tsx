@@ -45,6 +45,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/persona-selection" element={<PersonaSelection />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/features" element={<Navigate to="/pricing" replace />} />
