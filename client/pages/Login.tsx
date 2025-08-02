@@ -60,8 +60,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={() => setSidebarOpen(true)}
+          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        <div className="pt-16 min-h-screen flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-2">
@@ -184,6 +197,8 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
