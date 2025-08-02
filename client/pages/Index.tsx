@@ -155,6 +155,7 @@ export default function Index() {
       profession: "UX Designer",
       company: "Design Agency",
       createdAt: "2024-01-13",
+      ownerId: "user789",
     },
     {
       id: "3a",
