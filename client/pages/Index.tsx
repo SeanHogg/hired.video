@@ -27,6 +27,13 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    searchRadius: "25",
+    experienceLevel: "all",
+    education: "all",
+    datePosted: "all"
+  });
 
   // Mock data for AI-generated videos
   const videos = [
