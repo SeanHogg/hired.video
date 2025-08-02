@@ -14,7 +14,7 @@ export default function Footer() {
                 <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                MyVideoResume
+                MyVideoResu.ME
               </span>
             </Link>
             <p className="text-muted-foreground mb-4 max-w-md">
