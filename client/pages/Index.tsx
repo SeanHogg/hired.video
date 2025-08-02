@@ -238,6 +238,7 @@ export default function Index() {
       profession: "Frontend Developer",
       company: "Shopify",
       createdAt: "2024-01-08",
+      ownerId: "company789",
     },
   ];
 
