@@ -97,6 +97,12 @@ export default function ResumeCard({
 
                 {/* Status badges */}
                 <div className="flex items-center gap-2 mt-2">
+                  {isActive && (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                      <Target className="w-3 h-3 mr-1" />
+                      Active
+                    </Badge>
+                  )}
                   {isMaster && (
                     <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
                       <Star className="w-3 h-3 mr-1" />
