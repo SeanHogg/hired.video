@@ -18,6 +18,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
         <div className="flex justify-between items-center h-16">
           {/* Sidebar Toggle + Logo */}
           <div className="flex items-center space-x-3">
+            {/* Mobile Menu Toggle */}
             <Button
               variant="ghost"
               size="icon"
@@ -26,6 +27,18 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
             >
               <Menu className="h-5 w-5" />
             </Button>
+
+            {/* Desktop Sidebar Collapse Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onSidebarToggle}
+              className="hidden lg:flex"
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
             <Link to="/" className="flex items-center space-x-2">
             <div className="relative">
               <Video className="h-8 w-8 text-primary" />
