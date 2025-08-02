@@ -30,8 +30,7 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated } = useAuth();
 
   // If user is not authenticated, show CTA
