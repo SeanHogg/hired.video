@@ -13,7 +13,7 @@ import {
 interface User {
   id: string;
   isAuthenticated: boolean;
-  role: 'job_seeker' | 'recruiter' | 'employer';
+  role: 'job_seeker' | 'recruiter' | 'business';
 }
 
 interface ContentItem {
