@@ -34,13 +34,13 @@ export default function Resumes() {
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar 
           isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)} 
+          onClose={closeSidebar} 
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
           <Navigation 
-            onMenuClick={() => setSidebarOpen(true)}
-            onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
           
