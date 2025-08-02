@@ -214,6 +214,7 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+            <Footer />
         </div>
         </div>
       </div>
