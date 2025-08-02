@@ -61,7 +61,7 @@ export default function Pricing() {
                 Simple, Transparent Pricing
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                The best All-in-one HR/ATS/Recruiting CRM on a budget — build a true talent pipeline with our flexible pricing plans.
+                All-in-one HR platform with employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing — build a true talent pipeline with our flexible pricing plans.
               </p>
               <div className="flex items-center justify-center gap-4 mb-8">
                 <Badge variant="outline" className="flex items-center gap-2">
@@ -635,7 +635,7 @@ export default function Pricing() {
                           API Access
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">��</span>
+                          <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
