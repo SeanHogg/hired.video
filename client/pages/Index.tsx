@@ -283,19 +283,18 @@ export default function Index() {
           <div className="text-center max-w-4xl mx-auto">
             <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark">
               <Sparkles className="w-4 h-4 mr-2" />
-              AI-Generated Video Platform
+              All-in-One HR Platform
             </Badge>
-            
+
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
-              Discover AI-Generated{" "}
+              The Future of{" "}
               <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                Resume & Job Videos
+                Talent Management
               </span>
             </h1>
-            
+
             <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Watch AI-powered video presentations of resumes and job descriptions. 
-              Get inspired by career stories and discover perfect job opportunities.
+              Employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.
             </p>
 
             {/* Quick Stats */}
