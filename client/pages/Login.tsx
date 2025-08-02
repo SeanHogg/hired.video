@@ -75,19 +75,6 @@ export default function Login() {
 
         <div className="pt-16 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2">
-            <div className="relative">
-              <Video className="h-10 w-10 text-primary" />
-              <Sparkles className="h-5 w-5 text-brand-blue absolute -top-1 -right-1" />
-            </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-              MyVideoResume
-            </span>
-          </Link>
-        </div>
-
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Welcome back</CardTitle>
