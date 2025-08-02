@@ -40,6 +40,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarProps) {
   const [dragActive, setDragActive] = useState(false);
+  const { isAuthenticated, user, logout } = useAuth();
 
   const navigation = [
     { name: "Home", href: "/", icon: Home, current: true },
