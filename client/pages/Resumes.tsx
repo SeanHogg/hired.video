@@ -879,6 +879,17 @@ export default function Resumes() {
                                       <Calendar className="w-3 h-3" />
                                       {new Date(masterResume.createdAt).toLocaleDateString()}
                                     </div>
+                                    {!masterResume.isActive && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleSetActive(masterResume.id)}
+                                        className="text-green-600 border-green-200 hover:bg-green-50"
+                                      >
+                                        <Power className="w-4 h-4 mr-2" />
+                                        Set Active
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="outline"
                                       size="sm"
