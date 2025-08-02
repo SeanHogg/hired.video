@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
+import HeroCarousel from "@/components/HeroCarousel";
 
 import {
   Search,
@@ -280,44 +281,11 @@ export default function Index() {
           sidebarCollapsed={sidebarCollapsed}
         />
       
-      {/* Hero Section - Compact */}
-      <section className="pt-20 pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-4xl mx-auto">
-            <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark">
-              <Sparkles className="w-4 h-4 mr-2" />
-              All-in-One AI HR Platform
-            </Badge>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
-              The Future of{" "}
-              <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                Talent Management
-              </span>
-            </h1>
-
-            <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.
-            </p>
-
-            {/* Quick Stats */}
-            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mb-6">
-              <div className="flex items-center gap-1">
-                <Eye className="w-4 h-4" />
-                <span>{formatTotalViews(totalViews)} total views</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Sparkles className="w-4 h-4" />
-                <span>{contentItems.length} items</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>Updated daily</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Hero Carousel */}
+      <HeroCarousel
+        totalViews={formatTotalViews(totalViews)}
+        totalItems={contentItems.length}
+      />
 
       {/* Search and Filters */}
       <section className="py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
@@ -529,26 +497,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Upload CTA Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple to-brand-blue">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Create Your AI Video
-          </h2>
-          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-            Upload your resume or job description and let our AI create a stunning 
-            video presentation that stands out from the crowd.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-3 bg-white text-brand-purple hover:bg-white/90">
-              Upload Resume
-            </Button>
-            <Button size="lg" variant="outline" className="text-lg px-8 py-3 border-white/30 text-white hover:bg-white/10">
-              Post Job Description
-            </Button>
-          </div>
-        </div>
-      </section>
+
 
       <Footer />
       </div>
