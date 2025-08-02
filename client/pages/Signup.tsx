@@ -211,6 +211,7 @@ export default function Signup() {
         </Card>
           </div>
         </div>
+        <Footer />
       </div>
     </div>
   );
