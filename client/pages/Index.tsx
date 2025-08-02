@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
