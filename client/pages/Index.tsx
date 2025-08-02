@@ -210,6 +210,7 @@ export default function Index() {
       profession: "DevOps Engineer",
       company: "Netflix",
       createdAt: "2024-01-10",
+      ownerId: "company789",
     },
     {
       id: "7",
@@ -223,6 +224,7 @@ export default function Index() {
       profession: "Sales Director",
       company: "SaaS Company",
       createdAt: "2024-01-09",
+      ownerId: "user456",
     },
     {
       id: "8",
