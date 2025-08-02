@@ -48,7 +48,20 @@ export default function ActionsModal({
   onDelete,
   onTrack,
 }: ActionsModalProps) {
-  const isOwner = user?.isAuthenticated && item && user.id === item.ownerId;
+  // Early return if modal is not open or item is null
+  if (!isOpen || !item) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Actions</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const isOwner = user?.isAuthenticated && user.id === item.ownerId;
   const isRecruiter = user?.isAuthenticated && user.role === 'recruiter';
   const isAuthenticated = user?.isAuthenticated;
 
