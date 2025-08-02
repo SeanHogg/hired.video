@@ -53,6 +53,9 @@ export default function Index() {
     item: null,
   });
 
+  // AI Chat panel state
+  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+
   // Action handlers
   const handleOpenActions = (item: any) => {
     setActionsModal({ isOpen: true, item });
