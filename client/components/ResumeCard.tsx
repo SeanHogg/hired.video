@@ -22,6 +22,7 @@ interface ResumeCardProps {
   views?: number;
   privacy?: 'public' | 'recruiter_only' | 'private';
   isMaster?: boolean;
+  isActive?: boolean;
   parentId?: string;
   onView?: () => void;
   onActions?: () => void;
