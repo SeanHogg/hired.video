@@ -15,7 +15,7 @@ export default function FloatingAIButton({ className }: FloatingAIButtonProps) {
   return (
     <div className={cn("fixed bottom-6 right-6 z-40", className)}>
       <Button
-        onClick={onClick}
+        onClick={openAIChat}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className="w-14 h-14 rounded-full bg-gradient-to-r from-brand-purple to-brand-blue hover:from-brand-purple/90 hover:to-brand-blue/90 shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-white/20 group"
