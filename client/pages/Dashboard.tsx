@@ -59,14 +59,14 @@ export default function Dashboard() {
                   <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Dashboard
+                  HR Dashboard
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Your Personal Command Center
+                Your HR Command Center
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Access powerful insights, track your progress, and manage your career journey from one comprehensive dashboard.
+                Comprehensive talent management dashboard with social recruiting, ATS analytics, CRM insights, and recruitment marketing metrics all in one place.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
