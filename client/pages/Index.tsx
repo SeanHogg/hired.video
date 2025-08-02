@@ -283,7 +283,7 @@ export default function Index() {
           <div className="text-center max-w-4xl mx-auto">
             <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark">
               <Sparkles className="w-4 h-4 mr-2" />
-              All-in-One HR Platform
+              All-in-One AI HR Platform
             </Badge>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
