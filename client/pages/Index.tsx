@@ -239,8 +239,8 @@ export default function Index() {
           {/* Results Header */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-foreground mb-2">
-              {selectedCategory === "all" ? "All Videos" : 
-               selectedCategory === "resume" ? "Resume Videos" : "Job Description Videos"}
+              {selectedCategory === "all" ? "All" :
+               selectedCategory === "resume" ? "Resumes" : "Jobs"}
             </h2>
             <p className="text-muted-foreground">
               {filteredVideos.length} videos found
