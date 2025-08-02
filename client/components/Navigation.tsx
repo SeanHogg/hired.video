@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, Video, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+interface NavigationProps {
+  onMenuClick?: () => void;
+}
+
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
