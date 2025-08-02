@@ -54,7 +54,8 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+      const element = scrollAreaRef.current;
+      element.scrollTop = element.scrollHeight;
     }
   }, [messages]);
 
