@@ -179,12 +179,20 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
               </>
             ) : (
               <>
-                <span className="text-sm text-muted-foreground">
-                  Welcome, {user?.name}
-                </span>
-                <Button variant="ghost" onClick={logout} className="font-medium">
-                  Sign Out
-                </Button>
+                {/* Show upgrade button for free accounts */}
+                {(!user?.subscription || user?.subscription === 'free') ? (
+                  <Link to="/pricing">
+                    <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
+                      Upgrade Account
+                    </Button>
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="capitalize">
+                      {user?.subscription || 'Pro'} Plan
+                    </Badge>
+                  </div>
+                )}
               </>
             )}
           </div>
