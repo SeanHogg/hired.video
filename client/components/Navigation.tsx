@@ -33,10 +33,10 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
               variant="ghost"
               size="icon"
               onClick={onSidebarToggle}
-              className="hidden lg:flex"
+              className="hidden lg:flex h-12 w-12 -ml-2"
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </Button>
 
             <Link to="/" className="flex items-center space-x-2">
