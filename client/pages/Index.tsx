@@ -567,14 +567,7 @@ export default function Index() {
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
       />
 
-      {/* Floating AI Button */}
-      <FloatingAIButton onClick={() => setIsAIChatOpen(true)} />
 
-      {/* AI Chat Panel */}
-      <AIChatPanel
-        isOpen={isAIChatOpen}
-        onClose={() => setIsAIChatOpen(false)}
-      />
     </div>
   );
 }
