@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Brain, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAI } from "@/lib/ai-context";
 
 interface FloatingAIButtonProps {
-  onClick: () => void;
   className?: string;
 }
 
-export default function FloatingAIButton({ onClick, className }: FloatingAIButtonProps) {
+export default function FloatingAIButton({ className }: FloatingAIButtonProps) {
+  const { openAIChat } = useAI();
   const [isHovered, setIsHovered] = useState(false);
 
   return (
