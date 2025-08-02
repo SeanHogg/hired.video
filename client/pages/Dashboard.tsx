@@ -214,7 +214,7 @@ export default function Dashboard() {
 
   // Persona-specific metrics
   const getMetricsForPersona = () => {
-    switch (user.persona) {
+    switch (user.role) {
       case "job_seeker":
         return {
           title: "Job Seeker Dashboard",
