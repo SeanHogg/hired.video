@@ -198,13 +198,54 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
             <div className="flex flex-col space-y-4">
               {!isAuthenticated && (
                 <>
-                  <Link
-                    to="/features"
-                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Features
-                  </Link>
+                  {/* Mobile Features Menu */}
+                  <div>
+                    <button
+                      onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
+                      className="flex items-center justify-between w-full text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
+                    >
+                      Features
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isFeaturesOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isFeaturesOpen && (
+                      <div className="mt-2 ml-4 space-y-2">
+                        {navigationItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+                              onClick={() => {
+                                setIsMenuOpen(false);
+                                setIsFeaturesOpen(false);
+                              }}
+                            >
+                              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <Icon className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-sm">{item.name}</div>
+                                <div className="text-xs text-muted-foreground">{item.description}</div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                        <Link
+                          to="/features"
+                          className="flex items-center gap-2 p-2 text-sm font-medium text-primary"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setIsFeaturesOpen(false);
+                          }}
+                        >
+                          View All Features
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
                   <Link
                     to="/pricing"
                     className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
