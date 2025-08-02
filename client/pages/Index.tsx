@@ -182,6 +182,7 @@ export default function Index() {
       profession: "Data Scientist",
       company: "Stripe",
       createdAt: "2024-01-12",
+      ownerId: "company789",
     },
     {
       id: "5",
@@ -195,6 +196,7 @@ export default function Index() {
       profession: "Marketing Manager",
       company: "E-commerce",
       createdAt: "2024-01-11",
+      ownerId: "user456",
     },
     {
       id: "6",
