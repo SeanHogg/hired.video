@@ -1,13 +1,22 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import ResumeUpload from "@/components/ResumeUpload";
+import ResumeBuilder from "@/components/ResumeBuilder";
+import ResumeViewer from "@/components/ResumeViewer";
+import ResumeCard from "@/components/ResumeCard";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters } from "@/types/resume";
 import {
   FileText,
   Video,
@@ -22,11 +31,196 @@ import {
   Play,
   TrendingUp,
   Users,
+  Plus,
+  Search,
+  Filter,
+  Grid,
+  List,
+  Copy,
+  MoreHorizontal
 } from "lucide-react";
 
 export default function Resumes() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  // State management
+  const [view, setView] = useState<'list' | 'upload' | 'builder' | 'viewer'>('list');
+  const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
+  const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<ResumeSearchFilters>({});
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Sample data - replace with API calls
+  const sampleResumes: ResumeMetadata[] = [
+    {
+      id: 'resume_1',
+      name: 'Software Engineer Resume',
+      privacy: 'private',
+      isMaster: true,
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-20T14:30:00Z',
+      views: 45,
+      summary: 'Experienced software engineer with 5+ years in full-stack development...',
+      title: 'Senior Software Engineer'
+    },
+    {
+      id: 'resume_2',
+      name: 'Frontend Developer - React Specialist',
+      privacy: 'public',
+      isMaster: false,
+      parentId: 'resume_1',
+      createdAt: '2024-01-22T09:15:00Z',
+      updatedAt: '2024-01-22T16:45:00Z',
+      views: 23,
+      summary: 'Frontend specialist with expertise in React, TypeScript, and modern web technologies...',
+      title: 'Senior Frontend Developer'
+    }
+  ];
+
+  useEffect(() => {
+    if (id) {
+      loadResumeById(id);
+    } else {
+      loadResumes();
+    }
+  }, [id]);
+
+  const loadResumes = async () => {
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setResumes(sampleResumes);
+    } catch (error) {
+      console.error('Failed to load resumes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadResumeById = async (resumeId: string) => {
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const mockResume: Resume = {
+        id: resumeId,
+        name: 'Software Engineer Resume',
+        privacy: 'private',
+        isMaster: true,
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-20T14:30:00Z',
+        views: 45,
+        userId: user?.id || '',
+        data: {
+          Basics: {
+            Name: "Sean Hogg",
+            Label: "CTO and Technology Leader",
+            Image: "",
+            Email: "seanhogg@gmail.com",
+            Phone: "2488250176",
+            Url: "",
+            Summary: "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
+            Location: null
+          },
+          Work: [
+            {
+              Name: "OnTheClock",
+              Position: "CTO / Architect / Agile Practitioner",
+              Summary: "Led engineering teams and modernized processes",
+              StartDate: "2024-04-01",
+              EndDate: "2024-11-01",
+              Highlights: [
+                "Led onshore/offshore product engineering web & mobile teams",
+                "Modernized all engineering processes by teaching Scrum",
+                "Transformed Release Management into DevSecOps + GitOps"
+              ],
+              Url: ""
+            }
+          ],
+          Volunteer: [],
+          Education: [
+            {
+              Institution: "University of Windsor",
+              Area: "Computer Science",
+              StudyType: "Bachelor",
+              StartDate: "1999-01-01",
+              EndDate: "2004-12-01",
+              Score: "",
+              Courses: null,
+              Url: ""
+            }
+          ],
+          Awards: [],
+          Certificates: [],
+          Publications: [],
+          Skills: [
+            { Name: "JavaScript", Level: "Expert", Keywords: [] },
+            { Name: "React", Level: "Advanced", Keywords: [] },
+            { Name: "Node.js", Level: "Advanced", Keywords: [] }
+          ],
+          Languages: [],
+          Interests: [],
+          References: [],
+          Projects: []
+        }
+      };
+      setSelectedResume(mockResume);
+      setView('viewer');
+    } catch (error) {
+      console.error('Failed to load resume:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadSuccess = (response: ResumeUploadResponse) => {
+    setSuccessMessage('Resume uploaded successfully!');
+    setView('list');
+    loadResumes();
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
+  const handleCreateResume = (request: CreateResumeRequest) => {
+    setSuccessMessage('Resume created successfully!');
+    setView('list');
+    loadResumes();
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
+  const handleUpdateResume = (request: UpdateResumeRequest) => {
+    setSuccessMessage('Resume updated successfully!');
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
+  const handleResumeView = (resumeId: string) => {
+    navigate(`/resumes/${resumeId}`);
+  };
+
+  const handleCreateVariation = (parentId: string) => {
+    // Load parent resume data and pre-populate builder
+    setView('builder');
+  };
+
+  const filteredResumes = resumes.filter(resume => {
+    if (searchTerm && !resume.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+        !resume.summary.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    if (filters.privacy && resume.privacy !== filters.privacy) {
+      return false;
+    }
+    if (filters.isMaster !== undefined && resume.isMaster !== filters.isMaster) {
+      return false;
+    }
+    return true;
+  });
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -303,34 +497,219 @@ export default function Resumes() {
     );
   }
 
-  // If user is authenticated, show the actual resumes page (placeholder for now)
+  // Authenticated user resume management interface
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">Your Video Resumes</h1>
-            <p className="text-muted-foreground mb-8">Manage and track your video resumes.</p>
-            
-            <Card>
-              <CardContent className="p-8 text-center">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No resumes yet</h3>
-                <p className="text-muted-foreground mb-4">Create your first video resume to get started</p>
-                <Button>Create Video Resume</Button>
-              </CardContent>
-            </Card>
+            {/* Success Message */}
+            {successMessage && (
+              <Alert className="mb-6">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Upload View */}
+            {view === 'upload' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-3xl font-bold">Upload Resume</h1>
+                  <Button variant="outline" onClick={() => setView('list')}>
+                    Back to Resumes
+                  </Button>
+                </div>
+                <ResumeUpload
+                  onUploadSuccess={handleUploadSuccess}
+                  onCancel={() => setView('list')}
+                />
+              </div>
+            )}
+
+            {/* Builder View */}
+            {view === 'builder' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-3xl font-bold">Create Resume</h1>
+                  <Button variant="outline" onClick={() => setView('list')}>
+                    Back to Resumes
+                  </Button>
+                </div>
+                <ResumeBuilder
+                  onSave={handleCreateResume}
+                  onCancel={() => setView('list')}
+                />
+              </div>
+            )}
+
+            {/* Viewer View */}
+            {view === 'viewer' && selectedResume && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={() => { setView('list'); navigate('/resumes'); }}>
+                    ← Back to Resumes
+                  </Button>
+                </div>
+                <ResumeViewer
+                  resume={selectedResume}
+                  onUpdate={handleUpdateResume}
+                  onCreateVariation={handleCreateVariation}
+                  canEdit={true}
+                />
+              </div>
+            )}
+
+            {/* List View */}
+            {view === 'list' && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold">Your Resumes</h1>
+                    <p className="text-muted-foreground">Manage and track your resumes.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button onClick={() => setView('upload')} variant="outline">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Resume
+                    </Button>
+                    <Button onClick={() => setView('builder')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Resume
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Search and Filters */}
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search resumes..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      <Select
+                        value={filters.privacy || 'all'}
+                        onValueChange={(value) => setFilters({ ...filters, privacy: value === 'all' ? undefined : value as ResumePrivacy })}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Privacy" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Privacy</SelectItem>
+                          <SelectItem value="private">Private</SelectItem>
+                          <SelectItem value="recruiter_only">Recruiter Only</SelectItem>
+                          <SelectItem value="public">Public</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={filters.isMaster === undefined ? 'all' : filters.isMaster ? 'master' : 'variation'}
+                        onValueChange={(value) => setFilters({ ...filters, isMaster: value === 'all' ? undefined : value === 'master' })}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          <SelectItem value="master">Master</SelectItem>
+                          <SelectItem value="variation">Variation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => setViewMode('grid')}
+                          className="rounded-r-none"
+                        >
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={viewMode === 'list' ? 'default' : 'ghost'}
+                          size="sm"
+                          onClick={() => setViewMode('list')}
+                          className="rounded-l-none"
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Resume Grid/List */}
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground mt-4">Loading resumes...</p>
+                  </div>
+                ) : filteredResumes.length > 0 ? (
+                  <div className={`grid gap-6 ${
+                    viewMode === 'grid'
+                      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                      : 'grid-cols-1'
+                  }`}>
+                    {filteredResumes.map((resume) => (
+                      <ResumeCard
+                        key={resume.id}
+                        id={resume.id}
+                        name={resume.name}
+                        title={resume.title}
+                        summary={resume.summary}
+                        createdAt={resume.createdAt}
+                        views={resume.views}
+                        onView={() => handleResumeView(resume.id)}
+                        onActions={() => handleResumeView(resume.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">
+                        {searchTerm || Object.keys(filters).length > 0 ? 'No matching resumes' : 'No resumes yet'}
+                      </h3>
+                      <p className="text-muted-foreground mb-6">
+                        {searchTerm || Object.keys(filters).length > 0
+                          ? 'Try adjusting your search criteria or filters'
+                          : 'Create your first resume to get started'
+                        }
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        <Button onClick={() => setView('upload')} variant="outline">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Resume
+                        </Button>
+                        <Button onClick={() => setView('builder')}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Resume
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <Footer />
