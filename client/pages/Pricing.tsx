@@ -86,7 +86,7 @@ export default function Pricing() {
                     <span className="text-5xl font-bold">$0.00</span>
                   </div>
                   <CardDescription className="text-lg mt-4">
-                    The best All-in-one HR/ATS/Recruiting CRM on a budget — build a true talent pipeline.
+                    Essential HR platform features including ATS, social recruiting, and CRM — perfect for growing teams.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
