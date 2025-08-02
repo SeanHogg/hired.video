@@ -64,6 +64,7 @@ const App = () => (
               <Route path="/outreach" element={<Outreach />} />
               <Route path="/watch" element={<Watch />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/help" element={<Help />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
