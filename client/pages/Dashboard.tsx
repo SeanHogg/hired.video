@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/auth";
 import {
   Users,
