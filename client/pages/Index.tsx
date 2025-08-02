@@ -54,6 +54,39 @@ export default function Index() {
     item: null,
   });
 
+  // Action handlers
+  const handleOpenActions = (item: any) => {
+    setActionsModal({ isOpen: true, item });
+  };
+
+  const handleCloseActions = () => {
+    setActionsModal({ isOpen: false, item: null });
+  };
+
+  const handleView = (item: any) => {
+    console.log('View item:', item.id);
+  };
+
+  const handleShare = (item: any) => {
+    console.log('Share item:', item.id);
+  };
+
+  const handleEdit = (item: any) => {
+    console.log('Edit item:', item.id);
+  };
+
+  const handleDownload = (item: any) => {
+    console.log('Download item:', item.id);
+  };
+
+  const handleDelete = (item: any) => {
+    console.log('Delete item:', item.id);
+  };
+
+  const handleTrack = (item: any) => {
+    console.log('Track candidate:', item.id);
+  };
+
   // Mock data for AI-generated videos and resumes
   const contentItems = [
     {
