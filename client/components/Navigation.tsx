@@ -7,15 +7,24 @@ interface NavigationProps {
   onMenuClick?: () => void;
 }
 
-export default function Navigation() {
+export default function Navigation({ onMenuClick }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          {/* Sidebar Toggle + Logo */}
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="lg:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <Link to="/" className="flex items-center space-x-2">
             <div className="relative">
               <Video className="h-8 w-8 text-primary" />
               <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
@@ -23,7 +32,8 @@ export default function Navigation() {
             <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
               MyVideoResume
             </span>
-          </Link>
+            </Link>
+          </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
