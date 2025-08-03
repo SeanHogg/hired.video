@@ -495,12 +495,12 @@ export default function SearchBar({
                   <GraduationCap className="w-3 h-3" />
                   Education
                 </label>
-                <Select value={filters.education || ""} onValueChange={(value) => handleFilterChange('education', value)}>
+                <Select value={filters.education || "all"} onValueChange={(value) => handleFilterChange('education', value === 'all' ? undefined : value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Education</SelectItem>
+                    <SelectItem value="all">All Education</SelectItem>
                     <SelectItem value="high-school">High School</SelectItem>
                     <SelectItem value="associate">Associate Degree</SelectItem>
                     <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
