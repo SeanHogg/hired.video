@@ -127,6 +127,7 @@ export const MOCK_COMPANIES: Company[] = [
   },
   {
     id: MOCK_COMPANY_IDS.GROWTH_DYNAMICS,
+    slug: 'growth-dynamics',
     data: {
       name: 'Growth Dynamics',
       logo: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=100&h=100&fit=crop',
