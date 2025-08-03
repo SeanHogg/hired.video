@@ -176,7 +176,7 @@ export default function Index() {
       profession: "Marketing Manager",
       company: "GrowthCo",
       createdAt: "2024-01-28",
-      ownerId: "user_3", // Different user
+      ownerId: "5", // Different user
     },
     {
       id: "4",
