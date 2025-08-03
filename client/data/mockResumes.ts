@@ -438,6 +438,7 @@ export const MOCK_RESUMES: Resume[] = [
   },
   {
     id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
+    slug: 'michael-rodriguez-marketing-manager',
     name: 'Michael Rodriguez - Marketing Manager',
     data: {
       Basics: {
