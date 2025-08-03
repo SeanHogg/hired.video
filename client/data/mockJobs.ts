@@ -15,6 +15,7 @@ export const MOCK_JOB_IDS = {
 export const MOCK_JOBS: Job[] = [
   {
     id: MOCK_JOB_IDS.SENIOR_SOFTWARE_ENGINEER,
+    slug: 'senior-software-engineer-remote',
     data: {
       title: 'Senior Software Engineer',
       department: 'Engineering',
