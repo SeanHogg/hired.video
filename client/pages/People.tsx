@@ -314,13 +314,7 @@ export default function People() {
                     Discover Professionals
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {getUsersByFilters({
-                      search: searchFilters.search || "",
-                      role: searchFilters.role ? [searchFilters.role] : undefined,
-                      location: searchFilters.location,
-                      skills: searchFilters.skills ? searchFilters.skills.split(',').map(s => s.trim()) : undefined,
-                      openToWork: searchFilters.openToWork
-                    }).filter(person => person.id !== user?.id).map((person) => {
+                    {paginatedPeople.map((person) => {
                       const personMetadata = {
                         id: person.id,
                         firstName: person.data.firstName,
@@ -365,6 +359,15 @@ export default function People() {
                       );
                     })}
                   </div>
+
+                  {/* Pagination */}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredPeople.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
                 </div>
 
                 {/* Empty State */}
