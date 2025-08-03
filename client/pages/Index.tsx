@@ -68,7 +68,11 @@ export default function Index() {
   };
 
   const handleView = (item: any) => {
-    console.log('View item:', item.id);
+    if (item.type === 'resume') {
+      navigate(`/resumes/${item.id}`);
+    } else {
+      console.log('View item:', item.id);
+    }
   };
 
   const handleShare = (item: any) => {
