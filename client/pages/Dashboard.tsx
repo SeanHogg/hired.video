@@ -661,6 +661,97 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Your Content Library Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {currentFilter?.icon && <currentFilter.icon className="h-5 w-5" />}
+                    <CardTitle>Your Content Library</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4" />
+                      <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterTypes.map((filter) => (
+                            <SelectItem key={filter.id} value={filter.id}>
+                              <div className="flex items-center gap-2">
+                                <filter.icon className="h-4 w-4" />
+                                {filter.label}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-1 border rounded-md">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <CardDescription>
+                  Manage your saved content across all categories
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={selectedContentType} onValueChange={setSelectedContentType}>
+                  <TabsList className="grid w-full grid-cols-5">
+                    {contentTypes.map((type) => (
+                      <TabsTrigger key={type.id} value={type.id} className="flex items-center gap-2">
+                        <type.icon className="h-4 w-4" />
+                        <span className="hidden sm:inline">{type.label}</span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {contentTypes.map((type) => (
+                    <TabsContent key={type.id} value={type.id} className="mt-6">
+                      <div className={viewMode === "grid"
+                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                        : "space-y-2"
+                      }>
+                        {mockContent[type.id as keyof typeof mockContent]?.map((item) =>
+                          renderContentItem(item, type.id)
+                        )}
+                      </div>
+
+                      {mockContent[type.id as keyof typeof mockContent]?.length === 0 && (
+                        <div className="text-center py-12">
+                          <type.icon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-medium mb-2">No {type.label.toLowerCase()} found</h3>
+                          <p className="text-muted-foreground">
+                            {selectedFilter === "my-content" && `You haven't created any ${type.label.toLowerCase()} yet.`}
+                            {selectedFilter === "watch-later" && `You haven't saved any ${type.label.toLowerCase()} to watch later.`}
+                            {selectedFilter === "favorites" && `You haven't favorited any ${type.label.toLowerCase()} yet.`}
+                            {selectedFilter === "recent" && `You haven't viewed any ${type.label.toLowerCase()} recently.`}
+                          </p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
         </div>
         <Footer />
