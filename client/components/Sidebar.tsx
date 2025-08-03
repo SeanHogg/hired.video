@@ -53,12 +53,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
     { name: "Outreach", href: "/outreach", icon: Send },
   ];
 
-  const library = [
-    { name: "My Content", href: "/watch?filter=my-content", icon: User, count: 3 },
-    { name: "Watch Later", href: "/watch?filter=watch-later", icon: Clock, count: 12 },
-    { name: "Favorites", href: "/watch?filter=favorites", icon: Star, count: 8 },
-    { name: "Recently Viewed", href: "/watch?filter=recent", icon: Eye, count: 24 },
-  ];
+
 
   const categories = [
     { name: "Software Engineering", count: 156 },
@@ -146,66 +141,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
               </nav>
             </div>
 
-            {!collapsed && <Separator />}
 
-            {/* Library */}
-            <div>
-              {!collapsed && (
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Your Library
-                </h3>
-              )}
-              <nav className="space-y-1">
-                {library.map((item) => {
-                  // Check if this library item is currently active
-                  const isActive = location.pathname === "/watch" &&
-                    location.search.includes(item.href.split('?')[1]);
-
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={cn(
-                        "flex items-center text-sm font-medium rounded-md transition-colors",
-                        collapsed ? "px-2 py-2 justify-center" : "px-3 py-2 justify-between",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      )}
-                      onClick={onClose}
-                      title={collapsed ? `${item.name} (${item.count})` : undefined}
-                    >
-                      {collapsed ? (
-                        <div className="relative">
-                          <item.icon className="h-4 w-4" />
-                          {item.count && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full flex items-center justify-center">
-                              <span className="text-[8px] text-primary-foreground font-bold">
-                                {item.count > 9 ? "9+" : item.count}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center">
-                            <item.icon className="mr-3 h-4 w-4" />
-                            {item.name}
-                          </div>
-                          {item.count && (
-                            <Badge variant="secondary" className="text-xs">
-                              {item.count}
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {!collapsed && <Separator />}
 
             {/* Categories - Show only in expanded state */}
             {!collapsed && (
