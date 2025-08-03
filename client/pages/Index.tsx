@@ -106,17 +106,17 @@ export default function Index() {
       ownerId: "user456", // Different user
     },
     {
-      id: "1a",
-      name: "Bill Joeckel",
-      title: "Senior IT Recruiter",
-      summary: "More than Twenty years' experience in technical IT recruiting, talent acquisition, compliance and client relationship management.",
-      views: 847,
+      id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
+      name: "Sean Hogg",
+      title: "CTO and Technology Leader",
+      summary: "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
+      views: 45,
       type: "resume" as const,
       contentType: "text" as const,
-      profession: "IT Recruiter",
-      company: "Recruiting Agency",
-      createdAt: "2025-01-03",
-      ownerId: "user123", // Current user owns this
+      profession: "Technology Leader",
+      company: "HireFractionalTalent.com",
+      createdAt: "2024-01-15",
+      ownerId: "user_1", // Current user owns this
     },
     {
       id: "2",
