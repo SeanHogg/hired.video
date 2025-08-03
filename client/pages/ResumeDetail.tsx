@@ -115,7 +115,6 @@ export default function ResumeDetail() {
   
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
 
   // Mock data - in real app this would come from API
