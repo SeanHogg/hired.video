@@ -3,10 +3,14 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart-context";
 import { useSidebar } from "@/hooks/use-sidebar";
 import {
   Check,
@@ -33,11 +37,39 @@ import {
   Globe,
   TrendingUp,
   Handshake,
+  ShoppingCart,
+  Plus,
+  Minus,
 } from "lucide-react";
 
 export default function Pricing() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated } = useAuth();
+  const { addItem, openCart } = useCart();
+
+  // Pricing state
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState(1);
+
+  const basePrice = 9.95; // per user per month
+  const calculatePrice = (users: number, annual: boolean) => {
+    const monthlyTotal = basePrice * users;
+    if (annual) {
+      return monthlyTotal * 12 * 0.8; // 20% discount for annual
+    }
+    return monthlyTotal;
+  };
+
+  const handleAddToCart = () => {
+    addItem({
+      id: `premium-${selectedUsers}-${isAnnual ? 'annual' : 'monthly'}`,
+      name: 'Premium Plan',
+      price: calculatePrice(selectedUsers, isAnnual),
+      billingCycle: isAnnual ? 'annual' : 'monthly',
+      users: selectedUsers,
+    });
+    openCart();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
@@ -115,7 +147,13 @@ export default function Pricing() {
                         <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <Check className="h-3 w-3 text-green-600" />
                         </div>
-                        <span className="text-sm">Up to 5 Employees</span>
+                        <span className="text-sm">Up to 2 Employees</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <Check className="h-3 w-3 text-green-600" />
+                        </div>
+                        <span className="text-sm">AI Assistance (10 requests/month)</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -136,7 +174,7 @@ export default function Pricing() {
                     {!isAuthenticated ? (
                       <Link to="/signup" className="block">
                         <Button className="w-full" variant="outline" size="lg">
-                          Get Started Free
+                          Get Started
                         </Button>
                       </Link>
                     ) : (
