@@ -202,10 +202,9 @@ export default function ShoppingCart() {
               <Button
                 className="w-full"
                 onClick={handleCheckout}
-                disabled={isCheckingOut}
               >
                 <CreditCard className="h-4 w-4 mr-2" />
-                {isCheckingOut ? 'Processing...' : `Proceed to Checkout - $${totalPrice.toFixed(2)}`}
+                Proceed to Checkout - ${totalPrice.toFixed(2)}
               </Button>
 
               {/* Clear Cart */}
@@ -213,7 +212,6 @@ export default function ShoppingCart() {
                 variant="outline"
                 className="w-full"
                 onClick={clearCart}
-                disabled={isCheckingOut}
               >
                 Clear Cart
               </Button>
