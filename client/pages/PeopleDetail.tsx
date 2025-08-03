@@ -786,6 +786,14 @@ export default function PeopleDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        contentType="person"
+        title={`${person?.data.firstName} ${person?.data.lastName}` || 'Professional Profile'}
+      />
     </div>
   );
 }
