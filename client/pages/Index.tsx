@@ -14,6 +14,8 @@ import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { getPublicJobs } from "@/data/mockJobs";
+import { MOCK_COMPANIES } from "@/data/mockCompanies";
+import { MOCK_USERS } from "@/data/mockPeople";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
 
