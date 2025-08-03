@@ -534,41 +534,7 @@ export default function SearchBar({
         </Card>
       )}
 
-      {/* Active Filters Display */}
-      {getActiveFilterCount() > 0 && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
-          {Object.entries(filters).map(([key, value]) => {
-            if (value === undefined || value === "" || value === null) return null;
-            
-            let displayValue = value.toString();
-            if (key === 'openToWork') displayValue = value ? 'Open to work' : 'Not looking';
-            if (key === 'remote') displayValue = value ? 'Remote only' : 'On-site only';
-            if (key === 'isMaster') displayValue = value ? 'Master' : 'Variation';
-            
-            return (
-              <Button
-                key={key}
-                variant="secondary"
-                size="sm"
-                onClick={() => handleFilterChange(key, undefined)}
-                className="h-6 px-2 text-xs gap-1"
-              >
-                {displayValue}
-                <X className="w-3 h-3" />
-              </Button>
-            );
-          })}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearAllFilters}
-            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Clear all
-          </Button>
-        </div>
-      )}
+
     </div>
   );
 }
