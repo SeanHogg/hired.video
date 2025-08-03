@@ -11,6 +11,7 @@ import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
 
 import {
   Search,
