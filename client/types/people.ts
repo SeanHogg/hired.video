@@ -86,6 +86,7 @@ export type UserStatus = 'active' | 'inactive' | 'busy' | 'looking';
 
 export interface UserProfile {
   id: string;
+  slug: string; // User-friendly URL identifier (e.g., "john-seeker" or "jane-doe-123")
   data: UserData;
   role: 'job_seeker' | 'recruiter' | 'business'; // System role
   visibility: UserVisibility;
