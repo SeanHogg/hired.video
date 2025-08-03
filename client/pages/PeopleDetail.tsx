@@ -77,6 +77,10 @@ export default function PeopleDetail() {
   const connectionStatus = user && rawPerson ? getConnectionStatus(user.id, rawPerson.id) : 'none';
   const isOwnProfile = user && rawPerson && rawPerson.id === user.id;
 
+  // Check if person has an active public resume
+  const personResumes = rawPerson ? getResumesByUserId(rawPerson.id) : [];
+  const hasActivePublicResume = personResumes.some(resume => resume.privacy === 'public' && resume.isActive);
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
