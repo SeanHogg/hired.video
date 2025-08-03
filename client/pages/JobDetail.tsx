@@ -64,11 +64,16 @@ export default function JobDetail() {
   };
 
   const handleTrackJob = () => {
-    if (user && job) {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (user && rawJob) {
       if (isTracked) {
-        removeTrackedJob(job.id, user.id);
+        removeTrackedJob(rawJob.id, user.id);
       } else {
-        addTrackedJob(job.id, user.id);
+        addTrackedJob(rawJob.id, user.id);
       }
       // In a real app, you'd trigger a re-render here
     }
