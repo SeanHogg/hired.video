@@ -17,8 +17,8 @@ import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters } from "@/types/resume";
-import { MOCK_RESUME_METADATA, getResumesByUserId, generateResumeId } from '@/data/mockResumes';
+import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters, ResumeWithOwnership } from "@/types/resume";
+import { MOCK_RESUME_METADATA, getResumesByUserId, generateResumeId, getAllResumesForUser, isResumeTrackedByUser, addTrackedResume, removeTrackedResume } from '@/data/mockResumes';
 import {
   FileText,
   Video,
@@ -58,7 +58,7 @@ export default function Resumes() {
   // State management
   const [view, setView] = useState<'list' | 'upload' | 'builder' | 'viewer'>('list');
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
-  const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
+  const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<ResumeSearchFilters>({});
@@ -76,9 +76,44 @@ export default function Resumes() {
   });
 
   // Get user's resumes from centralized mock data
-  const getUserResumes = (): ResumeMetadata[] => {
+  const getUserResumes = (): ResumeWithOwnership[] => {
     if (!user?.id) return [];
-    return MOCK_RESUME_METADATA.filter(resume => resume.userId === user.id);
+
+    const { owned, tracked } = getAllResumesForUser(user.id);
+
+    const ownedWithOwnership: ResumeWithOwnership[] = owned.map(resume => ({
+      id: resume.id,
+      name: resume.name,
+      privacy: resume.privacy,
+      isMaster: resume.isMaster,
+      isActive: resume.isActive,
+      parentId: resume.parentId,
+      createdAt: resume.createdAt,
+      updatedAt: resume.updatedAt,
+      views: resume.views,
+      summary: resume.data.Basics.Summary,
+      title: resume.data.Basics.Label,
+      userId: resume.userId,
+      ownership: 'owned' as const
+    }));
+
+    const trackedWithOwnership: ResumeWithOwnership[] = tracked.map(resume => ({
+      id: resume.id,
+      name: resume.name,
+      privacy: resume.privacy,
+      isMaster: resume.isMaster,
+      isActive: resume.isActive,
+      parentId: resume.parentId,
+      createdAt: resume.createdAt,
+      updatedAt: resume.updatedAt,
+      views: resume.views,
+      summary: resume.data.Basics.Summary,
+      title: resume.data.Basics.Label,
+      userId: resume.userId,
+      ownership: 'tracked' as const
+    }));
+
+    return [...ownedWithOwnership, ...trackedWithOwnership];
   };
 
   useEffect(() => {
@@ -253,8 +288,18 @@ export default function Resumes() {
   };
 
   const handleTrack = (item: any) => {
-    setSuccessMessage('Candidate added to tracking list!');
-    setTimeout(() => setSuccessMessage(null), 3000);
+    if (user?.id && item.id) {
+      if (isResumeTrackedByUser(item.id, user.id)) {
+        removeTrackedResume(item.id, user.id);
+        setSuccessMessage('Resume removed from tracking list!');
+      } else {
+        addTrackedResume(item.id, user.id);
+        setSuccessMessage('Resume added to tracking list!');
+      }
+      // Refresh the resume list
+      setResumes(getUserResumes());
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
   };
 
   const handleSetActive = (resumeId: string) => {
@@ -673,9 +718,14 @@ export default function Resumes() {
                           Active: {getActiveResume()?.name}
                         </Badge>
                       )}
-                      {!getActiveResume() && (
+                      {!getActiveResume() && user?.role === 'job_seeker' && (
                         <Badge variant="outline" className="text-orange-600 border-orange-200">
                           No active resume
+                        </Badge>
+                      )}
+                      {(user?.role === 'recruiter' || user?.role === 'business') && (
+                        <Badge variant="outline" className="text-blue-600 border-blue-200">
+                          {user.role === 'recruiter' ? 'Recruiter' : 'Business'} • Tracking {resumes.filter(r => r.ownership === 'tracked').length} resumes
                         </Badge>
                       )}
                     </div>
