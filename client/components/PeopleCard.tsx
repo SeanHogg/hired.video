@@ -113,7 +113,7 @@ export default function PeopleCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg hover:text-primary truncate">
-                  <Link to={`/people/view/${person.id}`}>
+                  <Link to={`/people/${person.id}`}>
                     {person.fullName}
                   </Link>
                 </CardTitle>
