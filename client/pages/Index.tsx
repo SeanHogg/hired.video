@@ -149,7 +149,7 @@ export default function Index() {
       profession: "Software Engineer",
       company: "TechCorp Inc",
       createdAt: "2024-01-10",
-      ownerId: "user_2", // Different user
+      ownerId: "4", // Different user
     },
     {
       id: "3",
