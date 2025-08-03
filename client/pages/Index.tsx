@@ -253,6 +253,8 @@ export default function Index() {
 
   const categories = [
     { id: "all", label: "All", icon: TrendingUp },
+    { id: "people", label: "People", icon: User },
+    { id: "companies", label: "Companies", icon: Building2 },
     { id: "resume", label: "Resumes", icon: User },
     { id: "job_description", label: "Jobs", icon: Briefcase },
   ];
@@ -347,7 +349,6 @@ export default function Index() {
               context="all"
               value={searchFilters.search}
               filters={searchFilters}
-              showAdvanced={true}
               onSearch={handleSearch}
               onFilterChange={handleFilterChange}
               onClearFilters={handleClearFilters}
