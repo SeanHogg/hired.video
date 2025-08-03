@@ -18,6 +18,7 @@ import ActionsModal from "@/components/ActionsModal";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters } from "@/types/resume";
+import { MOCK_RESUME_METADATA, getResumesByUserId, generateResumeId } from '@/data/mockResumes';
 import {
   FileText,
   Video,
