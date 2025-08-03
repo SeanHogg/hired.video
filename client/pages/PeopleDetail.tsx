@@ -57,8 +57,9 @@ import {
 export default function PeopleDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     about: true,
     experience: true,
@@ -69,10 +70,11 @@ export default function PeopleDetail() {
   const [connectionMessage, setConnectionMessage] = useState('');
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
 
-  const person = id ? getUserById(id) : null;
-  const isTracked = user && person ? isPersonTrackedByUser(person.id, user.id) : false;
-  const connectionStatus = user && person ? getConnectionStatus(user.id, person.id) : 'none';
-  const isOwnProfile = user && person && person.id === user.id;
+  const rawPerson = id ? getUserById(id) : null;
+  const person = rawPerson ? (isAuthenticated ? rawPerson : generateFakePersonData(rawPerson)) : null;
+  const isTracked = user && rawPerson ? isPersonTrackedByUser(rawPerson.id, user.id) : false;
+  const connectionStatus = user && rawPerson ? getConnectionStatus(user.id, rawPerson.id) : 'none';
+  const isOwnProfile = user && rawPerson && rawPerson.id === user.id;
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
