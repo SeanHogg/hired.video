@@ -87,6 +87,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.PRODUCT_MARKETING_MANAGER,
+    slug: 'product-marketing-manager-growth',
     data: {
       title: 'Product Marketing Manager',
       department: 'Marketing',
