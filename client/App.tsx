@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { AIProvider } from "@/lib/ai-context";
+import { CartProvider } from "@/lib/cart-context";
 import FloatingAIButton from "./components/FloatingAIButton";
 import AIChatPanel from "./components/AIChatPanel";
 import Index from "./pages/Index";
