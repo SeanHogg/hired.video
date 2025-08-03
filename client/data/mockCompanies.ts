@@ -517,6 +517,10 @@ export const getCompanyById = (id: string): Company | undefined => {
   return MOCK_COMPANIES.find(company => company.id === id);
 };
 
+export const getCompanyBySlug = (slug: string): Company | undefined => {
+  return MOCK_COMPANIES.find(company => company.slug === slug);
+};
+
 export const getCompanyMetadataById = (id: string): CompanyMetadata | undefined => {
   return MOCK_COMPANY_METADATA.find(company => company.id === id);
 };
