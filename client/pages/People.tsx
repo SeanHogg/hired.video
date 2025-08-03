@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import PeopleCard from "@/components/PeopleCard";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { 
@@ -51,6 +52,40 @@ export default function People() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+
+  // Get filtered people data
+  const getFilteredPeople = () => {
+    const searchQuery = searchFilters.search || "";
+    return getUsersByFilters({
+      search: searchQuery,
+      role: searchFilters.role ? [searchFilters.role] : undefined,
+      location: searchFilters.location,
+      skills: searchFilters.skills ? searchFilters.skills.split(',').map(s => s.trim()) : undefined,
+      openToWork: searchFilters.openToWork
+    }).filter(person => person.id !== user?.id);
+  };
+
+  const filteredPeople = getFilteredPeople();
+
+  // Pagination logic
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange
+  } = usePagination(filteredPeople.length, 9);
+
+  // Update pagination when filtered people change
+  useEffect(() => {
+    handleTotalItemsChange(filteredPeople.length);
+  }, [filteredPeople.length, handleTotalItemsChange]);
+
+  // Get paginated people
+  const paginatedPeople = filteredPeople.slice(startIndex, endIndex);
 
   // Get people based on user role and authentication
   const getPeopleForUser = () => {
