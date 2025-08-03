@@ -107,14 +107,11 @@ class AIService {
       };
 
     } catch (error) {
+      // Handle both API errors and configuration errors
       logger.error('AI service error', error);
 
-      // Fallback to mock response on error
+      // Fallback to mock response on any error
       logger.warn('Falling back to mock response due to AI service error');
-      return this.getMockResponse(messages[messages.length - 1]?.content || '');
-    } catch (configError) {
-      // Handle configuration errors
-      logger.error('AI service configuration error', configError);
       return this.getMockResponse(messages[messages.length - 1]?.content || '');
     }
   }
