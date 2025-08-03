@@ -367,6 +367,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.FRONTEND_DEVELOPER,
+    slug: 'frontend-developer-react-typescript',
     data: {
       title: 'Frontend Developer',
       department: 'Engineering',
