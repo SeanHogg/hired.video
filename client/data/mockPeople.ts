@@ -695,3 +695,28 @@ export const generateUserId = (): string => {
     return v.toString(16);
   });
 };
+
+// Auto-track people when user tracks jobs/companies from those people
+export const autoTrackPersonFromJob = (jobUserId: string, userId: string): void => {
+  if (jobUserId !== userId && !isPersonTrackedByUser(jobUserId, userId)) {
+    addTrackedPerson(jobUserId, userId);
+  }
+};
+
+export const autoTrackPersonFromCompany = (companyUserId: string, userId: string): void => {
+  if (companyUserId !== userId && !isPersonTrackedByUser(companyUserId, userId)) {
+    addTrackedPerson(companyUserId, userId);
+  }
+};
+
+// Helper function to get people associated with companies
+export const getPeopleByCompanyId = (companyId: string): UserProfile[] => {
+  return MOCK_USERS.filter(user => user.companyId === companyId);
+};
+
+// Helper function to get people who posted specific jobs
+export const getPersonByJobId = (jobId: string): UserProfile | undefined => {
+  // This would integrate with the jobs system to find job owners
+  // For now, return undefined as jobs have their own user mapping
+  return undefined;
+};
