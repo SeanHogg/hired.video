@@ -211,10 +211,66 @@ export default function Pricing() {
                 </div>
                 <CardHeader className="text-center pb-8">
                   <CardTitle className="text-2xl">Premium</CardTitle>
-                  <div className="mt-4">
-                    <span className="text-5xl font-bold">$9.95</span>
-                    <span className="text-lg text-muted-foreground ml-2">/ user / month</span>
+
+                  {/* User Selection */}
+                  <div className="mt-4 space-y-4">
+                    <div className="flex items-center justify-center gap-4">
+                      <Label htmlFor="user-select">Number of users:</Label>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setSelectedUsers(Math.max(1, selectedUsers - 1))}
+                          disabled={selectedUsers <= 1}
+                          className="h-8 w-8"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Select
+                          value={selectedUsers.toString()}
+                          onValueChange={(value) => setSelectedUsers(parseInt(value))}
+                        >
+                          <SelectTrigger className="w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                              <SelectItem key={num} value={num.toString()}>
+                                {num}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setSelectedUsers(Math.min(20, selectedUsers + 1))}
+                          disabled={selectedUsers >= 20}
+                          className="h-8 w-8"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="text-center">
+                      <span className="text-5xl font-bold">
+                        ${isAnnual
+                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(2)
+                          : calculatePrice(selectedUsers, false).toFixed(2)
+                        }
+                      </span>
+                      <span className="text-lg text-muted-foreground ml-2">
+                        / {isAnnual ? 'month (billed annually)' : 'month'}
+                      </span>
+                      {isAnnual && (
+                        <div className="text-sm text-green-600 mt-2">
+                          Save ${(calculatePrice(selectedUsers, false) * 12 - calculatePrice(selectedUsers, true)).toFixed(2)} per year!
+                        </div>
+                      )}
+                    </div>
                   </div>
+
                   <CardDescription className="text-lg mt-4">
                     All FREE features plus advanced tools for growing teams
                   </CardDescription>
