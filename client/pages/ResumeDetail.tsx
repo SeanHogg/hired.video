@@ -581,6 +581,14 @@ export default function ResumeDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        contentType="resume"
+        title={resume?.data.Basics.Name || 'Professional Profile'}
+      />
     </div>
   );
 }
