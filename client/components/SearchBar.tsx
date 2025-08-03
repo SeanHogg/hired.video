@@ -368,8 +368,8 @@ export default function SearchBar({
         </div>
 
         {/* Quick Filter Buttons */}
-        {context !== 'all' && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {context !== 'all' && (
             <Button
               variant="outline"
               size="sm"
@@ -384,21 +384,21 @@ export default function SearchBar({
                 </span>
               )}
             </Button>
+          )}
 
-            {context === 'all' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="gap-2"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                Advanced
-                <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
-              </Button>
-            )}
-          </div>
-        )}
+          {context === 'all' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="gap-2"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Advanced
+              <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Basic Filters Panel */}
