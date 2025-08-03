@@ -348,6 +348,9 @@ export default function Index() {
                 <p className="text-muted-foreground">
                   {filteredItems.length} items found
                   {searchFilters.search && ` for "${searchFilters.search}"`}
+                  {filteredItems.length > itemsPerPage &&
+                    ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`
+                  }
                 </p>
               </div>
 
