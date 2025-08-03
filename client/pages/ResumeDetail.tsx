@@ -13,6 +13,7 @@ import ResumeViewer from '@/components/ResumeViewer';
 import { useAuth } from '@/lib/auth';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { Resume, ResumeData } from '@/types/resume';
+import { getResumeById } from '@/data/mockResumes';
 import {
   ArrowLeft,
   Edit,
@@ -231,21 +232,12 @@ export default function ResumeDetail() {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        const mockResume: Resume = {
-          id: id || 'resume_3',
-          name: 'Sean Hogg - CTO Resume',
-          data: mockResumeData,
-          privacy: 'public',
-          isMaster: false,
-          isActive: true,
-          parentId: 'resume_1',
-          createdAt: '2024-01-25T11:30:00Z',
-          updatedAt: '2024-01-25T15:20:00Z',
-          views: 47,
-          userId: user?.id || 'user_1'
-        };
+        const foundResume = getResumeById(id!);
+        if (!foundResume) {
+          throw new Error('Resume not found');
+        }
         
-        setResume(mockResume);
+        setResume(foundResume);
       } catch (error) {
         console.error('Failed to load resume:', error);
       } finally {
@@ -344,37 +336,7 @@ export default function ResumeDetail() {
     );
   }
 
-  if (isEditing) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
-            <ResumeViewer
-              resume={resume}
-              onUpdate={handleUpdateResume}
-              canEdit={isOwner}
-            />
-            <div className="max-w-4xl mx-auto mt-6">
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to View Mode
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Remove the editing view since we now have a separate edit page
 
   return (
     <div className="min-h-screen bg-background">
@@ -429,7 +391,7 @@ export default function ResumeDetail() {
                   {isOwner && (
                     <Button 
                       variant="secondary"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => navigate(`/resumes/edit/${resume.id}`)}
                       className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                     >
                       <Edit className="w-4 h-4 mr-2" />
