@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
-import LoginModal from '@/components/LoginModal';
+import AuthOverlay from '@/components/AuthOverlay';
 import { useAuth } from '@/lib/auth';
 import { generateFakePersonData } from '@/lib/fakeData';
 import { useSidebar } from '@/hooks/use-sidebar';
@@ -59,7 +59,7 @@ export default function PeopleDetail() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     about: true,
     experience: true,
@@ -85,7 +85,6 @@ export default function PeopleDetail() {
 
   const handleTrackPerson = () => {
     if (!isAuthenticated) {
-      setShowLoginModal(true);
       return;
     }
 
@@ -101,7 +100,6 @@ export default function PeopleDetail() {
 
   const handleSendConnectionRequest = () => {
     if (!isAuthenticated) {
-      setShowLoginModal(true);
       return;
     }
 
@@ -115,7 +113,6 @@ export default function PeopleDetail() {
 
   const handleAcceptConnection = () => {
     if (!isAuthenticated) {
-      setShowLoginModal(true);
       return;
     }
 
@@ -223,34 +220,10 @@ export default function PeopleDetail() {
         
         <div className={`pt-16 ${!isAuthenticated ? 'relative' : ''}`}>
           {!isAuthenticated && (
-            <>
-              {/* Blur overlay */}
-              <div
-                className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 cursor-pointer"
-                onClick={() => setShowLoginModal(true)}
-              />
-              {/* Login prompt overlay */}
-              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-                <div className="bg-background/95 backdrop-blur-md border rounded-lg p-6 max-w-md text-center shadow-lg pointer-events-auto">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <Users className="h-6 w-6" />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">Connect with Professionals</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Sign in to view complete professional profiles and build your network.
-                  </p>
-                  <Button
-                    onClick={() => setShowLoginModal(true)}
-                    className="w-full"
-                  >
-                    Sign In to Connect
-                    <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                  </Button>
-                </div>
-              </div>
-            </>
+            <AuthOverlay
+              contentType="person"
+              title={`${person?.data.firstName} ${person?.data.lastName}`}
+            />
           )}
           <div className="max-w-6xl mx-auto p-6">
             {/* Back Button */}
