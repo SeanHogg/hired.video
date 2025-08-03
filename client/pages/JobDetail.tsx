@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
-import LoginModal from '@/components/LoginModal';
+import AuthOverlay from '@/components/AuthOverlay';
 import { useAuth } from '@/lib/auth';
 import { generateFakeJobData } from '@/lib/fakeData';
 import { useSidebar } from '@/hooks/use-sidebar';
@@ -43,7 +43,7 @@ export default function JobDetail() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const [showLoginModal, setShowLoginModal] = useState(false);
+
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     responsibilities: true,
     requirements: true,
@@ -65,7 +65,6 @@ export default function JobDetail() {
 
   const handleTrackJob = () => {
     if (!isAuthenticated) {
-      setShowLoginModal(true);
       return;
     }
 
@@ -142,34 +141,10 @@ export default function JobDetail() {
 
         <div className={`pt-16 ${!isAuthenticated ? 'relative' : ''}`}>
           {!isAuthenticated && (
-            <>
-              {/* Blur overlay */}
-              <div
-                className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 cursor-pointer"
-                onClick={() => setShowLoginModal(true)}
-              />
-              {/* Login prompt overlay */}
-              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-                <div className="bg-background/95 backdrop-blur-md border rounded-lg p-6 max-w-md text-center shadow-lg pointer-events-auto">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <Briefcase className="h-6 w-6" />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">Access Full Job Details</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Sign in to view complete job descriptions, salary information, and apply directly to positions.
-                  </p>
-                  <Button
-                    onClick={() => setShowLoginModal(true)}
-                    className="w-full"
-                  >
-                    Sign In to Apply
-                    <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                  </Button>
-                </div>
-              </div>
-            </>
+            <AuthOverlay
+              contentType="job"
+              title={job?.data.title}
+            />
           )}
           <div className="max-w-6xl mx-auto p-6">
             {/* Back Button */}
@@ -234,7 +209,7 @@ export default function JobDetail() {
                                   </>
                                 )}
                               </Button>
-                              <Button onClick={() => isAuthenticated ? null : setShowLoginModal(true)}>
+                              <Button onClick={() => isAuthenticated ? null : null} disabled={!isAuthenticated}>
                                 Apply Now
                                 <ExternalLink className="h-4 w-4 ml-2" />
                               </Button>
@@ -545,7 +520,8 @@ export default function JobDetail() {
                       <Button
                         className="w-full"
                         size="lg"
-                        onClick={() => isAuthenticated ? null : setShowLoginModal(true)}
+                        onClick={() => isAuthenticated ? null : null}
+                        disabled={!isAuthenticated}
                       >
                         Apply Now
                         <ExternalLink className="h-4 w-4 ml-2" />
@@ -606,13 +582,7 @@ export default function JobDetail() {
         </div>
       </div>
 
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        contentType="job"
-        title={job?.data.title || 'Job Details'}
-      />
+
     </div>
   );
 }
