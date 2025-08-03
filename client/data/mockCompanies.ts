@@ -482,6 +482,7 @@ export const MOCK_COMPANY_METADATA: CompanyMetadata[] = MOCK_COMPANIES.map(compa
 
   return {
     id: company.id,
+    slug: company.slug,
     name: company.data.name,
     logo: company.data.logo,
     tagline: company.data.tagline,
