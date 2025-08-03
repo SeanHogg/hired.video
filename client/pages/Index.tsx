@@ -122,7 +122,7 @@ export default function Index() {
       profession: "Technology Leader",
       company: "HireFractionalTalent.com",
       createdAt: "2024-01-15",
-      ownerId: "user_1", // Current user owns this
+      ownerId: "1", // John Seeker owns this
     },
     {
       id: "2",
