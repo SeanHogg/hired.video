@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import {
@@ -47,6 +48,39 @@ export default function Jobs() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+
+  // Get filtered jobs data
+  const getFilteredJobs = () => {
+    return getJobsByFilters({
+      search: searchFilters.search || "",
+      location: searchFilters.location,
+      employmentType: searchFilters.employmentType,
+      experienceLevel: searchFilters.experienceLevel,
+      remote: searchFilters.remote
+    });
+  };
+
+  const filteredJobs = getFilteredJobs();
+
+  // Pagination logic
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange
+  } = usePagination(filteredJobs.length, 9);
+
+  // Update pagination when filtered jobs change
+  useEffect(() => {
+    handleTotalItemsChange(filteredJobs.length);
+  }, [filteredJobs.length, handleTotalItemsChange]);
+
+  // Get paginated jobs
+  const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
 
   // Get jobs based on user role and authentication
   const getJobsForUser = () => {
