@@ -501,7 +501,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-28T14:00:00Z',
     updatedAt: '2024-01-28T14:00:00Z',
     views: 2,
-    userId: '5' // Different job seeker
+    userId: 'u5b6c7d8-e9f0-1234-5678-901234567890' // Maria Garcia
   }
 ];
 
