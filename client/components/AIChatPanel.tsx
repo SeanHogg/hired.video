@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAI } from "@/lib/ai-context";
+import { sendHRMessage, isAIServiceConfigured, type ChatMessage } from "@/lib/services/ai-service";
 
 interface Message {
   id: string;
@@ -38,7 +39,9 @@ export default function AIChatPanel() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isAIConfigured = isAIServiceConfigured();
 
   const quickSuggestions = [
     { text: "Optimize my resume", icon: FileText },
@@ -69,46 +72,44 @@ export default function AIChatPanel() {
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(content);
+    try {
+      // Send message to AI service
+      const response = await sendHRMessage(content.trim(), conversationHistory);
+
+      // Update conversation history
+      const newHistory: ChatMessage[] = [
+        ...conversationHistory,
+        { role: 'user', content: content.trim() },
+        { role: 'assistant', content: response.message },
+      ];
+      setConversationHistory(newHistory);
+
+      // Add AI response
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: aiResponse,
+        content: response.message,
         sender: "ai",
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error) {
+      console.error('AI service error:', error);
+
+      // Fallback to mock response
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I apologize, but I'm having trouble connecting to the AI service right now. Please try again in a moment.",
+        sender: "ai",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 1500);
+    }
   };
 
-  const generateAIResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes("resume") || input.includes("cv")) {
-      return "🎯 I can help optimize your resume! Our AI analyzes your resume for ATS compatibility, suggests keyword improvements, and provides personalized recommendations. Would you like me to:\n\n• Scan your current resume for improvements\n• Suggest industry-specific keywords\n• Create a video resume script\n• Compare against job descriptions";
-    }
-    
-    if (input.includes("job") || input.includes("career") || input.includes("position")) {
-      return "💼 Great! I can help you find the perfect job opportunities. Our platform uses AI to match you with positions based on:\n\n• Skills and experience alignment\n• Salary expectations\n• Company culture fit\n• Growth potential\n\nWould you like me to start analyzing available positions for you?";
-    }
-    
-    if (input.includes("recruit") || input.includes("hire") || input.includes("talent")) {
-      return "🎯 Excellent! As a recruiter, I can help you:\n\n• Source passive candidates with AI matching\n• Create compelling job descriptions\n• Automate outreach campaigns\n• Track hiring metrics and ROI\n• Build talent pipelines\n\nWhich recruiting challenge would you like to tackle first?";
-    }
-    
-    if (input.includes("analytics") || input.includes("data") || input.includes("metrics")) {
-      return "📊 I can provide insights on your HR analytics! Our platform tracks:\n\n• Time-to-hire metrics\n• Candidate quality scores\n• Conversion rates\n• Cost-per-hire analysis\n• Employee retention data\n\nWhat specific metrics would you like to explore?";
-    }
-    
-    if (input.includes("help") || input.includes("how") || input.includes("what")) {
-      return "💡 I'm here to help with all aspects of HR and talent management! I can assist with:\n\n🎯 **For Job Seekers:**\n• Resume optimization\n• Job matching\n• Interview preparation\n• Career guidance\n\n👥 **For Recruiters:**\n• Candidate sourcing\n• Outreach automation\n• Pipeline management\n• Performance analytics\n\nWhat would you like to explore?";
-    }
-    
-    // Default response
-    return "🤖 That's an interesting question! I'm constantly learning about HR and talent management. Based on what you've shared, I'd recommend exploring our:\n\n• AI-powered resume tools\n• Smart job matching system\n• Recruitment automation features\n• Analytics dashboard\n\nIs there a specific area you'd like to dive deeper into?";
-  };
+
 
   const handleQuickSuggestion = (suggestion: string) => {
     handleSendMessage(suggestion);
@@ -240,7 +241,10 @@ export default function AIChatPanel() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            AI responses are simulated for demo purposes
+            {isAIConfigured
+              ? "Powered by OpenRouter AI"
+              : "AI service not configured - using demo responses"
+            }
           </p>
         </div>
       </div>

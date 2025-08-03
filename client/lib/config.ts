@@ -65,6 +65,12 @@ const ConfigSchema = z.object({
   SEARCH_DEBOUNCE_MS: z.coerce.number().min(100).default(300),
   SEARCH_MIN_QUERY_LENGTH: z.coerce.number().min(1).default(2),
   
+  // AI Configuration
+  OPENROUTER_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default('openai/gpt-4o'),
+  AI_MAX_TOKENS: z.coerce.number().min(100).max(4000).default(1000),
+  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
+
   // External Services
   GOOGLE_ANALYTICS_ID: z.string().optional(),
   HOTJAR_ID: z.string().optional(),
@@ -135,6 +141,12 @@ function loadConfig(): z.infer<typeof ConfigSchema> {
     SEARCH_DEBOUNCE_MS: import.meta.env.VITE_SEARCH_DEBOUNCE_MS,
     SEARCH_MIN_QUERY_LENGTH: import.meta.env.VITE_SEARCH_MIN_QUERY_LENGTH,
     
+    // AI Configuration
+    OPENROUTER_API_KEY: import.meta.env.VITE_OPENROUTER_API_KEY,
+    AI_MODEL: import.meta.env.VITE_AI_MODEL,
+    AI_MAX_TOKENS: import.meta.env.VITE_AI_MAX_TOKENS,
+    AI_TEMPERATURE: import.meta.env.VITE_AI_TEMPERATURE,
+
     // External Services
     GOOGLE_ANALYTICS_ID: import.meta.env.VITE_GOOGLE_ANALYTICS_ID,
     HOTJAR_ID: import.meta.env.VITE_HOTJAR_ID,
@@ -265,6 +277,18 @@ export function getSearchConfig() {
   return {
     debounceMs: config.SEARCH_DEBOUNCE_MS,
     minQueryLength: config.SEARCH_MIN_QUERY_LENGTH,
+  };
+}
+
+/**
+ * Get AI configuration
+ */
+export function getAIConfig() {
+  return {
+    apiKey: config.OPENROUTER_API_KEY,
+    model: config.AI_MODEL,
+    maxTokens: config.AI_MAX_TOKENS,
+    temperature: config.AI_TEMPERATURE,
   };
 }
 
