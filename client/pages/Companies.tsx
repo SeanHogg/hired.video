@@ -3,12 +3,11 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import CompanyCard from "@/components/CompanyCard";
+import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { 
@@ -47,11 +46,7 @@ import {
 export default function Companies() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [industryFilter, setIndustryFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
 
   // Get companies based on user role and authentication
   const getCompaniesForUser = () => {
@@ -136,11 +131,16 @@ export default function Companies() {
     }
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setIndustryFilter("");
-    setSizeFilter("");
-    setLocationFilter("");
+  const handleSearch = (query: string) => {
+    setSearchFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({});
   };
 
   // If user is authenticated, show the actual companies page
@@ -188,79 +188,15 @@ export default function Companies() {
               </div>
 
               {/* Search and Filters */}
-              <div className="mb-6 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search companies, industries, or locations..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="shrink-0"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                  </Button>
-                </div>
-
-                {showFilters && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Industry</label>
-                          <Select value={industryFilter} onValueChange={setIndustryFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All industries" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All industries</SelectItem>
-                              <SelectItem value="Technology">Technology</SelectItem>
-                              <SelectItem value="Marketing Technology">Marketing Technology</SelectItem>
-                              <SelectItem value="Cloud Infrastructure">Cloud Infrastructure</SelectItem>
-                              <SelectItem value="Web Development">Web Development</SelectItem>
-                              <SelectItem value="Venture Capital">Venture Capital</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Company Size</label>
-                          <Select value={sizeFilter} onValueChange={setSizeFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All sizes" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All sizes</SelectItem>
-                              <SelectItem value="1-10">1-10 employees</SelectItem>
-                              <SelectItem value="10-50">10-50 employees</SelectItem>
-                              <SelectItem value="50-200">50-200 employees</SelectItem>
-                              <SelectItem value="200-500">200-500 employees</SelectItem>
-                              <SelectItem value="500+">500+ employees</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Location</label>
-                          <Input 
-                            placeholder="City, State"
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={clearFilters}>
-                        <X className="h-3 w-3 mr-1" />
-                        Clear Filters
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
+              <div className="mb-6">
+                <SearchBar
+                  context="companies"
+                  value={searchFilters.search}
+                  filters={searchFilters}
+                  onSearch={handleSearch}
+                  onFilterChange={handleFilterChange}
+                  onClearFilters={handleClearFilters}
+                />
               </div>
 
               {/* Company Listings */}
@@ -316,10 +252,10 @@ export default function Companies() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {getCompaniesByFilters({
-                        search: searchQuery,
-                        industry: industryFilter ? [industryFilter] : undefined,
-                        size: sizeFilter ? [sizeFilter] : undefined,
-                        location: locationFilter
+                        search: searchFilters.search || "",
+                        industry: searchFilters.industry ? [searchFilters.industry] : undefined,
+                        size: searchFilters.size ? [searchFilters.size] : undefined,
+                        location: searchFilters.location
                       }).map((company) => {
                         const companyMetadata = {
                           id: company.id,
