@@ -536,6 +536,10 @@ export const getJobById = (id: string): Job | undefined => {
   return MOCK_JOBS.find(job => job.id === id);
 };
 
+export const getJobBySlug = (slug: string): Job | undefined => {
+  return MOCK_JOBS.find(job => job.slug === slug);
+};
+
 export const getJobMetadataById = (id: string): JobMetadata | undefined => {
   return MOCK_JOB_METADATA.find(job => job.id === id);
 };
