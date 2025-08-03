@@ -57,9 +57,10 @@ export default function CompanyDetail() {
     onboarding: true
   });
 
-  const company = id ? getCompanyById(id) : null;
-  const isOwner = user && company && (company.userId === user.id || company.teamMembers?.includes(user.id));
-  const isTracked = user && company ? isCompanyTrackedByUser(company.id, user.id) : false;
+  const rawCompany = id ? getCompanyById(id) : null;
+  const company = rawCompany ? (isAuthenticated ? rawCompany : generateFakeCompanyData(rawCompany)) : null;
+  const isOwner = user && rawCompany && (rawCompany.userId === user.id || rawCompany.teamMembers?.includes(user.id));
+  const isTracked = user && rawCompany ? isCompanyTrackedByUser(rawCompany.id, user.id) : false;
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
