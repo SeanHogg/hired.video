@@ -25,6 +25,7 @@ import {
   rejectConnectionRequest,
   getPendingConnectionRequests
 } from '@/data/mockPeople';
+import { getResumesByUserId } from '@/data/mockResumes';
 import {
   MapPin,
   Globe,
