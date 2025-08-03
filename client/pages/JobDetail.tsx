@@ -128,19 +128,49 @@ export default function JobDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
-        <div className="pt-16">
+
+        <div className={`pt-16 ${!isAuthenticated ? 'relative' : ''}`}>
+          {!isAuthenticated && (
+            <>
+              {/* Blur overlay */}
+              <div
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 cursor-pointer"
+                onClick={() => setShowLoginModal(true)}
+              />
+              {/* Login prompt overlay */}
+              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                <div className="bg-background/95 backdrop-blur-md border rounded-lg p-6 max-w-md text-center shadow-lg pointer-events-auto">
+                  <div className="flex justify-center mb-4">
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      <Briefcase className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">Access Full Job Details</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Sign in to view complete job descriptions, salary information, and apply directly to positions.
+                  </p>
+                  <Button
+                    onClick={() => setShowLoginModal(true)}
+                    className="w-full"
+                  >
+                    Sign In to Apply
+                    <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
           <div className="max-w-6xl mx-auto p-6">
             {/* Back Button */}
             <div className="mb-6">
