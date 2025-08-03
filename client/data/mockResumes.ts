@@ -291,6 +291,7 @@ export const SEAN_HOGG_RESUME_DATA: ResumeData = {
 export const MOCK_RESUMES: Resume[] = [
   {
     id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
+    slug: 'john-seeker-cto-resume',
     name: "John Seeker - CTO Resume",
     data: {
       ...SEAN_HOGG_RESUME_DATA,
