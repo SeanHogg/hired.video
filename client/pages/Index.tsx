@@ -15,6 +15,7 @@ import PeopleCard from "@/components/PeopleCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
 import { getPublicJobs } from "@/data/mockJobs";
 import { MOCK_COMPANIES } from "@/data/mockCompanies";
 import { MOCK_USERS } from "@/data/mockPeople";
