@@ -55,6 +55,7 @@ export type JobPrivacy = 'public' | 'company_only' | 'recruiter_only' | 'private
 
 export interface Job {
   id: string;
+  slug: string; // User-friendly URL identifier (e.g., "senior-software-engineer-remote")
   data: JobData;
   status: JobStatus;
   privacy: JobPrivacy;
