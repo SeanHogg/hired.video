@@ -515,7 +515,8 @@ export const MOCK_RESUME_METADATA: ResumeMetadata[] = MOCK_RESUMES.map(resume =>
   updatedAt: resume.updatedAt,
   views: resume.views,
   summary: resume.data.Basics.Summary,
-  title: resume.data.Basics.Label
+  title: resume.data.Basics.Label,
+  userId: resume.userId
 }));
 
 // Helper functions
