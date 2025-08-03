@@ -32,8 +32,13 @@ interface CompanyCardProps {
 
 export default function CompanyCard({ company, showOwnership = false, onTrack, onUntrack }: CompanyCardProps) {
   const { user } = useAuth();
-  
-  const ownership = company && 'ownership' in company ? company.ownership : undefined;
+
+  // Early return if company is undefined
+  if (!company) {
+    return null;
+  }
+
+  const ownership = 'ownership' in company ? company.ownership : undefined;
   const isOwned = ownership === 'owned' || (!ownership && (company.userId === user?.id || company.teamMembers?.includes(user?.id || '')));
   const isTracked = ownership === 'tracked';
   const canEdit = isOwned;
