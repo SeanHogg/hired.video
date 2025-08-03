@@ -48,8 +48,13 @@ export default function PeopleCard({
   onRejectConnection
 }: PeopleCardProps) {
   const { user } = useAuth();
-  
-  const ownership = person && 'ownership' in person ? person.ownership : undefined;
+
+  // Early return if person is undefined
+  if (!person) {
+    return null;
+  }
+
+  const ownership = 'ownership' in person ? person.ownership : undefined;
   const isTracked = ownership === 'tracked';
   const isConnected = ownership === 'connected' || connectionStatus === 'connected';
   const isPendingSent = connectionStatus === 'pending_sent';
