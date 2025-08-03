@@ -516,12 +516,12 @@ export default function SearchBar({
                   <Calendar className="w-3 h-3" />
                   Date Posted
                 </label>
-                <Select value={filters.datePosted || ""} onValueChange={(value) => handleFilterChange('datePosted', value)}>
+                <Select value={filters.datePosted || "all"} onValueChange={(value) => handleFilterChange('datePosted', value === 'all' ? undefined : value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any Time</SelectItem>
+                    <SelectItem value="all">Any Time</SelectItem>
                     <SelectItem value="24h">Last 24 hours</SelectItem>
                     <SelectItem value="3d">Last 3 days</SelectItem>
                     <SelectItem value="week">Last week</SelectItem>
