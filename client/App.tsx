@@ -62,9 +62,7 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
       refetchOnWindowFocus: isProduction,
-      onError: (error) => {
-        logger.error('Query error', { error: error instanceof Error ? error.message : String(error) });
-      },
+
     },
     mutations: {
       retry: isProduction ? 2 : 0,

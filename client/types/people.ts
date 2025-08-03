@@ -24,6 +24,7 @@ export interface UserExperience {
   endDate?: string; // null for current position
   description?: string;
   skills?: string[];
+  highlights?: string[];
   isCurrent: boolean;
 }
 

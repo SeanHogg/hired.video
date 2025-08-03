@@ -24,6 +24,7 @@ export interface CompanyFinancials {
   valuation?: number;
   revenue?: number;
   profitability?: 'profitable' | 'break-even' | 'burning' | 'unknown';
+  investors?: string[];
 }
 
 export interface CompanyBenefits {
@@ -38,6 +39,7 @@ export interface CompanyBenefits {
   flexibleSchedule: boolean;
   remoteWork: boolean;
   learningBudget: boolean;
+  professionalDevelopment: boolean;
   gymMembership: boolean;
   freeFood: boolean;
   commuteBenefits: boolean;

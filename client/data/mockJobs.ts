@@ -42,6 +42,7 @@ export const MOCK_JOBS: Job[] = [
         'Knowledge of database design and SQL',
         'Experience with version control (Git) and CI/CD'
       ],
+      skills: ['React', 'Node.js', 'TypeScript', 'AWS', 'Docker', 'PostgreSQL'],
       benefits: [
         { type: 'Health Insurance', description: 'Comprehensive medical, dental, and vision coverage' },
         { type: 'Stock Options', description: 'Equity participation in company growth' },
@@ -114,6 +115,7 @@ export const MOCK_JOBS: Job[] = [
         'Strong analytical and data-driven approach',
         'Excellent written and verbal communication skills'
       ],
+      skills: ['Product Marketing', 'SaaS', 'Analytics', 'Content Creation', 'Public Speaking'],
       benefits: [
         { type: 'Health Insurance', description: 'Full health, dental, and vision coverage' },
         { type: 'Equity', description: 'Stock options with high growth potential' },
@@ -184,6 +186,7 @@ export const MOCK_JOBS: Job[] = [
         'Experience with Infrastructure as Code',
         'Knowledge of monitoring and logging tools'
       ],
+      skills: ['AWS', 'Kubernetes', 'Docker', 'Terraform', 'Python', 'CI/CD'],
       benefits: [
         { type: 'Health Insurance', description: 'Premium health coverage for you and family' },
         { type: 'Stock Options', description: 'Early-stage equity opportunity' },
@@ -254,6 +257,7 @@ export const MOCK_JOBS: Job[] = [
         'Proficiency in design tools (Figma, Sketch, etc.)',
         'Understanding of front-end development principles'
       ],
+      skills: ['UX Design', 'Figma', 'User Research', 'Prototyping', 'Mobile Design'],
       benefits: [
         { type: 'Health Insurance', description: 'Comprehensive health and wellness coverage' },
         { type: 'Creative Budget', description: '$1,500 annual creative tools and inspiration budget' },
@@ -324,6 +328,7 @@ export const MOCK_JOBS: Job[] = [
         'Experience with machine learning frameworks',
         'Knowledge of statistical analysis and modeling'
       ],
+      skills: ['Python', 'Machine Learning', 'SQL', 'Statistics', 'Pandas', 'TensorFlow'],
       benefits: [
         { type: 'Health Insurance', description: 'Full medical, dental, and vision coverage' },
         { type: 'Research Time', description: '20% time for personal research projects' },
@@ -394,6 +399,7 @@ export const MOCK_JOBS: Job[] = [
         'Knowledge of version control (Git)',
         'Understanding of web performance optimization'
       ],
+      skills: ['React', 'JavaScript', 'CSS', 'TypeScript', 'Tailwind CSS', 'HTML'],
       benefits: [
         { type: 'Health Insurance', description: 'Health and dental coverage' },
         { type: 'Professional Development', description: 'Learning stipend and conference attendance' },
@@ -464,6 +470,7 @@ export const MOCK_JOBS: Job[] = [
         'Experience with enterprise accounts',
         'Strong communication and leadership skills'
       ],
+      skills: ['B2B Sales', 'Team Management', 'SaaS', 'CRM', 'Negotiation', 'Leadership'],
       benefits: [
         { type: 'Commission', description: 'Uncapped commission with accelerators' },
         { type: 'Health Insurance', description: 'Premium health coverage' },

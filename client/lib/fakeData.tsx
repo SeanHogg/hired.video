@@ -1,6 +1,7 @@
 import { Company } from "@/types/company";
 import { Job } from "@/types/job";
 import { User } from "@/lib/auth";
+import { UserProfile } from "@/types/people";
 import { Resume } from "@/types/resume";
 
 export const generateFakeCompanyData = (realCompany: Company): Company => {
@@ -170,6 +171,7 @@ export const generateFakeJobData = (realJob: Job): Job => {
         state: "CA",
         country: "United States",
         remote: true,
+        hybrid: false,
         timezone: "PST"
       },
       employmentType: "full-time",
@@ -182,7 +184,7 @@ export const generateFakeJobData = (realJob: Job): Job => {
   };
 };
 
-export const generateFakePersonData = (realPerson: User): User => {
+export const generateFakePersonData = (realPerson: UserProfile): UserProfile => {
   return {
     ...realPerson,
     data: {

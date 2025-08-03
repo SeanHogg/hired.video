@@ -168,6 +168,7 @@ export function createMockCompany(overrides: Partial<Company> = {}): Company {
         dentalInsurance: true,
         visionInsurance: false,
         retirement401k: true,
+        retirementPlan: true,
         stockOptions: false,
         paidTimeOff: true,
         parentalLeave: true,
@@ -224,7 +225,6 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
         remote: true,
         hybrid: false,
       },
-      remote: true,
       salary: {
         min: 50000,
         max: 100000,
@@ -287,7 +287,7 @@ export function createMockResume(overrides: Partial<Resume> = {}): Resume {
       Interests: [],
       References: [],
       Meta: {
-        Version: '1.0.0',
+        version: '1.0.0',
       },
     },
     privacy: 'private',
@@ -385,7 +385,7 @@ export function expectTextContent(element: HTMLElement, text: string) {
  * Assert that an element is visible
  */
 export function expectVisible(element: HTMLElement) {
-  expect(element).not.toHaveStyle('display: none');
+  expect(element.style.display).not.toBe('none');
 }
 
 /**
