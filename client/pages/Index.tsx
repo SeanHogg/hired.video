@@ -12,6 +12,7 @@ import ResumeCard from "@/components/ResumeCard";
 import JobCard from "@/components/JobCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
+import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { getPublicJobs } from "@/data/mockJobs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
@@ -36,15 +37,13 @@ import {
 export default function Index() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchRadius: "25",
     experienceLevel: "all",
     education: "all",
     datePosted: "all"
   });
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   // Mock user state - in real app this would come from auth context
   const [currentUser] = useState(null);
@@ -281,7 +280,25 @@ export default function Index() {
     ...realJobs
   ];
 
+  const handleSearch = (query: string) => {
+    setSearchFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({
+      searchRadius: "25",
+      experienceLevel: "all",
+      education: "all",
+      datePosted: "all"
+    });
+  };
+
   const filteredItems = allContentItems.filter((item) => {
+    const searchQuery = searchFilters.search || "";
     const matchesCategory = selectedCategory === "all" ||
                            (selectedCategory === "job_description" && item.type === "job_listing") ||
                            item.type === selectedCategory;
@@ -324,20 +341,20 @@ export default function Index() {
       {/* Search and Filters */}
       <section className="py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search videos, professions, companies..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="flex flex-col gap-4">
+            {/* Search Bar */}
+            <SearchBar
+              context="all"
+              value={searchFilters.search}
+              filters={searchFilters}
+              showAdvanced={true}
+              onSearch={handleSearch}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+            />
 
             {/* Category Filters */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 justify-center md:justify-start flex-wrap">
               {categories.map((category) => (
                 <Button
                   key={category.id}
@@ -350,128 +367,8 @@ export default function Index() {
                   {category.label}
                 </Button>
               ))}
-
-              {/* Advanced Filter Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="gap-2"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                Advanced
-                <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
-              </Button>
             </div>
           </div>
-
-          {/* Advanced Filters Panel */}
-          {showAdvancedFilters && (
-            <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-foreground">Advanced Filters</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setFilters({
-                      searchRadius: "25",
-                      experienceLevel: "all",
-                      education: "all",
-                      datePosted: "all"
-                    });
-                  }}
-                  className="text-xs"
-                >
-                  Clear All
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Search Radius */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    Search Radius
-                  </label>
-                  <Select value={filters.searchRadius} onValueChange={(value) => setFilters({...filters, searchRadius: value})}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 miles</SelectItem>
-                      <SelectItem value="10">10 miles</SelectItem>
-                      <SelectItem value="25">25 miles</SelectItem>
-                      <SelectItem value="50">50 miles</SelectItem>
-                      <SelectItem value="100">100 miles</SelectItem>
-                      <SelectItem value="remote">Remote</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Experience Level */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Briefcase className="w-3 h-3" />
-                    Experience Level
-                  </label>
-                  <Select value={filters.experienceLevel} onValueChange={(value) => setFilters({...filters, experienceLevel: value})}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Levels</SelectItem>
-                      <SelectItem value="entry">Entry Level</SelectItem>
-                      <SelectItem value="mid">Mid Level</SelectItem>
-                      <SelectItem value="senior">Senior Level</SelectItem>
-                      <SelectItem value="executive">Executive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Education */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <GraduationCap className="w-3 h-3" />
-                    Education
-                  </label>
-                  <Select value={filters.education} onValueChange={(value) => setFilters({...filters, education: value})}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Education</SelectItem>
-                      <SelectItem value="high-school">High School</SelectItem>
-                      <SelectItem value="associate">Associate Degree</SelectItem>
-                      <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
-                      <SelectItem value="master">Master's Degree</SelectItem>
-                      <SelectItem value="phd">PhD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date Posted */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    Date Posted
-                  </label>
-                  <Select value={filters.datePosted} onValueChange={(value) => setFilters({...filters, datePosted: value})}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Any Time</SelectItem>
-                      <SelectItem value="24h">Last 24 hours</SelectItem>
-                      <SelectItem value="3d">Last 3 days</SelectItem>
-                      <SelectItem value="week">Last week</SelectItem>
-                      <SelectItem value="month">Last month</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
@@ -486,7 +383,7 @@ export default function Index() {
             </h2>
             <p className="text-muted-foreground">
               {filteredItems.length} items found
-              {searchQuery && ` for "${searchQuery}"`}
+              {searchFilters.search && ` for "${searchFilters.search}"`}
             </p>
           </div>
 
