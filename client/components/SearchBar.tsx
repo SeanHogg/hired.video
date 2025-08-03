@@ -295,12 +295,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Employment Type</label>
-            <Select value={filters.employmentType || ""} onValueChange={(value) => handleFilterChange('employmentType', value)}>
+            <Select value={filters.employmentType || "all"} onValueChange={(value) => handleFilterChange('employmentType', value === 'all' ? undefined : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All types</SelectItem>
+                <SelectItem value="all">All types</SelectItem>
                 <SelectItem value="full-time">Full-time</SelectItem>
                 <SelectItem value="part-time">Part-time</SelectItem>
                 <SelectItem value="contract">Contract</SelectItem>
