@@ -104,6 +104,7 @@ export interface UserProfile {
 
 export interface UserMetadata {
   id: string;
+  slug: string; // User-friendly URL identifier
   firstName: string;
   lastName: string;
   fullName: string;
