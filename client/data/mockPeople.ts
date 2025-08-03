@@ -30,6 +30,7 @@ export const MOCK_PEOPLE_IDS = {
 export const MOCK_USERS: UserProfile[] = [
   {
     id: MOCK_PEOPLE_IDS.JOHN_SEEKER,
+    slug: 'john-seeker',
     data: {
       firstName: 'John',
       lastName: 'Seeker',
