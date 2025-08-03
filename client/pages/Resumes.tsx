@@ -314,7 +314,7 @@ export default function Resumes() {
   };
 
   const getActiveResume = () => {
-    return resumes.find(resume => resume.isActive);
+    return resumes.find(resume => resume.isActive && resume.ownership === 'owned');
   };
 
   const filteredResumes = resumes.filter(resume => {
@@ -341,6 +341,9 @@ export default function Resumes() {
       children: variations.filter(variation => variation.parentId === master.id)
     }));
   };
+
+  const ownedResumes = filteredResumes.filter(r => r.ownership === 'owned');
+  const trackedResumes = filteredResumes.filter(r => r.ownership === 'tracked');
 
   const resumeTree = getResumeTree();
 
@@ -831,6 +834,7 @@ export default function Resumes() {
                           isMaster={resume.isMaster}
                           isActive={resume.isActive}
                           parentId={resume.parentId}
+                          ownership={resume.ownership}
                           onView={() => handleResumeView(resume.id)}
                           onActions={() => handleOpenActions(resume.id)}
                         />
@@ -1055,17 +1059,26 @@ export default function Resumes() {
                         }
                       </p>
                       <div className="flex gap-2 justify-center">
-                        <Button onClick={() => navigate('/resumes/upload')} variant="outline">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Resume
-                        </Button>
-                        <Button onClick={() => {
-                          const newId = generateResumeId();
-                          navigate(`/resumes/create/${newId}`);
-                        }}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Resume
-                        </Button>
+                        {user?.role === 'job_seeker' && (
+                          <>
+                            <Button onClick={() => navigate('/resumes/upload')} variant="outline">
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload Resume
+                            </Button>
+                            <Button onClick={() => {
+                              const newId = generateResumeId();
+                              navigate(`/resumes/create/${newId}`);
+                            }}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Create Resume
+                            </Button>
+                          </>
+                        )}
+                        {(user?.role === 'recruiter' || user?.role === 'business') && (
+                          <p className="text-sm text-muted-foreground">
+                            Browse and track candidate resumes from the home page search.
+                          </p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
