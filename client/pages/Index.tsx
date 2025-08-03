@@ -378,9 +378,10 @@ export default function Index() {
 
           {/* Content Grid/List */}
           {filteredItems.length > 0 ? (
-            viewMode === 'grid' ? (
+            <>
+            {viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredItems.map((item) => {
+                {paginatedItems.map((item) => {
                   if (item.type === "job_listing" && 'jobData' in item) {
                     const jobMetadata = {
                       id: item.jobData.id,
@@ -478,7 +479,7 @@ export default function Index() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <div key={item.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0">
@@ -527,7 +528,17 @@ export default function Index() {
                   </div>
                 ))}
               </div>
-            )
+            )}
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredItems.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+            </>
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
