@@ -70,6 +70,7 @@ export interface Job {
 
 export interface JobMetadata {
   id: string;
+  slug: string; // User-friendly URL identifier
   title: string;
   company: string;
   location: string;
