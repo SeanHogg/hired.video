@@ -124,7 +124,7 @@ export default function Dashboard() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
                   <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
-                    Get Started Free
+                    Get Started
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
