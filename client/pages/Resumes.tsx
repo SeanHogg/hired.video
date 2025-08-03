@@ -656,7 +656,7 @@ export default function Resumes() {
                 </p>
                 <Link to="/signup">
                   <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                    Get Started Free Today
+                    Get Started Today
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
