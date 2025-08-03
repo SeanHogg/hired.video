@@ -10,9 +10,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import LoginModal from '@/components/LoginModal';
 import { useAuth } from '@/lib/auth';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { getCompanyById, addTrackedCompany, removeTrackedCompany, isCompanyTrackedByUser, updateOnboardingTask } from '@/data/mockCompanies';
+import { generateFakeCompanyData } from '@/lib/fakeData';
 import {
   MapPin,
   Globe,
