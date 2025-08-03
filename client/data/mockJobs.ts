@@ -570,10 +570,10 @@ export const addTrackedJob = (jobId: string, userId: string): void => {
 
     // Auto-track the company when tracking a job
     const job = getJobById(jobId);
-    if (job && job.companyId) {
+    if (job && job.data.company.name) {
       // Import and use company tracking functions
-      import('./mockCompanies').then(({ autoTrackCompanyFromJob }) => {
-        autoTrackCompanyFromJob(job.companyId!, userId);
+      import('./mockCompanies').then(({ trackCompanyFromJobData }) => {
+        trackCompanyFromJobData(job.data.company.name, userId);
       });
     }
   }
