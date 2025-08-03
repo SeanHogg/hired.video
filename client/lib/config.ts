@@ -14,7 +14,7 @@ const ConfigSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   
   // API Configuration
-  API_BASE_URL: z.string().url().default('/api'),
+  API_BASE_URL: z.string().default('/api'),
   API_TIMEOUT: z.coerce.number().min(1000).default(10000),
   API_RETRIES: z.coerce.number().min(0).max(10).default(3),
   
