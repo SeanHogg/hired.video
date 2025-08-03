@@ -335,7 +335,7 @@ export default function CompanyDetail() {
                         <Progress value={onboardingProgress} className="h-2" />
                         
                         <div className="space-y-3">
-                          {company.onboardingTasks
+                          {(rawCompany || company).onboardingTasks
                             .sort((a, b) => a.order - b.order)
                             .map((task) => (
                               <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border">
