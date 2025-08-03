@@ -46,6 +46,12 @@ import {
 export default function Jobs() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [employmentTypeFilter, setEmploymentTypeFilter] = useState("");
+  const [experienceLevelFilter, setExperienceLevelFilter] = useState("");
+  const [remoteFilter, setRemoteFilter] = useState<boolean | undefined>(undefined);
+  const [showFilters, setShowFilters] = useState(false);
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
