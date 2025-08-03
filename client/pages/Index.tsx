@@ -351,69 +351,154 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Content Grid */}
+          {/* Content Grid/List */}
           {filteredItems.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map((item) => {
-                if (item.contentType === "job" && 'jobData' in item) {
-                  // Use JobCard for real job listings
-                  const jobMetadata = {
-                    id: item.jobData.id,
-                    title: item.jobData.data.title,
-                    company: item.jobData.data.company.name,
-                    location: item.jobData.data.location.remote
-                      ? 'Remote'
-                      : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
-                    salary: item.jobData.data.salaryMin && item.jobData.data.salaryMax
-                      ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
-                      : undefined,
-                    employmentType: item.jobData.data.employmentType,
-                    experienceLevel: item.jobData.data.experienceLevel,
-                    status: item.jobData.status,
-                    privacy: item.jobData.privacy,
-                    createdAt: item.jobData.createdAt,
-                    updatedAt: item.jobData.updatedAt,
-                    expiresAt: item.jobData.expiresAt,
-                    views: item.jobData.views,
-                    applications: item.jobData.applications,
-                    summary: item.jobData.data.summary,
-                    userId: item.jobData.userId,
-                    companyId: item.jobData.companyId
-                  };
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredItems.map((item) => {
+                  if (item.type === "job_listing" && 'jobData' in item) {
+                    const jobMetadata = {
+                      id: item.jobData.id,
+                      title: item.jobData.data.title,
+                      company: item.jobData.data.company.name,
+                      location: item.jobData.data.location.remote
+                        ? 'Remote'
+                        : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
+                      salary: item.jobData.data.salaryMin && item.jobData.data.salaryMax
+                        ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
+                        : undefined,
+                      employmentType: item.jobData.data.employmentType,
+                      experienceLevel: item.jobData.data.experienceLevel,
+                      status: item.jobData.status,
+                      privacy: item.jobData.privacy,
+                      createdAt: item.jobData.createdAt,
+                      updatedAt: item.jobData.updatedAt,
+                      expiresAt: item.jobData.expiresAt,
+                      views: item.jobData.views,
+                      applications: item.jobData.applications,
+                      summary: item.jobData.data.summary,
+                      userId: item.jobData.userId,
+                      companyId: item.jobData.companyId
+                    };
 
-                  return (
-                    <JobCard
-                      key={item.id}
-                      job={jobMetadata}
-                    />
-                  );
-                } else if (item.contentType === "video") {
-                  return (
-                    <VideoCard
-                      key={item.id}
-                      {...item}
-                      title={item.title || ''}
-                      description={item.description || ''}
-                      thumbnail={item.thumbnail || ''}
-                      duration={item.duration || ''}
-                      onView={() => handleView(item)}
-                      onActions={() => handleOpenActions(item)}
-                    />
-                  );
-                } else {
-                  return (
-                    <ResumeCard
-                      key={item.id}
-                      {...item}
-                      name={item.name || ''}
-                      summary={item.summary || ''}
-                      onView={() => handleView(item)}
-                      onActions={() => handleOpenActions(item)}
-                    />
-                  );
-                }
-              })}
-            </div>
+                    return (
+                      <JobCard
+                        key={item.id}
+                        job={jobMetadata}
+                      />
+                    );
+                  } else if (item.type === "people") {
+                    return (
+                      <PeopleCard
+                        key={item.id}
+                        id={item.id}
+                        firstName={item.name.split(' ')[0]}
+                        lastName={item.name.split(' ')[1] || ''}
+                        headline={item.title}
+                        avatar={item.avatar}
+                        currentRole={item.title}
+                        location={item.location}
+                        role={item.role}
+                        isVerified={item.isVerified}
+                        isPremium={item.isPremium}
+                        profileViews={item.views}
+                        onView={() => navigate(`/people/${item.id}`)}
+                        onActions={() => handleOpenActions(item)}
+                      />
+                    );
+                  } else if (item.type === "companies") {
+                    return (
+                      <CompanyCard
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        tagline={item.title}
+                        logo={item.logo}
+                        industry={item.profession}
+                        location={item.location}
+                        size={item.size}
+                        activeJobCount={item.activeJobCount}
+                        followers={item.followers}
+                        views={item.views}
+                        onView={() => navigate(`/companies/view/${item.id}`)}
+                        onActions={() => handleOpenActions(item)}
+                      />
+                    );
+                  } else if (item.type === "resume") {
+                    return (
+                      <ResumeCard
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        title={item.title}
+                        summary={item.summary}
+                        createdAt={item.createdAt}
+                        views={item.views}
+                        privacy="public"
+                        isMaster={true}
+                        isActive={true}
+                        parentId={null}
+                        ownership="public"
+                        onView={() => navigate(`/resumes/${item.id}`)}
+                        onActions={() => handleOpenActions(item)}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredItems.map((item) => (
+                  <div key={item.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        {item.type === "people" && item.avatar && (
+                          <img src={item.avatar} alt={item.name} className="w-12 h-12 rounded-full object-cover" />
+                        )}
+                        {item.type === "companies" && item.logo && (
+                          <img src={item.logo} alt={item.name} className="w-12 h-12 rounded-lg object-cover" />
+                        )}
+                        {(item.type === "resume" || item.type === "job_listing") && (
+                          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                            {item.type === "resume" ? (
+                              <User className="w-6 h-6 text-primary" />
+                            ) : (
+                              <Briefcase className="w-6 h-6 text-primary" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg truncate">{item.name || item.title}</h3>
+                            <p className="text-muted-foreground">{item.title}</p>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.summary}</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => {
+                            if (item.type === "people") navigate(`/people/${item.id}`);
+                            else if (item.type === "companies") navigate(`/companies/view/${item.id}`);
+                            else if (item.type === "resume") navigate(`/resumes/${item.id}`);
+                            else if (item.type === "job_listing") navigate(`/jobs/${item.id}`);
+                          }}>
+                            View
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                          {item.company && <span>{item.company}</span>}
+                          {item.location && <span>{item.location}</span>}
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            {item.views} views
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
