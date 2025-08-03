@@ -11,13 +11,14 @@ import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { 
-  getAllJobsForUser, 
-  addTrackedJob, 
-  removeTrackedJob, 
+import {
+  getAllJobsForUser,
+  addTrackedJob,
+  removeTrackedJob,
   getPublicJobs,
-  getJobsByFilters 
+  getJobsByFilters
 } from "@/data/mockJobs";
+import { trackCompanyFromJobData } from "@/data/mockCompanies";
 import { JobWithOwnership } from "@/types/job";
 import {
   Briefcase,
