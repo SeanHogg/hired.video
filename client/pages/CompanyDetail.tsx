@@ -248,7 +248,7 @@ export default function CompanyDetail() {
                         <div className="flex items-center gap-2">
                           {isOwner ? (
                             <Button asChild>
-                              <Link to={`/companies/edit/${company.id}`}>
+                              <Link to={`/companies/edit/${rawCompany?.id || company.id}`}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Company
                               </Link>
