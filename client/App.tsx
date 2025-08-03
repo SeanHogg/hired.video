@@ -39,6 +39,10 @@ import ResumeDetail from "./pages/ResumeDetail";
 import ResumeUploadPage from "./pages/ResumeUploadPage";
 import ResumeCreatePage from "./pages/ResumeCreatePage";
 import ResumeEditPage from "./pages/ResumeEditPage";
+import JobDetail from "./pages/JobDetail";
+import JobUploadPage from "./pages/JobUploadPage";
+import JobCreatePage from "./pages/JobCreatePage";
+import JobEditPage from "./pages/JobEditPage";
 
 const queryClient = new QueryClient();
 
