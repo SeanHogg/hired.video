@@ -284,12 +284,7 @@ export default function Companies() {
                       {isJobSeeker ? "Discover Companies" : "Explore Companies"}
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {getCompaniesByFilters({
-                        search: searchFilters.search || "",
-                        industry: searchFilters.industry ? [searchFilters.industry] : undefined,
-                        size: searchFilters.size ? [searchFilters.size] : undefined,
-                        location: searchFilters.location
-                      }).map((company) => {
+                      {paginatedCompanies.map((company) => {
                         const companyMetadata = {
                           id: company.id,
                           name: company.data.name,
@@ -321,6 +316,15 @@ export default function Companies() {
                         );
                       })}
                     </div>
+
+                    {/* Pagination */}
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={filteredCompanies.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
                   </div>
                 )}
 
