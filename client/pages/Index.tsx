@@ -104,22 +104,50 @@ export default function Index() {
     console.log('Track candidate:', item.id);
   };
 
-  // Mock data for AI-generated videos and resumes
+  // Get real data from mock sources
+  const realJobs = getPublicJobs().slice(0, 4);
+  const realCompanies = MOCK_COMPANIES.slice(0, 4);
+  const realPeople = MOCK_USERS.slice(0, 4);
+
+  // Convert to unified content items
   const contentItems = [
-    {
-      id: "1",
-      title: "Software Engineer Resume - Full Stack Developer with 5 Years Experience",
-      description: "AI-generated video showcasing a full-stack developer's journey from junior to senior level, highlighting React, Node.js, and AWS expertise.",
-      thumbnail: "",
-      duration: "2:34",
-      views: 12500,
-      type: "resume" as const,
-      contentType: "video" as const,
-      profession: "Software Engineer",
-      company: "Tech Startup",
-      createdAt: "2024-01-15",
-      ownerId: "user456", // Different user
-    },
+    // People
+    ...realPeople.map(person => ({
+      id: person.id,
+      name: `${person.data.firstName} ${person.data.lastName}`,
+      title: person.data.headline,
+      summary: person.data.summary,
+      avatar: person.data.avatar,
+      views: Math.floor(Math.random() * 500) + 50,
+      type: "people" as const,
+      contentType: "profile" as const,
+      profession: person.data.headline.split(' | ')[0] || person.data.headline,
+      company: person.data.experience[0]?.company || 'Independent',
+      createdAt: person.createdAt,
+      location: `${person.data.location.city}, ${person.data.location.state}`,
+      role: person.role,
+      isVerified: person.isVerified,
+      isPremium: person.isPremium
+    })),
+    // Companies
+    ...realCompanies.map(company => ({
+      id: company.id,
+      name: company.data.name,
+      title: company.data.tagline,
+      summary: company.data.description,
+      logo: company.data.logo,
+      views: company.views,
+      type: "companies" as const,
+      contentType: "profile" as const,
+      profession: company.data.industry,
+      company: company.data.name,
+      createdAt: company.createdAt,
+      location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
+      size: company.data.size,
+      activeJobCount: company.activeJobCount,
+      followers: company.followers
+    })),
+    // Resumes
     {
       id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
       name: "Sean Hogg",
@@ -131,21 +159,7 @@ export default function Index() {
       profession: "Technology Leader",
       company: "HireFractionalTalent.com",
       createdAt: "2024-01-15",
-      ownerId: "1", // John Seeker owns this
-    },
-    {
-      id: "2",
-      title: "Senior Product Manager Job Description - Remote Position at Fortune 500",
-      description: "AI visualization of a senior product manager role requirements, responsibilities, and growth opportunities at a major technology company.",
-      thumbnail: "",
-      duration: "3:12",
-      views: 8300,
-      type: "job_description" as const,
-      contentType: "video" as const,
-      profession: "Product Manager",
-      company: "Google",
-      createdAt: "2024-01-14",
-      ownerId: "company789", // Company owns this
+      ownerId: "1"
     },
     {
       id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
@@ -158,105 +172,39 @@ export default function Index() {
       profession: "Software Engineer",
       company: "TechCorp Inc",
       createdAt: "2024-01-10",
-      ownerId: "4", // Different user
-    },
-    {
-      id: "3",
-      title: "UX Designer Portfolio - From Freelancer to Design Lead",
-      description: "Creative AI presentation of a UX designer's career progression, showcasing key projects and design thinking process.",
-      thumbnail: "",
-      duration: "4:21",
-      views: 15600,
-      type: "resume" as const,
-      contentType: "video" as const,
-      profession: "UX Designer",
-      company: "Design Agency",
-      createdAt: "2024-01-13",
-      ownerId: "user789",
+      ownerId: "4"
     },
     {
       id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
       name: "Michael Rodriguez",
       title: "Senior Marketing Manager",
-      summary: "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy. Proven track record of increasing brand awareness and driving revenue growth.",
+      summary: "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy.",
       views: 2,
       type: "resume" as const,
       contentType: "text" as const,
       profession: "Marketing Manager",
       company: "GrowthCo",
       createdAt: "2024-01-28",
-      ownerId: "5", // Different user
+      ownerId: "5"
     },
-    {
-      id: "4",
-      title: "Data Scientist Opening - Machine Learning Focus at Fintech Startup",
-      description: "Dynamic presentation of data scientist role with focus on ML algorithms, Python expertise, and financial technology applications.",
-      thumbnail: "",
-      duration: "2:45",
-      views: 6700,
-      type: "job_description" as const,
-      contentType: "video" as const,
-      profession: "Data Scientist",
-      company: "Stripe",
-      createdAt: "2024-01-12",
-      ownerId: "company789",
-    },
-    {
-      id: "5",
-      title: "Marketing Manager Resume - Digital Marketing Specialist with ROI Focus",
-      description: "AI-powered showcase of marketing achievements, campaign successes, and strategic thinking in digital marketing landscape.",
-      thumbnail: "",
-      duration: "3:08",
-      views: 9400,
-      type: "resume" as const,
-      contentType: "video" as const,
-      profession: "Marketing Manager",
-      company: "E-commerce",
-      createdAt: "2024-01-11",
-      ownerId: "user456",
-    },
-    {
-      id: "6",
-      title: "DevOps Engineer Position - Cloud Infrastructure & Kubernetes Expert",
-      description: "Technical deep-dive into DevOps role requirements, showcasing AWS, Docker, and CI/CD pipeline expertise needed.",
-      thumbnail: "",
-      duration: "3:56",
-      views: 11200,
-      type: "job_description" as const,
-      contentType: "video" as const,
-      profession: "DevOps Engineer",
-      company: "Netflix",
-      createdAt: "2024-01-10",
-      ownerId: "company789",
-    },
-    {
-      id: "7",
-      title: "Sales Director Resume - B2B SaaS Revenue Growth Specialist",
-      description: "Compelling narrative of sales leadership, team building, and revenue growth achievements in the SaaS industry.",
-      thumbnail: "",
-      duration: "2:52",
-      views: 7800,
-      type: "resume" as const,
-      contentType: "video" as const,
-      profession: "Sales Director",
-      company: "SaaS Company",
-      createdAt: "2024-01-09",
-      ownerId: "user456",
-    },
-    {
-      id: "8",
-      title: "Frontend Developer Job - React & TypeScript Expert for E-commerce",
-      description: "Modern frontend development role showcasing React ecosystem, TypeScript mastery, and e-commerce platform experience.",
-      thumbnail: "",
-      duration: "2:18",
-      views: 13900,
-      type: "job_description" as const,
-      contentType: "video" as const,
-      profession: "Frontend Developer",
-      company: "Shopify",
-      createdAt: "2024-01-08",
-      ownerId: "company789",
-    },
+    // Jobs
+    ...realJobs.map(job => ({
+      id: job.id,
+      title: job.data.title,
+      name: job.data.title,
+      summary: job.data.summary,
+      views: job.views,
+      type: "job_listing" as const,
+      contentType: "job" as const,
+      profession: job.data.title,
+      company: job.data.company.name,
+      createdAt: job.createdAt,
+      location: job.data.location.remote ? 'Remote' : `${job.data.location.city}, ${job.data.location.state}`,
+      employmentType: job.data.employmentType,
+      salaryMin: job.data.salaryMin,
+      salaryMax: job.data.salaryMax,
+      jobData: job
+    }))
   ];
 
   const categories = [
