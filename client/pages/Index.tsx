@@ -10,6 +10,8 @@ import Footer from "@/components/Footer";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
 import JobCard from "@/components/JobCard";
+import CompanyCard from "@/components/CompanyCard";
+import PeopleCard from "@/components/PeopleCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
