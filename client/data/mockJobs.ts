@@ -297,6 +297,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.DATA_SCIENTIST,
+    slug: 'data-scientist-ml-remote',
     data: {
       title: 'Data Scientist',
       department: 'Analytics',
