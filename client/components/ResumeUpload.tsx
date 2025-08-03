@@ -245,7 +245,7 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
             <Checkbox
               id="master-resume"
               checked={isMaster}
-              onCheckedChange={setIsMaster}
+              onCheckedChange={(checked) => setIsMaster(checked === true)}
               disabled={isUploading}
             />
             <Label htmlFor="master-resume" className="text-sm">

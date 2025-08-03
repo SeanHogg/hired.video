@@ -8,6 +8,7 @@ export interface User {
   name: string;
   role?: UserRole;
   onboardingComplete: boolean;
+  subscription?: 'free' | 'pro' | 'enterprise';
   avatar?: string;
 }
 

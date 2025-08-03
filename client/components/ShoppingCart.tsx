@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useCart } from "@/lib/cart-context";
-import { ShoppingCart, Plus, Minus, X, CreditCard, Users } from "lucide-react";
+import { ShoppingCart as ShoppingCartIcon, Plus, Minus, X, CreditCard, Users } from "lucide-react";
 
 export default function ShoppingCart() {
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ export default function ShoppingCart() {
     >
       <SheetTrigger asChild>
         <Button variant="outline" size="icon" className="relative">
-          <ShoppingCart className="h-4 w-4" />
+          <ShoppingCartIcon className="h-4 w-4" />
           {itemCount > 0 && (
             <Badge
               variant="destructive"
@@ -82,7 +82,7 @@ export default function ShoppingCart() {
         <div className="mt-6 space-y-4">
           {items.length === 0 ? (
             <div className="text-center py-8">
-              <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <ShoppingCartIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Your cart is empty</h3>
               <p className="text-muted-foreground">
                 Add a premium plan to get started

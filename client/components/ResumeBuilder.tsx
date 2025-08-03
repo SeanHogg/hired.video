@@ -198,7 +198,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
             <Checkbox
               id="master-resume"
               checked={isMaster}
-              onCheckedChange={setIsMaster}
+              onCheckedChange={(checked) => setIsMaster(checked === true)}
             />
             <Label htmlFor="master-resume" className="text-sm">
               Mark as Master Resume
