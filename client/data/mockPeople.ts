@@ -690,6 +690,10 @@ export const getUserById = (id: string): UserProfile | undefined => {
   return MOCK_USERS.find(user => user.id === id);
 };
 
+export const getUserBySlug = (slug: string): UserProfile | undefined => {
+  return MOCK_USERS.find(user => user.slug === slug);
+};
+
 export const getUserMetadataById = (id: string): UserMetadata | undefined => {
   return MOCK_USER_METADATA.find(user => user.id === id);
 };
