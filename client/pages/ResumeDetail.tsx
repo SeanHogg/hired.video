@@ -116,8 +116,10 @@ export default function ResumeDetail() {
   const { isAuthenticated, user } = useAuth();
   
   const [resume, setResume] = useState<Resume | null>(null);
+  const [rawResume, setRawResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [showVideo, setShowVideo] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
 
 
