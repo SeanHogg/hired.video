@@ -49,7 +49,7 @@ export default function PeopleCard({
 }: PeopleCardProps) {
   const { user } = useAuth();
   
-  const ownership = 'ownership' in person ? person.ownership : undefined;
+  const ownership = person && 'ownership' in person ? person.ownership : undefined;
   const isTracked = ownership === 'tracked';
   const isConnected = ownership === 'connected' || connectionStatus === 'connected';
   const isPendingSent = connectionStatus === 'pending_sent';
