@@ -130,6 +130,7 @@ export default function Jobs() {
   const handleTrackJob = (jobId: string) => {
     if (user) {
       addTrackedJob(jobId, user.id);
+      // The addTrackedJob function will automatically track the company too
       // In a real app, you'd trigger a re-render here
     }
   };
