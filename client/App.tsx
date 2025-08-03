@@ -10,7 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart-context";
-import { config, isProduction } from "@/lib/config";
+import { isProduction } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
 import AIChatPanel from "./components/AIChatPanel";
@@ -23,7 +23,7 @@ import CompanyDetail from "./pages/CompanyDetail";
 import CompanyEditPage from "./pages/CompanyEditPage";
 import CookiePolicy from "./pages/CookiePolicy";
 import Dashboard from "./pages/Dashboard";
-import Features from "./pages/Features";
+
 import ForRecruiters from "./pages/ForRecruiters";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";

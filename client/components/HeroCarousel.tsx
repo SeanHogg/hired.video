@@ -3,7 +3,6 @@ import {
   Eye,
   Clock,
   FileText,
-  Upload,
   Plus,
   ChevronLeft,
   ChevronRight,

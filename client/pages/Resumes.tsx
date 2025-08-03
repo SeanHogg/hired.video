@@ -72,7 +72,11 @@ export default function Resumes() {
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
     isOpen: boolean;
-    item: any | null;
+    item: (ResumeWithOwnership & {
+      type: 'resume' | 'job_description';
+      contentType: 'video' | 'text';
+      ownerId?: string;
+    }) | null;
   }>({
     isOpen: false,
     item: null,
@@ -269,31 +273,31 @@ export default function Resumes() {
     setActionsModal({ isOpen: false, item: null });
   };
 
-  const handleShare = (item: any) => {
+  const handleShare = (item: ResumeWithOwnership) => {
     const shareUrl = `${window.location.origin}/resumes/${item.id}`;
     navigator.clipboard.writeText(shareUrl);
     setSuccessMessage('Resume link copied to clipboard!');
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: ResumeWithOwnership) => {
     navigate(`/resumes/${item.id}`);
   };
 
-  const handleDownload = (item: any) => {
+  const handleDownload = (item: ResumeWithOwnership) => {
     // Simulate download
     setSuccessMessage('Resume download started!');
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleDelete = (item: any) => {
+  const handleDelete = (item: ResumeWithOwnership) => {
     // Remove from local state (in real app, this would be an API call)
     setResumes(resumes.filter(r => r.id !== item.id));
     setSuccessMessage('Resume deleted successfully!');
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleTrack = (item: any) => {
+  const handleTrack = (item: ResumeWithOwnership) => {
     if (user?.id && item.id) {
       if (isResumeTrackedByUser(item.id, user.id)) {
         removeTrackedResume(item.id, user.id);
