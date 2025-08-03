@@ -601,6 +601,14 @@ export default function JobDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        contentType="job"
+        title={job?.data.title || 'Job Details'}
+      />
     </div>
   );
 }
