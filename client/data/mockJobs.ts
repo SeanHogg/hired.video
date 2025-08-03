@@ -508,6 +508,7 @@ export const MOCK_JOBS: Job[] = [
 
 export const MOCK_JOB_METADATA: JobMetadata[] = MOCK_JOBS.map(job => ({
   id: job.id,
+  slug: job.slug,
   title: job.data.title,
   company: job.data.company.name,
   location: job.data.location.remote 
