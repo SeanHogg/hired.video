@@ -134,8 +134,9 @@ export default function ResumeDetail() {
         if (!foundResume) {
           throw new Error('Resume not found');
         }
-        
-        setResume(foundResume);
+
+        setRawResume(foundResume);
+        setResume(isAuthenticated ? foundResume : generateFakeResumeData(foundResume));
       } catch (error) {
         console.error('Failed to load resume:', error);
       } finally {
