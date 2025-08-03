@@ -733,19 +733,21 @@ export default function Resumes() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={() => navigate('/resumes/upload')} variant="outline">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Resume
-                    </Button>
-                    <Button onClick={() => {
-                      const newId = generateResumeId();
-                      navigate(`/resumes/create/${newId}`);
-                    }}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Resume
-                    </Button>
-                  </div>
+                  {user?.role === 'job_seeker' && (
+                    <div className="flex items-center gap-2">
+                      <Button onClick={() => navigate('/resumes/upload')} variant="outline">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Resume
+                      </Button>
+                      <Button onClick={() => {
+                        const newId = generateResumeId();
+                        navigate(`/resumes/create/${newId}`);
+                      }}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Resume
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Search and Filters */}
