@@ -531,6 +531,43 @@ export const getResumesByUserId = (userId: string): Resume[] => {
   return MOCK_RESUMES.filter(resume => resume.userId === userId);
 };
 
+// Tracked resumes for recruiters and business users
+export const TRACKED_RESUMES: { [userId: string]: string[] } = {
+  '2': [MOCK_RESUME_IDS.SARAH_CHEN_RESUME, MOCK_RESUME_IDS.FRONTEND_SPECIALIST], // Sarah Recruiter tracks these
+  '3': [MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ, MOCK_RESUME_IDS.DEVOPS_ENGINEER] // Michael Business tracks these
+};
+
+export const getTrackedResumesByUserId = (userId: string): Resume[] => {
+  const trackedIds = TRACKED_RESUMES[userId] || [];
+  return MOCK_RESUMES.filter(resume => trackedIds.includes(resume.id));
+};
+
+export const getAllResumesForUser = (userId: string): { owned: Resume[], tracked: Resume[] } => {
+  const owned = getResumesByUserId(userId);
+  const tracked = getTrackedResumesByUserId(userId);
+  return { owned, tracked };
+};
+
+export const isResumeTrackedByUser = (resumeId: string, userId: string): boolean => {
+  const trackedIds = TRACKED_RESUMES[userId] || [];
+  return trackedIds.includes(resumeId);
+};
+
+export const addTrackedResume = (resumeId: string, userId: string): void => {
+  if (!TRACKED_RESUMES[userId]) {
+    TRACKED_RESUMES[userId] = [];
+  }
+  if (!TRACKED_RESUMES[userId].includes(resumeId)) {
+    TRACKED_RESUMES[userId].push(resumeId);
+  }
+};
+
+export const removeTrackedResume = (resumeId: string, userId: string): void => {
+  if (TRACKED_RESUMES[userId]) {
+    TRACKED_RESUMES[userId] = TRACKED_RESUMES[userId].filter(id => id !== resumeId);
+  }
+};
+
 export const generateResumeId = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
