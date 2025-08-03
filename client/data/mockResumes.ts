@@ -502,6 +502,102 @@ export const MOCK_RESUMES: Resume[] = [
     updatedAt: '2024-01-28T14:00:00Z',
     views: 2,
     userId: 'u5b6c7d8-e9f0-1234-5678-901234567890' // Maria Garcia
+  },
+  {
+    id: MOCK_RESUME_IDS.JENNIFER_MARTINEZ_PRIVATE,
+    name: 'Senior Data Scientist - Private',
+    data: {
+      ...SEAN_HOGG_RESUME_DATA,
+      Basics: {
+        ...SEAN_HOGG_RESUME_DATA.Basics,
+        Name: "Jennifer Martinez",
+        Label: "Senior Data Scientist | Machine Learning Expert",
+        Email: "jennifer.martinez@example.com",
+        Image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+        Summary: "Experienced data scientist with 10+ years in machine learning, predictive analytics, and AI solutions. Specialized in developing scalable ML models for fintech and healthcare industries. Passionate about turning complex data into actionable business insights.",
+        Location: {
+          Address: "456 Data Street",
+          PostalCode: "78701",
+          City: "Austin",
+          CountryCode: "US",
+          Region: "Texas"
+        }
+      },
+      Work: [
+        {
+          Name: "DataTech Solutions",
+          Position: "Senior Data Scientist",
+          Summary: "Lead data science initiatives for enterprise clients, developing ML models that increased revenue by 25% on average.",
+          StartDate: "2020-03-01",
+          EndDate: "Present",
+          Highlights: [
+            "Built predictive models reducing customer churn by 40%",
+            "Led team of 5 data scientists on complex analytics projects",
+            "Implemented MLOps pipelines improving model deployment speed by 60%",
+            "Developed real-time recommendation engine serving 1M+ users daily"
+          ],
+          Url: "https://datatechsolutions.com"
+        },
+        {
+          Name: "FinanceAI Corp",
+          Position: "Data Scientist",
+          Summary: "Developed machine learning algorithms for fraud detection and risk assessment in financial services.",
+          StartDate: "2017-06-01",
+          EndDate: "2020-02-28",
+          Highlights: [
+            "Created fraud detection system with 95% accuracy",
+            "Reduced false positives by 30% through advanced feature engineering",
+            "Collaborated with product teams to integrate ML into customer-facing applications",
+            "Published 3 research papers on anomaly detection techniques"
+          ],
+          Url: "https://financeai.com"
+        }
+      ],
+      Education: [
+        {
+          Institution: "Stanford University",
+          StudyType: "PhD",
+          Area: "Computer Science - Machine Learning",
+          StartDate: "2013-09-01",
+          EndDate: "2017-05-15",
+          Score: "4.0",
+          Courses: ["Advanced Machine Learning", "Deep Learning", "Statistical Learning Theory"]
+        },
+        {
+          Institution: "University of Texas at Austin",
+          StudyType: "Master of Science",
+          Area: "Statistics",
+          StartDate: "2011-08-01",
+          EndDate: "2013-05-15",
+          Score: "3.9",
+          Courses: ["Bayesian Statistics", "Time Series Analysis", "Multivariate Statistics"]
+        }
+      ],
+      Skills: [
+        {
+          Name: "Machine Learning",
+          Level: "Expert",
+          Keywords: ["Python", "TensorFlow", "PyTorch", "Scikit-learn", "MLOps"]
+        },
+        {
+          Name: "Data Engineering",
+          Level: "Advanced",
+          Keywords: ["Apache Spark", "Kafka", "Airflow", "SQL", "NoSQL"]
+        },
+        {
+          Name: "Cloud Platforms",
+          Level: "Intermediate",
+          Keywords: ["AWS", "Docker", "Kubernetes", "SageMaker"]
+        }
+      ]
+    },
+    privacy: 'private',
+    isMaster: true,
+    isActive: false,
+    createdAt: '2023-11-20T09:00:00Z',
+    updatedAt: '2024-01-15T11:30:00Z',
+    views: 0, // Private resume, no views
+    userId: 'u1f2g3h4-i5j6-7890-1234-567890123456' // Jennifer Martinez
   }
 ];
 
