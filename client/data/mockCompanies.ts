@@ -15,6 +15,7 @@ export const MOCK_COMPANY_IDS = {
 export const MOCK_COMPANIES: Company[] = [
   {
     id: MOCK_COMPANY_IDS.TECHCORP_INC,
+    slug: 'techcorp-inc',
     data: {
       name: 'TechCorp Inc.',
       logo: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=100&h=100&fit=crop',
