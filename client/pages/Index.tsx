@@ -493,29 +493,65 @@ export default function Index() {
           {/* Content Grid */}
           {filteredItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map((item) => (
-                item.contentType === "video" ? (
-                  <VideoCard
-                    key={item.id}
-                    {...item}
-                    title={item.title || ''}
-                    description={item.description || ''}
-                    thumbnail={item.thumbnail || ''}
-                    duration={item.duration || ''}
-                    onView={() => handleView(item)}
-                    onActions={() => handleOpenActions(item)}
-                  />
-                ) : (
-                  <ResumeCard
-                    key={item.id}
-                    {...item}
-                    name={item.name || ''}
-                    summary={item.summary || ''}
-                    onView={() => handleView(item)}
-                    onActions={() => handleOpenActions(item)}
-                  />
-                )
-              ))}
+              {filteredItems.map((item) => {
+                if (item.contentType === "job" && 'jobData' in item) {
+                  // Use JobCard for real job listings
+                  const jobMetadata = {
+                    id: item.jobData.id,
+                    title: item.jobData.data.title,
+                    company: item.jobData.data.company.name,
+                    location: item.jobData.data.location.remote
+                      ? 'Remote'
+                      : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
+                    salary: item.jobData.data.salaryMin && item.jobData.data.salaryMax
+                      ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
+                      : undefined,
+                    employmentType: item.jobData.data.employmentType,
+                    experienceLevel: item.jobData.data.experienceLevel,
+                    status: item.jobData.status,
+                    privacy: item.jobData.privacy,
+                    createdAt: item.jobData.createdAt,
+                    updatedAt: item.jobData.updatedAt,
+                    expiresAt: item.jobData.expiresAt,
+                    views: item.jobData.views,
+                    applications: item.jobData.applications,
+                    summary: item.jobData.data.summary,
+                    userId: item.jobData.userId,
+                    companyId: item.jobData.companyId
+                  };
+
+                  return (
+                    <JobCard
+                      key={item.id}
+                      job={jobMetadata}
+                    />
+                  );
+                } else if (item.contentType === "video") {
+                  return (
+                    <VideoCard
+                      key={item.id}
+                      {...item}
+                      title={item.title || ''}
+                      description={item.description || ''}
+                      thumbnail={item.thumbnail || ''}
+                      duration={item.duration || ''}
+                      onView={() => handleView(item)}
+                      onActions={() => handleOpenActions(item)}
+                    />
+                  );
+                } else {
+                  return (
+                    <ResumeCard
+                      key={item.id}
+                      {...item}
+                      name={item.name || ''}
+                      summary={item.summary || ''}
+                      onView={() => handleView(item)}
+                      onActions={() => handleOpenActions(item)}
+                    />
+                  );
+                }
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
