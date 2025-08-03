@@ -15,6 +15,7 @@ import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
+import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters, ResumeWithOwnership } from "@/types/resume";
@@ -60,8 +61,7 @@ export default function Resumes() {
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState<ResumeSearchFilters>({});
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(new Set());
@@ -317,15 +317,28 @@ export default function Resumes() {
     return resumes.find(resume => resume.isActive && resume.ownership === 'owned');
   };
 
+  const handleSearch = (query: string) => {
+    setSearchFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({});
+  };
+
   const filteredResumes = resumes.filter(resume => {
+    const searchTerm = searchFilters.search || "";
     if (searchTerm && !resume.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
         !resume.summary.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
-    if (filters.privacy && resume.privacy !== filters.privacy) {
+    if (searchFilters.privacy && resume.privacy !== searchFilters.privacy) {
       return false;
     }
-    if (filters.isMaster !== undefined && resume.isMaster !== filters.isMaster) {
+    if (searchFilters.isMaster !== undefined && resume.isMaster !== searchFilters.isMaster) {
       return false;
     }
     return true;
@@ -751,68 +764,38 @@ export default function Resumes() {
                 </div>
 
                 {/* Search and Filters */}
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Search resumes..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <Select
-                        value={filters.privacy || 'all'}
-                        onValueChange={(value) => setFilters({ ...filters, privacy: value === 'all' ? undefined : value as ResumePrivacy })}
+                <div className="space-y-4">
+                  <SearchBar
+                    context="resumes"
+                    value={searchFilters.search}
+                    filters={searchFilters}
+                    onSearch={handleSearch}
+                    onFilterChange={handleFilterChange}
+                    onClearFilters={handleClearFilters}
+                  />
+
+                  {/* View Mode Toggle */}
+                  <div className="flex justify-end">
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('grid')}
+                        className="rounded-r-none"
                       >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue placeholder="Privacy" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Privacy</SelectItem>
-                          <SelectItem value="private">Private</SelectItem>
-                          <SelectItem value="recruiter_only">Recruiter Only</SelectItem>
-                          <SelectItem value="public">Public</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={filters.isMaster === undefined ? 'all' : filters.isMaster ? 'master' : 'variation'}
-                        onValueChange={(value) => setFilters({ ...filters, isMaster: value === 'all' ? undefined : value === 'master' })}
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setViewMode('list')}
+                        className="rounded-l-none"
                       >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue placeholder="Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="master">Master</SelectItem>
-                          <SelectItem value="variation">Variation</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center border rounded-md">
-                        <Button
-                          variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setViewMode('grid')}
-                          className="rounded-r-none"
-                        >
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={viewMode === 'list' ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setViewMode('list')}
-                          className="rounded-l-none"
-                        >
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        <List className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
                 {/* Resume Grid/List */}
                 {loading ? (
@@ -1052,10 +1035,10 @@ export default function Resumes() {
                     <CardContent className="p-12 text-center">
                       <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        {searchTerm || Object.keys(filters).length > 0 ? 'No matching resumes' : 'No resumes yet'}
+                        {searchFilters.search || Object.keys(searchFilters).length > 0 ? 'No matching resumes' : 'No resumes yet'}
                       </h3>
                       <p className="text-muted-foreground mb-6">
-                        {searchTerm || Object.keys(filters).length > 0
+                        {searchFilters.search || Object.keys(searchFilters).length > 0
                           ? 'Try adjusting your search criteria or filters'
                           : 'Create your first resume to get started'
                         }
