@@ -257,10 +257,7 @@ export const generateFakePersonData = (realPerson: User): User => {
           link: "https://project-portfolio.com/digital-transformation"
         }
       ],
-      languages: [
-        { name: "English", proficiency: "Native" },
-        { name: "Spanish", proficiency: "Conversational" }
-      ],
+      languages: ["English", "Spanish"],
       openToWork: true,
       preferredRoles: ["Senior Manager", "Director", "VP of Operations"],
       salaryExpectation: {
