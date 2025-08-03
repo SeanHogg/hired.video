@@ -33,7 +33,7 @@ export default function Onboarding() {
     id: "user123",
     name: "Sarah Johnson",
     email: "sarah@example.com",
-    persona: "recruiter" as const,
+    persona: "recruiter" as "job_seeker" | "recruiter" | "business",
   });
 
   const [currentStep, setCurrentStep] = useState(0);

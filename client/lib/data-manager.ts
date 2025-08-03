@@ -230,7 +230,7 @@ export class DataManager {
       return this.client.get(endpoint, schema);
     });
 
-    const data = response.data as ListResponse<T>;
+    const data = response.data;
 
     // Cache the result
     if (options.useCache !== false) {

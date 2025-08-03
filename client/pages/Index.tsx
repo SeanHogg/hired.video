@@ -417,6 +417,7 @@ export default function Index() {
                   } else if (item.type === "people") {
                     const personData = {
                       id: item.id,
+                      slug: `${item.name.toLowerCase().replace(/\s+/g, '-')}-${item.id.slice(-4)}`,
                       firstName: item.name.split(' ')[0],
                       lastName: item.name.split(' ')[1] || '',
                       fullName: item.name,
@@ -424,9 +425,22 @@ export default function Index() {
                       headline: item.title,
                       location: item.location,
                       role: item.role,
+                      visibility: 'public' as const,
+                      status: 'active' as const,
+                      companyId: undefined,
+                      companyName: item.company,
+                      createdAt: item.createdAt,
+                      updatedAt: item.createdAt,
+                      lastActiveAt: item.createdAt,
+                      profileViews: item.views,
+                      connectionCount: 0,
+                      followerCount: 0,
                       isVerified: item.isVerified,
                       isPremium: item.isPremium,
-                      profileViews: item.views
+                      openToWork: true,
+                      experienceLevel: 'mid',
+                      currentPosition: item.profession,
+                      currentCompany: item.company
                     };
                     return (
                       <PeopleCard
@@ -438,16 +452,24 @@ export default function Index() {
                   } else if (item.type === "companies") {
                     const companyData = {
                       id: item.id,
+                      slug: `${item.name.toLowerCase().replace(/\s+/g, '-')}-${item.id.slice(-4)}`,
                       name: item.name,
-                      tagline: item.title,
                       logo: item.logo,
+                      tagline: item.title,
                       industry: item.profession,
-                      location: item.location,
                       size: item.size,
-                      activeJobCount: item.activeJobCount,
-                      followers: item.followers,
+                      location: item.location,
+                      status: 'active' as const,
+                      visibility: 'public' as const,
+                      createdAt: item.createdAt || new Date().toISOString(),
+                      updatedAt: item.createdAt || new Date().toISOString(),
                       views: item.views,
-                      fullName: item.name
+                      followers: item.followers,
+                      jobCount: item.activeJobCount,
+                      activeJobCount: item.activeJobCount,
+                      userId: 'system',
+                      teamMembers: [],
+                      onboardingProgress: 100
                     };
                     return (
                       <CompanyCard
@@ -469,7 +491,7 @@ export default function Index() {
                         isMaster={true}
                         isActive={true}
                         parentId={null}
-                        ownership="public"
+                        ownership="tracked"
                         onView={() => navigate(`/resumes/${item.id}`)}
                         onActions={() => handleOpenActions(item)}
                       />
@@ -518,7 +540,7 @@ export default function Index() {
                         </div>
                         <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
                           {item.company && <span>{item.company}</span>}
-                          {item.location && <span>{item.location}</span>}
+                          {'location' in item && item.location && <span>{item.location}</span>}
                           <span className="flex items-center gap-1">
                             <Eye className="w-3 h-3" />
                             {item.views} views
