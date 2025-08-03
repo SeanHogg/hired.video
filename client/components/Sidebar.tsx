@@ -176,36 +176,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                   Quick Actions
                 </h3>
               )}
-              <div className="space-y-2">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "h-auto py-2",
-                    collapsed
-                      ? "w-10 justify-center px-2"
-                      : "w-full justify-start gap-3"
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? "Post Job Description" : undefined}
-                >
-                  <Briefcase className="h-4 w-4" />
-                  {!collapsed && "Post Job Description"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "h-auto py-2",
-                    collapsed
-                      ? "w-10 justify-center px-2"
-                      : "w-full justify-start gap-3"
-                  )}
-                  onClick={onClose}
-                  title={collapsed ? "Schedule Interview" : undefined}
-                >
-                  <Calendar className="h-4 w-4" />
-                  {!collapsed && "Schedule Interview"}
-                </Button>
-              </div>
+              <div className="space-y-2" />
             </div>
           </div>
 
