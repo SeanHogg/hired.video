@@ -234,7 +234,7 @@ export default function JobDetail() {
                                   </>
                                 )}
                               </Button>
-                              <Button>
+                              <Button onClick={() => isAuthenticated ? null : setShowLoginModal(true)}>
                                 Apply Now
                                 <ExternalLink className="h-4 w-4 ml-2" />
                               </Button>
