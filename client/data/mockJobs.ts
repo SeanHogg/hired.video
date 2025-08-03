@@ -437,6 +437,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.SALES_MANAGER,
+    slug: 'sales-manager-enterprise-saas',
     data: {
       title: 'Regional Sales Manager',
       department: 'Sales',
