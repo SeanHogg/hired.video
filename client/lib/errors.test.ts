@@ -156,7 +156,7 @@ describe('Error System', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.message).toBe('Async error');
+        expect((result as { success: false; error: AppError }).error.message).toBe('Async error');
       }
     });
   });
@@ -180,7 +180,7 @@ describe('Error System', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.message).toBe('Sync error');
+        expect((result as { success: false; error: AppError }).error.message).toBe('Sync error');
       }
     });
   });
@@ -227,7 +227,7 @@ describe('Error System', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBeInstanceOf(ValidationError);
+        expect((result as { success: false; error: ValidationError }).error).toBeInstanceOf(ValidationError);
       }
     });
   });
