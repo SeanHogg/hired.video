@@ -105,6 +105,7 @@ export default function People() {
     const { tracked } = getAllPeopleForUser(user.id);
     const trackedWithOwnership: UserWithOwnership[] = tracked.map(person => ({
       id: person.id,
+      slug: person.slug,
       firstName: person.data.firstName,
       lastName: person.data.lastName,
       fullName: `${person.data.firstName} ${person.data.lastName}`,
@@ -317,6 +318,7 @@ export default function People() {
                     {paginatedPeople.map((person) => {
                       const personMetadata = {
                         id: person.id,
+                        slug: person.slug,
                         firstName: person.data.firstName,
                         lastName: person.data.lastName,
                         fullName: `${person.data.firstName} ${person.data.lastName}`,
@@ -469,6 +471,7 @@ export default function People() {
                 {getPublicUsers().slice(0, 3).map((person) => {
                   const personMetadata = {
                     id: person.id,
+                    slug: person.slug,
                     firstName: person.data.firstName,
                     lastName: person.data.lastName,
                     fullName: `${person.data.firstName} ${person.data.lastName}`,

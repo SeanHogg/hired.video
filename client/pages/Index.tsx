@@ -385,6 +385,7 @@ export default function Index() {
                   if (item.type === "job_listing" && 'jobData' in item) {
                     const jobMetadata = {
                       id: item.jobData.id,
+                      slug: item.jobData.slug,
                       title: item.jobData.data.title,
                       company: item.jobData.data.company.name,
                       location: item.jobData.data.location.remote

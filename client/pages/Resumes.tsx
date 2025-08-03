@@ -84,6 +84,7 @@ export default function Resumes() {
 
     const ownedWithOwnership: ResumeWithOwnership[] = owned.map(resume => ({
       id: resume.id,
+      slug: resume.slug,
       name: resume.name,
       privacy: resume.privacy,
       isMaster: resume.isMaster,
@@ -100,6 +101,7 @@ export default function Resumes() {
 
     const trackedWithOwnership: ResumeWithOwnership[] = tracked.map(resume => ({
       id: resume.id,
+      slug: resume.slug,
       name: resume.name,
       privacy: resume.privacy,
       isMaster: resume.isMaster,
@@ -146,6 +148,7 @@ export default function Resumes() {
       const resumeMetadata = getUserResumes().find(r => r.id === resumeId);
       const mockResume: Resume = {
         id: resumeId,
+        slug: resumeMetadata?.slug || 'software-engineer-resume',
         name: resumeMetadata?.name || 'Software Engineer Resume',
         privacy: resumeMetadata?.privacy || 'private',
         isMaster: resumeMetadata?.isMaster || true,
