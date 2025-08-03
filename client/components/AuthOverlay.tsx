@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import LoginModal from "@/components/LoginModal";
 import {
   Lock,
   ArrowRight,
@@ -19,12 +18,11 @@ interface AuthOverlayProps {
   message?: string;
 }
 
-export default function AuthOverlay({ 
+export default function AuthOverlay({
   contentType = 'company',
   title,
   message
 }: AuthOverlayProps) {
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const getContentIcon = () => {
     switch (contentType) {
@@ -54,10 +52,7 @@ export default function AuthOverlay({
   return (
     <>
       {/* Blur overlay */}
-      <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 cursor-pointer"
-        onClick={() => setShowLoginModal(true)}
-      />
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40" />
 
       {/* Auth prompt at top */}
       <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-6 pointer-events-none">
@@ -83,22 +78,17 @@ export default function AuthOverlay({
 
               {/* Action buttons */}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  onClick={() => setShowLoginModal(true)}
-                  className="flex-1"
-                  size="sm"
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Sign In
+                <Button asChild className="flex-1" size="sm">
+                  <Link to="/login">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Link>
                 </Button>
-                <Button
-                  onClick={() => setShowLoginModal(true)}
-                  variant="outline"
-                  className="flex-1"
-                  size="sm"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Create Account
+                <Button asChild variant="outline" className="flex-1" size="sm">
+                  <Link to="/signup">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Create Account
+                  </Link>
                 </Button>
               </div>
 
@@ -113,13 +103,7 @@ export default function AuthOverlay({
         </Card>
       </div>
 
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        contentType={contentType}
-        title={title}
-      />
+
     </>
   );
 }
