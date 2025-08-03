@@ -2,9 +2,9 @@
  * Global test setup and configuration
  */
 
-import { expect, afterEach, beforeAll, afterAll } from 'vitest';
+import { expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import matchers from '@testing-library/jest-dom/matchers';
+import * as matchers from '@testing-library/jest-dom/matchers';
 import { server } from './test-utils/mock-server';
 
 // Extend Vitest's expect with jest-dom matchers

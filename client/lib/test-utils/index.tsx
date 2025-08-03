@@ -265,7 +265,7 @@ export function createMockResume(overrides: Partial<Resume> = {}): Resume {
         Label: 'Software Developer',
         Email: 'mock@example.com',
         Phone: '+1234567890',
-        Website: 'https://mockuser.com',
+        Url: 'https://mockuser.com',
         Summary: 'Mock resume summary',
         Location: {
           Address: '123 Mock St',
@@ -274,7 +274,6 @@ export function createMockResume(overrides: Partial<Resume> = {}): Resume {
           PostalCode: '12345',
           CountryCode: 'US',
         },
-        Profiles: [],
         Image: 'https://example.com/avatar.jpg',
       },
       Work: [],
