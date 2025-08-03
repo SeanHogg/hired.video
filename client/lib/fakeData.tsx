@@ -29,13 +29,18 @@ export const generateFakeCompanyData = (realCompany: Company): Company => {
         healthInsurance: true,
         dentalInsurance: true,
         visionInsurance: true,
+        retirement401k: true,
         retirementPlan: true,
+        stockOptions: true,
         paidTimeOff: true,
         parentalLeave: true,
         flexibleSchedule: true,
         remoteWork: true,
+        learningBudget: true,
         professionalDevelopment: true,
         gymMembership: false,
+        freeFood: true,
+        commuteBenefits: true,
         other: ["Annual team retreats", "Mental health support", "Home office stipend"]
       },
       contact: {
@@ -258,27 +263,15 @@ export const generateFakePersonData = (realPerson: UserProfile): UserProfile => 
         }
       ],
       skills: [
-        { name: "Leadership", level: "Expert", endorsed: 45 },
-        { name: "Project Management", level: "Advanced", endorsed: 38 },
-        { name: "Strategic Planning", level: "Advanced", endorsed: 32 },
-        { name: "Team Building", level: "Expert", endorsed: 28 },
-        { name: "Innovation", level: "Advanced", endorsed: 25 }
+        { name: "Leadership", level: "Expert", endorsed: true, endorsements: 45 },
+        { name: "Project Management", level: "Advanced", endorsed: true, endorsements: 38 },
+        { name: "Strategic Planning", level: "Advanced", endorsed: true, endorsements: 32 },
+        { name: "Team Building", level: "Expert", endorsed: true, endorsements: 28 },
+        { name: "Innovation", level: "Advanced", endorsed: true, endorsements: 25 }
       ],
       certifications: [
-        {
-          name: "Project Management Professional (PMP)",
-          issuer: "Project Management Institute",
-          issueDate: "2019-03-01",
-          expiryDate: "2022-03-01",
-          credentialId: "PMP123456"
-        },
-        {
-          name: "Certified ScrumMaster",
-          issuer: "Scrum Alliance",
-          issueDate: "2018-08-01",
-          expiryDate: null,
-          credentialId: "CSM789012"
-        }
+        "Project Management Professional (PMP) - 2019",
+        "Certified ScrumMaster - 2018"
       ],
       projects: [
         {

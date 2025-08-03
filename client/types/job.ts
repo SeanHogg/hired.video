@@ -31,6 +31,7 @@ export interface JobBenefit {
 export interface JobData {
   title: string;
   department?: string;
+  category?: string;
   description: string;
   summary: string;
   responsibilities: string[];

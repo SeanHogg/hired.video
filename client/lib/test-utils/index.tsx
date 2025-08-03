@@ -175,6 +175,7 @@ export function createMockCompany(overrides: Partial<Company> = {}): Company {
         flexibleSchedule: true,
         remoteWork: true,
         learningBudget: false,
+        professionalDevelopment: true,
         gymMembership: false,
         freeFood: false,
         commuteBenefits: false,
@@ -225,12 +226,9 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
         remote: true,
         hybrid: false,
       },
-      salary: {
-        min: 50000,
-        max: 100000,
-        currency: 'USD',
-        period: 'yearly',
-      },
+      salaryMin: 50000,
+      salaryMax: 100000,
+      currency: 'USD',
       benefits: [
         {
           type: 'Health Insurance',
@@ -277,6 +275,7 @@ export function createMockResume(overrides: Partial<Resume> = {}): Resume {
         Image: 'https://example.com/avatar.jpg',
       },
       Work: [],
+      Volunteer: [],
       Education: [],
       Skills: [],
       Projects: [],

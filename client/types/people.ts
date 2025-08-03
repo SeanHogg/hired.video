@@ -24,12 +24,14 @@ export interface UserExperience {
   endDate?: string; // null for current position
   description?: string;
   skills?: string[];
+  technologies?: string[];
   highlights?: string[];
   isCurrent: boolean;
 }
 
 export interface UserEducation {
   institution: string;
+  school?: string; // Alternative name for institution
   degree: string;
   field: string;
   startDate: string;
@@ -51,6 +53,7 @@ export interface UserProject {
   description: string;
   technologies: string[];
   url?: string;
+  link?: string; // Alternative name for url
   startDate: string;
   endDate?: string;
   role?: string;
