@@ -9,6 +9,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { AIProvider } from "@/lib/ai-context";
 import { CartProvider } from "@/lib/cart-context";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { logger } from "@/lib/logger";
+import { performanceMonitor } from "@/lib/performance";
+import { config, isProduction } from "@/lib/config";
 import FloatingAIButton from "./components/FloatingAIButton";
 import AIChatPanel from "./components/AIChatPanel";
 import Index from "./pages/Index";
@@ -50,17 +54,74 @@ import CompanyEditPage from "./pages/CompanyEditPage";
 import PeopleDetail from "./pages/PeopleDetail";
 import Checkout from "./pages/Checkout";
 
-const queryClient = new QueryClient();
+// Create a client with production-ready configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: isProduction ? 3 : 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: isProduction,
+      onError: (error) => {
+        logger.error('Query error', { error: error instanceof Error ? error.message : String(error) });
+      },
+    },
+    mutations: {
+      retry: isProduction ? 2 : 0,
+      onError: (error) => {
+        logger.error('Mutation error', { error: error instanceof Error ? error.message : String(error) });
+      },
+    },
+  },
+});
+
+// Initialize performance monitoring
+if (isProduction) {
+  performanceMonitor.recordMemoryUsage();
+
+  // Record memory usage periodically
+  setInterval(() => {
+    performanceMonitor.recordMemoryUsage();
+  }, 60000); // Every minute
+}
+
+// Global error handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  logger.error('Unhandled promise rejection', {
+    reason: event.reason,
+    promise: event.promise,
+  });
+
+  // Prevent the default browser behavior
+  event.preventDefault();
+});
+
+// Global error handler for uncaught errors
+window.addEventListener('error', (event) => {
+  logger.error('Uncaught error', {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    error: event.error,
+  });
+});
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <CartProvider>
-        <AIProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+  <ErrorBoundary level="critical" onError={(error, errorInfo) => {
+    logger.error('Critical application error', {
+      error: error.toJSON(),
+      errorInfo,
+    });
+  }}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <CartProvider>
+          <AIProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
@@ -134,6 +195,7 @@ const App = () => (
       </CartProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 createRoot(document.getElementById("root")!).render(<App />);

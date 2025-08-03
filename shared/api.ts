@@ -77,6 +77,158 @@ export type ApiSuccessResponse<T> = {
 export type DemoResponse = z.infer<typeof DemoResponseSchema>;
 
 // ============================================================================
+// API ENDPOINT SCHEMAS
+// ============================================================================
+
+/**
+ * Authentication Endpoints
+ */
+export const LoginRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const LoginResponseSchema = z.object({
+  user: z.object({
+    id: z.string().uuid(),
+    email: z.string().email(),
+    name: z.string(),
+    role: z.enum(['job_seeker', 'recruiter', 'business']),
+  }),
+  token: z.string(),
+  expiresAt: z.string().datetime(),
+});
+
+export const SignupRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(1),
+  role: z.enum(['job_seeker', 'recruiter', 'business']).optional(),
+});
+
+/**
+ * User Profile Endpoints
+ */
+export const UserProfileResponseSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  data: z.object({
+    firstName: z.string(),
+    lastName: z.string(),
+    avatar: z.string().url().optional(),
+    headline: z.string(),
+    summary: z.string(),
+    // Add more fields as needed
+  }),
+  role: z.enum(['job_seeker', 'recruiter', 'business']),
+  isVerified: z.boolean(),
+  isPremium: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const UpdateUserProfileRequestSchema = z.object({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  headline: z.string().optional(),
+  summary: z.string().optional(),
+  // Add more fields as needed
+});
+
+/**
+ * Resume Endpoints
+ */
+export const ResumeListResponseSchema = z.object({
+  resumes: z.array(z.object({
+    id: z.string().uuid(),
+    slug: z.string(),
+    name: z.string(),
+    privacy: z.enum(['public', 'private', 'unlisted']),
+    isMaster: z.boolean(),
+    isActive: z.boolean(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    views: z.number(),
+  })),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+});
+
+export const CreateResumeRequestSchema = z.object({
+  name: z.string().min(1),
+  privacy: z.enum(['public', 'private', 'unlisted']).default('private'),
+  templateId: z.string().uuid().optional(),
+});
+
+/**
+ * Job Endpoints
+ */
+export const JobListResponseSchema = z.object({
+  jobs: z.array(z.object({
+    id: z.string().uuid(),
+    slug: z.string(),
+    data: z.object({
+      title: z.string(),
+      description: z.string(),
+      company: z.string(),
+      location: z.object({
+        city: z.string(),
+        state: z.string(),
+        country: z.string(),
+        remote: z.boolean(),
+      }),
+      employmentType: z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship']),
+      experienceLevel: z.enum(['entry', 'mid', 'senior', 'lead', 'executive']),
+    }),
+    status: z.enum(['draft', 'active', 'paused', 'closed']),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    views: z.number(),
+    applications: z.number(),
+  })),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+});
+
+export const CreateJobRequestSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  requirements: z.array(z.string()).default([]),
+  responsibilities: z.array(z.string()).default([]),
+  skills: z.array(z.string()).default([]),
+  experienceLevel: z.enum(['entry', 'mid', 'senior', 'lead', 'executive']),
+  employmentType: z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship']),
+  location: z.object({
+    city: z.string(),
+    state: z.string(),
+    country: z.string(),
+    remote: z.boolean(),
+  }),
+  salary: z.object({
+    min: z.number().min(0).optional(),
+    max: z.number().min(0).optional(),
+    currency: z.string().length(3),
+    period: z.enum(['hourly', 'daily', 'weekly', 'monthly', 'yearly']),
+  }).optional(),
+});
+
+// ============================================================================
+// API ENDPOINT TYPES
+// ============================================================================
+
+export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+export type LoginResponse = z.infer<typeof LoginResponseSchema>;
+export type SignupRequest = z.infer<typeof SignupRequestSchema>;
+export type UserProfileResponse = z.infer<typeof UserProfileResponseSchema>;
+export type UpdateUserProfileRequest = z.infer<typeof UpdateUserProfileRequestSchema>;
+export type ResumeListResponse = z.infer<typeof ResumeListResponseSchema>;
+export type CreateResumeRequest = z.infer<typeof CreateResumeRequestSchema>;
+export type JobListResponse = z.infer<typeof JobListResponseSchema>;
+export type CreateJobRequest = z.infer<typeof CreateJobRequestSchema>;
+
+// ============================================================================
 // VALIDATION UTILITIES
 // ============================================================================
 
