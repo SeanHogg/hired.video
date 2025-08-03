@@ -41,8 +41,9 @@ import {
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     responsibilities: true,
     requirements: true,
@@ -50,9 +51,10 @@ export default function JobDetail() {
     benefits: false
   });
 
-  const job = id ? getJobById(id) : null;
-  const isOwner = user && job && job.userId === user.id;
-  const isTracked = user && job ? isJobTrackedByUser(job.id, user.id) : false;
+  const rawJob = id ? getJobById(id) : null;
+  const job = rawJob ? (isAuthenticated ? rawJob : generateFakeJobData(rawJob)) : null;
+  const isOwner = user && rawJob && rawJob.userId === user.id;
+  const isTracked = user && rawJob ? isJobTrackedByUser(rawJob.id, user.id) : false;
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
