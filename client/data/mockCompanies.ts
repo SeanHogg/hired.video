@@ -217,6 +217,7 @@ export const MOCK_COMPANIES: Company[] = [
   },
   {
     id: MOCK_COMPANY_IDS.CLOUDSCALE_SOLUTIONS,
+    slug: 'cloudscale-solutions',
     data: {
       name: 'CloudScale Solutions',
       logo: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=100&h=100&fit=crop',
