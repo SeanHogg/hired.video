@@ -567,6 +567,15 @@ export const addTrackedJob = (jobId: string, userId: string): void => {
   }
   if (!TRACKED_JOBS[userId].includes(jobId)) {
     TRACKED_JOBS[userId].push(jobId);
+
+    // Auto-track the company when tracking a job
+    const job = getJobById(jobId);
+    if (job && job.companyId) {
+      // Import and use company tracking functions
+      import('./mockCompanies').then(({ autoTrackCompanyFromJob }) => {
+        autoTrackCompanyFromJob(job.companyId!, userId);
+      });
+    }
   }
 };
 
