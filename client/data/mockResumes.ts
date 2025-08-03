@@ -290,15 +290,23 @@ export const SEAN_HOGG_RESUME_DATA: ResumeData = {
 export const MOCK_RESUMES: Resume[] = [
   {
     id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
-    name: "Sean Hogg - CTO Resume",
-    data: SEAN_HOGG_RESUME_DATA,
+    name: "John Seeker - CTO Resume",
+    data: {
+      ...SEAN_HOGG_RESUME_DATA,
+      Basics: {
+        ...SEAN_HOGG_RESUME_DATA.Basics,
+        Name: "John Seeker",
+        Email: "john.seeker@example.com",
+        Image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
+      }
+    },
     privacy: 'private',
     isMaster: true,
     isActive: false,
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-20T14:30:00Z',
     views: 45,
-    userId: 'user_1'
+    userId: '1' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.FRONTEND_SPECIALIST,
