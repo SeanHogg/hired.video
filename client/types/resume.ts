@@ -121,6 +121,7 @@ export type ResumePrivacy = 'public' | 'recruiter_only' | 'private' | 'draft';
 
 export interface Resume {
   id: string;
+  slug: string; // User-friendly URL identifier (e.g., "john-seeker-cto-resume")
   name: string;
   data: ResumeData;
   privacy: ResumePrivacy;
