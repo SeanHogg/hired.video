@@ -361,6 +361,29 @@ export default function Resumes() {
 
   const resumeTree = getResumeTree();
 
+  // Pagination logic
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange
+  } = usePagination(filteredResumes.length, 12);
+
+  // Update pagination when filtered resumes change
+  useEffect(() => {
+    handleTotalItemsChange(filteredResumes.length);
+  }, [filteredResumes.length, handleTotalItemsChange]);
+
+  // Get paginated resumes for grid view
+  const paginatedResumes = filteredResumes.slice(startIndex, endIndex);
+
+  // Get paginated resume tree for list view
+  const paginatedResumeTree = resumeTree.slice(startIndex, endIndex);
+
   const toggleMasterExpansion = (masterId: string) => {
     const newExpanded = new Set(expandedMasters);
     if (newExpanded.has(masterId)) {
