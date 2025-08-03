@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import CompanyCard from "@/components/CompanyCard";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { 
@@ -47,6 +48,38 @@ export default function Companies() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+
+  // Get filtered companies data
+  const getFilteredCompanies = () => {
+    return getCompaniesByFilters({
+      search: searchFilters.search || "",
+      industry: searchFilters.industry ? [searchFilters.industry] : undefined,
+      size: searchFilters.size ? [searchFilters.size] : undefined,
+      location: searchFilters.location
+    });
+  };
+
+  const filteredCompanies = getFilteredCompanies();
+
+  // Pagination logic
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange
+  } = usePagination(filteredCompanies.length, 9);
+
+  // Update pagination when filtered companies change
+  useEffect(() => {
+    handleTotalItemsChange(filteredCompanies.length);
+  }, [filteredCompanies.length, handleTotalItemsChange]);
+
+  // Get paginated companies
+  const paginatedCompanies = filteredCompanies.slice(startIndex, endIndex);
 
   // Get companies based on user role and authentication
   const getCompaniesForUser = () => {
