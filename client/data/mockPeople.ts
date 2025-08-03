@@ -456,6 +456,144 @@ export const MOCK_USERS: UserProfile[] = [
     followerCount: 67,
     isVerified: true,
     isPremium: true
+  },
+  {
+    id: MOCK_PEOPLE_IDS.JENNIFER_MARTINEZ,
+    data: {
+      firstName: 'Jennifer',
+      lastName: 'Martinez',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+      headline: 'Senior Data Scientist | Machine Learning Expert',
+      summary: 'Experienced data scientist with 10+ years in machine learning, predictive analytics, and AI solutions. Specialized in developing scalable ML models for fintech and healthcare industries. Passionate about turning complex data into actionable business insights.',
+      location: {
+        city: 'Austin',
+        state: 'TX',
+        country: 'USA',
+        remote: true
+      },
+      contact: {
+        email: 'jennifer.martinez@example.com',
+        linkedin: 'https://linkedin.com/in/jennifermartinez',
+        github: 'https://github.com/jennifermartinez'
+      },
+      experience: [
+        {
+          company: 'DataTech Solutions',
+          position: 'Senior Data Scientist',
+          startDate: '2020-03-01',
+          endDate: 'Present',
+          location: {
+            city: 'Austin',
+            state: 'TX',
+            country: 'USA',
+            remote: true
+          },
+          description: 'Lead data science initiatives for enterprise clients, developing ML models that increased revenue by 25% on average.',
+          highlights: [
+            'Built predictive models reducing customer churn by 40%',
+            'Led team of 5 data scientists on complex analytics projects',
+            'Implemented MLOps pipelines improving model deployment speed by 60%'
+          ],
+          isCurrent: true
+        },
+        {
+          company: 'FinanceAI Corp',
+          position: 'Data Scientist',
+          startDate: '2017-06-01',
+          endDate: '2020-02-28',
+          location: {
+            city: 'San Francisco',
+            state: 'CA',
+            country: 'USA',
+            remote: false
+          },
+          description: 'Developed machine learning algorithms for fraud detection and risk assessment in financial services.',
+          highlights: [
+            'Created fraud detection system with 95% accuracy',
+            'Reduced false positives by 30% through advanced feature engineering',
+            'Collaborated with product teams to integrate ML into customer-facing applications'
+          ],
+          isCurrent: false
+        }
+      ],
+      education: [
+        {
+          institution: 'Stanford University',
+          degree: 'PhD in Computer Science',
+          field: 'Machine Learning',
+          startDate: '2013-09-01',
+          endDate: '2017-05-15',
+          location: {
+            city: 'Stanford',
+            state: 'CA',
+            country: 'USA'
+          }
+        },
+        {
+          institution: 'University of Texas at Austin',
+          degree: 'Master of Science',
+          field: 'Statistics',
+          startDate: '2011-08-01',
+          endDate: '2013-05-15',
+          location: {
+            city: 'Austin',
+            state: 'TX',
+            country: 'USA'
+          }
+        }
+      ],
+      skills: [
+        { name: 'Python', level: 'Expert', years: 10 },
+        { name: 'Machine Learning', level: 'Expert', years: 10 },
+        { name: 'TensorFlow', level: 'Advanced', years: 7 },
+        { name: 'PyTorch', level: 'Advanced', years: 6 },
+        { name: 'SQL', level: 'Advanced', years: 8 },
+        { name: 'AWS', level: 'Intermediate', years: 5 },
+        { name: 'Docker', level: 'Intermediate', years: 4 },
+        { name: 'MLOps', level: 'Advanced', years: 5 }
+      ],
+      languages: [
+        { name: 'English', level: 'Native' },
+        { name: 'Spanish', level: 'Native' }
+      ],
+      projects: [
+        {
+          name: 'Customer Churn Prediction Platform',
+          description: 'Built end-to-end ML platform for predicting customer churn using ensemble methods.',
+          technologies: ['Python', 'TensorFlow', 'AWS SageMaker', 'Docker'],
+          url: 'https://github.com/jennifermartinez/churn-prediction',
+          startDate: '2022-01-01',
+          endDate: '2022-06-30'
+        }
+      ],
+      certifications: [
+        {
+          name: 'AWS Certified Machine Learning - Specialty',
+          issuer: 'Amazon Web Services',
+          issueDate: '2021-08-15',
+          expiryDate: '2024-08-15',
+          credentialId: 'AWS-ML-12345'
+        }
+      ],
+      interests: ['Machine Learning Research', 'Open Source Contributions', 'Mentoring', 'Rock Climbing']
+    },
+    role: 'job_seeker',
+    status: 'looking',
+    visibility: 'public',
+    settings: {
+      emailNotifications: true,
+      profileDiscoverable: true,
+      showContactInfo: false,
+      allowMessaging: true
+    },
+    createdAt: '2023-11-15T00:00:00Z',
+    updatedAt: '2024-01-29T10:30:00Z',
+    lastActiveAt: '2024-01-30T14:20:00Z',
+    profileViews: 89,
+    connectionCount: 156,
+    followerCount: 23,
+    isVerified: false,
+    isPremium: false
   }
   // Additional users would be here...
 ];
