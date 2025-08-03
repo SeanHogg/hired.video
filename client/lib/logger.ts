@@ -68,9 +68,14 @@ class AppLogger implements Logger {
   }
 
   private getLogLevel(): LogLevel {
-    // In production, default to 'info', in development default to 'debug'
-    const defaultLevel = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
-    return (process.env.VITE_LOG_LEVEL as LogLevel) || defaultLevel;
+    try {
+      // In production, default to 'info', in development default to 'debug'
+      const defaultLevel = import.meta.env.MODE === 'production' ? 'info' : 'debug';
+      return (import.meta.env.VITE_LOG_LEVEL as LogLevel) || defaultLevel;
+    } catch (error) {
+      // Fallback if import.meta.env is not available
+      return 'info';
+    }
   }
 
   private createLogEntry(level: LogLevel, message: string, context?: LogContext): LogEntry {
@@ -126,7 +131,7 @@ class AppLogger implements Logger {
     }
 
     // Send to external logging service in production
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.MODE === 'production') {
       this.sendToExternalService(entry);
     }
 
