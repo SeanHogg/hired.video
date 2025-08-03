@@ -94,6 +94,7 @@ export interface Company {
 
 export interface CompanyMetadata {
   id: string;
+  slug: string; // User-friendly URL identifier
   name: string;
   logo?: string;
   tagline?: string;
