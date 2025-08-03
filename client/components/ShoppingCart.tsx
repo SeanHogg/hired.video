@@ -1,0 +1,231 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { useCart } from '@/lib/cart-context';
+import { ShoppingCart, Plus, Minus, X, CreditCard, Users } from 'lucide-react';
+
+export default function ShoppingCart() {
+  const {
+    items,
+    isOpen,
+    removeItem,
+    updateQuantity,
+    updateUsers,
+    updateBillingCycle,
+    clearCart,
+    openCart,
+    closeCart,
+    getTotalPrice,
+    getItemCount,
+  } = useCart();
+
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const handleCheckout = async () => {
+    setIsCheckingOut(true);
+    // Simulate checkout process
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    alert('Checkout successful! (This is a demo)');
+    clearCart();
+    closeCart();
+    setIsCheckingOut(false);
+  };
+
+  const formatPrice = (price: number, billingCycle: 'monthly' | 'annual') => {
+    if (billingCycle === 'annual') {
+      return `$${price.toFixed(2)}/year`;
+    }
+    return `$${price.toFixed(2)}/month`;
+  };
+
+  const itemCount = getItemCount();
+  const totalPrice = getTotalPrice();
+
+  return (
+    <Sheet open={isOpen} onOpenChange={(open) => open ? openCart() : closeCart()}>
+      <SheetTrigger asChild>
+        <Button variant="outline" size="icon" className="relative">
+          <ShoppingCart className="h-4 w-4" />
+          {itemCount > 0 && (
+            <Badge 
+              variant="destructive" 
+              className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {itemCount}
+            </Badge>
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetHeader>
+          <SheetTitle>Shopping Cart</SheetTitle>
+          <SheetDescription>
+            Review your plan upgrades and proceed to checkout
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-4">
+          {items.length === 0 ? (
+            <div className="text-center py-8">
+              <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Your cart is empty</h3>
+              <p className="text-muted-foreground">Add a premium plan to get started</p>
+            </div>
+          ) : (
+            <>
+              {/* Cart Items */}
+              <div className="space-y-4">
+                {items.map((item) => (
+                  <Card key={item.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {formatPrice(item.price, item.billingCycle)}
+                            {item.billingCycle === 'annual' && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                20% OFF
+                              </Badge>
+                            )}
+                          </p>
+
+                          {/* Users Selection */}
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              <span className="text-sm font-medium">Number of users:</span>
+                              <Select
+                                value={item.users.toString()}
+                                onValueChange={(value) => updateUsers(item.id, parseInt(value))}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                                    <SelectItem key={num} value={num.toString()}>
+                                      {num}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Billing Cycle */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Billing:</span>
+                              <Select
+                                value={item.billingCycle}
+                                onValueChange={(value: 'monthly' | 'annual') => 
+                                  updateBillingCycle(item.id, value)
+                                }
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="monthly">Monthly</SelectItem>
+                                  <SelectItem value="annual">
+                                    Annual
+                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                      Save 20%
+                                    </Badge>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">Quantity:</span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  disabled={item.quantity <= 1}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="w-8 text-center text-sm">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(item.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <Separator />
+
+              {/* Total */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Total:</span>
+                  <span>${totalPrice.toFixed(2)}</span>
+                </div>
+                {items.some(item => item.billingCycle === 'annual') && (
+                  <p className="text-sm text-green-600">
+                    ✓ You're saving 20% with annual billing!
+                  </p>
+                )}
+              </div>
+
+              {/* Checkout Button */}
+              <Button
+                className="w-full"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                {isCheckingOut ? 'Processing...' : `Proceed to Checkout - $${totalPrice.toFixed(2)}`}
+              </Button>
+
+              {/* Clear Cart */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={clearCart}
+                disabled={isCheckingOut}
+              >
+                Clear Cart
+              </Button>
+            </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
