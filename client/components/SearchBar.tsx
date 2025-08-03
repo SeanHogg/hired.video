@@ -278,12 +278,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Type</label>
-            <Select value={filters.isMaster === undefined ? "" : filters.isMaster ? "master" : "variation"} onValueChange={(value) => handleFilterChange('isMaster', value === "" ? undefined : value === "master")}>
+            <Select value={filters.isMaster === undefined ? "all" : filters.isMaster ? "master" : "variation"} onValueChange={(value) => handleFilterChange('isMaster', value === "all" ? undefined : value === "master")}>
               <SelectTrigger>
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All types</SelectItem>
+                <SelectItem value="all">All types</SelectItem>
                 <SelectItem value="master">Master</SelectItem>
                 <SelectItem value="variation">Variation</SelectItem>
               </SelectContent>
