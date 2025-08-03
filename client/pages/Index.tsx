@@ -294,7 +294,7 @@ export default function Index() {
     return matchesCategory && matchesSearch;
   });
 
-  const totalViews = contentItems.reduce((sum, item) => sum + (item.views || 0), 0);
+  const totalViews = allContentItems.reduce((sum, item) => sum + (item.views || 0), 0);
   const formatTotalViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
