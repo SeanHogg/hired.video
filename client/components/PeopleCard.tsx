@@ -271,7 +271,7 @@ export default function PeopleCard({
 
                 {/* View Profile */}
                 <Button asChild variant="outline" size="sm">
-                  <Link to={`/people/view/${person.id}`}>
+                  <Link to={`/people/${person.id}`}>
                     <ExternalLink className="h-3 w-3" />
                   </Link>
                 </Button>
