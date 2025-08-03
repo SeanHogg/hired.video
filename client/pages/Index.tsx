@@ -9,8 +9,10 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import VideoCard from "@/components/VideoCard";
 import ResumeCard from "@/components/ResumeCard";
+import JobCard from "@/components/JobCard";
 import ActionsModal from "@/components/ActionsModal";
 import HeroCarousel from "@/components/HeroCarousel";
+import { getPublicJobs } from "@/data/mockJobs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
 
