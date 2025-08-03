@@ -77,6 +77,7 @@ export interface OnboardingTask {
 
 export interface Company {
   id: string;
+  slug: string; // User-friendly URL identifier (e.g., "techcorp-inc" or "acme-corp")
   data: CompanyData;
   status: CompanyStatus;
   visibility: CompanyVisibility;
