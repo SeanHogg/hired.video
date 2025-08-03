@@ -37,9 +37,54 @@ import {
   User,
 } from "lucide-react";
 
+// Content data for the activity section
+const contentTypes = [
+  { id: "videos", label: "Videos", icon: Video },
+  { id: "resumes", label: "Resumes", icon: FileText },
+  { id: "jobs", label: "Job Postings", icon: Briefcase },
+  { id: "companies", label: "Companies", icon: Building2 },
+  { id: "profiles", label: "Profiles", icon: User },
+];
+
+const filterTypes = [
+  { id: "my-content", label: "My Content", icon: User },
+  { id: "watch-later", label: "Watch Later", icon: Clock },
+  { id: "favorites", label: "Favorites", icon: Star },
+  { id: "recent", label: "Recently Viewed", icon: Eye },
+];
+
+// Mock data for activity content
+const mockContent = {
+  videos: [
+    { id: 1, title: "React Best Practices", duration: "15:30", views: 1200, thumbnail: "/placeholder.svg" },
+    { id: 2, title: "TypeScript Advanced Tips", duration: "22:45", views: 850, thumbnail: "/placeholder.svg" },
+  ],
+  resumes: [
+    { id: 1, title: "John Doe - Software Engineer", type: "PDF", size: "2.3 MB", lastModified: "2 days ago" },
+    { id: 2, title: "Jane Smith - Product Manager", type: "PDF", size: "1.8 MB", lastModified: "1 week ago" },
+  ],
+  jobs: [
+    { id: 1, title: "Senior Frontend Developer", company: "TechCorp", location: "Remote", posted: "3 days ago" },
+    { id: 2, title: "Product Designer", company: "StartupXYZ", location: "San Francisco", posted: "1 week ago" },
+  ],
+  companies: [
+    { id: 1, name: "TechCorp", industry: "Technology", employees: "1000+", logo: "/placeholder.svg" },
+    { id: 2, name: "StartupXYZ", industry: "SaaS", employees: "50-100", logo: "/placeholder.svg" },
+  ],
+  profiles: [
+    { id: 1, name: "John Doe", role: "Software Engineer", location: "New York", avatar: "/placeholder.svg" },
+    { id: 2, name: "Jane Smith", role: "Product Manager", location: "San Francisco", avatar: "/placeholder.svg" },
+  ],
+};
+
 export default function Dashboard() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated } = useAuth();
+
+  // Activity content state
+  const [selectedContentType, setSelectedContentType] = useState("videos");
+  const [selectedFilter, setSelectedFilter] = useState("my-content");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // If user is not authenticated, show CTA
   if (!isAuthenticated || !user) {
