@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import ShoppingCart from "@/components/ShoppingCart";
 
 interface NavigationProps {
   onMenuClick?: () => void;
@@ -174,12 +175,13 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                 </Link>
                 <Link to="/signup">
                   <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                    Get Started Free
+                    Get Started
                   </Button>
                 </Link>
               </>
             ) : (
               <>
+                <ShoppingCart />
                 {/* Show upgrade button for free accounts */}
                 {(!user?.subscription || user?.subscription === 'free') ? (
                   <Link to="/pricing">
@@ -294,7 +296,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                     </Link>
                     <Link to="/signup" onClick={() => setIsMenuOpen(false)}>
                       <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                        Get Started Free
+                        Get Started
                       </Button>
                     </Link>
                   </>
