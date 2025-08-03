@@ -38,6 +38,7 @@ import {
 export default function Index() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchRadius: "25",
     experienceLevel: "all",
