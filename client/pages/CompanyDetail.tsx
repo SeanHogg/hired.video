@@ -364,7 +364,7 @@ export default function CompanyDetail() {
                             ))}
                         </div>
                         
-                        {onboardingProgress === 100 && company.status !== 'active' && (
+                        {onboardingProgress === 100 && (rawCompany || company).status !== 'active' && (
                           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                             <div className="flex items-center gap-2 text-green-800">
                               <CheckCircle className="h-5 w-5" />
@@ -499,7 +499,7 @@ export default function CompanyDetail() {
                         <h4 className="font-medium mb-2">Special Benefits</h4>
                         <ul className="space-y-1">
                           {company.data.benefits.other.map((benefit, index) => (
-                            <li key={index} className="text-sm text-muted-foreground">• {benefit}</li>
+                            <li key={index} className="text-sm text-muted-foreground">�� {benefit}</li>
                           ))}
                         </ul>
                       </div>
