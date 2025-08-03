@@ -622,13 +622,18 @@ export const updateOnboardingTask = (companyId: string, taskId: string, complete
 };
 
 // Auto-track company when user tracks a job from that company
-export const autoTrackCompanyFromJob = (jobCompanyId: string, userId: string): void => {
-  // Find company by looking through job data - this would be properly implemented with job-company relationships
-  const company = MOCK_COMPANIES.find(c => 
-    c.data.name.toLowerCase().replace(/[^a-z0-9]/g, '-') === jobCompanyId?.toLowerCase()
+export const autoTrackCompanyFromJob = (jobCompanyName: string, userId: string): void => {
+  // Find company by name (case-insensitive)
+  const company = MOCK_COMPANIES.find(c =>
+    c.data.name.toLowerCase() === jobCompanyName.toLowerCase()
   );
-  
+
   if (company && !isCompanyTrackedByUser(company.id, userId)) {
     addTrackedCompany(company.id, userId);
   }
+};
+
+// Helper function to track company when job is tracked
+export const trackCompanyFromJobData = (jobCompanyName: string, userId: string): void => {
+  autoTrackCompanyFromJob(jobCompanyName, userId);
 };
