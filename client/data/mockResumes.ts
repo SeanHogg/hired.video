@@ -628,6 +628,10 @@ export const getResumeById = (id: string): Resume | undefined => {
   return MOCK_RESUMES.find(resume => resume.id === id);
 };
 
+export const getResumeBySlug = (slug: string): Resume | undefined => {
+  return MOCK_RESUMES.find(resume => resume.slug === slug);
+};
+
 export const getResumeMetadataById = (id: string): ResumeMetadata | undefined => {
   return MOCK_RESUME_METADATA.find(resume => resume.id === id);
 };
