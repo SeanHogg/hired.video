@@ -84,19 +84,29 @@ export default function PeopleDetail() {
   };
 
   const handleTrackPerson = () => {
-    if (user && person) {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (user && rawPerson) {
       if (isTracked) {
-        removeTrackedPerson(person.id, user.id);
+        removeTrackedPerson(rawPerson.id, user.id);
       } else {
-        addTrackedPerson(person.id, user.id);
+        addTrackedPerson(rawPerson.id, user.id);
       }
       // In a real app, you'd trigger a re-render here
     }
   };
 
   const handleSendConnectionRequest = () => {
-    if (user && person) {
-      sendConnectionRequest(user.id, person.id, connectionMessage);
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (user && rawPerson) {
+      sendConnectionRequest(user.id, rawPerson.id, connectionMessage);
       setShowConnectionDialog(false);
       setConnectionMessage('');
       // In a real app, you'd trigger a re-render here
@@ -104,9 +114,14 @@ export default function PeopleDetail() {
   };
 
   const handleAcceptConnection = () => {
-    if (user && person) {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (user && rawPerson) {
       const requests = getPendingConnectionRequests(user.id);
-      const request = requests.find(req => req.fromUserId === person.id);
+      const request = requests.find(req => req.fromUserId === rawPerson.id);
       if (request) {
         acceptConnectionRequest(request.id);
         // In a real app, you'd trigger a re-render here
