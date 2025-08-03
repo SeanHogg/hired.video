@@ -46,7 +46,6 @@ export default [
       }],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/prefer-const': 'error',
       '@typescript-eslint/no-inferrable-types': 'error',
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
@@ -126,7 +125,7 @@ export default [
       }],
       'import/no-unresolved': 'off', // TypeScript handles this
       'import/no-duplicates': 'error',
-      'import/no-unused-modules': 'error',
+      // 'import/no-unused-modules': 'error', // Can be performance intensive
       'import/first': 'error',
       'import/newline-after-import': 'error',
       'import/no-absolute-path': 'error',
