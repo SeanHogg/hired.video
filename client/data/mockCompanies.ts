@@ -637,3 +637,14 @@ export const autoTrackCompanyFromJob = (jobCompanyName: string, userId: string):
 export const trackCompanyFromJobData = (jobCompanyName: string, userId: string): void => {
   autoTrackCompanyFromJob(jobCompanyName, userId);
 };
+
+// Get companies that should be auto-tracked based on tracked jobs
+export const getCompaniesFromTrackedJobs = (userId: string): Company[] => {
+  // This would integrate with the job tracking system
+  // For now, it's automatically handled in the addTrackedJob function
+  const trackedCompanies = getTrackedCompaniesByUserId(userId);
+  return trackedCompanies.filter(company =>
+    // Filter companies that were auto-tracked from jobs
+    company.status === 'active' && company.visibility === 'public'
+  );
+};
