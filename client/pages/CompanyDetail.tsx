@@ -672,6 +672,14 @@ export default function CompanyDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        contentType="company"
+        title={company?.data.name || 'Company Profile'}
+      />
     </div>
   );
 }
