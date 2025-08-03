@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Mock users
 const mockUsers: Array<User & { password: string }> = [
   {
-    id: '1',
+    id: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890',
     email: 'john.seeker@example.com',
     password: 'password123',
     name: 'John Seeker',
@@ -35,7 +35,7 @@ const mockUsers: Array<User & { password: string }> = [
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
   },
   {
-    id: '2',
+    id: 'u2b3c4d5-e6f7-8901-bcde-f23456789012',
     email: 'sarah.recruiter@example.com',
     password: 'password123',
     name: 'Sarah Recruiter',
@@ -44,7 +44,7 @@ const mockUsers: Array<User & { password: string }> = [
     avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face'
   },
   {
-    id: '3',
+    id: 'u3c4d5e6-f7g8-9012-cdef-345678901234',
     email: 'michael.business@example.com',
     password: 'password123',
     name: 'Michael Business',
