@@ -251,7 +251,37 @@ export default function ResumeDetail() {
           sidebarCollapsed={sidebarCollapsed}
         />
         
-        <div className="pt-16">
+        <div className={`pt-16 ${!isAuthenticated ? 'relative' : ''}`}>
+          {!isAuthenticated && (
+            <>
+              {/* Blur overlay */}
+              <div
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm z-40 cursor-pointer"
+                onClick={() => setShowLoginModal(true)}
+              />
+              {/* Login prompt overlay */}
+              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                <div className="bg-background/95 backdrop-blur-md border rounded-lg p-6 max-w-md text-center shadow-lg pointer-events-auto">
+                  <div className="flex justify-center mb-4">
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      <User className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">View Professional Profile</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Sign in to access complete professional profiles, work experience, and connect with talent.
+                  </p>
+                  <Button
+                    onClick={() => setShowLoginModal(true)}
+                    className="w-full"
+                  >
+                    Sign In to View Details
+                    <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
           {/* Header with Video */}
           <div className="relative bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground">
             <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />
