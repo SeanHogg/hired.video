@@ -384,16 +384,40 @@ export default function Index() {
         <div className="max-w-7xl mx-auto">
           {/* Results Header */}
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-foreground mb-2">
-              {selectedCategory === "all" ? "All" :
-               selectedCategory === "people" ? "People" :
-               selectedCategory === "companies" ? "Companies" :
-               selectedCategory === "resume" ? "Resumes" : "Jobs"}
-            </h2>
-            <p className="text-muted-foreground">
-              {filteredItems.length} items found
-              {searchFilters.search && ` for "${searchFilters.search}"`}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  {selectedCategory === "all" ? "All" :
+                   selectedCategory === "people" ? "People" :
+                   selectedCategory === "companies" ? "Companies" :
+                   selectedCategory === "resume" ? "Resumes" : "Jobs"}
+                </h2>
+                <p className="text-muted-foreground">
+                  {filteredItems.length} items found
+                  {searchFilters.search && ` for "${searchFilters.search}"`}
+                </p>
+              </div>
+
+              {/* View Toggle */}
+              <div className="flex rounded-md border">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-r-none"
+                >
+                  <Grid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-l-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Content Grid */}
