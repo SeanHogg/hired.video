@@ -308,6 +308,9 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                         {user?.role?.replace('_', ' ')}
                       </p>
                     </div>
+                    <div className="px-2 py-1">
+                      <ShoppingCart />
+                    </div>
                     <Button
                       variant="ghost"
                       onClick={() => {
