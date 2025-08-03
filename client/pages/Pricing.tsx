@@ -320,7 +320,7 @@ export default function Pricing() {
                           <Zap className="h-3 w-3 text-primary" />
                         </div>
                         <div>
-                          <span className="text-sm font-medium">Generative AI</span>
+                          <span className="text-sm font-medium">Unlimited AI Assistance</span>
                           <p className="text-xs text-muted-foreground">AI-powered resume optimization & job matching</p>
                         </div>
                       </div>
