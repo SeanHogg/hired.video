@@ -53,13 +53,14 @@ class AIService {
       temperature?: number;
     }
   ): Promise<ChatResponse> {
-    const config = getAIConfig();
-    
-    // Check if API key is available
-    if (!config.apiKey) {
-      logger.warn('OpenRouter API key not configured, falling back to mock response');
-      return this.getMockResponse(messages[messages.length - 1]?.content || '');
-    }
+    try {
+      const config = getAIConfig();
+
+      // Check if API key is available
+      if (!config.apiKey) {
+        logger.warn('OpenRouter API key not configured, falling back to mock response');
+        return this.getMockResponse(messages[messages.length - 1]?.content || '');
+      }
 
     try {
       const response = await fetch(`${this.baseURL}/chat/completions`, {
@@ -107,9 +108,13 @@ class AIService {
 
     } catch (error) {
       logger.error('AI service error', error);
-      
+
       // Fallback to mock response on error
       logger.warn('Falling back to mock response due to AI service error');
+      return this.getMockResponse(messages[messages.length - 1]?.content || '');
+    } catch (configError) {
+      // Handle configuration errors
+      logger.error('AI service configuration error', configError);
       return this.getMockResponse(messages[messages.length - 1]?.content || '');
     }
   }
@@ -209,6 +214,17 @@ export async function sendHRMessage(message: string, history: ChatMessage[] = []
  * Check if AI service is properly configured
  */
 export function isAIServiceConfigured(): boolean {
-  const config = getAIConfig();
-  return !!config.apiKey;
+  try {
+    const config = getAIConfig();
+    const isConfigured = !!config.apiKey;
+    logger.info('AI service configuration check', {
+      isConfigured,
+      hasApiKey: !!config.apiKey,
+      model: config.model
+    });
+    return isConfigured;
+  } catch (error) {
+    logger.error('Error checking AI service configuration', error);
+    return false;
+  }
 }

@@ -94,12 +94,13 @@ export default function AIChatPanel() {
       setMessages(prev => [...prev, aiMessage]);
 
     } catch (error) {
-      console.error('AI service error:', error);
+      console.error('Unexpected error in AI chat:', error);
 
-      // Fallback to mock response
+      // This should rarely happen since AI service has internal fallbacks
+      // But provide a user-friendly message just in case
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I apologize, but I'm having trouble connecting to the AI service right now. Please try again in a moment.",
+        content: "I'm experiencing a technical issue. Let me try to help you anyway! What would you like to know about resumes, job searching, or recruitment?",
         sender: "ai",
         timestamp: new Date(),
       };
