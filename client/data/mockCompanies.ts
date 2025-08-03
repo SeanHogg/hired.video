@@ -307,6 +307,7 @@ export const MOCK_COMPANIES: Company[] = [
   },
   {
     id: MOCK_COMPANY_IDS.WEBCRAFT_STUDIOS,
+    slug: 'webcraft-studios',
     data: {
       name: 'WebCraft Studios',
       logo: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=100&h=100&fit=crop',
