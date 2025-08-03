@@ -475,12 +475,12 @@ export default function SearchBar({
                   <Briefcase className="w-3 h-3" />
                   Experience Level
                 </label>
-                <Select value={filters.experienceLevel || ""} onValueChange={(value) => handleFilterChange('experienceLevel', value)}>
+                <Select value={filters.experienceLevel || "all"} onValueChange={(value) => handleFilterChange('experienceLevel', value === 'all' ? undefined : value)}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Levels</SelectItem>
+                    <SelectItem value="all">All Levels</SelectItem>
                     <SelectItem value="entry">Entry Level</SelectItem>
                     <SelectItem value="mid">Mid Level</SelectItem>
                     <SelectItem value="senior">Senior Level</SelectItem>
