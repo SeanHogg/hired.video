@@ -98,6 +98,7 @@ export default function Companies() {
 
       return {
         id: company.id,
+        slug: company.slug,
         name: company.data.name,
         logo: company.data.logo,
         tagline: company.data.tagline,
@@ -126,6 +127,7 @@ export default function Companies() {
 
       return {
         id: company.id,
+        slug: company.slug,
         name: company.data.name,
         logo: company.data.logo,
         tagline: company.data.tagline,
@@ -287,6 +289,7 @@ export default function Companies() {
                       {paginatedCompanies.map((company) => {
                         const companyMetadata = {
                           id: company.id,
+                          slug: company.slug,
                           name: company.data.name,
                           logo: company.data.logo,
                           tagline: company.data.tagline,
@@ -428,6 +431,7 @@ export default function Companies() {
                 {getPublicCompanies().slice(0, 3).map((company) => {
                   const companyMetadata = {
                     id: company.id,
+                    slug: company.slug,
                     name: company.data.name,
                     logo: company.data.logo,
                     tagline: company.data.tagline,

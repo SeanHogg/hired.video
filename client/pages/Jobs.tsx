@@ -104,6 +104,7 @@ export default function Jobs() {
     const { owned, tracked } = getAllJobsForUser(user.id);
     const ownedWithOwnership: JobWithOwnership[] = owned.map(job => ({
       id: job.id,
+      slug: job.slug,
       title: job.data.title,
       company: job.data.company.name,
       location: job.data.location.remote 
@@ -129,6 +130,7 @@ export default function Jobs() {
 
     const trackedWithOwnership: JobWithOwnership[] = tracked.map(job => ({
       id: job.id,
+      slug: job.slug,
       title: job.data.title,
       company: job.data.company.name,
       location: job.data.location.remote 
@@ -300,6 +302,7 @@ export default function Jobs() {
                     {paginatedJobs.map((job) => {
                       const jobMetadata = {
                         id: job.id,
+                        slug: job.slug,
                         title: job.data.title,
                         company: job.data.company.name,
                         location: job.data.location.remote 
@@ -426,6 +429,7 @@ export default function Jobs() {
                 {getPublicJobs().slice(0, 2).map((job) => {
                   const jobMetadata = {
                     id: job.id,
+                    slug: job.slug,
                     title: job.data.title,
                     company: job.data.company.name,
                     location: job.data.location.remote 
