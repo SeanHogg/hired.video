@@ -58,59 +58,77 @@ const App = () => (
       <CartProvider>
         <AIProvider>
           <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/persona-selection" element={<PersonaSelection />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/features" element={<Navigate to="/pricing" replace />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/for-recruiters" element={<ForRecruiters />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/resumes" element={<Resumes />} />
-              <Route path="/resumes/upload" element={<ResumeUploadPage />} />
-              <Route path="/resumes/create/:id" element={<ResumeCreatePage />} />
-              <Route path="/resumes/edit/:id" element={<ResumeEditPage />} />
-              <Route path="/resumes/:id" element={<ResumeDetail />} />
-              <Route path="/jobs" element={<Jobs />} />
-              <Route path="/jobs/upload" element={<JobUploadPage />} />
-              <Route path="/jobs/create" element={<JobCreatePage />} />
-              <Route path="/jobs/create/:id" element={<JobCreatePage />} />
-              <Route path="/jobs/edit/:id" element={<JobEditPage />} />
-              <Route path="/jobs/:id" element={<JobDetail />} />
-              <Route path="/companies" element={<Companies />} />
-              <Route path="/companies/create" element={<CompanyCreatePage />} />
-              <Route path="/companies/create/:id" element={<CompanyCreatePage />} />
-              <Route path="/companies/edit/:id" element={<CompanyEditPage />} />
-              <Route path="/companies/:id" element={<CompanyDetail />} />
-              <Route path="/people" element={<People />} />
-              <Route path="/people/:id" element={<PeopleDetail />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/tools" element={<Tools />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/outreach" element={<Outreach />} />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route
+                  path="/persona-selection"
+                  element={<PersonaSelection />}
+                />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route
+                  path="/features"
+                  element={<Navigate to="/pricing" replace />}
+                />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/for-recruiters" element={<ForRecruiters />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/resumes" element={<Resumes />} />
+                <Route path="/resumes/upload" element={<ResumeUploadPage />} />
+                <Route
+                  path="/resumes/create/:id"
+                  element={<ResumeCreatePage />}
+                />
+                <Route path="/resumes/edit/:id" element={<ResumeEditPage />} />
+                <Route path="/resumes/:id" element={<ResumeDetail />} />
+                <Route path="/jobs" element={<Jobs />} />
+                <Route path="/jobs/upload" element={<JobUploadPage />} />
+                <Route path="/jobs/create" element={<JobCreatePage />} />
+                <Route path="/jobs/create/:id" element={<JobCreatePage />} />
+                <Route path="/jobs/edit/:id" element={<JobEditPage />} />
+                <Route path="/jobs/:id" element={<JobDetail />} />
+                <Route path="/companies" element={<Companies />} />
+                <Route
+                  path="/companies/create"
+                  element={<CompanyCreatePage />}
+                />
+                <Route
+                  path="/companies/create/:id"
+                  element={<CompanyCreatePage />}
+                />
+                <Route
+                  path="/companies/edit/:id"
+                  element={<CompanyEditPage />}
+                />
+                <Route path="/companies/:id" element={<CompanyDetail />} />
+                <Route path="/people" element={<People />} />
+                <Route path="/people/:id" element={<PeopleDetail />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/tools" element={<Tools />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/outreach" element={<Outreach />} />
 
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/privacy" element={<PrivacyPolicy />} />
-              <Route path="/terms" element={<TermsOfService />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/cookies" element={<CookiePolicy />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/cookies" element={<CookiePolicy />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
 
-            {/* Global AI Components - Available on all pages */}
-            <FloatingAIButton />
-            <AIChatPanel />
-          </BrowserRouter>
+              {/* Global AI Components - Available on all pages */}
+              <FloatingAIButton />
+              <AIChatPanel />
+            </BrowserRouter>
           </TooltipProvider>
         </AIProvider>
       </CartProvider>

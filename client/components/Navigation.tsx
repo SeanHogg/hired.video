@@ -1,7 +1,22 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Menu, X, Video, Sparkles, ChevronDown, Home, TrendingUp, FileText, Briefcase, Building2, Users, Wrench, CheckSquare, Send } from "lucide-react";
+import {
+  Menu,
+  X,
+  Video,
+  Sparkles,
+  ChevronDown,
+  Home,
+  TrendingUp,
+  FileText,
+  Briefcase,
+  Building2,
+  Users,
+  Wrench,
+  CheckSquare,
+  Send,
+} from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
@@ -14,7 +29,11 @@ interface NavigationProps {
   sidebarCollapsed?: boolean;
 }
 
-export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollapsed }: NavigationProps) {
+export default function Navigation({
+  onMenuClick,
+  onSidebarToggle,
+  sidebarCollapsed,
+}: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
   const { isAuthenticated, logout, user } = useAuth();
@@ -22,26 +41,69 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
   const featuresRef = useRef<HTMLDivElement>(null);
 
   const navigationItems = [
-    { name: "Video Resumes", href: "/resumes", icon: FileText, description: "Create AI-powered video resumes" },
-    { name: "Smart Jobs", href: "/jobs", icon: Briefcase, description: "Find jobs with AI matching" },
-    { name: "For Companies", href: "/companies", icon: Building2, description: "Hire top talent efficiently" },
-    { name: "Professional Network", href: "/people", icon: Users, description: "Connect with professionals" },
-    { name: "AI Tools", href: "/tools", icon: Wrench, description: "Career enhancement tools" },
-    { name: "Task Management", href: "/tasks", icon: CheckSquare, description: "Organize your career journey" },
-    { name: "Smart Outreach", href: "/outreach", icon: Send, description: "Intelligent networking" },
-    { name: "Dashboard", href: "/dashboard", icon: TrendingUp, description: "Track your progress" },
+    {
+      name: "Video Resumes",
+      href: "/resumes",
+      icon: FileText,
+      description: "Create AI-powered video resumes",
+    },
+    {
+      name: "Smart Jobs",
+      href: "/jobs",
+      icon: Briefcase,
+      description: "Find jobs with AI matching",
+    },
+    {
+      name: "For Companies",
+      href: "/companies",
+      icon: Building2,
+      description: "Hire top talent efficiently",
+    },
+    {
+      name: "Professional Network",
+      href: "/people",
+      icon: Users,
+      description: "Connect with professionals",
+    },
+    {
+      name: "AI Tools",
+      href: "/tools",
+      icon: Wrench,
+      description: "Career enhancement tools",
+    },
+    {
+      name: "Task Management",
+      href: "/tasks",
+      icon: CheckSquare,
+      description: "Organize your career journey",
+    },
+    {
+      name: "Smart Outreach",
+      href: "/outreach",
+      icon: Send,
+      description: "Intelligent networking",
+    },
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: TrendingUp,
+      description: "Track your progress",
+    },
   ];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (featuresRef.current && !featuresRef.current.contains(event.target as Node)) {
+      if (
+        featuresRef.current &&
+        !featuresRef.current.contains(event.target as Node)
+      ) {
         setIsFeaturesOpen(false);
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -72,13 +134,13 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
             </Button>
 
             <Link to="/" className="flex items-center space-x-2">
-            <div className="relative">
-              <Video className="h-8 w-8 text-primary" />
-              <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-              MyVideoResu.ME
-            </span>
+              <div className="relative">
+                <Video className="h-8 w-8 text-primary" />
+                <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                MyVideoResu.ME
+              </span>
             </Link>
           </div>
 
@@ -94,7 +156,9 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                     className="flex items-center gap-1 text-foreground/70 hover:text-foreground transition-colors font-medium"
                   >
                     Features
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isFeaturesOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${isFeaturesOpen ? "rotate-180" : ""}`}
+                    />
                   </button>
 
                   {isFeaturesOpen && (
@@ -116,8 +180,12 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                                 <Icon className="h-5 w-5 text-primary" />
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-semibold text-sm text-foreground">{item.name}</h4>
-                                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+                                <h4 className="font-semibold text-sm text-foreground">
+                                  {item.name}
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {item.description}
+                                </p>
                               </div>
                             </Link>
                           );
@@ -144,7 +212,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                     "transition-colors font-medium",
                     location.pathname === "/pricing"
                       ? "text-primary"
-                      : "text-foreground/70 hover:text-foreground"
+                      : "text-foreground/70 hover:text-foreground",
                   )}
                 >
                   Pricing
@@ -155,7 +223,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                     "transition-colors font-medium",
                     location.pathname === "/about"
                       ? "text-primary"
-                      : "text-foreground/70 hover:text-foreground"
+                      : "text-foreground/70 hover:text-foreground",
                   )}
                 >
                   About
@@ -183,7 +251,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
             ) : (
               <>
                 {/* Show upgrade button for free accounts */}
-                {(!user?.subscription || user?.subscription === 'free') ? (
+                {!user?.subscription || user?.subscription === "free" ? (
                   <Link to="/pricing">
                     <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
                       Upgrade Account
@@ -192,7 +260,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                 ) : (
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="capitalize">
-                      {user?.subscription || 'Pro'} Plan
+                      {user?.subscription || "Pro"} Plan
                     </Badge>
                   </div>
                 )}
@@ -229,7 +297,9 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                       className="flex items-center justify-between w-full text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
                     >
                       Features
-                      <ChevronDown className={`h-4 w-4 transition-transform ${isFeaturesOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${isFeaturesOpen ? "rotate-180" : ""}`}
+                      />
                     </button>
 
                     {isFeaturesOpen && (
@@ -250,8 +320,12 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                                 <Icon className="h-4 w-4 text-primary" />
                               </div>
                               <div>
-                                <div className="font-medium text-sm">{item.name}</div>
-                                <div className="text-xs text-muted-foreground">{item.description}</div>
+                                <div className="font-medium text-sm">
+                                  {item.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.description}
+                                </div>
                               </div>
                             </Link>
                           );
@@ -293,7 +367,10 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                 {!isAuthenticated ? (
                   <>
                     <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start font-medium">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start font-medium"
+                      >
                         Sign In
                       </Button>
                     </Link>
@@ -306,9 +383,11 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                 ) : (
                   <>
                     <div className="px-2 py-1">
-                      <p className="text-sm font-medium">Welcome, {user?.name}</p>
+                      <p className="text-sm font-medium">
+                        Welcome, {user?.name}
+                      </p>
                       <p className="text-xs text-muted-foreground capitalize">
-                        {user?.role?.replace('_', ' ')}
+                        {user?.role?.replace("_", " ")}
                       </p>
                     </div>
                     <Button

@@ -1,19 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import Footer from '@/components/Footer';
-import { useAuth } from '@/lib/auth';
-import { useCart } from '@/lib/cart-context';
-import { useSidebar } from '@/hooks/use-sidebar';
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
+import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart-context";
+import { useSidebar } from "@/hooks/use-sidebar";
 import {
   CreditCard,
   Lock,
@@ -23,32 +35,38 @@ import {
   Users,
   Calendar,
   DollarSign,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function Checkout() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { user, isAuthenticated } = useAuth();
   const { items, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [paymentMethod, setPaymentMethod] = useState("card");
   const [billingInfo, setBillingInfo] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    company: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'US',
+    firstName: "",
+    lastName: "",
+    email: "",
+    company: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "US",
   });
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login?redirect=/checkout');
+      navigate("/login?redirect=/checkout");
       return;
     }
   }, [isAuthenticated, navigate]);
@@ -56,13 +74,13 @@ export default function Checkout() {
   // Redirect if cart is empty
   useEffect(() => {
     if (isAuthenticated && items.length === 0) {
-      navigate('/pricing');
+      navigate("/pricing");
       return;
     }
   }, [items.length, isAuthenticated, navigate]);
 
   const handleInputChange = (field: string, value: string) => {
-    setBillingInfo(prev => ({ ...prev, [field]: value }));
+    setBillingInfo((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,14 +89,14 @@ export default function Checkout() {
 
     // Simulate payment processing
     try {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
       // Clear cart and show success
       clearCart();
-      alert('Payment successful! Welcome to Premium! 🎉');
-      navigate('/dashboard');
+      alert("Payment successful! Welcome to Premium! 🎉");
+      navigate("/dashboard");
     } catch (error) {
-      alert('Payment failed. Please try again.');
+      alert("Payment failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -114,12 +132,17 @@ export default function Checkout() {
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
-              <Link to="/pricing" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
+              <Link
+                to="/pricing"
+                className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
+              >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Pricing
               </Link>
               <h1 className="text-3xl font-bold">Checkout</h1>
-              <p className="text-muted-foreground">Complete your premium upgrade</p>
+              <p className="text-muted-foreground">
+                Complete your premium upgrade
+              </p>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-8">
@@ -140,12 +163,14 @@ export default function Checkout() {
                             <h4 className="font-medium">{item.name}</h4>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Users className="h-4 w-4" />
-                              {item.users} user{item.users > 1 ? 's' : ''}
+                              {item.users} user{item.users > 1 ? "s" : ""}
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Calendar className="h-4 w-4" />
-                              {item.billingCycle === 'annual' ? 'Annual billing' : 'Monthly billing'}
-                              {item.billingCycle === 'annual' && (
+                              {item.billingCycle === "annual"
+                                ? "Annual billing"
+                                : "Monthly billing"}
+                              {item.billingCycle === "annual" && (
                                 <Badge variant="secondary" className="text-xs">
                                   Save 20%
                                 </Badge>
@@ -155,7 +180,9 @@ export default function Checkout() {
                           <div className="text-right">
                             <div className="font-medium">
                               ${item.price.toFixed(2)}
-                              {item.billingCycle === 'annual' ? '/year' : '/month'}
+                              {item.billingCycle === "annual"
+                                ? "/year"
+                                : "/month"}
                             </div>
                             {item.quantity > 1 && (
                               <div className="text-sm text-muted-foreground">
@@ -188,7 +215,9 @@ export default function Checkout() {
                     <div className="bg-green-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 text-green-700 text-sm">
                         <CheckCircle2 className="h-4 w-4" />
-                        <span className="font-medium">30-day money-back guarantee</span>
+                        <span className="font-medium">
+                          30-day money-back guarantee
+                        </span>
                       </div>
                       <p className="text-green-600 text-xs mt-1">
                         Not satisfied? Get a full refund within 30 days.
@@ -216,7 +245,9 @@ export default function Checkout() {
                           <Input
                             id="firstName"
                             value={billingInfo.firstName}
-                            onChange={(e) => handleInputChange('firstName', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange("firstName", e.target.value)
+                            }
                             required
                           />
                         </div>
@@ -225,7 +256,9 @@ export default function Checkout() {
                           <Input
                             id="lastName"
                             value={billingInfo.lastName}
-                            onChange={(e) => handleInputChange('lastName', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange("lastName", e.target.value)
+                            }
                             required
                           />
                         </div>
@@ -237,7 +270,9 @@ export default function Checkout() {
                           id="email"
                           type="email"
                           value={billingInfo.email}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("email", e.target.value)
+                          }
                           required
                         />
                       </div>
@@ -247,7 +282,9 @@ export default function Checkout() {
                         <Input
                           id="company"
                           value={billingInfo.company}
-                          onChange={(e) => handleInputChange('company', e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("company", e.target.value)
+                          }
                         />
                       </div>
 
@@ -256,7 +293,9 @@ export default function Checkout() {
                         <Input
                           id="address"
                           value={billingInfo.address}
-                          onChange={(e) => handleInputChange('address', e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("address", e.target.value)
+                          }
                           required
                         />
                       </div>
@@ -267,7 +306,9 @@ export default function Checkout() {
                           <Input
                             id="city"
                             value={billingInfo.city}
-                            onChange={(e) => handleInputChange('city', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange("city", e.target.value)
+                            }
                             required
                           />
                         </div>
@@ -276,7 +317,9 @@ export default function Checkout() {
                           <Input
                             id="state"
                             value={billingInfo.state}
-                            onChange={(e) => handleInputChange('state', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange("state", e.target.value)
+                            }
                             required
                           />
                         </div>
@@ -288,13 +331,20 @@ export default function Checkout() {
                           <Input
                             id="zipCode"
                             value={billingInfo.zipCode}
-                            onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                            onChange={(e) =>
+                              handleInputChange("zipCode", e.target.value)
+                            }
                             required
                           />
                         </div>
                         <div>
                           <Label htmlFor="country">Country *</Label>
-                          <Select value={billingInfo.country} onValueChange={(value) => handleInputChange('country', value)}>
+                          <Select
+                            value={billingInfo.country}
+                            onValueChange={(value) =>
+                              handleInputChange("country", value)
+                            }
+                          >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -319,17 +369,23 @@ export default function Checkout() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <RadioGroup
+                        value={paymentMethod}
+                        onValueChange={setPaymentMethod}
+                      >
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="card" id="card" />
-                          <Label htmlFor="card" className="flex items-center gap-2">
+                          <Label
+                            htmlFor="card"
+                            className="flex items-center gap-2"
+                          >
                             <CreditCard className="h-4 w-4" />
                             Credit/Debit Card
                           </Label>
                         </div>
                       </RadioGroup>
 
-                      {paymentMethod === 'card' && (
+                      {paymentMethod === "card" && (
                         <div className="space-y-4 pt-4 border-t">
                           <div>
                             <Label htmlFor="cardNumber">Card Number *</Label>
@@ -350,11 +406,7 @@ export default function Checkout() {
                             </div>
                             <div>
                               <Label htmlFor="cvv">CVV *</Label>
-                              <Input
-                                id="cvv"
-                                placeholder="123"
-                                required
-                              />
+                              <Input id="cvv" placeholder="123" required />
                             </div>
                           </div>
                         </div>
@@ -362,7 +414,9 @@ export default function Checkout() {
 
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Lock className="h-4 w-4" />
-                        <span>Your payment information is secure and encrypted</span>
+                        <span>
+                          Your payment information is secure and encrypted
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
@@ -388,11 +442,11 @@ export default function Checkout() {
                   </Button>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    By completing this purchase, you agree to our{' '}
+                    By completing this purchase, you agree to our{" "}
                     <Link to="/terms" className="underline">
                       Terms of Service
-                    </Link>{' '}
-                    and{' '}
+                    </Link>{" "}
+                    and{" "}
                     <Link to="/privacy" className="underline">
                       Privacy Policy
                     </Link>
