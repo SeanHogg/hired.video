@@ -107,6 +107,22 @@ export default function Pricing() {
               </div>
             </div>
 
+            {/* Billing Toggle */}
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <Label htmlFor="billing-toggle" className={!isAnnual ? "font-semibold" : ""}>
+                Monthly
+              </Label>
+              <Switch
+                id="billing-toggle"
+                checked={isAnnual}
+                onCheckedChange={setIsAnnual}
+              />
+              <Label htmlFor="billing-toggle" className={isAnnual ? "font-semibold" : ""}>
+                Annual
+                <Badge variant="secondary" className="ml-2">Save 20%</Badge>
+              </Label>
+            </div>
+
             {/* Pricing Cards */}
             <div className="grid md:grid-cols-2 gap-8 mb-16 max-w-4xl mx-auto">
               
