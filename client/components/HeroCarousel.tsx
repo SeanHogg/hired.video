@@ -47,7 +47,7 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
         { icon: Clock, label: "Updated daily" },
       ],
       actions: [
-        { label: "Get Started Free", variant: "default" as const, size: "lg" as const },
+        { label: "Get Started", variant: "default" as const, size: "lg" as const },
         { label: "Watch Demo", variant: "outline" as const, size: "lg" as const },
       ],
     },
