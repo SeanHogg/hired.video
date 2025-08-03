@@ -567,7 +567,8 @@ export const MOCK_RESUMES: Resume[] = [
           StartDate: "2013-09-01",
           EndDate: "2017-05-15",
           Score: "4.0",
-          Courses: ["Advanced Machine Learning", "Deep Learning", "Statistical Learning Theory"]
+          Courses: ["Advanced Machine Learning", "Deep Learning", "Statistical Learning Theory"],
+          Url: "https://stanford.edu"
         },
         {
           Institution: "University of Texas at Austin",

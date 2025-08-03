@@ -488,12 +488,7 @@ export const MOCK_USERS: UserProfile[] = [
           position: 'Senior Data Scientist',
           startDate: '2020-03-01',
           endDate: 'Present',
-          location: {
-            city: 'Austin',
-            state: 'TX',
-            country: 'USA',
-            remote: true
-          },
+          location: "Austin, TX, USA (Remote)",
           description: 'Lead data science initiatives for enterprise clients, developing ML models that increased revenue by 25% on average.',
           highlights: [
             'Built predictive models reducing customer churn by 40%',
@@ -507,12 +502,7 @@ export const MOCK_USERS: UserProfile[] = [
           position: 'Data Scientist',
           startDate: '2017-06-01',
           endDate: '2020-02-28',
-          location: {
-            city: 'San Francisco',
-            state: 'CA',
-            country: 'USA',
-            remote: false
-          },
+          location: "San Francisco, CA, USA",
           description: 'Developed machine learning algorithms for fraud detection and risk assessment in financial services.',
           highlights: [
             'Created fraud detection system with 95% accuracy',
@@ -528,39 +518,29 @@ export const MOCK_USERS: UserProfile[] = [
           degree: 'PhD in Computer Science',
           field: 'Machine Learning',
           startDate: '2013-09-01',
-          endDate: '2017-05-15',
-          location: {
-            city: 'Stanford',
-            state: 'CA',
-            country: 'USA'
-          }
+          endDate: '2017-05-15'
         },
         {
           institution: 'University of Texas at Austin',
           degree: 'Master of Science',
           field: 'Statistics',
           startDate: '2011-08-01',
-          endDate: '2013-05-15',
-          location: {
-            city: 'Austin',
-            state: 'TX',
-            country: 'USA'
-          }
+          endDate: '2013-05-15'
         }
       ],
       skills: [
-        { name: 'Python', level: 'Expert', years: 10 },
-        { name: 'Machine Learning', level: 'Expert', years: 10 },
-        { name: 'TensorFlow', level: 'Advanced', years: 7 },
-        { name: 'PyTorch', level: 'Advanced', years: 6 },
-        { name: 'SQL', level: 'Advanced', years: 8 },
-        { name: 'AWS', level: 'Intermediate', years: 5 },
-        { name: 'Docker', level: 'Intermediate', years: 4 },
-        { name: 'MLOps', level: 'Advanced', years: 5 }
+        { name: 'Python', level: 'Expert', yearsOfExperience: 10 },
+        { name: 'Machine Learning', level: 'Expert', yearsOfExperience: 10 },
+        { name: 'TensorFlow', level: 'Advanced', yearsOfExperience: 7 },
+        { name: 'PyTorch', level: 'Advanced', yearsOfExperience: 6 },
+        { name: 'SQL', level: 'Advanced', yearsOfExperience: 8 },
+        { name: 'AWS', level: 'Intermediate', yearsOfExperience: 5 },
+        { name: 'Docker', level: 'Intermediate', yearsOfExperience: 4 },
+        { name: 'MLOps', level: 'Advanced', yearsOfExperience: 5 }
       ],
       languages: [
-        { name: 'English', level: 'Native' },
-        { name: 'Spanish', level: 'Native' }
+        'English (Native)',
+        'Spanish (Native)'
       ],
       projects: [
         {
@@ -573,13 +553,7 @@ export const MOCK_USERS: UserProfile[] = [
         }
       ],
       certifications: [
-        {
-          name: 'AWS Certified Machine Learning - Specialty',
-          issuer: 'Amazon Web Services',
-          issueDate: '2021-08-15',
-          expiryDate: '2024-08-15',
-          credentialId: 'AWS-ML-12345'
-        }
+        'AWS Certified Machine Learning - Specialty (2021-2024)'
       ],
       interests: ['Machine Learning Research', 'Open Source Contributions', 'Mentoring', 'Rock Climbing']
     },
