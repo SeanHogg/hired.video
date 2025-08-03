@@ -94,7 +94,7 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
-      setResumes(sampleResumes);
+      setResumes(getUserResumes());
     } catch (error) {
       console.error('Failed to load resumes:', error);
     } finally {
