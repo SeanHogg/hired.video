@@ -157,12 +157,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Industry</label>
-            <Select value={filters.industry || ""} onValueChange={(value) => handleFilterChange('industry', value)}>
+            <Select value={filters.industry || "all"} onValueChange={(value) => handleFilterChange('industry', value === 'all' ? undefined : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All industries" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All industries</SelectItem>
+                <SelectItem value="all">All industries</SelectItem>
                 <SelectItem value="Technology">Technology</SelectItem>
                 <SelectItem value="Marketing Technology">Marketing Technology</SelectItem>
                 <SelectItem value="Cloud Infrastructure">Cloud Infrastructure</SelectItem>
