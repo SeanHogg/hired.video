@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import LoginModal from '@/components/LoginModal';
 import { useAuth } from '@/lib/auth';
+import { generateFakePersonData } from '@/lib/fakeData';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { 
   getUserById, 
