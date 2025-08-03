@@ -1005,11 +1005,14 @@ export default function Resumes() {
                         }
                       </p>
                       <div className="flex gap-2 justify-center">
-                        <Button onClick={() => setView('upload')} variant="outline">
+                        <Button onClick={() => navigate('/resumes/upload')} variant="outline">
                           <Upload className="h-4 w-4 mr-2" />
                           Upload Resume
                         </Button>
-                        <Button onClick={() => setView('builder')}>
+                        <Button onClick={() => {
+                          const newId = generateResumeId();
+                          navigate(`/resumes/create/${newId}`);
+                        }}>
                           <Plus className="h-4 w-4 mr-2" />
                           Create Resume
                         </Button>
