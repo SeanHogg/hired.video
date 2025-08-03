@@ -341,10 +341,13 @@ export const MOCK_RESUMES: Resume[] = [
       ...SEAN_HOGG_RESUME_DATA,
       Basics: {
         ...SEAN_HOGG_RESUME_DATA.Basics,
+        Name: "John Seeker",
         Label: "Senior DevOps Engineer",
+        Email: "john.seeker@example.com",
+        Image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
         Summary: "DevOps specialist with extensive experience in cloud infrastructure, CI/CD pipelines, and container orchestration. Passionate about automation and reliability with expertise in AWS, Kubernetes, and modern DevOps practices."
       },
-      Work: SEAN_HOGG_RESUME_DATA.Work.filter(work => 
+      Work: SEAN_HOGG_RESUME_DATA.Work.filter(work =>
         work.Name.includes('OnTheClock') || work.Name.includes('Alliance') || work.Name.includes('Career Now Brands')
       )
     },
@@ -355,7 +358,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-25T11:30:00Z',
     updatedAt: '2024-01-25T15:20:00Z',
     views: 12,
-    userId: 'user_1'
+    userId: '1' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
