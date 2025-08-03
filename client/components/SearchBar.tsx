@@ -260,12 +260,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Privacy</label>
-            <Select value={filters.privacy || ""} onValueChange={(value) => handleFilterChange('privacy', value)}>
+            <Select value={filters.privacy || "all"} onValueChange={(value) => handleFilterChange('privacy', value === 'all' ? undefined : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All privacy levels" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All privacy levels</SelectItem>
+                <SelectItem value="all">All privacy levels</SelectItem>
                 <SelectItem value="private">Private</SelectItem>
                 <SelectItem value="recruiter_only">Recruiter Only</SelectItem>
                 <SelectItem value="public">Public</SelectItem>
