@@ -177,12 +177,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Company Size</label>
-            <Select value={filters.size || ""} onValueChange={(value) => handleFilterChange('size', value)}>
+            <Select value={filters.size || "all"} onValueChange={(value) => handleFilterChange('size', value === 'all' ? undefined : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All sizes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All sizes</SelectItem>
+                <SelectItem value="all">All sizes</SelectItem>
                 <SelectItem value="1-10">1-10 employees</SelectItem>
                 <SelectItem value="10-50">10-50 employees</SelectItem>
                 <SelectItem value="50-200">50-200 employees</SelectItem>
