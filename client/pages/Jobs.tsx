@@ -297,13 +297,7 @@ export default function Jobs() {
                     {isJobSeeker ? "Available Jobs" : "All Jobs"}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {getJobsByFilters({
-                      search: searchFilters.search || "",
-                      location: searchFilters.location,
-                      employmentType: searchFilters.employmentType,
-                      experienceLevel: searchFilters.experienceLevel,
-                      remote: searchFilters.remote
-                    }).map((job) => {
+                    {paginatedJobs.map((job) => {
                       const jobMetadata = {
                         id: job.id,
                         title: job.data.title,
@@ -338,6 +332,15 @@ export default function Jobs() {
                       );
                     })}
                   </div>
+
+                  {/* Pagination */}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredJobs.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
                 </div>
               </div>
             </div>
