@@ -227,6 +227,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.UX_DESIGNER,
+    slug: 'ux-designer-saas-platform',
     data: {
       title: 'Senior UX Designer',
       department: 'Design',
