@@ -48,6 +48,7 @@ import CompanyDetail from "./pages/CompanyDetail";
 import CompanyCreatePage from "./pages/CompanyCreatePage";
 import CompanyEditPage from "./pages/CompanyEditPage";
 import PeopleDetail from "./pages/PeopleDetail";
+import Checkout from "./pages/Checkout";
 
 const queryClient = new QueryClient();
 
