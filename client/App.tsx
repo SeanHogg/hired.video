@@ -46,6 +46,7 @@ import JobEditPage from "./pages/JobEditPage";
 import CompanyDetail from "./pages/CompanyDetail";
 import CompanyCreatePage from "./pages/CompanyCreatePage";
 import CompanyEditPage from "./pages/CompanyEditPage";
+import PeopleDetail from "./pages/PeopleDetail";
 
 const queryClient = new QueryClient();
 
