@@ -314,12 +314,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Remote</label>
-            <Select value={filters.remote?.toString() || ""} onValueChange={(value) => handleFilterChange('remote', value ? value === "true" : undefined)}>
+            <Select value={filters.remote?.toString() || "all"} onValueChange={(value) => handleFilterChange('remote', value === 'all' ? undefined : value === "true")}>
               <SelectTrigger>
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All locations</SelectItem>
+                <SelectItem value="all">All locations</SelectItem>
                 <SelectItem value="true">Remote only</SelectItem>
                 <SelectItem value="false">On-site only</SelectItem>
               </SelectContent>
