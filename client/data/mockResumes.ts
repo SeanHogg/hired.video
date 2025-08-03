@@ -577,7 +577,8 @@ export const MOCK_RESUMES: Resume[] = [
           StartDate: "2011-08-01",
           EndDate: "2013-05-15",
           Score: "3.9",
-          Courses: ["Bayesian Statistics", "Time Series Analysis", "Multivariate Statistics"]
+          Courses: ["Bayesian Statistics", "Time Series Analysis", "Multivariate Statistics"],
+          Url: "https://utexas.edu"
         }
       ],
       Skills: [
