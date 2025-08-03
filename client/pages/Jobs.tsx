@@ -3,12 +3,11 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
+import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import {
@@ -47,12 +46,7 @@ import {
 export default function Jobs() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [employmentTypeFilter, setEmploymentTypeFilter] = useState("");
-  const [experienceLevelFilter, setExperienceLevelFilter] = useState("");
-  const [remoteFilter, setRemoteFilter] = useState<boolean | undefined>(undefined);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
 
   // Get jobs based on user role and authentication
   const getJobsForUser = () => {
@@ -142,12 +136,16 @@ export default function Jobs() {
     }
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setLocationFilter("");
-    setEmploymentTypeFilter("");
-    setExperienceLevelFilter("");
-    setRemoteFilter(undefined);
+  const handleSearch = (query: string) => {
+    setSearchFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({});
   };
 
   // If user is authenticated, show the actual jobs page
@@ -203,90 +201,15 @@ export default function Jobs() {
               </div>
 
               {/* Search and Filters */}
-              <div className="mb-6 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search jobs, companies, or skills..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="shrink-0"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                  </Button>
-                </div>
-
-                {showFilters && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Location</label>
-                          <Input 
-                            placeholder="City, State"
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Employment Type</label>
-                          <Select value={employmentTypeFilter} onValueChange={setEmploymentTypeFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All types</SelectItem>
-                              <SelectItem value="full-time">Full-time</SelectItem>
-                              <SelectItem value="part-time">Part-time</SelectItem>
-                              <SelectItem value="contract">Contract</SelectItem>
-                              <SelectItem value="internship">Internship</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Experience Level</label>
-                          <Select value={experienceLevelFilter} onValueChange={setExperienceLevelFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All levels" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All levels</SelectItem>
-                              <SelectItem value="entry">Entry</SelectItem>
-                              <SelectItem value="mid">Mid-level</SelectItem>
-                              <SelectItem value="senior">Senior</SelectItem>
-                              <SelectItem value="executive">Executive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Remote</label>
-                          <Select value={remoteFilter?.toString() || ""} onValueChange={(value) => setRemoteFilter(value ? value === "true" : undefined)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All locations" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All locations</SelectItem>
-                              <SelectItem value="true">Remote only</SelectItem>
-                              <SelectItem value="false">On-site only</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={clearFilters}>
-                        <X className="h-3 w-3 mr-1" />
-                        Clear Filters
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
+              <div className="mb-6">
+                <SearchBar
+                  context="jobs"
+                  value={searchFilters.search}
+                  filters={searchFilters}
+                  onSearch={handleSearch}
+                  onFilterChange={handleFilterChange}
+                  onClearFilters={handleClearFilters}
+                />
               </div>
 
               {/* Job Listings */}
@@ -341,11 +264,11 @@ export default function Jobs() {
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getJobsByFilters({
-                      search: searchQuery,
-                      location: locationFilter,
-                      employmentType: employmentTypeFilter,
-                      experienceLevel: experienceLevelFilter,
-                      remote: remoteFilter
+                      search: searchFilters.search || "",
+                      location: searchFilters.location,
+                      employmentType: searchFilters.employmentType,
+                      experienceLevel: searchFilters.experienceLevel,
+                      remote: searchFilters.remote
                     }).map((job) => {
                       const jobMetadata = {
                         id: job.id,
