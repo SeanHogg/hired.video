@@ -166,6 +166,7 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
+            <ShoppingCart />
             {!isAuthenticated ? (
               <>
                 <Link to="/login">
@@ -181,7 +182,6 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
               </>
             ) : (
               <>
-                <ShoppingCart />
                 {/* Show upgrade button for free accounts */}
                 {(!user?.subscription || user?.subscription === 'free') ? (
                   <Link to="/pricing">
@@ -287,6 +287,9 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                 </>
               )}
               <div className="flex flex-col space-y-2 pt-4 border-t border-border">
+                <div className="px-2 py-1">
+                  <ShoppingCart />
+                </div>
                 {!isAuthenticated ? (
                   <>
                     <Link to="/login" onClick={() => setIsMenuOpen(false)}>
@@ -307,9 +310,6 @@ export default function Navigation({ onMenuClick, onSidebarToggle, sidebarCollap
                       <p className="text-xs text-muted-foreground capitalize">
                         {user?.role?.replace('_', ' ')}
                       </p>
-                    </div>
-                    <div className="px-2 py-1">
-                      <ShoppingCart />
                     </div>
                     <Button
                       variant="ghost"
