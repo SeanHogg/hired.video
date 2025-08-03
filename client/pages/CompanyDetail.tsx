@@ -70,11 +70,16 @@ export default function CompanyDetail() {
   };
 
   const handleTrackCompany = () => {
-    if (user && company) {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    if (user && rawCompany) {
       if (isTracked) {
-        removeTrackedCompany(company.id, user.id);
+        removeTrackedCompany(rawCompany.id, user.id);
       } else {
-        addTrackedCompany(company.id, user.id);
+        addTrackedCompany(rawCompany.id, user.id);
       }
       // In a real app, you'd trigger a re-render here
     }
