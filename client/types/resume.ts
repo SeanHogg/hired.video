@@ -145,6 +145,13 @@ export interface ResumeMetadata {
   views: number;
   summary: string; // Derived from basics.summary
   title: string; // Derived from basics.label
+  userId: string;
+}
+
+export type ResumeOwnership = 'owned' | 'tracked';
+
+export interface ResumeWithOwnership extends ResumeMetadata {
+  ownership: ResumeOwnership;
 }
 
 export interface CreateResumeRequest {
