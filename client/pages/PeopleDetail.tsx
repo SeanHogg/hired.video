@@ -432,165 +432,186 @@ export default function PeopleDetail() {
                   </CardContent>
                 </Card>
 
-                {/* Experience Section */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5" />
-                      Experience
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      {person.data.experience.map((exp, index) => (
-                        <div key={index} className="flex gap-4">
-                          <div className="flex-shrink-0">
-                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Building2 className="h-6 w-6 text-primary" />
-                            </div>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h3 className="font-semibold text-lg">{exp.title}</h3>
-                                <p className="text-muted-foreground">{exp.company}</p>
-                                {exp.location && (
-                                  <p className="text-sm text-muted-foreground">{exp.location}</p>
+                {/* Resume Details - Only show if user has active public resume */}
+                {hasActivePublicResume ? (
+                  <>
+                    {/* Experience Section */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Briefcase className="h-5 w-5" />
+                          Experience
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-6">
+                          {person.data.experience.map((exp, index) => (
+                            <div key={index} className="flex gap-4">
+                              <div className="flex-shrink-0">
+                                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                  <Building2 className="h-6 w-6 text-primary" />
+                                </div>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{exp.title}</h3>
+                                    <p className="text-muted-foreground">{exp.company}</p>
+                                    {exp.location && (
+                                      <p className="text-sm text-muted-foreground">{exp.location}</p>
+                                    )}
+                                  </div>
+                                  {exp.isCurrent && (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                                      Current
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  {exp.startDate} - {exp.endDate || 'Present'}
+                                </p>
+                                {exp.description && (
+                                  <p className="text-sm mb-3">{exp.description}</p>
+                                )}
+                                {exp.skills && exp.skills.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {exp.skills.map((skill, skillIndex) => (
+                                      <Badge key={skillIndex} variant="secondary" className="text-xs">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
-                              {exp.isCurrent && (
-                                <Badge variant="outline" className="bg-green-50 text-green-700">
-                                  Current
-                                </Badge>
-                              )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {exp.startDate} - {exp.endDate || 'Present'}
-                            </p>
-                            {exp.description && (
-                              <p className="text-sm mb-3">{exp.description}</p>
-                            )}
-                            {exp.skills && exp.skills.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {exp.skills.map((skill, skillIndex) => (
-                                  <Badge key={skillIndex} variant="secondary" className="text-xs">
-                                    {skill}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </Card>
 
-                {/* Education Section */}
-                {person.data.education.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <GraduationCap className="h-5 w-5" />
-                        Education
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {person.data.education.map((edu, index) => (
-                          <div key={index} className="flex gap-4">
-                            <div className="flex-shrink-0">
-                              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                <GraduationCap className="h-6 w-6 text-blue-600" />
+                    {/* Education Section */}
+                    {person.data.education.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <GraduationCap className="h-5 w-5" />
+                            Education
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {person.data.education.map((edu, index) => (
+                              <div key={index} className="flex gap-4">
+                                <div className="flex-shrink-0">
+                                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                                    <GraduationCap className="h-6 w-6 text-blue-600" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold">{edu.degree} in {edu.field}</h3>
+                                  <p className="text-muted-foreground">{edu.institution}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {edu.startDate} - {edu.endDate || 'Present'}
+                                  </p>
+                                  {edu.gpa && (
+                                    <p className="text-sm text-muted-foreground">GPA: {edu.gpa}</p>
+                                  )}
+                                  {edu.description && (
+                                    <p className="text-sm mt-2">{edu.description}</p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{edu.degree} in {edu.field}</h3>
-                              <p className="text-muted-foreground">{edu.institution}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {edu.startDate} - {edu.endDate || 'Present'}
-                              </p>
-                              {edu.gpa && (
-                                <p className="text-sm text-muted-foreground">GPA: {edu.gpa}</p>
-                              )}
-                              {edu.description && (
-                                <p className="text-sm mt-2">{edu.description}</p>
-                              )}
-                            </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                {/* Skills Section */}
-                {person.data.skills.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Award className="h-5 w-5" />
-                        Skills & Expertise
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {person.data.skills.map((skill, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <div className="font-medium">{skill.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {skill.level}
-                                {skill.yearsOfExperience && ` • ${skill.yearsOfExperience} years`}
+                    {/* Skills Section */}
+                    {person.data.skills.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Award className="h-5 w-5" />
+                            Skills & Expertise
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {person.data.skills.map((skill, index) => (
+                              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div>
+                                  <div className="font-medium">{skill.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {skill.level}
+                                    {skill.yearsOfExperience && ` • ${skill.yearsOfExperience} years`}
+                                  </div>
+                                </div>
+                                {skill.endorsements && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {skill.endorsements} endorsements
+                                  </Badge>
+                                )}
                               </div>
-                            </div>
-                            {skill.endorsements && (
-                              <Badge variant="outline" className="text-xs">
-                                {skill.endorsements} endorsements
-                              </Badge>
-                            )}
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                {/* Projects Section */}
-                {person.data.projects.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Projects</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {person.data.projects.map((project, index) => (
-                          <div key={index} className="border rounded-lg p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="font-semibold">{project.name}</h3>
-                              {project.url && (
-                                <Button variant="outline" size="sm" asChild>
-                                  <a href={project.url} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {project.startDate} - {project.endDate || 'Present'}
-                              {project.role && ` • ${project.role}`}
-                            </p>
-                            <p className="text-sm mb-3">{project.description}</p>
-                            <div className="flex flex-wrap gap-1">
-                              {project.technologies.map((tech, techIndex) => (
-                                <Badge key={techIndex} variant="secondary" className="text-xs">
-                                  {tech}
-                                </Badge>
-                              ))}
-                            </div>
+                    {/* Projects Section */}
+                    {person.data.projects.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Projects</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {person.data.projects.map((project, index) => (
+                              <div key={index} className="border rounded-lg p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <h3 className="font-semibold">{project.name}</h3>
+                                  {project.url && (
+                                    <Button variant="outline" size="sm" asChild>
+                                      <a href={project.url} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    </Button>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  {project.startDate} - {project.endDate || 'Present'}
+                                  {project.role && ` • ${project.role}`}
+                                </p>
+                                <p className="text-sm mb-3">{project.description}</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {project.technologies.map((tech, techIndex) => (
+                                    <Badge key={techIndex} variant="secondary" className="text-xs">
+                                      {tech}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                ) : (
+                  /* No Public Resume Message */
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <div className="flex justify-center mb-4">
+                        <div className="p-3 bg-muted rounded-full">
+                          <Briefcase className="h-6 w-6 text-muted-foreground" />
+                        </div>
                       </div>
+                      <h3 className="font-semibold text-lg mb-2">Professional Details Private</h3>
+                      <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                        This user hasn't made their detailed professional information public yet.
+                        You can still connect with them and see their basic profile information.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
