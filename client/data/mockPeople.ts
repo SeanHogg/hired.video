@@ -380,6 +380,7 @@ export const MOCK_USERS: UserProfile[] = [
   },
   {
     id: MOCK_PEOPLE_IDS.MARIA_GARCIA,
+    slug: 'maria-garcia',
     data: {
       firstName: 'Maria',
       lastName: 'Garcia',
