@@ -147,7 +147,7 @@ export default function ResumeDetail() {
     if (id) {
       loadResume();
     }
-  }, [id, user]);
+  }, [id, user, isAuthenticated]);
 
   const handleUpdateResume = (updateData: any) => {
     if (resume) {
