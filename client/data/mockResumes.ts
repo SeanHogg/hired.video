@@ -312,6 +312,7 @@ export const MOCK_RESUMES: Resume[] = [
   },
   {
     id: MOCK_RESUME_IDS.FRONTEND_SPECIALIST,
+    slug: 'john-seeker-frontend-react-specialist',
     name: 'Frontend Developer - React Specialist',
     data: {
       ...SEAN_HOGG_RESUME_DATA,
