@@ -86,8 +86,8 @@ export default function CompanyDetail() {
   };
 
   const handleOnboardingTaskToggle = (taskId: string, completed: boolean) => {
-    if (company && isOwner) {
-      updateOnboardingTask(company.id, taskId, completed);
+    if (rawCompany && isOwner) {
+      updateOnboardingTask(rawCompany.id, taskId, completed);
       // In a real app, you'd trigger a re-render here
     }
   };
