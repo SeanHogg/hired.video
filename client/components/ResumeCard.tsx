@@ -12,7 +12,8 @@ import {
   Lock,
   Copy,
   Target,
-  Edit
+  Edit,
+  UserCheck
 } from "lucide-react";
 
 interface ResumeCardProps {
@@ -26,6 +27,7 @@ interface ResumeCardProps {
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
+  ownership?: 'owned' | 'tracked';
   onView?: () => void;
   onActions?: () => void;
 }
@@ -40,6 +42,7 @@ export default function ResumeCard({
   isMaster = false,
   isActive = false,
   parentId,
+  ownership = 'owned',
   onView,
   onActions,
 }: ResumeCardProps) {
@@ -101,6 +104,12 @@ export default function ResumeCard({
 
                 {/* Status badges */}
                 <div className="flex items-center gap-2 mt-2">
+                  {ownership === 'tracked' && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Tracked
+                    </Badge>
+                  )}
                   {isActive && (
                     <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
                       <Target className="w-3 h-3 mr-1" />
