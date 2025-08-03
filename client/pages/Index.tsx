@@ -33,6 +33,8 @@ import {
   X,
   ChevronDown,
   Building2,
+  Grid,
+  List
 } from "lucide-react";
 
 export default function Index() {
