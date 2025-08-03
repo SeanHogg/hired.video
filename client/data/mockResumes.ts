@@ -535,8 +535,8 @@ export const getResumesByUserId = (userId: string): Resume[] => {
 
 // Tracked resumes for recruiters and business users
 export const TRACKED_RESUMES: { [userId: string]: string[] } = {
-  '2': [MOCK_RESUME_IDS.SARAH_CHEN_RESUME, MOCK_RESUME_IDS.FRONTEND_SPECIALIST], // Sarah Recruiter tracks these
-  '3': [MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ, MOCK_RESUME_IDS.DEVOPS_ENGINEER] // Michael Business tracks these
+  'u2b3c4d5-e6f7-8901-bcde-f23456789012': [MOCK_RESUME_IDS.SARAH_CHEN_RESUME, MOCK_RESUME_IDS.FRONTEND_SPECIALIST], // Sarah Recruiter tracks these
+  'u3c4d5e6-f7g8-9012-cdef-345678901234': [MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ, MOCK_RESUME_IDS.DEVOPS_ENGINEER] // Michael Business tracks these
 };
 
 export const getTrackedResumesByUserId = (userId: string): Resume[] => {
