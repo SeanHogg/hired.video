@@ -307,7 +307,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-15T10:00:00Z',
     updatedAt: '2024-01-20T14:30:00Z',
     views: 45,
-    userId: '1' // John Seeker (job_seeker)
+    userId: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.FRONTEND_SPECIALIST,
@@ -333,7 +333,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-22T09:15:00Z',
     updatedAt: '2024-01-22T16:45:00Z',
     views: 23,
-    userId: '1' // John Seeker (job_seeker)
+    userId: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.DEVOPS_ENGINEER,
@@ -359,7 +359,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-25T11:30:00Z',
     updatedAt: '2024-01-25T15:20:00Z',
     views: 12,
-    userId: '1' // John Seeker (job_seeker)
+    userId: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
