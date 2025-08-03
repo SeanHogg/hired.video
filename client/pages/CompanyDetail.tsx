@@ -141,8 +141,8 @@ export default function CompanyDetail() {
     }
   };
 
-  const completedTasks = company.onboardingTasks.filter(task => task.completed).length;
-  const totalTasks = company.onboardingTasks.length;
+  const completedTasks = (rawCompany || company)?.onboardingTasks.filter(task => task.completed).length || 0;
+  const totalTasks = (rawCompany || company)?.onboardingTasks.length || 1;
   const onboardingProgress = Math.round((completedTasks / totalTasks) * 100);
 
   return (
