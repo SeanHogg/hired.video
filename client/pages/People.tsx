@@ -3,12 +3,11 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import PeopleCard from "@/components/PeopleCard";
+import SearchBar, { SearchFilters } from "@/components/SearchBar";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { 
@@ -51,12 +50,7 @@ import {
 export default function People() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [skillsFilter, setSkillsFilter] = useState("");
-  const [openToWorkFilter, setOpenToWorkFilter] = useState<boolean | undefined>(undefined);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
 
   // Get people based on user role and authentication
   const getPeopleForUser = () => {
@@ -184,12 +178,16 @@ export default function People() {
     }
   };
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setRoleFilter("");
-    setLocationFilter("");
-    setSkillsFilter("");
-    setOpenToWorkFilter(undefined);
+  const handleSearch = (query: string) => {
+    setSearchFilters(prev => ({ ...prev, search: query }));
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({});
   };
 
   // If user is authenticated, show the actual people page
@@ -235,82 +233,15 @@ export default function People() {
               </div>
 
               {/* Search and Filters */}
-              <div className="mb-6 space-y-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search professionals by name, role, or skills..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="shrink-0"
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                  </Button>
-                </div>
-
-                {showFilters && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Role</label>
-                          <Select value={roleFilter} onValueChange={setRoleFilter}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All roles" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All roles</SelectItem>
-                              <SelectItem value="job_seeker">Job Seekers</SelectItem>
-                              <SelectItem value="recruiter">Recruiters</SelectItem>
-                              <SelectItem value="business">Business Leaders</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Location</label>
-                          <Input 
-                            placeholder="City, State"
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Skills</label>
-                          <Input 
-                            placeholder="e.g. React, Python"
-                            value={skillsFilter}
-                            onChange={(e) => setSkillsFilter(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">Availability</label>
-                          <Select value={openToWorkFilter?.toString() || ""} onValueChange={(value) => setOpenToWorkFilter(value ? value === "true" : undefined)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="All professionals" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">All professionals</SelectItem>
-                              <SelectItem value="true">Open to work</SelectItem>
-                              <SelectItem value="false">Not looking</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={clearFilters}>
-                        <X className="h-3 w-3 mr-1" />
-                        Clear Filters
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
+              <div className="mb-6">
+                <SearchBar
+                  context="people"
+                  value={searchFilters.search}
+                  filters={searchFilters}
+                  onSearch={handleSearch}
+                  onFilterChange={handleFilterChange}
+                  onClearFilters={handleClearFilters}
+                />
               </div>
 
               {/* People Listings */}
@@ -349,11 +280,11 @@ export default function People() {
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {getUsersByFilters({
-                      search: searchQuery,
-                      role: roleFilter ? [roleFilter] : undefined,
-                      location: locationFilter,
-                      skills: skillsFilter ? skillsFilter.split(',').map(s => s.trim()) : undefined,
-                      openToWork: openToWorkFilter
+                      search: searchFilters.search || "",
+                      role: searchFilters.role ? [searchFilters.role] : undefined,
+                      location: searchFilters.location,
+                      skills: searchFilters.skills ? searchFilters.skills.split(',').map(s => s.trim()) : undefined,
+                      openToWork: searchFilters.openToWork
                     }).filter(person => person.id !== user?.id).map((person) => {
                       const personMetadata = {
                         id: person.id,
