@@ -61,8 +61,6 @@ class AIService {
         logger.warn('OpenRouter API key not configured, falling back to mock response');
         return this.getMockResponse(messages[messages.length - 1]?.content || '');
       }
-
-    try {
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
