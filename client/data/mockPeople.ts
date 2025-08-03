@@ -720,3 +720,156 @@ export const getPersonByJobId = (jobId: string): UserProfile | undefined => {
   // For now, return undefined as jobs have their own user mapping
   return undefined;
 };
+
+// Messaging system foundation
+export const MOCK_CONVERSATIONS: Conversation[] = [
+  {
+    id: 'conv-1',
+    participants: [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.SARAH_RECRUITER],
+    lastMessage: {
+      id: 'msg-1',
+      conversationId: 'conv-1',
+      fromUserId: MOCK_PEOPLE_IDS.SARAH_RECRUITER,
+      toUserId: MOCK_PEOPLE_IDS.JOHN_SEEKER,
+      content: 'Hi John! I saw your React experience and would love to discuss some opportunities at TechCorp.',
+      createdAt: '2024-01-30T14:30:00Z',
+      messageType: 'text'
+    },
+    updatedAt: '2024-01-30T14:30:00Z',
+    unreadCount: {
+      [MOCK_PEOPLE_IDS.JOHN_SEEKER]: 1,
+      [MOCK_PEOPLE_IDS.SARAH_RECRUITER]: 0
+    }
+  }
+];
+
+export const MOCK_MESSAGES: Message[] = [
+  {
+    id: 'msg-1',
+    conversationId: 'conv-1',
+    fromUserId: MOCK_PEOPLE_IDS.SARAH_RECRUITER,
+    toUserId: MOCK_PEOPLE_IDS.JOHN_SEEKER,
+    content: 'Hi John! I saw your React experience and would love to discuss some opportunities at TechCorp.',
+    createdAt: '2024-01-30T14:30:00Z',
+    messageType: 'text'
+  },
+  {
+    id: 'msg-2',
+    conversationId: 'conv-1',
+    fromUserId: MOCK_PEOPLE_IDS.JOHN_SEEKER,
+    toUserId: MOCK_PEOPLE_IDS.SARAH_RECRUITER,
+    content: 'Hi Sarah! Thanks for reaching out. I\'d definitely be interested in learning more about the opportunities.',
+    createdAt: '2024-01-30T15:45:00Z',
+    messageType: 'text',
+    readAt: '2024-01-30T16:00:00Z'
+  }
+];
+
+// Messaging functions
+export const getConversationsByUserId = (userId: string): Conversation[] => {
+  return MOCK_CONVERSATIONS.filter(conv => conv.participants.includes(userId));
+};
+
+export const getMessagesByConversationId = (conversationId: string): Message[] => {
+  return MOCK_MESSAGES.filter(msg => msg.conversationId === conversationId);
+};
+
+export const sendMessage = (fromUserId: string, toUserId: string, content: string): Message => {
+  // Find or create conversation
+  let conversation = MOCK_CONVERSATIONS.find(conv =>
+    conv.participants.includes(fromUserId) && conv.participants.includes(toUserId)
+  );
+
+  if (!conversation) {
+    conversation = {
+      id: `conv-${Date.now()}`,
+      participants: [fromUserId, toUserId],
+      updatedAt: new Date().toISOString(),
+      unreadCount: {
+        [fromUserId]: 0,
+        [toUserId]: 1
+      }
+    };
+    MOCK_CONVERSATIONS.push(conversation);
+  }
+
+  const newMessage: Message = {
+    id: `msg-${Date.now()}`,
+    conversationId: conversation.id,
+    fromUserId,
+    toUserId,
+    content,
+    createdAt: new Date().toISOString(),
+    messageType: 'text'
+  };
+
+  MOCK_MESSAGES.push(newMessage);
+  conversation.lastMessage = newMessage;
+  conversation.updatedAt = newMessage.createdAt;
+  conversation.unreadCount[toUserId] = (conversation.unreadCount[toUserId] || 0) + 1;
+
+  return newMessage;
+};
+
+export const markMessageAsRead = (messageId: string, userId: string): void => {
+  const message = MOCK_MESSAGES.find(msg => msg.id === messageId);
+  if (message && message.toUserId === userId) {
+    message.readAt = new Date().toISOString();
+
+    // Update conversation unread count
+    const conversation = MOCK_CONVERSATIONS.find(conv => conv.id === message.conversationId);
+    if (conversation) {
+      conversation.unreadCount[userId] = 0;
+    }
+  }
+};
+
+// Connection helper functions
+export const getConnectionsByStatus = (userId: string, status: ConnectionStatus): Connection[] => {
+  return MOCK_CONNECTIONS.filter(conn => {
+    if (status === 'connected') {
+      return (conn.fromUserId === userId || conn.toUserId === userId) && conn.status === 'connected';
+    } else if (status === 'pending_sent') {
+      return conn.fromUserId === userId && conn.status === 'pending_sent';
+    } else if (status === 'pending_received') {
+      return conn.toUserId === userId && conn.status === 'pending_sent';
+    }
+    return false;
+  });
+};
+
+export const getConnectedUsers = (userId: string): UserProfile[] => {
+  const connections = getConnectionsByStatus(userId, 'connected');
+  const connectedUserIds = connections.map(conn =>
+    conn.fromUserId === userId ? conn.toUserId : conn.fromUserId
+  );
+  return MOCK_USERS.filter(user => connectedUserIds.includes(user.id));
+};
+
+export const canMessageUser = (fromUserId: string, toUserId: string): boolean => {
+  return getConnectionStatus(fromUserId, toUserId) === 'connected';
+};
+
+// Advanced search and recommendations
+export const getRecommendedConnections = (userId: string): UserProfile[] => {
+  const user = getUserById(userId);
+  if (!user) return [];
+
+  // Simple recommendation logic based on skills and industry
+  const userSkills = user.data.skills.map(skill => skill.name.toLowerCase());
+  const userIndustry = user.data.experience[0]?.company || '';
+
+  return MOCK_USERS
+    .filter(otherUser =>
+      otherUser.id !== userId &&
+      getConnectionStatus(userId, otherUser.id) === 'none' &&
+      otherUser.visibility === 'public'
+    )
+    .filter(otherUser => {
+      // Recommend users with similar skills
+      const otherSkills = otherUser.data.skills.map(skill => skill.name.toLowerCase());
+      const commonSkills = userSkills.filter(skill => otherSkills.includes(skill));
+      return commonSkills.length > 0;
+    })
+    .slice(0, 5); // Limit to 5 recommendations
+};
