@@ -510,6 +510,7 @@ export const MOCK_RESUMES: Resume[] = [
   },
   {
     id: MOCK_RESUME_IDS.JENNIFER_MARTINEZ_PRIVATE,
+    slug: 'jennifer-martinez-data-scientist-private',
     name: 'Senior Data Scientist - Private',
     data: {
       ...SEAN_HOGG_RESUME_DATA,
