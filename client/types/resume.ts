@@ -136,6 +136,7 @@ export interface Resume {
 
 export interface ResumeMetadata {
   id: string;
+  slug: string; // User-friendly URL identifier
   name: string;
   privacy: ResumePrivacy;
   isMaster: boolean;
