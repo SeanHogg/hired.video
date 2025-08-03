@@ -374,6 +374,110 @@ export default function Dashboard() {
   const completedTasksCount = onboardingTasks.filter(task => task.completed).length;
   const progressPercentage = Math.round((completedTasksCount / onboardingTasks.length) * 100);
 
+  // Helper function to render content items
+  const renderContentItem = (item: any, type: string) => {
+    switch (type) {
+      case "videos":
+        return (
+          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="relative mb-3">
+                <img
+                  src={item.thumbnail}
+                  alt={item.title}
+                  className="w-full h-32 object-cover rounded-md bg-muted"
+                />
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md">
+                  <Play className="h-8 w-8 text-white" />
+                </div>
+                <Badge className="absolute bottom-2 right-2 bg-black/70 text-white">
+                  {item.duration}
+                </Badge>
+              </div>
+              <h3 className="font-medium text-sm mb-1 line-clamp-2">{item.title}</h3>
+              <p className="text-xs text-muted-foreground">{item.views} views</p>
+            </CardContent>
+          </Card>
+        );
+      case "resumes":
+        return (
+          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-5 w-5 text-red-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.title}</h3>
+                  <p className="text-xs text-muted-foreground">{item.type} • {item.size}</p>
+                  <p className="text-xs text-muted-foreground">{item.lastModified}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case "jobs":
+        return (
+          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.title}</h3>
+                  <p className="text-xs text-muted-foreground">{item.company}</p>
+                  <p className="text-xs text-muted-foreground">{item.location} • {item.posted}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case "companies":
+        return (
+          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.name}</h3>
+                  <p className="text-xs text-muted-foreground">{item.industry}</p>
+                  <p className="text-xs text-muted-foreground">{item.employees} employees</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case "profiles":
+        return (
+          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-md flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.name}</h3>
+                  <p className="text-xs text-muted-foreground">{item.role}</p>
+                  <p className="text-xs text-muted-foreground">{item.location}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const currentFilter = filterTypes.find(f => f.id === selectedFilter);
+  const currentContentType = contentTypes.find(c => c.id === selectedContentType);
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar
