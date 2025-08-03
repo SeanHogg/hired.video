@@ -2,8 +2,8 @@
  * Mock server for API testing using MSW (Mock Service Worker)
  */
 
-import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
 import { TEST_CONFIG } from '../test-setup';
 import { createMockUser, createMockCompany, createMockJob, createMockResume } from './index';
 
@@ -136,7 +136,7 @@ export const handlers = [
           email,
         },
       },
-      role: role as any,
+      role,
     });
 
     mockUsers.push(newUser);
@@ -166,7 +166,7 @@ export const handlers = [
   http.post('/api/auth/refresh', ({ request }) => {
     const authHeader = request.headers.get('Authorization');
     
-    if (!authHeader || !authHeader.includes(TEST_CONFIG.TEST_TOKENS.VALID)) {
+    if (!authHeader?.includes(TEST_CONFIG.TEST_TOKENS.VALID)) {
       return HttpResponse.json(
         {
           success: false,
@@ -203,7 +203,7 @@ export const handlers = [
   http.get('/api/users/me', ({ request }) => {
     const authHeader = request.headers.get('Authorization');
     
-    if (!authHeader || !authHeader.includes(TEST_CONFIG.TEST_TOKENS.VALID)) {
+    if (!authHeader?.includes(TEST_CONFIG.TEST_TOKENS.VALID)) {
       return HttpResponse.json(
         {
           success: false,
@@ -342,7 +342,7 @@ export function mockSuccess(method: string, url: string, data: any) {
 /**
  * Mock an error response for any endpoint
  */
-export function mockError(method: string, url: string, error: any, status: number = 500) {
+export function mockError(method: string, url: string, error: any, status = 500) {
   const handler = http[method.toLowerCase() as keyof typeof http](url, () => {
     return HttpResponse.json(
       {

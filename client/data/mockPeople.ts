@@ -1,11 +1,12 @@
-import { 
+import type { 
   UserProfile, 
   UserMetadata, 
-  UserWithOwnership, 
   Connection, 
   ConnectionStatus,
   Message,
-  Conversation,
+  Conversation} from '@/types/people';
+import { 
+  UserWithOwnership,
   getUserFullName,
   getCurrentPosition,
   getExperienceLevel,
@@ -651,9 +652,9 @@ function getCompanyNameById(companyId: string): string | undefined {
 
 // Tracked people for different users
 export const TRACKED_PEOPLE: { [userId: string]: string[] } = {
-  '1': [MOCK_PEOPLE_IDS.SARAH_RECRUITER, MOCK_PEOPLE_IDS.ALEX_THOMPSON], // John tracks these
-  '2': [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.MARIA_GARCIA], // Sarah tracks these
-  '3': [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.ALEX_THOMPSON], // Michael tracks these
+  1: [MOCK_PEOPLE_IDS.SARAH_RECRUITER, MOCK_PEOPLE_IDS.ALEX_THOMPSON], // John tracks these
+  2: [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.MARIA_GARCIA], // Sarah tracks these
+  3: [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.ALEX_THOMPSON], // Michael tracks these
   [MOCK_PEOPLE_IDS.ALEX_THOMPSON]: [MOCK_PEOPLE_IDS.JOHN_SEEKER, MOCK_PEOPLE_IDS.MICHAEL_BUSINESS],
   [MOCK_PEOPLE_IDS.MARIA_GARCIA]: [MOCK_PEOPLE_IDS.SARAH_RECRUITER, MOCK_PEOPLE_IDS.JOHN_SEEKER]
 };
@@ -844,11 +845,11 @@ export const getUsersByFilters = (filters: {
 };
 
 export const generateUserId = (): string => {
-  return 'u' + 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return `u${  'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
-  });
+  })}`;
 };
 
 // Auto-track people when user tracks jobs/companies from those people

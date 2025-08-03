@@ -1,14 +1,14 @@
+import { Upload, FileText, Loader2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
 import { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, FileText, Loader2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
-import { ResumePrivacy, UploadResumeRequest, ResumeUploadResponse } from '@/types/resume';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { ResumePrivacy, UploadResumeRequest, ResumeUploadResponse } from '@/types/resume';
 
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;

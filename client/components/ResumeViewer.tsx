@@ -1,10 +1,3 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Edit,
   Eye,
@@ -23,7 +16,14 @@ import {
   Award,
   CheckCircle2
 } from 'lucide-react';
-import { Resume, ResumePrivacy, UpdateResumeRequest } from '@/types/resume';
+import { useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import type { Resume, ResumePrivacy, UpdateResumeRequest } from '@/types/resume';
 import ResumeBuilder from './ResumeBuilder';
 
 interface ResumeViewerProps {
@@ -232,7 +232,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
                 <div className="space-y-6">
                   {resume.data.Work.map((work, index) => (
                     <div key={index} className="border-l-2 border-primary/20 pl-6 relative">
-                      <div className="absolute w-3 h-3 bg-primary rounded-full -left-2 top-2"></div>
+                      <div className="absolute w-3 h-3 bg-primary rounded-full -left-2 top-2" />
                       <div className="space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                           <h3 className="text-lg font-semibold">{work.Position}</h3>

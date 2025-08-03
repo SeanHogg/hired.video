@@ -1,28 +1,3 @@
-import { useState, useEffect } from "react";
-import * as React from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import VideoCard from "@/components/VideoCard";
-import ResumeCard from "@/components/ResumeCard";
-import JobCard from "@/components/JobCard";
-import CompanyCard from "@/components/CompanyCard";
-import PeopleCard from "@/components/PeopleCard";
-import ActionsModal from "@/components/ActionsModal";
-import HeroCarousel from "@/components/HeroCarousel";
-import SearchBar, { SearchFilters } from "@/components/SearchBar";
-import Pagination, { usePagination } from "@/components/Pagination";
-import { getPublicJobs } from "@/data/mockJobs";
-import { MOCK_COMPANIES } from "@/data/mockCompanies";
-import { MOCK_USERS } from "@/data/mockPeople";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
-
 import {
   Search,
   Filter,
@@ -42,6 +17,32 @@ import {
   Grid,
   List
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
+import ActionsModal from "@/components/ActionsModal";
+import CompanyCard from "@/components/CompanyCard";
+import Footer from "@/components/Footer";
+import HeroCarousel from "@/components/HeroCarousel";
+import JobCard from "@/components/JobCard";
+import Navigation from "@/components/Navigation";
+import ResumeCard from "@/components/ResumeCard";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import VideoCard from "@/components/VideoCard";
+import PeopleCard from "@/components/PeopleCard";
+import type { SearchFilters } from "@/components/SearchBar";
+import SearchBar from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
+import { MOCK_COMPANIES } from "@/data/mockCompanies";
+import { getPublicJobs } from "@/data/mockJobs";
+import { MOCK_USERS } from "@/data/mockPeople";
+import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
+import { useSidebar } from "@/hooks/use-sidebar";
+
 
 export default function Index() {
   const navigate = useNavigate();
@@ -293,95 +294,95 @@ export default function Index() {
           sidebarCollapsed={sidebarCollapsed}
         />
       
-      {/* Hero Carousel */}
-      <HeroCarousel
-        totalViews={formatTotalViews(totalViews)}
-        totalItems={contentItems.length}
-      />
+        {/* Hero Carousel */}
+        <HeroCarousel
+          totalViews={formatTotalViews(totalViews)}
+          totalItems={contentItems.length}
+        />
 
-      {/* Search and Filters */}
-      <section className="py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4">
-            {/* Search Bar */}
-            <SearchBar
-              context="all"
-              value={searchFilters.search}
-              filters={searchFilters}
-              onSearch={handleSearch}
-              onFilterChange={handleFilterChange}
-              onClearFilters={handleClearFilters}
-            />
+        {/* Search and Filters */}
+        <section className="py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col gap-4">
+              {/* Search Bar */}
+              <SearchBar
+                context="all"
+                value={searchFilters.search}
+                filters={searchFilters}
+                onSearch={handleSearch}
+                onFilterChange={handleFilterChange}
+                onClearFilters={handleClearFilters}
+              />
 
-            {/* Category Filters */}
-            <div className="flex gap-2 justify-center md:justify-start flex-wrap">
-              {categories.map((category) => (
-                <Button
-                  key={category.id}
-                  variant={selectedCategory === category.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category.id)}
-                  className="gap-2"
-                >
-                  <category.icon className="w-4 h-4" />
-                  {category.label}
-                </Button>
+              {/* Category Filters */}
+              <div className="flex gap-2 justify-center md:justify-start flex-wrap">
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedCategory(category.id)}
+                    className="gap-2"
+                  >
+                    <category.icon className="w-4 h-4" />
+                    {category.label}
+                  </Button>
               ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Video Grid */}
-      <section className="py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Results Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">
-                  {selectedCategory === "all" ? "All" :
+        {/* Video Grid */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Results Header */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground mb-2">
+                    {selectedCategory === "all" ? "All" :
                    selectedCategory === "people" ? "People" :
                    selectedCategory === "companies" ? "Companies" :
                    selectedCategory === "resume" ? "Resumes" : "Jobs"}
-                </h2>
-                <p className="text-muted-foreground">
-                  {filteredItems.length} items found
-                  {searchFilters.search && ` for "${searchFilters.search}"`}
-                  {filteredItems.length > itemsPerPage &&
+                  </h2>
+                  <p className="text-muted-foreground">
+                    {filteredItems.length} items found
+                    {searchFilters.search && ` for "${searchFilters.search}"`}
+                    {filteredItems.length > itemsPerPage &&
                     ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`
                   }
-                </p>
-              </div>
+                  </p>
+                </div>
 
-              {/* View Toggle */}
-              <div className="flex rounded-md border">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="rounded-r-none"
-                >
-                  <Grid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="rounded-l-none"
-                >
-                  <List className="h-4 w-4" />
-                </Button>
+                {/* View Toggle */}
+                <div className="flex rounded-md border">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className="rounded-r-none"
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className="rounded-l-none"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Content Grid/List */}
-          {filteredItems.length > 0 ? (
-            <>
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedItems.map((item) => {
+            {/* Content Grid/List */}
+            {filteredItems.length > 0 ? (
+              <>
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {paginatedItems.map((item) => {
                   if (item.type === "job_listing" && 'jobData' in item) {
                     const jobMetadata = {
                       id: item.jobData.id,
@@ -488,8 +489,8 @@ export default function Index() {
                         createdAt={item.createdAt}
                         views={item.views}
                         privacy="public"
-                        isMaster={true}
-                        isActive={true}
+                        isMaster
+                        isActive
                         parentId={null}
                         ownership="tracked"
                         onView={() => navigate(`/resumes/${item.id}`)}
@@ -499,7 +500,7 @@ export default function Index() {
                   }
                   return null;
                 })}
-              </div>
+                  </div>
             ) : (
               <div className="space-y-4">
                 {paginatedItems.map((item) => (
@@ -529,12 +530,16 @@ export default function Index() {
                             <p className="text-muted-foreground">{item.title}</p>
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.summary}</p>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => {
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
                             if (item.type === "people") navigate(`/people/${item.id}`);
                             else if (item.type === "companies") navigate(`/companies/view/${item.id}`);
                             else if (item.type === "resume") navigate(`/resumes/${item.id}`);
                             else if (item.type === "job_listing") navigate(`/jobs/${item.id}`);
-                          }}>
+                          }}
+                          >
                             View
                           </Button>
                         </div>
@@ -553,15 +558,15 @@ export default function Index() {
               </div>
             )}
 
-            {/* Pagination */}
-            <Pagination
-              currentPage={currentPage}
-              totalItems={filteredItems.length}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              onItemsPerPageChange={handleItemsPerPageChange}
-            />
-            </>
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={filteredItems.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </>
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -573,12 +578,12 @@ export default function Index() {
               </p>
             </div>
           )}
-        </div>
-      </section>
+          </div>
+        </section>
 
 
 
-      <Footer />
+        <Footer />
       </div>
 
       {/* Actions Modal */}

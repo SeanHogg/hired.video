@@ -1,31 +1,3 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import Footer from '@/components/Footer';
-import AuthOverlay from '@/components/AuthOverlay';
-import { useAuth } from '@/lib/auth';
-import { generateFakePersonData } from '@/lib/fakeData';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { 
-  getUserById, 
-  addTrackedPerson, 
-  removeTrackedPerson, 
-  isPersonTrackedByUser,
-  getConnectionStatus,
-  sendConnectionRequest,
-  acceptConnectionRequest,
-  rejectConnectionRequest,
-  getPendingConnectionRequests
-} from '@/data/mockPeople';
-import { getResumesByUserId } from '@/data/mockResumes';
 import {
   MapPin,
   Globe,
@@ -54,6 +26,34 @@ import {
   X,
   Send
 } from 'lucide-react';
+import { useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import AuthOverlay from '@/components/AuthOverlay';
+import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
+import Sidebar from '@/components/Sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  getUserById, 
+  addTrackedPerson, 
+  removeTrackedPerson, 
+  isPersonTrackedByUser,
+  getConnectionStatus,
+  sendConnectionRequest,
+  acceptConnectionRequest,
+  rejectConnectionRequest,
+  getPendingConnectionRequests
+} from '@/data/mockPeople';
+import { getResumesByUserId } from '@/data/mockResumes';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import { generateFakePersonData } from '@/lib/fakeData';
 
 export default function PeopleDetail() {
   const { id } = useParams<{ id: string }>();

@@ -1,25 +1,3 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import JobCard from "@/components/JobCard";
-import SearchBar, { SearchFilters } from "@/components/SearchBar";
-import Pagination, { usePagination } from "@/components/Pagination";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
-import {
-  getAllJobsForUser,
-  addTrackedJob,
-  removeTrackedJob,
-  getPublicJobs,
-  getJobsByFilters
-} from "@/data/mockJobs";
-import { trackCompanyFromJobData } from "@/data/mockCompanies";
-import { JobWithOwnership } from "@/types/job";
 import {
   Briefcase,
   Video,
@@ -43,6 +21,29 @@ import {
   Filter,
   X
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import JobCard from "@/components/JobCard";
+import Navigation from "@/components/Navigation";
+import Pagination, { usePagination } from "@/components/Pagination";
+import type { SearchFilters } from "@/components/SearchBar";
+import SearchBar from "@/components/SearchBar";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { trackCompanyFromJobData } from "@/data/mockCompanies";
+import {
+  getAllJobsForUser,
+  addTrackedJob,
+  removeTrackedJob,
+  getPublicJobs,
+  getJobsByFilters
+} from "@/data/mockJobs";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import type { JobWithOwnership } from "@/types/job";
 
 export default function Jobs() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -262,7 +263,7 @@ export default function Jobs() {
                         <JobCard 
                           key={job.id} 
                           job={job} 
-                          showOwnership={true}
+                          showOwnership
                           onTrack={handleTrackJob}
                           onUntrack={handleUntrackJob}
                         />
@@ -283,7 +284,7 @@ export default function Jobs() {
                         <JobCard 
                           key={job.id} 
                           job={job} 
-                          showOwnership={true}
+                          showOwnership
                           onTrack={handleTrackJob}
                           onUntrack={handleUntrackJob}
                         />

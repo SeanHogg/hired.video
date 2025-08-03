@@ -1,18 +1,3 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import Footer from '@/components/Footer';
-import AuthOverlay from '@/components/AuthOverlay';
-import { useAuth } from '@/lib/auth';
-import { generateFakeJobData } from '@/lib/fakeData';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { getJobById, addTrackedJob, removeTrackedJob, isJobTrackedByUser } from '@/data/mockJobs';
 import {
   MapPin,
   DollarSign,
@@ -37,6 +22,21 @@ import {
   CheckCircle,
   ArrowLeft
 } from 'lucide-react';
+import { useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import AuthOverlay from '@/components/AuthOverlay';
+import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
+import Sidebar from '@/components/Sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { getJobById, addTrackedJob, removeTrackedJob, isJobTrackedByUser } from '@/data/mockJobs';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import { generateFakeJobData } from '@/lib/fakeData';
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();

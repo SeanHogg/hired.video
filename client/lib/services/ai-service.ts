@@ -65,11 +65,11 @@ class AIService {
         method: 'POST',
         headers: {
           ...this.defaultHeaders,
-          'Authorization': `Bearer ${config.apiKey}`,
+          Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify({
           model: options?.model || config.model,
-          messages: messages,
+          messages,
           max_tokens: options?.maxTokens || config.maxTokens,
           temperature: options?.temperature || config.temperature,
           stream: false,
@@ -83,7 +83,7 @@ class AIService {
 
       const data = await response.json();
       
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      if (!data.choices?.[0]?.message) {
         throw new Error('Invalid response format from OpenRouter API');
       }
 

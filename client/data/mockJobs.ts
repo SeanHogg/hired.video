@@ -1,4 +1,5 @@
-import { Job, JobMetadata, JobData } from '@/types/job';
+import type { Job, JobMetadata} from '@/types/job';
+import { JobData } from '@/types/job';
 
 // Generate consistent UUIDs for mock job data
 export const MOCK_JOB_IDS = {
@@ -557,11 +558,11 @@ export const getJobsByUserId = (userId: string): Job[] => {
 
 // Tracked jobs for recruiters, business users, and job seekers
 export const TRACKED_JOBS: { [userId: string]: string[] } = {
-  '1': [MOCK_JOB_IDS.SENIOR_SOFTWARE_ENGINEER, MOCK_JOB_IDS.DEVOPS_ENGINEER], // John Seeker tracks these
-  '2': [MOCK_JOB_IDS.UX_DESIGNER, MOCK_JOB_IDS.DATA_SCIENTIST], // Sarah Recruiter tracks these (in addition to her own)
-  '3': [MOCK_JOB_IDS.FRONTEND_DEVELOPER], // Michael Business tracks this
-  '4': [MOCK_JOB_IDS.PRODUCT_MARKETING_MANAGER, MOCK_JOB_IDS.SENIOR_SOFTWARE_ENGINEER], // Another job seeker
-  '5': [MOCK_JOB_IDS.UX_DESIGNER, MOCK_JOB_IDS.FRONTEND_DEVELOPER] // Another job seeker
+  1: [MOCK_JOB_IDS.SENIOR_SOFTWARE_ENGINEER, MOCK_JOB_IDS.DEVOPS_ENGINEER], // John Seeker tracks these
+  2: [MOCK_JOB_IDS.UX_DESIGNER, MOCK_JOB_IDS.DATA_SCIENTIST], // Sarah Recruiter tracks these (in addition to her own)
+  3: [MOCK_JOB_IDS.FRONTEND_DEVELOPER], // Michael Business tracks this
+  4: [MOCK_JOB_IDS.PRODUCT_MARKETING_MANAGER, MOCK_JOB_IDS.SENIOR_SOFTWARE_ENGINEER], // Another job seeker
+  5: [MOCK_JOB_IDS.UX_DESIGNER, MOCK_JOB_IDS.FRONTEND_DEVELOPER] // Another job seeker
 };
 
 export const getTrackedJobsByUserId = (userId: string): Job[] => {
@@ -605,11 +606,11 @@ export const removeTrackedJob = (jobId: string, userId: string): void => {
 };
 
 export const generateJobId = (): string => {
-  return 'j' + 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return `j${  'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
-  });
+  })}`;
 };
 
 // Get public jobs for marketing pages

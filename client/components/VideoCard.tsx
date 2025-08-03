@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface VideoCardProps {
   id: string;

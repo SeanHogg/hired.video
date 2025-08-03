@@ -1,10 +1,3 @@
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserMetadata, UserWithOwnership, ConnectionStatus } from '@/types/people';
-import { useAuth } from '@/lib/auth';
 import { 
   MapPin, 
   Users, 
@@ -23,6 +16,13 @@ import {
   X,
   Star
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/lib/auth';
+import type { UserMetadata, UserWithOwnership, ConnectionStatus } from '@/types/people';
 
 interface PeopleCardProps {
   person: UserMetadata | UserWithOwnership;

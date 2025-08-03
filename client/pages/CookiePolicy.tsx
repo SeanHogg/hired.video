@@ -1,14 +1,3 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   Cookie,
   Shield,
@@ -23,6 +12,17 @@ import {
   AlertTriangle,
   Info,
 } from "lucide-react";
+import { useState } from "react";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 
 export default function CookiePolicy() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -155,13 +155,15 @@ export default function CookiePolicy() {
                           cookie.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900' :
                           cookie.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900' :
                           'bg-orange-100 dark:bg-orange-900'
-                        }`}>
+                        }`}
+                        >
                           <cookie.icon className={`h-5 w-5 ${
                             cookie.color === 'green' ? 'text-green-600 dark:text-green-400' :
                             cookie.color === 'blue' ? 'text-blue-600 dark:text-blue-400' :
                             cookie.color === 'purple' ? 'text-purple-600 dark:text-purple-400' :
                             'text-orange-600 dark:text-orange-400'
-                          }`} />
+                          }`}
+                          />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
@@ -370,8 +372,12 @@ export default function CookiePolicy() {
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-1">Google Analytics</h4>
                     <p className="text-sm text-muted-foreground mb-2">Website analytics and performance monitoring</p>
-                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" 
-                       className="text-primary text-sm hover:underline">
+                    <a
+                      href="https://policies.google.com/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer" 
+                      className="text-primary text-sm hover:underline"
+                    >
                       View Google's Privacy Policy →
                     </a>
                   </div>
@@ -379,8 +385,12 @@ export default function CookiePolicy() {
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-1">LinkedIn Ads</h4>
                     <p className="text-sm text-muted-foreground mb-2">Professional networking and job advertising</p>
-                    <a href="https://www.linkedin.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer"
-                       className="text-primary text-sm hover:underline">
+                    <a
+                      href="https://www.linkedin.com/legal/privacy-policy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary text-sm hover:underline"
+                    >
                       View LinkedIn's Privacy Policy →
                     </a>
                   </div>
@@ -388,8 +398,12 @@ export default function CookiePolicy() {
                   <div className="border rounded-lg p-4">
                     <h4 className="font-medium mb-1">Intercom</h4>
                     <p className="text-sm text-muted-foreground mb-2">Customer support and messaging</p>
-                    <a href="https://www.intercom.com/legal/privacy" target="_blank" rel="noopener noreferrer"
-                       className="text-primary text-sm hover:underline">
+                    <a
+                      href="https://www.intercom.com/legal/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary text-sm hover:underline"
+                    >
                       View Intercom's Privacy Policy →
                     </a>
                   </div>

@@ -1,6 +1,3 @@
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Menu,
   X,
@@ -18,10 +15,12 @@ import {
   Send,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Link , useLocation } from "react-router-dom";
+import ShoppingCart from "@/components/ShoppingCart";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import ShoppingCart from "@/components/ShoppingCart";
 
 interface NavigationProps {
   onMenuClick?: () => void;

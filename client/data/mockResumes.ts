@@ -1,4 +1,4 @@
-import { Resume, ResumeMetadata, ResumeData } from '@/types/resume';
+import type { Resume, ResumeMetadata, ResumeData } from '@/types/resume';
 
 // Generate consistent UUIDs for mock data
 export const MOCK_RESUME_IDS = {
@@ -11,279 +11,279 @@ export const MOCK_RESUME_IDS = {
 } as const;
 
 export const SEAN_HOGG_RESUME_DATA: ResumeData = {
-  "Basics": {
-    "Name": "Sean Hogg",
-    "Label": "CTO and Technology Leader",
-    "Image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-    "Email": "seanhogg@gmail.com",
-    "Phone": "2488250176",
-    "Url": "https://seanhogg.dev",
-    "Summary": "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams. Expert in aligning technical goals with business objectives, optimizing scalable cloud-native solutions, and fostering a collaborative team environment. Passionate about culture, customer experience, and delivering robust, distributed systems across multiple industries, while championing strategic initiatives and advanced AI & Machine Learning solutions.",
-    "Location": {
-      "Address": "123 Tech Street",
-      "PostalCode": "48304",
-      "City": "Detroit",
-      "CountryCode": "US",
-      "Region": "Michigan"
+  Basics: {
+    Name: "Sean Hogg",
+    Label: "CTO and Technology Leader",
+    Image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+    Email: "seanhogg@gmail.com",
+    Phone: "2488250176",
+    Url: "https://seanhogg.dev",
+    Summary: "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams. Expert in aligning technical goals with business objectives, optimizing scalable cloud-native solutions, and fostering a collaborative team environment. Passionate about culture, customer experience, and delivering robust, distributed systems across multiple industries, while championing strategic initiatives and advanced AI & Machine Learning solutions.",
+    Location: {
+      Address: "123 Tech Street",
+      PostalCode: "48304",
+      City: "Detroit",
+      CountryCode: "US",
+      Region: "Michigan"
     }
   },
-  "Work": [
+  Work: [
     {
-      "Name": "HireFractionalTalent.com",
-      "Position": "Consulting Fractional VP of Technology/CTO",
-      "Summary": "Leading technology strategy and implementation for multiple clients in FinTech, Health, and Retail sectors.",
-      "StartDate": "2022-10-01",
-      "EndDate": "Present",
-      "Highlights": [
+      Name: "HireFractionalTalent.com",
+      Position: "Consulting Fractional VP of Technology/CTO",
+      Summary: "Leading technology strategy and implementation for multiple clients in FinTech, Health, and Retail sectors.",
+      StartDate: "2022-10-01",
+      EndDate: "Present",
+      Highlights: [
         "Mentor startups and SMBs in FinTech, Health, Retail, Agriculture, and Energy sectors.",
         "Specialize in SaaS, IoT, SaMD, and e-commerce platforms.",
         "Implement CRM and sales automation using HubSpot and Salesforce.",
         "Modernize applications with Kubernetes and CI/CD/CT pipelines.",
         "Implemented advanced AI & Machine Learning solutions, significantly improving operational efficiency for diverse SMBs in FinTech and Health sectors."
       ],
-      "Url": "https://hirefractionaltalent.com"
+      Url: "https://hirefractionaltalent.com"
     },
     {
-      "Name": "OnTheClock",
-      "Position": "Site Reliability DevOps / Full Stack Engineer / Dev. Manager / CTO / Architect / Agile Practitioner",
-      "Summary": "Led comprehensive technology transformation and team modernization.",
-      "StartDate": "2024-04-01",
-      "EndDate": "2024-11-01",
-      "Highlights": [
+      Name: "OnTheClock",
+      Position: "Site Reliability DevOps / Full Stack Engineer / Dev. Manager / CTO / Architect / Agile Practitioner",
+      Summary: "Led comprehensive technology transformation and team modernization.",
+      StartDate: "2024-04-01",
+      EndDate: "2024-11-01",
+      Highlights: [
         "Led onshore/offshore product engineering web & mobile teams and multiple vendor partners to deliver over 200 features in 8 months.",
         "Modernized all engineering processes by teaching Scrum and establishing metrics/scorecard by launching Jira.",
         "Transformed Release Management into DevSecOps + GitOps + Jira enabling the teams transition from manual 'ad hoc' to monthly delivery.",
         "Automated manual builds reducing cycle time and increasing deployment frequency.",
         "Transformed the Production release process to use SYMLINKS for near zero downtime deployments/rollbacks."
       ],
-      "Url": "https://ontheclock.com"
+      Url: "https://ontheclock.com"
     },
     {
-      "Name": "Alliance Inspection Management",
-      "Position": "VP of Technology/CIO",
-      "Summary": "Drove digital transformation and operational excellence initiatives.",
-      "StartDate": "2021-08-01",
-      "EndDate": "2024-01-01",
-      "Highlights": [
+      Name: "Alliance Inspection Management",
+      Position: "VP of Technology/CIO",
+      Summary: "Drove digital transformation and operational excellence initiatives.",
+      StartDate: "2021-08-01",
+      EndDate: "2024-01-01",
+      Highlights: [
         "Reduced operating costs by $1.79M through IT process modernization and contract renegotiation.",
         "Lowered attrition by 90% by fostering a performance-based, people-first culture.",
         "Increased ticket completion by 92%, enhancing IT support and customer satisfaction by 30.",
         "Boosted product delivery efficiency, improving story completion from 57.45% to 84.8%."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "Career Now Brands",
-      "Position": "EVP/VP, Product & Technology",
-      "Summary": "Led product development and technology strategy for multiple brand portfolio.",
-      "StartDate": "2019-03-01",
-      "EndDate": "2021-09-01",
-      "Highlights": [
+      Name: "Career Now Brands",
+      Position: "EVP/VP, Product & Technology",
+      Summary: "Led product development and technology strategy for multiple brand portfolio.",
+      StartDate: "2019-03-01",
+      EndDate: "2021-09-01",
+      Highlights: [
         "Increased project completion rate by 175% while cutting costs from $4M to $1.7M in the first year.",
         "Delivered 3 new products generating $6M+ in revenue within 2 years using a single framework.",
         "Instituted CI/CD and Agile best practices, restructuring software development processes.",
         "Led migration from DigitalOcean to AWS, ensuring seamless re-platforming and consolidation."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "United Wholesale Mortgage",
-      "Position": "Solutions Architecture, Team Lead",
-      "Summary": "Defined enterprise architecture strategy and led cross-functional development teams.",
-      "StartDate": "2017-12-01",
-      "EndDate": "2019-03-01",
-      "Highlights": [
+      Name: "United Wholesale Mortgage",
+      Position: "Solutions Architecture, Team Lead",
+      Summary: "Defined enterprise architecture strategy and led cross-functional development teams.",
+      StartDate: "2017-12-01",
+      EndDate: "2019-03-01",
+      Highlights: [
         "Led a 10+ member cross-functional Solution Architecture Team, enhancing collaboration and efficiency.",
         "Defined Data Governance and Product Architecture strategies, driving 'nextgen' system development.",
         "Implemented SonarQube for SAST, significantly improving code quality and security."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "Urban Science",
-      "Position": "Principal Full Stack Software Engineer (Application Architect)",
-      "Summary": "Led development of enterprise SaaS solutions and microservices architecture.",
-      "StartDate": "2014-10-01",
-      "EndDate": "2017-12-01",
-      "Highlights": [
+      Name: "Urban Science",
+      Position: "Principal Full Stack Software Engineer (Application Architect)",
+      Summary: "Led development of enterprise SaaS solutions and microservices architecture.",
+      StartDate: "2014-10-01",
+      EndDate: "2017-12-01",
+      Highlights: [
         "Led development of Contact Manager SaaS, managing 10+ engineers, enhancing user engagement.",
         "Optimized KPI Generator Microservice, improving performance and efficiency with a team of 5.",
         "Established CI/CD pipelines in Azure DevOps, streamlining deployment processes."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "Dassault Systèmes 3DEXCITE",
-      "Position": "Software Development Manager",
-      "Summary": "Managed multiple SaaS product teams and standardized development processes.",
-      "StartDate": "2013-10-01",
-      "EndDate": "2014-10-01",
-      "Highlights": [
+      Name: "Dassault Systèmes 3DEXCITE",
+      Position: "Software Development Manager",
+      Summary: "Managed multiple SaaS product teams and standardized development processes.",
+      StartDate: "2013-10-01",
+      EndDate: "2014-10-01",
+      Highlights: [
         "Led three SaaS product teams with $3.5M budget, enhancing cross-functional collaboration and efficiency.",
         "Implemented SCRUM and TFS for RTT USA's Application Development, standardizing ALM Governance."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "Urban Science",
-      "Position": "Software Development Manager / Sr. Full Stack Software Engineer",
-      "Summary": "Developed and managed multiple SaaS products with focus on scalability and performance.",
-      "StartDate": "2008-03-01",
-      "EndDate": "2013-10-01",
-      "Highlights": [
+      Name: "Urban Science",
+      Position: "Software Development Manager / Sr. Full Stack Software Engineer",
+      Summary: "Developed and managed multiple SaaS products with focus on scalability and performance.",
+      StartDate: "2008-03-01",
+      EndDate: "2013-10-01",
+      Highlights: [
         "Managed and developed multiple SaaS products, ensuring timely and budget-compliant delivery.",
         "Implemented a real-time OLAP SSAS solution for advanced reporting, enhancing data analysis."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "Compuware",
-      "Position": "Full Stack Software Engineer",
-      "Summary": "Modernized legacy applications and implemented virtualization solutions.",
-      "StartDate": "2006-04-01",
-      "EndDate": "2008-01-01",
-      "Highlights": [
+      Name: "Compuware",
+      Position: "Full Stack Software Engineer",
+      Summary: "Modernized legacy applications and implemented virtualization solutions.",
+      StartDate: "2006-04-01",
+      EndDate: "2008-01-01",
+      Highlights: [
         "Modernized VB6 applications to C# .Net, enhancing performance and maintainability.",
         "Implemented VMWare, reducing development setup time and costs."
       ],
-      "Url": ""
+      Url: ""
     },
     {
-      "Name": "RelatedNews.ca",
-      "Position": "Founder",
-      "Summary": "Founded and successfully exited a custom web development startup.",
-      "StartDate": "1999-01-01",
-      "EndDate": "2005-01-01",
-      "Highlights": [
+      Name: "RelatedNews.ca",
+      Position: "Founder",
+      Summary: "Founded and successfully exited a custom web development startup.",
+      StartDate: "1999-01-01",
+      EndDate: "2005-01-01",
+      Highlights: [
         "Founded and sold RelatedNews.ca, a startup for custom websites with unique CMS solutions.",
         "Architected Just-A-Click CMS, utilizing .Net, VB, C#, JavaScript, Java, and PHP."
       ],
-      "Url": ""
+      Url: ""
     }
   ],
-  "Volunteer": [
+  Volunteer: [
     {
-      "Organization": "Mentors in Tech (MinT)",
-      "Position": "Mentor",
-      "Summary": "Providing guidance and support to emerging technology professionals.",
-      "StartDate": "2023-01-01",
-      "EndDate": "Present",
-      "Highlights": [
+      Organization: "Mentors in Tech (MinT)",
+      Position: "Mentor",
+      Summary: "Providing guidance and support to emerging technology professionals.",
+      StartDate: "2023-01-01",
+      EndDate: "Present",
+      Highlights: [
         "Mentored 15+ junior developers in career advancement strategies.",
         "Conducted workshops on modern software architecture and leadership."
       ],
-      "Url": "https://mentorsintech.org"
+      Url: "https://mentorsintech.org"
     },
     {
-      "Organization": "Micromentor",
-      "Position": "Mentor",
-      "Summary": "Supporting small business owners with technology strategy and implementation.",
-      "StartDate": "2022-12-01",
-      "EndDate": "Present",
-      "Highlights": [
+      Organization: "Micromentor",
+      Position: "Mentor",
+      Summary: "Supporting small business owners with technology strategy and implementation.",
+      StartDate: "2022-12-01",
+      EndDate: "Present",
+      Highlights: [
         "Advised 8 small businesses on digital transformation initiatives.",
         "Helped implement cloud migration strategies for local businesses."
       ],
-      "Url": "https://micromentor.org"
+      Url: "https://micromentor.org"
     },
     {
-      "Organization": "SCORE Mentors",
-      "Position": "Certified Business Mentor",
-      "Summary": "Providing business mentorship to entrepreneurs and small business owners.",
-      "StartDate": "2022-12-01",
-      "EndDate": "Present",
-      "Highlights": [
+      Organization: "SCORE Mentors",
+      Position: "Certified Business Mentor",
+      Summary: "Providing business mentorship to entrepreneurs and small business owners.",
+      StartDate: "2022-12-01",
+      EndDate: "Present",
+      Highlights: [
         "Mentored 12 startup founders on technology and business strategy.",
         "Led workshops on scaling technology teams and processes."
       ],
-      "Url": "https://score.org"
+      Url: "https://score.org"
     }
   ],
-  "Education": [
+  Education: [
     {
-      "Institution": "University of Windsor",
-      "Area": "Computer Science",
-      "StudyType": "Bachelor",
-      "StartDate": "1999-01-01",
-      "EndDate": "2004-12-01",
-      "Score": "3.8/4.0",
-      "Courses": ["Data Structures", "Algorithms", "Software Engineering", "Database Systems"],
-      "Url": "https://uwindsor.ca"
+      Institution: "University of Windsor",
+      Area: "Computer Science",
+      StudyType: "Bachelor",
+      StartDate: "1999-01-01",
+      EndDate: "2004-12-01",
+      Score: "3.8/4.0",
+      Courses: ["Data Structures", "Algorithms", "Software Engineering", "Database Systems"],
+      Url: "https://uwindsor.ca"
     },
     {
-      "Institution": "University of Windsor",
-      "Area": "Psychology",
-      "StudyType": "Bachelor",
-      "StartDate": "1999-01-01",
-      "EndDate": "2004-12-01",
-      "Score": "3.6/4.0",
-      "Courses": ["Cognitive Psychology", "Research Methods", "Statistics"],
-      "Url": "https://uwindsor.ca"
+      Institution: "University of Windsor",
+      Area: "Psychology",
+      StudyType: "Bachelor",
+      StartDate: "1999-01-01",
+      EndDate: "2004-12-01",
+      Score: "3.6/4.0",
+      Courses: ["Cognitive Psychology", "Research Methods", "Statistics"],
+      Url: "https://uwindsor.ca"
     }
   ],
-  "Awards": [
+  Awards: [
     {
-      "Title": "Technology Leader of the Year",
-      "Date": "2023-11-15",
-      "Awarder": "Detroit Tech Awards",
-      "Summary": "Recognized for outstanding leadership in technology transformation and team development."
+      Title: "Technology Leader of the Year",
+      Date: "2023-11-15",
+      Awarder: "Detroit Tech Awards",
+      Summary: "Recognized for outstanding leadership in technology transformation and team development."
     }
   ],
-  "Certificates": [
+  Certificates: [
     {
-      "Name": "AWS Solutions Architect Professional",
-      "Date": "2023-03-15",
-      "Issuer": "Amazon Web Services",
-      "Url": "https://aws.amazon.com/certification/"
+      Name: "AWS Solutions Architect Professional",
+      Date: "2023-03-15",
+      Issuer: "Amazon Web Services",
+      Url: "https://aws.amazon.com/certification/"
     },
     {
-      "Name": "Certified Kubernetes Administrator",
-      "Date": "2022-08-20",
-      "Issuer": "Cloud Native Computing Foundation",
-      "Url": "https://cncf.io"
+      Name: "Certified Kubernetes Administrator",
+      Date: "2022-08-20",
+      Issuer: "Cloud Native Computing Foundation",
+      Url: "https://cncf.io"
     }
   ],
-  "Publications": [
+  Publications: [
     {
-      "Name": "Scaling Engineering Teams in High-Growth Startups",
-      "Publisher": "Tech Leadership Quarterly",
-      "ReleaseDate": "2023-09-01",
-      "Url": "https://techleadership.com/articles/scaling-teams",
-      "Summary": "A comprehensive guide to building and scaling engineering teams from 5 to 50+ engineers."
+      Name: "Scaling Engineering Teams in High-Growth Startups",
+      Publisher: "Tech Leadership Quarterly",
+      ReleaseDate: "2023-09-01",
+      Url: "https://techleadership.com/articles/scaling-teams",
+      Summary: "A comprehensive guide to building and scaling engineering teams from 5 to 50+ engineers."
     }
   ],
-  "Skills": [
-    { "Name": "JavaScript", "Level": "Expert", "Keywords": ["React", "Node.js", "TypeScript"] },
-    { "Name": "Cloud Architecture", "Level": "Expert", "Keywords": ["AWS", "Azure", "GCP"] },
-    { "Name": "DevOps", "Level": "Advanced", "Keywords": ["Docker", "Kubernetes", "CI/CD"] },
-    { "Name": "Leadership", "Level": "Expert", "Keywords": ["Team Building", "Strategy", "Mentoring"] },
-    { "Name": "Python", "Level": "Advanced", "Keywords": ["Django", "FastAPI", "ML"] },
-    { "Name": "Database Design", "Level": "Advanced", "Keywords": ["PostgreSQL", "MongoDB", "Redis"] }
+  Skills: [
+    { Name: "JavaScript", Level: "Expert", Keywords: ["React", "Node.js", "TypeScript"] },
+    { Name: "Cloud Architecture", Level: "Expert", Keywords: ["AWS", "Azure", "GCP"] },
+    { Name: "DevOps", Level: "Advanced", Keywords: ["Docker", "Kubernetes", "CI/CD"] },
+    { Name: "Leadership", Level: "Expert", Keywords: ["Team Building", "Strategy", "Mentoring"] },
+    { Name: "Python", Level: "Advanced", Keywords: ["Django", "FastAPI", "ML"] },
+    { Name: "Database Design", Level: "Advanced", Keywords: ["PostgreSQL", "MongoDB", "Redis"] }
   ],
-  "Languages": [
-    { "Language": "English", "Fluency": "Native" },
-    { "Language": "French", "Fluency": "Conversational" }
+  Languages: [
+    { Language: "English", Fluency: "Native" },
+    { Language: "French", Fluency: "Conversational" }
   ],
-  "Interests": [
-    { "Name": "AI/Machine Learning", "Keywords": ["OpenAI", "TensorFlow", "AutoML"] },
-    { "Name": "Startup Ecosystem", "Keywords": ["Venture Capital", "Product Strategy", "Growth"] },
-    { "Name": "Music Production", "Keywords": ["Ableton", "Synthesis", "Audio Engineering"] }
+  Interests: [
+    { Name: "AI/Machine Learning", Keywords: ["OpenAI", "TensorFlow", "AutoML"] },
+    { Name: "Startup Ecosystem", Keywords: ["Venture Capital", "Product Strategy", "Growth"] },
+    { Name: "Music Production", Keywords: ["Ableton", "Synthesis", "Audio Engineering"] }
   ],
-  "References": [
-    { "Name": "Available upon request", "Reference": "Professional references available upon request" }
+  References: [
+    { Name: "Available upon request", Reference: "Professional references available upon request" }
   ],
-  "Projects": [
+  Projects: [
     {
-      "Name": "Enterprise SaaS Platform",
-      "Description": "Led development of multi-tenant SaaS platform serving 100K+ users",
-      "Highlights": ["Microservices architecture", "Real-time data processing", "99.9% uptime SLA"],
-      "Keywords": ["React", "Node.js", "AWS", "Kubernetes"],
-      "StartDate": "2022-01-01",
-      "EndDate": "2023-12-01",
-      "Url": "https://enterprise-platform.com",
-      "Roles": ["Technical Lead", "Architect"],
-      "Entity": "HireFractionalTalent.com",
-      "Type": "SaaS Platform"
+      Name: "Enterprise SaaS Platform",
+      Description: "Led development of multi-tenant SaaS platform serving 100K+ users",
+      Highlights: ["Microservices architecture", "Real-time data processing", "99.9% uptime SLA"],
+      Keywords: ["React", "Node.js", "AWS", "Kubernetes"],
+      StartDate: "2022-01-01",
+      EndDate: "2023-12-01",
+      Url: "https://enterprise-platform.com",
+      Roles: ["Technical Lead", "Architect"],
+      Entity: "HireFractionalTalent.com",
+      Type: "SaaS Platform"
     }
   ]
 };
@@ -680,7 +680,7 @@ export const removeTrackedResume = (resumeId: string, userId: string): void => {
 };
 
 export const generateResumeId = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);

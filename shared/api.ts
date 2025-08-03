@@ -64,12 +64,12 @@ export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
 /**
  * Success Response Type
  */
-export type ApiSuccessResponse<T> = {
+export interface ApiSuccessResponse<T> {
   success: true;
   message?: string;
   timestamp?: string;
   data: T;
-};
+}
 
 /**
  * Demo Response Type

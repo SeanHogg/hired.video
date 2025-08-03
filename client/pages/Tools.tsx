@@ -1,13 +1,3 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   Wrench,
   Video,
@@ -29,6 +19,16 @@ import {
   Award,
   TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 
 export default function Tools() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -293,7 +293,7 @@ export default function Tools() {
                           <span>ATS Compatibility</span>
                           <div className="flex items-center gap-2">
                             <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-4/5 h-full bg-green-500 rounded-full"></div>
+                              <div className="w-4/5 h-full bg-green-500 rounded-full" />
                             </div>
                             <span className="text-green-600 font-medium">92%</span>
                           </div>
@@ -302,7 +302,7 @@ export default function Tools() {
                           <span>Content Quality</span>
                           <div className="flex items-center gap-2">
                             <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-5/6 h-full bg-blue-500 rounded-full"></div>
+                              <div className="w-5/6 h-full bg-blue-500 rounded-full" />
                             </div>
                             <span className="text-blue-600 font-medium">88%</span>
                           </div>
@@ -311,7 +311,7 @@ export default function Tools() {
                           <span>Keywords Score</span>
                           <div className="flex items-center gap-2">
                             <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-3/4 h-full bg-purple-500 rounded-full"></div>
+                              <div className="w-3/4 h-full bg-purple-500 rounded-full" />
                             </div>
                             <span className="text-purple-600 font-medium">85%</span>
                           </div>

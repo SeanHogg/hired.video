@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
 import { Video, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (

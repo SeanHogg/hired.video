@@ -1,16 +1,3 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   Users,
   FileText,
@@ -36,6 +23,19 @@ import {
   MoreHorizontal,
   User,
 } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 
 // Content data for the activity section
 const contentTypes = [
@@ -103,172 +103,172 @@ export default function Dashboard() {
           />
 
           <div className="pt-16">
-          <div className="max-w-6xl mx-auto px-4 py-16">
-            {/* Hero Section */}
-            <div className="text-center mb-16">
-              <div className="inline-flex items-center space-x-2 mb-6">
-                <div className="relative">
-                  <Video className="h-12 w-12 text-primary" />
-                  <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+            <div className="max-w-6xl mx-auto px-4 py-16">
+              {/* Hero Section */}
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center space-x-2 mb-6">
+                  <div className="relative">
+                    <Video className="h-12 w-12 text-primary" />
+                    <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                  </div>
+                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                    HR Dashboard
+                  </span>
                 </div>
-                <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  HR Dashboard
-                </span>
+                <h1 className="text-5xl font-bold mb-6">
+                  Your HR Command Center
+                </h1>
+                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                  Comprehensive talent management dashboard with social recruiting, ATS analytics, CRM insights, and recruitment marketing metrics all in one place.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link to="/signup">
+                    <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
+                      Get Started
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button size="lg" variant="outline" className="text-lg px-8">
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <h1 className="text-5xl font-bold mb-6">
-                Your HR Command Center
-              </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Comprehensive talent management dashboard with social recruiting, ATS analytics, CRM insights, and recruitment marketing metrics all in one place.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+              {/* Features Grid */}
+              <div className="grid md:grid-cols-3 gap-8 mb-16">
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <BarChart3 className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>Real-time Analytics</CardTitle>
+                    <CardDescription>
+                      Track your profile views, application success rates, and career progress with detailed metrics.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                  <CardHeader>
+                    <Target className="h-10 w-10 text-brand-blue mb-4" />
+                    <CardTitle>Goal Tracking</CardTitle>
+                    <CardDescription>
+                      Set and monitor your career goals with personalized recommendations and progress insights.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                  <CardHeader>
+                    <CheckCircle2 className="h-10 w-10 text-primary mb-4" />
+                    <CardTitle>Task Management</CardTitle>
+                    <CardDescription>
+                      Stay organized with guided onboarding tasks and personalized action items for your persona.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              {/* Persona-specific Benefits */}
+              <div className="mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">Tailored for Your Role</h2>
+                <div className="grid md:grid-cols-3 gap-8">
+                  <Card className="text-center">
+                    <CardHeader>
+                      <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
+                      <CardTitle>Job Seekers</CardTitle>
+                      <CardDescription>
+                        Track resume views, application status, interview requests, and career progress all in one place.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-left">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Resume analytics & optimization tips
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Job application tracking
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Interview preparation tools
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="text-center">
+                    <CardHeader>
+                      <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
+                      <CardTitle>Recruiters</CardTitle>
+                      <CardDescription>
+                        Manage candidate pipelines, track placement rates, and optimize your recruitment workflow.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-left">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Candidate sourcing analytics
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Interview scheduling tools
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Placement success metrics
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="text-center">
+                    <CardHeader>
+                      <Building2 className="h-12 w-12 mx-auto text-purple-600 mb-4" />
+                      <CardTitle>Businesses</CardTitle>
+                      <CardDescription>
+                        Monitor hiring operations, team growth, and recruitment ROI with comprehensive business insights.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-left">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Team growth analytics
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Hiring cost optimization
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          Department-wise insights
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Final CTA */}
+              <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
+                <h3 className="text-2xl font-bold mb-4">Ready to Take Control of Your Career?</h3>
+                <p className="text-muted-foreground mb-6">
+                  Join thousands of professionals who are already using MyVideoResume to accelerate their careers.
+                </p>
                 <Link to="/signup">
-                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
-                    Get Started
+                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                    Start Your Dashboard Today
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Link to="/login">
-                  <Button size="lg" variant="outline" className="text-lg px-8">
-                    Sign In
-                  </Button>
-                </Link>
               </div>
             </div>
-
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
-              <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
-                <CardHeader>
-                  <BarChart3 className="h-10 w-10 text-brand-purple mb-4" />
-                  <CardTitle>Real-time Analytics</CardTitle>
-                  <CardDescription>
-                    Track your profile views, application success rates, and career progress with detailed metrics.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
-                <CardHeader>
-                  <Target className="h-10 w-10 text-brand-blue mb-4" />
-                  <CardTitle>Goal Tracking</CardTitle>
-                  <CardDescription>
-                    Set and monitor your career goals with personalized recommendations and progress insights.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
-                <CardHeader>
-                  <CheckCircle2 className="h-10 w-10 text-primary mb-4" />
-                  <CardTitle>Task Management</CardTitle>
-                  <CardDescription>
-                    Stay organized with guided onboarding tasks and personalized action items for your persona.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-
-            {/* Persona-specific Benefits */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-12">Tailored for Your Role</h2>
-              <div className="grid md:grid-cols-3 gap-8">
-                <Card className="text-center">
-                  <CardHeader>
-                    <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
-                    <CardTitle>Job Seekers</CardTitle>
-                    <CardDescription>
-                      Track resume views, application status, interview requests, and career progress all in one place.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm text-left">
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Resume analytics & optimization tips
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Job application tracking
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Interview preparation tools
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="text-center">
-                  <CardHeader>
-                    <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
-                    <CardTitle>Recruiters</CardTitle>
-                    <CardDescription>
-                      Manage candidate pipelines, track placement rates, and optimize your recruitment workflow.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm text-left">
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Candidate sourcing analytics
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Interview scheduling tools
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Placement success metrics
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="text-center">
-                  <CardHeader>
-                    <Building2 className="h-12 w-12 mx-auto text-purple-600 mb-4" />
-                    <CardTitle>Businesses</CardTitle>
-                    <CardDescription>
-                      Monitor hiring operations, team growth, and recruitment ROI with comprehensive business insights.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm text-left">
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Team growth analytics
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Hiring cost optimization
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 text-yellow-500" />
-                        Department-wise insights
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Final CTA */}
-            <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-              <h3 className="text-2xl font-bold mb-4">Ready to Take Control of Your Career?</h3>
-              <p className="text-muted-foreground mb-6">
-                Join thousands of professionals who are already using MyVideoResume to accelerate their careers.
-              </p>
-              <Link to="/signup">
-                <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                  Start Your Dashboard Today
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            </div>
-          </div>
             <Footer />
-        </div>
+          </div>
         </div>
       </div>
     );
@@ -566,7 +566,8 @@ export default function Dashboard() {
                     <div className="text-2xl font-bold">{metric.value}</div>
                     <div className={`text-xs flex items-center gap-1 ${
                       metric.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}>
+                    }`}
+                    >
                       <TrendingUp className={`h-3 w-3 ${metric.trend === 'down' ? 'rotate-180' : ''}`} />
                       {metric.change} from last month
                     </div>
@@ -729,7 +730,8 @@ export default function Dashboard() {
                       <div className={viewMode === "grid"
                         ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                         : "space-y-2"
-                      }>
+                      }
+                      >
                         {mockContent[type.id as keyof typeof mockContent]?.map((item) =>
                           renderContentItem(item, type.id)
                         )}

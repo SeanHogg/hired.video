@@ -1,15 +1,15 @@
+import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
 import ResumeBuilder from '@/components/ResumeBuilder';
-import { useAuth } from '@/lib/auth';
-import { useSidebar } from '@/hooks/use-sidebar';
+import Sidebar from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { CreateResumeRequest, ResumeData } from '@/types/resume';
 import { generateResumeId } from '@/data/mockResumes';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import type { CreateResumeRequest, ResumeData } from '@/types/resume';
 
 export default function ResumeCreatePage() {
   const { id } = useParams<{ id: string }>();

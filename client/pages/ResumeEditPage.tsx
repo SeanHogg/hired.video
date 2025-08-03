@@ -1,15 +1,15 @@
+import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
 import ResumeViewer from '@/components/ResumeViewer';
-import { useAuth } from '@/lib/auth';
-import { useSidebar } from '@/hooks/use-sidebar';
+import Sidebar from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { Resume, UpdateResumeRequest } from '@/types/resume';
 import { getResumeById } from '@/data/mockResumes';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import type { Resume, UpdateResumeRequest } from '@/types/resume';
 
 export default function ResumeEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,8 +90,8 @@ export default function ResumeEditPage() {
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto">
               <div className="animate-pulse space-y-6">
-                <div className="h-8 bg-muted rounded w-1/3"></div>
-                <div className="h-64 bg-muted rounded"></div>
+                <div className="h-8 bg-muted rounded w-1/3" />
+                <div className="h-64 bg-muted rounded" />
               </div>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function ResumeEditPage() {
             <ResumeViewer
               resume={resume}
               onUpdate={handleUpdateResume}
-              canEdit={true}
+              canEdit
             />
           </div>
         </div>

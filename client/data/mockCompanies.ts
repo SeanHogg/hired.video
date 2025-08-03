@@ -1,4 +1,5 @@
-import { Company, CompanyMetadata, CompanyData, CompanyWithOwnership, OnboardingTask, DEFAULT_ONBOARDING_TASKS } from '@/types/company';
+import type { Company, CompanyMetadata} from '@/types/company';
+import { CompanyData, CompanyWithOwnership, OnboardingTask, DEFAULT_ONBOARDING_TASKS } from '@/types/company';
 
 // Generate consistent UUIDs for mock company data
 export const MOCK_COMPANY_IDS = {
@@ -515,11 +516,11 @@ export const MOCK_COMPANY_METADATA: CompanyMetadata[] = MOCK_COMPANIES.map(compa
 
 // Tracked companies for different users
 export const TRACKED_COMPANIES: { [userId: string]: string[] } = {
-  '1': [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.GROWTH_DYNAMICS], // John Seeker tracks these
-  '2': [MOCK_COMPANY_IDS.GROWTH_DYNAMICS], // Sarah Recruiter tracks others (in addition to her own)
-  '3': [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.CLOUDSCALE_SOLUTIONS], // Michael Business tracks these
-  '4': [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.WEBCRAFT_STUDIOS], // Another job seeker
-  '5': [MOCK_COMPANY_IDS.GROWTH_DYNAMICS, MOCK_COMPANY_IDS.CLOUDSCALE_SOLUTIONS] // Another job seeker
+  1: [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.GROWTH_DYNAMICS], // John Seeker tracks these
+  2: [MOCK_COMPANY_IDS.GROWTH_DYNAMICS], // Sarah Recruiter tracks others (in addition to her own)
+  3: [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.CLOUDSCALE_SOLUTIONS], // Michael Business tracks these
+  4: [MOCK_COMPANY_IDS.TECHCORP_INC, MOCK_COMPANY_IDS.WEBCRAFT_STUDIOS], // Another job seeker
+  5: [MOCK_COMPANY_IDS.GROWTH_DYNAMICS, MOCK_COMPANY_IDS.CLOUDSCALE_SOLUTIONS] // Another job seeker
 };
 
 // Helper functions
@@ -573,11 +574,11 @@ export const removeTrackedCompany = (companyId: string, userId: string): void =>
 };
 
 export const generateCompanyId = (): string => {
-  return 'c' + 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return `c${  'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
-  });
+  })}`;
 };
 
 // Get public companies for discovery

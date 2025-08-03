@@ -2,8 +2,8 @@
  * Performance monitoring and optimization utilities
  */
 
-import { logger } from './logger';
 import { config, getPerformanceConfig } from './config';
+import { logger } from './logger';
 
 // ============================================================================
 // TYPES AND INTERFACES

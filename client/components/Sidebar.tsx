@@ -1,10 +1,3 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Home,
   Video,
@@ -28,8 +21,14 @@ import {
   Send,
   LogOut,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -109,7 +108,8 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
           <div className={cn(
             "flex-1 p-4 space-y-6",
             collapsed ? "overflow-hidden" : "overflow-y-auto"
-          )}>
+          )}
+          >
 
 
             {/* Navigation */}

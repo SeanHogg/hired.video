@@ -1,14 +1,14 @@
-import { useNavigate } from 'react-router-dom';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import Footer from '@/components/Footer';
-import ResumeUpload from '@/components/ResumeUpload';
-import { useAuth } from '@/lib/auth';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { ResumeUploadResponse } from '@/types/resume';
+import { useNavigate } from 'react-router-dom';
+import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
+import ResumeUpload from '@/components/ResumeUpload';
+import Sidebar from '@/components/Sidebar';
+import { Button } from '@/components/ui/button';
 import { generateResumeId } from '@/data/mockResumes';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import type { ResumeUploadResponse } from '@/types/resume';
 
 export default function ResumeUploadPage() {
   const navigate = useNavigate();

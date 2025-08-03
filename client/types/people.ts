@@ -231,8 +231,8 @@ export interface UserStats {
   responseRate: number;
   avgResponseTime: number; // in hours
   topSkills: string[];
-  viewsGrowth: { date: string; count: number }[];
-  connectionsGrowth: { date: string; count: number }[];
+  viewsGrowth: Array<{ date: string; count: number }>;
+  connectionsGrowth: Array<{ date: string; count: number }>;
 }
 
 // Helper types for connection actions

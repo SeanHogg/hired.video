@@ -2,18 +2,19 @@
  * Comprehensive test utilities
  */
 
-import React from 'react';
-import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { RenderOptions, RenderResult } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
+import { vi, expect } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/lib/auth';
+import type { Company } from '@/types/company';
+import type { Job } from '@/types/job';
+import type { UserProfile } from '@/types/people';
+import type { Resume } from '@/types/resume';
 import { TEST_CONFIG } from '../test-setup';
-import { UserProfile } from '@/types/people';
-import { Company } from '@/types/company';
-import { Job } from '@/types/job';
-import { Resume } from '@/types/resume';
-import { vi, expect } from 'vitest';
 
 // ============================================================================
 // RENDER UTILITIES
@@ -363,7 +364,7 @@ export function mockFetch(responses: Record<string, any> = {}) {
 /**
  * Wait for async operations to complete
  */
-export function waitForAsync(ms: number = 0): Promise<void> {
+export function waitForAsync(ms = 0): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 

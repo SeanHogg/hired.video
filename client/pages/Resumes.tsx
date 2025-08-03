@@ -1,26 +1,3 @@
-import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import ResumeUpload from "@/components/ResumeUpload";
-import ResumeBuilder from "@/components/ResumeBuilder";
-import ResumeViewer from "@/components/ResumeViewer";
-import ResumeCard from "@/components/ResumeCard";
-import ActionsModal from "@/components/ActionsModal";
-import SearchBar, { SearchFilters } from "@/components/SearchBar";
-import Pagination, { usePagination } from "@/components/Pagination";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters, ResumeWithOwnership } from "@/types/resume";
-import { MOCK_RESUME_METADATA, getResumesByUserId, generateResumeId, getAllResumesForUser, isResumeTrackedByUser, addTrackedResume, removeTrackedResume } from '@/data/mockResumes';
 import {
   FileText,
   Video,
@@ -50,6 +27,31 @@ import {
   Target,
   Power
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import ActionsModal from "@/components/ActionsModal";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import ResumeBuilder from "@/components/ResumeBuilder";
+import ResumeUpload from "@/components/ResumeUpload";
+import Sidebar from "@/components/Sidebar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ResumeViewer from "@/components/ResumeViewer";
+import ResumeCard from "@/components/ResumeCard";
+import type { SearchFilters } from "@/components/SearchBar";
+import SearchBar from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
+import { MOCK_RESUME_METADATA, getResumesByUserId, generateResumeId, getAllResumesForUser, isResumeTrackedByUser, addTrackedResume, removeTrackedResume } from '@/data/mockResumes';
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import type { Resume, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeWithOwnership } from "@/types/resume";
+import { ResumeMetadata, ResumePrivacy, ResumeSearchFilters } from "@/types/resume";
 
 export default function Resumes() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -741,7 +743,7 @@ export default function Resumes() {
                   resume={selectedResume}
                   onUpdate={handleUpdateResume}
                   onCreateVariation={handleCreateVariation}
-                  canEdit={true}
+                  canEdit
                 />
               </div>
             )}
@@ -782,7 +784,8 @@ export default function Resumes() {
                       <Button onClick={() => {
                         const newId = generateResumeId();
                         navigate(`/resumes/create/${newId}`);
-                      }}>
+                      }}
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Create Resume
                       </Button>
@@ -827,32 +830,32 @@ export default function Resumes() {
                 {/* Resume Grid/List */}
                 {loading ? (
                   <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                     <p className="text-muted-foreground mt-4">Loading resumes...</p>
                   </div>
                 ) : filteredResumes.length > 0 ? (
                   <>
-                  {viewMode === 'grid' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {paginatedResumes.map((resume) => (
-                        <ResumeCard
-                          key={resume.id}
-                          id={resume.id}
-                          name={resume.name}
-                          title={resume.title}
-                          summary={resume.summary}
-                          createdAt={resume.createdAt}
-                          views={resume.views}
-                          privacy={resume.privacy}
-                          isMaster={resume.isMaster}
-                          isActive={resume.isActive}
-                          parentId={resume.parentId}
-                          ownership={resume.ownership}
-                          onView={() => handleResumeView(resume.id)}
-                          onActions={() => handleOpenActions(resume.id)}
-                        />
+                    {viewMode === 'grid' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {paginatedResumes.map((resume) => (
+                          <ResumeCard
+                            key={resume.id}
+                            id={resume.id}
+                            name={resume.name}
+                            title={resume.title}
+                            summary={resume.summary}
+                            createdAt={resume.createdAt}
+                            views={resume.views}
+                            privacy={resume.privacy}
+                            isMaster={resume.isMaster}
+                            isActive={resume.isActive}
+                            parentId={resume.parentId}
+                            ownership={resume.ownership}
+                            onView={() => handleResumeView(resume.id)}
+                            onActions={() => handleOpenActions(resume.id)}
+                          />
                       ))}
-                    </div>
+                      </div>
                   ) : (
                     <div className="space-y-4">
                       {paginatedResumeTree.map((masterResume) => (
@@ -904,7 +907,8 @@ export default function Resumes() {
                                         masterResume.privacy === 'public' ? 'bg-green-100 text-green-800' :
                                         masterResume.privacy === 'recruiter_only' ? 'bg-blue-100 text-blue-800' :
                                         'bg-gray-100 text-gray-800'
-                                      }`}>
+                                      }`}
+                                      >
                                         {masterResume.privacy === 'public' && <Globe className="w-3 h-3 mr-1" />}
                                         {masterResume.privacy === 'recruiter_only' && <Users className="w-3 h-3 mr-1" />}
                                         {masterResume.privacy === 'private' && <Lock className="w-3 h-3 mr-1" />}
@@ -998,7 +1002,8 @@ export default function Resumes() {
                                             variation.privacy === 'public' ? 'bg-green-100 text-green-800' :
                                             variation.privacy === 'recruiter_only' ? 'bg-blue-100 text-blue-800' :
                                             'bg-gray-100 text-gray-800'
-                                          }`}>
+                                          }`}
+                                          >
                                             {variation.privacy === 'public' && <Globe className="w-3 h-3 mr-1" />}
                                             {variation.privacy === 'recruiter_only' && <Users className="w-3 h-3 mr-1" />}
                                             {variation.privacy === 'private' && <Lock className="w-3 h-3 mr-1" />}
@@ -1059,14 +1064,14 @@ export default function Resumes() {
                     </div>
                   )}
 
-                  {/* Pagination */}
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredResumes.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={handleItemsPerPageChange}
-                  />
+                    {/* Pagination */}
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={filteredResumes.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
                   </>
                 ) : (
                   <Card>
@@ -1091,7 +1096,8 @@ export default function Resumes() {
                             <Button onClick={() => {
                               const newId = generateResumeId();
                               navigate(`/resumes/create/${newId}`);
-                            }}>
+                            }}
+                            >
                               <Plus className="h-4 w-4 mr-2" />
                               Create Resume
                             </Button>

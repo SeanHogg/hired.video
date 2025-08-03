@@ -2,18 +2,20 @@
  * Comprehensive API client with type safety, error handling, and interceptors
  */
 
-import { z } from 'zod';
-import { 
+import type { z } from 'zod';
+import type { 
   ApiResponse, 
   ApiErrorResponse, 
-  ApiSuccessResponse, 
+  ApiSuccessResponse} from '@shared/api';
+import { 
   validateApiResponse,
   createApiError,
   ApiResponseSchema,
   ApiErrorResponseSchema 
 } from '@shared/api';
+import type { 
+  AppError} from './errors';
 import { 
-  AppError, 
   NetworkError, 
   ValidationError, 
   AuthenticationError, 
@@ -287,7 +289,7 @@ export class ApiClient {
         const normalizedError = normalizeError(error);
 
         logApiCall(processedConfig.method || 'GET', url, undefined, { 
-          attempt: attempt,
+          attempt,
           error: normalizedError.message 
         });
 

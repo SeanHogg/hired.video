@@ -167,11 +167,11 @@ export interface CompanyStats {
   totalApplications: number;
   avgApplicationsPerJob: number;
   topJobCategories: string[];
-  followerGrowth: { date: string; count: number }[];
+  followerGrowth: Array<{ date: string; count: number }>;
 }
 
 // Default onboarding tasks
-export const DEFAULT_ONBOARDING_TASKS: Omit<OnboardingTask, 'completed'>[] = [
+export const DEFAULT_ONBOARDING_TASKS: Array<Omit<OnboardingTask, 'completed'>> = [
   {
     id: 'update_profile',
     title: 'Update Business Profile',

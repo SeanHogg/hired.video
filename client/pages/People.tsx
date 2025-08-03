@@ -1,29 +1,3 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import PeopleCard from "@/components/PeopleCard";
-import SearchBar, { SearchFilters } from "@/components/SearchBar";
-import Pagination, { usePagination } from "@/components/Pagination";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { 
-  getAllPeopleForUser, 
-  addTrackedPerson, 
-  removeTrackedPerson, 
-  getPublicUsers,
-  getUsersByFilters,
-  getConnectionStatus,
-  sendConnectionRequest,
-  acceptConnectionRequest,
-  rejectConnectionRequest,
-  getPendingConnectionRequests
-} from "@/data/mockPeople";
-import { UserWithOwnership, ConnectionStatus } from "@/types/people";
 import {
   Users,
   Video,
@@ -47,6 +21,34 @@ import {
   Clock,
   Building2
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Pagination, { usePagination } from "@/components/Pagination";
+import PeopleCard from "@/components/PeopleCard";
+import type { SearchFilters } from "@/components/SearchBar";
+import SearchBar from "@/components/SearchBar";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  getAllPeopleForUser, 
+  addTrackedPerson, 
+  removeTrackedPerson, 
+  getPublicUsers,
+  getUsersByFilters,
+  getConnectionStatus,
+  sendConnectionRequest,
+  acceptConnectionRequest,
+  rejectConnectionRequest,
+  getPendingConnectionRequests
+} from "@/data/mockPeople";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import type { UserWithOwnership} from "@/types/people";
+import { ConnectionStatus } from "@/types/people";
 
 export default function People() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -295,7 +297,7 @@ export default function People() {
                           key={person.id} 
                           person={person}
                           connectionStatus={user ? getConnectionStatus(user.id, person.id) : 'none'}
-                          showOwnership={true}
+                          showOwnership
                           onTrack={handleTrackPerson}
                           onUntrack={handleUntrackPerson}
                           onConnect={handleConnect}

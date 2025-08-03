@@ -3,13 +3,13 @@
  */
 
 import { z } from 'zod';
-import { dataManager, DataManager, PaginationParams, FilterParams } from '../data-manager';
-import { 
+import type { 
   LoginRequest, 
   LoginResponse, 
   SignupRequest,
   UserProfileResponse,
-  UpdateUserProfileRequest,
+  UpdateUserProfileRequest} from '@shared/api';
+import {
   LoginRequestSchema,
   LoginResponseSchema,
   SignupRequestSchema,
@@ -17,6 +17,8 @@ import {
   UpdateUserProfileRequestSchema
 } from '@shared/api';
 import { UserDataSchema } from '@shared/validation';
+import { dataManager } from '../data-manager';
+import type { DataManager, PaginationParams, FilterParams } from '../data-manager';
 import { logger } from '../logger';
 
 // ============================================================================

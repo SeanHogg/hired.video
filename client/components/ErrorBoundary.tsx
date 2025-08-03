@@ -3,11 +3,13 @@
  * Catches JavaScript errors anywhere in the child component tree and displays fallback UI
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AppError, normalizeError, handleError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
-import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import type { ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
+import { Button } from '@/components/ui/button';
+import type { AppError} from '@/lib/errors';
+import { normalizeError, handleError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // ERROR BOUNDARY PROPS AND STATE

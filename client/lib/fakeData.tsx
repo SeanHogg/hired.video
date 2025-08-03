@@ -1,8 +1,8 @@
-import { Company } from "@/types/company";
-import { Job } from "@/types/job";
 import { User } from "@/lib/auth";
-import { UserProfile } from "@/types/people";
-import { Resume } from "@/types/resume";
+import type { Company } from "@/types/company";
+import type { Job } from "@/types/job";
+import type { UserProfile } from "@/types/people";
+import type { Resume } from "@/types/resume";
 
 export const generateFakeCompanyData = (realCompany: Company): Company => {
   return {

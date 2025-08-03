@@ -1,24 +1,3 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import CompanyCard from "@/components/CompanyCard";
-import SearchBar, { SearchFilters } from "@/components/SearchBar";
-import Pagination, { usePagination } from "@/components/Pagination";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { 
-  getAllCompaniesForUser, 
-  addTrackedCompany, 
-  removeTrackedCompany, 
-  getPublicCompanies,
-  getCompaniesByFilters 
-} from "@/data/mockCompanies";
-import { CompanyWithOwnership } from "@/types/company";
 import {
   Building2,
   Video,
@@ -43,6 +22,28 @@ import {
   Eye,
   Briefcase
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import CompanyCard from "@/components/CompanyCard";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Pagination, { usePagination } from "@/components/Pagination";
+import type { SearchFilters } from "@/components/SearchBar";
+import SearchBar from "@/components/SearchBar";
+import Sidebar from "@/components/Sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  getAllCompaniesForUser, 
+  addTrackedCompany, 
+  removeTrackedCompany, 
+  getPublicCompanies,
+  getCompaniesByFilters 
+} from "@/data/mockCompanies";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import type { CompanyWithOwnership } from "@/types/company";
 
 export default function Companies() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -248,7 +249,7 @@ export default function Companies() {
                         <CompanyCard 
                           key={company.id} 
                           company={company} 
-                          showOwnership={true}
+                          showOwnership
                           onTrack={handleTrackCompany}
                           onUntrack={handleUntrackCompany}
                         />
@@ -269,7 +270,7 @@ export default function Companies() {
                         <CompanyCard 
                           key={company.id} 
                           company={company} 
-                          showOwnership={true}
+                          showOwnership
                           onTrack={handleTrackCompany}
                           onUntrack={handleUntrackCompany}
                         />

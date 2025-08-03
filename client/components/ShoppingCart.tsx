@@ -1,7 +1,8 @@
+import { ShoppingCart as ShoppingCartIcon, Plus, Minus, X, CreditCard, Users } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -20,7 +21,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useCart } from "@/lib/cart-context";
-import { ShoppingCart as ShoppingCartIcon, Plus, Minus, X, CreditCard, Users } from "lucide-react";
 
 export default function ShoppingCart() {
   const navigate = useNavigate();

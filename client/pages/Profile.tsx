@@ -1,19 +1,3 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useAuth } from "@/lib/auth";
-import { useSidebar } from "@/hooks/use-sidebar";
 import {
   User,
   Mail,
@@ -35,6 +19,22 @@ import {
   Share,
   ExternalLink,
 } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 
 export default function Profile() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -432,7 +432,7 @@ export default function Profile() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">Profile updated</p>
                       <p className="text-xs text-muted-foreground">You updated your professional information • 2 hours ago</p>
@@ -440,7 +440,7 @@ export default function Profile() {
                   </div>
                   
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">Resume viewed</p>
                       <p className="text-xs text-muted-foreground">Your resume was viewed by Google • 5 hours ago</p>
@@ -448,7 +448,7 @@ export default function Profile() {
                   </div>
                   
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">Application submitted</p>
                       <p className="text-xs text-muted-foreground">Applied to Senior Developer at Meta • 1 day ago</p>
@@ -456,7 +456,7 @@ export default function Profile() {
                   </div>
                   
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">Profile view</p>
                       <p className="text-xs text-muted-foreground">Your profile was viewed 15 times • 2 days ago</p>

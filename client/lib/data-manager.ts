@@ -4,10 +4,11 @@
  */
 
 import { z } from 'zod';
-import { apiClient, ApiClient } from './api-client';
-import { logger, logAsyncPerformance } from './logger';
-import { validateOrThrow, ValidationError } from './errors';
 import { ApiSuccessResponse } from '@shared/api';
+import type { ApiClient } from './api-client';
+import { apiClient } from './api-client';
+import { validateOrThrow, ValidationError } from './errors';
+import { logger, logAsyncPerformance } from './logger';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -68,7 +69,7 @@ class DataCache {
     this.strategy = config.strategy || 'lru';
   }
 
-  set<T>(key: string, data: T, ttl: number = 300000): void { // Default 5 minutes
+  set<T>(key: string, data: T, ttl = 300000): void { // Default 5 minutes
     // Remove expired entries
     this.cleanup();
 

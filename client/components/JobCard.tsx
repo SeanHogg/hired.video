@@ -1,9 +1,3 @@
-import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { JobMetadata, JobWithOwnership } from '@/types/job';
-import { useAuth } from '@/lib/auth';
 import { 
   MapPin, 
   DollarSign, 
@@ -17,6 +11,12 @@ import {
   Bookmark,
   BookmarkCheck
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/lib/auth';
+import type { JobMetadata, JobWithOwnership } from '@/types/job';
 
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;

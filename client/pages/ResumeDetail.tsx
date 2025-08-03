@@ -1,21 +1,3 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import Footer from '@/components/Footer';
-import ResumeViewer from '@/components/ResumeViewer';
-import AuthOverlay from '@/components/AuthOverlay';
-import { useAuth } from '@/lib/auth';
-import { generateFakeResumeData } from '@/lib/fakeData';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { Resume, ResumeData } from '@/types/resume';
-import { getResumeById } from '@/data/mockResumes';
 import {
   ArrowLeft,
   Edit,
@@ -39,6 +21,25 @@ import {
   Lock,
   Star
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import AuthOverlay from '@/components/AuthOverlay';
+import Footer from '@/components/Footer';
+import Navigation from '@/components/Navigation';
+import ResumeViewer from '@/components/ResumeViewer';
+import Sidebar from '@/components/Sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { getResumeById } from '@/data/mockResumes';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import { generateFakeResumeData } from '@/lib/fakeData';
+import type { Resume} from '@/types/resume';
+import { ResumeData } from '@/types/resume';
 
 interface TimelineItemProps {
   title: string;
@@ -130,7 +131,7 @@ export default function ResumeDetail() {
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        const foundResume = getResumeById(id!);
+        const foundResume = getResumeById(id);
         if (!foundResume) {
           throw new Error('Resume not found');
         }
@@ -192,11 +193,11 @@ export default function ResumeDetail() {
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto">
               <div className="animate-pulse space-y-6">
-                <div className="h-8 bg-muted rounded w-1/3"></div>
-                <div className="h-64 bg-muted rounded"></div>
+                <div className="h-8 bg-muted rounded w-1/3" />
+                <div className="h-64 bg-muted rounded" />
                 <div className="space-y-4">
-                  <div className="h-4 bg-muted rounded w-3/4"></div>
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
+                  <div className="h-4 bg-muted rounded w-3/4" />
+                  <div className="h-4 bg-muted rounded w-1/2" />
                 </div>
               </div>
             </div>
@@ -434,17 +435,17 @@ export default function ResumeDetail() {
                       {resume.data.Work
                         .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
                         .map((work, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={work.Position}
-                          subtitle={work.Name}
-                          startDate={work.StartDate}
-                          endDate={work.EndDate || 'Present'}
-                          description={work.Summary}
-                          highlights={work.Highlights}
-                          icon={Building}
-                          isLast={index === resume.data.Work.length - 1}
-                        />
+                          <TimelineItem
+                            key={index}
+                            title={work.Position}
+                            subtitle={work.Name}
+                            startDate={work.StartDate}
+                            endDate={work.EndDate || 'Present'}
+                            description={work.Summary}
+                            highlights={work.Highlights}
+                            icon={Building}
+                            isLast={index === resume.data.Work.length - 1}
+                          />
                       ))}
                     </div>
                   </CardContent>
@@ -468,16 +469,16 @@ export default function ResumeDetail() {
                       {resume.data.Education
                         .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
                         .map((edu, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={`${edu.StudyType} in ${edu.Area}`}
-                          subtitle={edu.Institution}
-                          startDate={edu.StartDate}
-                          endDate={edu.EndDate}
-                          description={edu.Score ? `GPA: ${edu.Score}` : undefined}
-                          icon={GraduationCap}
-                          isLast={index === resume.data.Education.length - 1}
-                        />
+                          <TimelineItem
+                            key={index}
+                            title={`${edu.StudyType} in ${edu.Area}`}
+                            subtitle={edu.Institution}
+                            startDate={edu.StartDate}
+                            endDate={edu.EndDate}
+                            description={edu.Score ? `GPA: ${edu.Score}` : undefined}
+                            icon={GraduationCap}
+                            isLast={index === resume.data.Education.length - 1}
+                          />
                       ))}
                     </div>
                   </CardContent>
@@ -501,17 +502,17 @@ export default function ResumeDetail() {
                       {resume.data.Volunteer
                         .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
                         .map((volunteer, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={volunteer.Position}
-                          subtitle={volunteer.Organization}
-                          startDate={volunteer.StartDate}
-                          endDate={volunteer.EndDate || 'Present'}
-                          description={volunteer.Summary}
-                          highlights={volunteer.Highlights || undefined}
-                          icon={Heart}
-                          isLast={index === resume.data.Volunteer.length - 1}
-                        />
+                          <TimelineItem
+                            key={index}
+                            title={volunteer.Position}
+                            subtitle={volunteer.Organization}
+                            startDate={volunteer.StartDate}
+                            endDate={volunteer.EndDate || 'Present'}
+                            description={volunteer.Summary}
+                            highlights={volunteer.Highlights || undefined}
+                            icon={Heart}
+                            isLast={index === resume.data.Volunteer.length - 1}
+                          />
                       ))}
                     </div>
                   </CardContent>

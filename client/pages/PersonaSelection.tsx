@@ -1,12 +1,13 @@
+import { Users, Briefcase, Building2, ArrowRight, Check } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Users, Briefcase, Building2, ArrowRight, Check } from 'lucide-react';
-import { useAuth, UserRole } from '@/lib/auth';
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { UserRole } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 
 const personas = [
   {

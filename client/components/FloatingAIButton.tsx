@@ -1,8 +1,8 @@
+import { Brain, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Brain, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useAI } from "@/lib/ai-context";
+import { cn } from "@/lib/utils";
 
 interface FloatingAIButtonProps {
   className?: string;

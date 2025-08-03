@@ -1,23 +1,18 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   X,
   Send,
   Brain,
-  Sparkles,
-  MessageCircle,
-  User,
-  Zap,
   FileText,
   Users,
   Briefcase,
   BarChart3,
-  Lightbulb,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAI } from "@/lib/ai-context";
 import { sendHRMessage, isAIServiceConfigured, type ChatMessage } from "@/lib/services/ai-service";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
