@@ -221,12 +221,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Availability</label>
-            <Select value={filters.openToWork?.toString() || ""} onValueChange={(value) => handleFilterChange('openToWork', value ? value === "true" : undefined)}>
+            <Select value={filters.openToWork?.toString() || "all"} onValueChange={(value) => handleFilterChange('openToWork', value === 'all' ? undefined : value === "true")}>
               <SelectTrigger>
                 <SelectValue placeholder="All professionals" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All professionals</SelectItem>
+                <SelectItem value="all">All professionals</SelectItem>
                 <SelectItem value="true">Open to work</SelectItem>
                 <SelectItem value="false">Not looking</SelectItem>
               </SelectContent>
