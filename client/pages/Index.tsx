@@ -383,6 +383,8 @@ export default function Index() {
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-foreground mb-2">
               {selectedCategory === "all" ? "All" :
+               selectedCategory === "people" ? "People" :
+               selectedCategory === "companies" ? "Companies" :
                selectedCategory === "resume" ? "Resumes" : "Jobs"}
             </h2>
             <p className="text-muted-foreground">
