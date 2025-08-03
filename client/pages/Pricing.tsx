@@ -398,7 +398,7 @@ export default function Pricing() {
                           <Users className="h-4 w-4 text-muted-foreground" />
                           Team Size
                         </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">Up to 5</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Up to 2</td>
                         <td className="text-center p-4 text-sm text-muted-foreground">Unlimited</td>
                       </tr>
                       <tr>
@@ -430,7 +430,7 @@ export default function Pricing() {
                           AI Video Script Generation
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
@@ -461,8 +461,8 @@ export default function Pricing() {
                           <FileText className="h-4 w-4 text-muted-foreground" />
                           Resume Optimization
                         </td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
-                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Powered</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Powered (Limited)</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">AI-Powered (Unlimited)</td>
                       </tr>
 
                       {/* AI-Powered Tools */}
@@ -474,14 +474,10 @@ export default function Pricing() {
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Brain className="h-4 w-4 text-muted-foreground" />
-                          Generative AI
+                          AI Assistance
                         </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">10 requests/month</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Unlimited</td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
