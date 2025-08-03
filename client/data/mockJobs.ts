@@ -157,6 +157,7 @@ export const MOCK_JOBS: Job[] = [
   },
   {
     id: MOCK_JOB_IDS.DEVOPS_ENGINEER,
+    slug: 'devops-engineer-kubernetes',
     data: {
       title: 'DevOps Engineer',
       department: 'Infrastructure',
