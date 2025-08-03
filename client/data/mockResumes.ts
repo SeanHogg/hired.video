@@ -430,7 +430,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-10T08:00:00Z',
     updatedAt: '2024-01-18T12:00:00Z',
     views: 67,
-    userId: '4' // Different job seeker
+    userId: 'u4a5b6c7-d8e9-0123-4567-890123456789' // Alex Thompson
   },
   {
     id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
