@@ -464,6 +464,7 @@ export const MOCK_USERS: UserProfile[] = [
   },
   {
     id: MOCK_PEOPLE_IDS.JENNIFER_MARTINEZ,
+    slug: 'jennifer-martinez-data-scientist',
     data: {
       firstName: 'Jennifer',
       lastName: 'Martinez',
