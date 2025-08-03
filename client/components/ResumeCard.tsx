@@ -11,7 +11,8 @@ import {
   Users,
   Lock,
   Copy,
-  Target
+  Target,
+  Edit
 } from "lucide-react";
 
 interface ResumeCardProps {
@@ -21,7 +22,7 @@ interface ResumeCardProps {
   summary: string;
   createdAt: string;
   views?: number;
-  privacy?: 'public' | 'recruiter_only' | 'private';
+  privacy?: 'public' | 'recruiter_only' | 'private' | 'draft';
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
@@ -59,6 +60,7 @@ export default function ResumeCard({
       case 'public': return <Globe className="w-3 h-3" />;
       case 'recruiter_only': return <Users className="w-3 h-3" />;
       case 'private': return <Lock className="w-3 h-3" />;
+      case 'draft': return <Edit className="w-3 h-3" />;
       default: return <Lock className="w-3 h-3" />;
     }
   };
@@ -68,6 +70,7 @@ export default function ResumeCard({
       case 'public': return 'Public';
       case 'recruiter_only': return 'Recruiter Only';
       case 'private': return 'Private';
+      case 'draft': return 'Draft';
       default: return 'Private';
     }
   };
@@ -77,6 +80,7 @@ export default function ResumeCard({
       case 'public': return 'bg-green-100 text-green-800';
       case 'recruiter_only': return 'bg-blue-100 text-blue-800';
       case 'private': return 'bg-gray-100 text-gray-800';
+      case 'draft': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
