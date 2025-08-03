@@ -388,22 +388,24 @@ export default function Index() {
                       />
                     );
                   } else if (item.type === "people") {
+                    const personData = {
+                      id: item.id,
+                      firstName: item.name.split(' ')[0],
+                      lastName: item.name.split(' ')[1] || '',
+                      fullName: item.name,
+                      avatar: item.avatar,
+                      headline: item.title,
+                      location: item.location,
+                      role: item.role,
+                      isVerified: item.isVerified,
+                      isPremium: item.isPremium,
+                      profileViews: item.views
+                    };
                     return (
                       <PeopleCard
                         key={item.id}
-                        id={item.id}
-                        firstName={item.name.split(' ')[0]}
-                        lastName={item.name.split(' ')[1] || ''}
-                        headline={item.title}
-                        avatar={item.avatar}
-                        currentRole={item.title}
-                        location={item.location}
-                        role={item.role}
-                        isVerified={item.isVerified}
-                        isPremium={item.isPremium}
-                        profileViews={item.views}
-                        onView={() => navigate(`/people/${item.id}`)}
-                        onActions={() => handleOpenActions(item)}
+                        person={personData}
+                        onConnect={() => navigate(`/people/${item.id}`)}
                       />
                     );
                   } else if (item.type === "companies") {
