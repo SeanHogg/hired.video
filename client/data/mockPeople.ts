@@ -606,6 +606,7 @@ export const MOCK_USERS: UserProfile[] = [
 
 export const MOCK_USER_METADATA: UserMetadata[] = MOCK_USERS.map(user => ({
   id: user.id,
+  slug: user.slug,
   firstName: user.data.firstName,
   lastName: user.data.lastName,
   fullName: getUserFullName(user),
