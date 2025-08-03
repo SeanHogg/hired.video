@@ -36,6 +36,9 @@ import Signup from "./pages/Signup";
 import PersonaSelection from "./pages/PersonaSelection";
 import Profile from "./pages/Profile";
 import ResumeDetail from "./pages/ResumeDetail";
+import ResumeUploadPage from "./pages/ResumeUploadPage";
+import ResumeCreatePage from "./pages/ResumeCreatePage";
+import ResumeEditPage from "./pages/ResumeEditPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +63,9 @@ const App = () => (
               <Route path="/for-recruiters" element={<ForRecruiters />} />
               <Route path="/about" element={<About />} />
               <Route path="/resumes" element={<Resumes />} />
+              <Route path="/resumes/upload" element={<ResumeUploadPage />} />
+              <Route path="/resumes/create/:id" element={<ResumeCreatePage />} />
+              <Route path="/resumes/edit/:id" element={<ResumeEditPage />} />
               <Route path="/resumes/:id" element={<ResumeDetail />} />
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/companies" element={<Companies />} />
