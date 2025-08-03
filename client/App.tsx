@@ -54,8 +54,9 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <AIProvider>
-        <TooltipProvider>
+      <CartProvider>
+        <AIProvider>
+          <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -108,8 +109,9 @@ const App = () => (
             <FloatingAIButton />
             <AIChatPanel />
           </BrowserRouter>
-        </TooltipProvider>
-      </AIProvider>
+          </TooltipProvider>
+        </AIProvider>
+      </CartProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
