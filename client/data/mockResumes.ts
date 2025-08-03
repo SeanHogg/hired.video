@@ -315,10 +315,13 @@ export const MOCK_RESUMES: Resume[] = [
       ...SEAN_HOGG_RESUME_DATA,
       Basics: {
         ...SEAN_HOGG_RESUME_DATA.Basics,
+        Name: "John Seeker",
         Label: "Senior Frontend Developer",
+        Email: "john.seeker@example.com",
+        Image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
         Summary: "Frontend specialist with expertise in React, TypeScript, and modern web technologies. Focused on creating amazing user experiences and scalable applications with 10+ years of experience in frontend development."
       },
-      Work: SEAN_HOGG_RESUME_DATA.Work.filter(work => 
+      Work: SEAN_HOGG_RESUME_DATA.Work.filter(work =>
         work.Name.includes('OnTheClock') || work.Name.includes('Urban Science') || work.Name.includes('Career Now Brands')
       )
     },
@@ -329,7 +332,7 @@ export const MOCK_RESUMES: Resume[] = [
     createdAt: '2024-01-22T09:15:00Z',
     updatedAt: '2024-01-22T16:45:00Z',
     views: 23,
-    userId: 'user_1'
+    userId: '1' // John Seeker (job_seeker)
   },
   {
     id: MOCK_RESUME_IDS.DEVOPS_ENGINEER,
