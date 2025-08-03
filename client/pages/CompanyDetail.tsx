@@ -315,7 +315,7 @@ export default function CompanyDetail() {
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Onboarding Tasks (Only for owners with incomplete onboarding) */}
-                {isOwner && (company.status === 'draft' || company.status === 'onboarding') && (
+                {isOwner && ((rawCompany || company).status === 'draft' || (rawCompany || company).status === 'onboarding') && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -499,7 +499,7 @@ export default function CompanyDetail() {
                         <h4 className="font-medium mb-2">Special Benefits</h4>
                         <ul className="space-y-1">
                           {company.data.benefits.other.map((benefit, index) => (
-                            <li key={index} className="text-sm text-muted-foreground">�� {benefit}</li>
+                            <li key={index} className="text-sm text-muted-foreground">• {benefit}</li>
                           ))}
                         </ul>
                       </div>
