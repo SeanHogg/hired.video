@@ -304,6 +304,8 @@ export default function Index() {
     const searchQuery = searchFilters.search || "";
     const matchesCategory = selectedCategory === "all" ||
                            (selectedCategory === "job_description" && item.type === "job_listing") ||
+                           (selectedCategory === "people" && item.type === "resume") ||
+                           (selectedCategory === "companies" && false) || // No company data in current content
                            item.type === selectedCategory;
     const matchesSearch = searchQuery === "" ||
       (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
