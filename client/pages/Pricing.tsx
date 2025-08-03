@@ -449,12 +449,8 @@ export default function Pricing() {
                           <BarChart3 className="h-4 w-4 text-muted-foreground" />
                           Video Analytics & Performance
                         </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced + AI Insights</td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
@@ -490,26 +486,18 @@ export default function Pricing() {
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          Interview Simulator
+                          AI Interview Simulator
                         </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic (Limited)</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced (Unlimited)</td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Resume Scoring & Feedback
+                          AI Resume Scoring & Feedback
                         </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic (Limited)</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced (Unlimited)</td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
@@ -598,12 +586,8 @@ export default function Pricing() {
                           <MessageCircle className="h-4 w-4 text-muted-foreground" />
                           AI Message Personalization
                         </td>
-                        <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
-                        </td>
-                        <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
-                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Basic (Limited)</td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">Advanced (Unlimited)</td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
