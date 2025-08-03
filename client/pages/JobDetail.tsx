@@ -542,7 +542,11 @@ export default function JobDetail() {
                       <CardTitle>Ready to Apply?</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <Button className="w-full" size="lg">
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={() => isAuthenticated ? null : setShowLoginModal(true)}
+                      >
                         Apply Now
                         <ExternalLink className="h-4 w-4 ml-2" />
                       </Button>
