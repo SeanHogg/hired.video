@@ -609,6 +609,7 @@ export const MOCK_RESUMES: Resume[] = [
 
 export const MOCK_RESUME_METADATA: ResumeMetadata[] = MOCK_RESUMES.map(resume => ({
   id: resume.id,
+  slug: resume.slug,
   name: resume.name,
   privacy: resume.privacy,
   isMaster: resume.isMaster,
