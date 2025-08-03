@@ -11,12 +11,12 @@ import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import {
-  getAllJobsForUser,
-  addTrackedJob,
-  removeTrackedJob,
+import { 
+  getAllJobsForUser, 
+  addTrackedJob, 
+  removeTrackedJob, 
   getPublicJobs,
-  getJobsByFilters
+  getJobsByFilters 
 } from "@/data/mockJobs";
 import { JobWithOwnership } from "@/types/job";
 import {
@@ -53,10 +53,109 @@ export default function Jobs() {
   const [remoteFilter, setRemoteFilter] = useState<boolean | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(false);
 
-  // If user is not authenticated, show marketing page
-  if (!isAuthenticated || !user) {
+  // Get jobs based on user role and authentication
+  const getJobsForUser = () => {
+    if (!user) {
+      return getPublicJobs().map(job => ({
+        ...job,
+        title: job.data.title,
+        company: job.data.company.name,
+        location: job.data.location.remote 
+          ? 'Remote' 
+          : `${job.data.location.city}, ${job.data.location.state}`,
+        salary: job.data.salaryMin && job.data.salaryMax 
+          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+          : undefined,
+        employmentType: job.data.employmentType,
+        experienceLevel: job.data.experienceLevel,
+        summary: job.data.summary
+      }));
+    }
+
+    const { owned, tracked } = getAllJobsForUser(user.id);
+    const ownedWithOwnership: JobWithOwnership[] = owned.map(job => ({
+      id: job.id,
+      title: job.data.title,
+      company: job.data.company.name,
+      location: job.data.location.remote 
+        ? 'Remote' 
+        : `${job.data.location.city}, ${job.data.location.state}`,
+      salary: job.data.salaryMin && job.data.salaryMax 
+        ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+        : undefined,
+      employmentType: job.data.employmentType,
+      experienceLevel: job.data.experienceLevel,
+      status: job.status,
+      privacy: job.privacy,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      expiresAt: job.expiresAt,
+      views: job.views,
+      applications: job.applications,
+      summary: job.data.summary,
+      userId: job.userId,
+      companyId: job.companyId,
+      ownership: 'owned' as const
+    }));
+
+    const trackedWithOwnership: JobWithOwnership[] = tracked.map(job => ({
+      id: job.id,
+      title: job.data.title,
+      company: job.data.company.name,
+      location: job.data.location.remote 
+        ? 'Remote' 
+        : `${job.data.location.city}, ${job.data.location.state}`,
+      salary: job.data.salaryMin && job.data.salaryMax 
+        ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+        : undefined,
+      employmentType: job.data.employmentType,
+      experienceLevel: job.data.experienceLevel,
+      status: job.status,
+      privacy: job.privacy,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      expiresAt: job.expiresAt,
+      views: job.views,
+      applications: job.applications,
+      summary: job.data.summary,
+      userId: job.userId,
+      companyId: job.companyId,
+      ownership: 'tracked' as const
+    }));
+
+    return { owned: ownedWithOwnership, tracked: trackedWithOwnership };
+  };
+
+  const handleTrackJob = (jobId: string) => {
+    if (user) {
+      addTrackedJob(jobId, user.id);
+      // In a real app, you'd trigger a re-render here
+    }
+  };
+
+  const handleUntrackJob = (jobId: string) => {
+    if (user) {
+      removeTrackedJob(jobId, user.id);
+      // In a real app, you'd trigger a re-render here
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setLocationFilter("");
+    setEmploymentTypeFilter("");
+    setExperienceLevelFilter("");
+    setRemoteFilter(undefined);
+  };
+
+  // If user is authenticated, show the actual jobs page
+  if (isAuthenticated && user) {
+    const jobsData = getJobsForUser();
+    const isJobSeeker = user.role === 'job_seeker';
+    const isRecruiterOrBusiness = user.role === 'recruiter' || user.role === 'business';
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      <div className="min-h-screen bg-background">
         <Sidebar 
           isOpen={sidebarOpen} 
           onClose={closeSidebar} 
@@ -69,360 +168,230 @@ export default function Jobs() {
             sidebarCollapsed={sidebarCollapsed}
           />
           
-          <div className="pt-16">
-            <div className="max-w-6xl mx-auto px-4 py-16">
-              {/* Hero Section */}
-              <div className="text-center mb-16">
-                <div className="inline-flex items-center space-x-2 mb-6">
-                  <div className="relative">
-                    <Briefcase className="h-12 w-12 text-primary" />
-                    <Video className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
-                  </div>
-                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Smart Jobs
-                  </span>
+          <div className="pt-16 p-6">
+            <div className="max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h1 className="text-3xl font-bold mb-2">Jobs</h1>
+                  <p className="text-muted-foreground">
+                    {isJobSeeker 
+                      ? "Discover and track job opportunities that match your skills" 
+                      : "Manage your job postings and discover talent"}
+                  </p>
                 </div>
-                <h1 className="text-5xl font-bold mb-6">
-                  Discover Your Perfect Career Match
-                </h1>
-                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Find jobs that truly fit your skills and aspirations with AI-powered matching, video job descriptions, and direct connections to hiring managers.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link to="/signup">
-                    <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
-                      Find Your Dream Job
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
-                  <Button size="lg" variant="outline" className="text-lg px-8">
-                    <Play className="mr-2 h-5 w-5" />
-                    See How It Works
+                <div className="flex items-center gap-2">
+                  {isRecruiterOrBusiness && (
+                    <>
+                      <Button asChild variant="outline">
+                        <Link to="/jobs/upload">
+                          <Upload className="h-4 w-4 mr-2" />
+                          Import Job
+                        </Link>
+                      </Button>
+                      <Button asChild>
+                        <Link to="/jobs/create">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Post Job
+                        </Link>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Search and Filters */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search jobs, companies, or skills..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="shrink-0"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filters
                   </Button>
                 </div>
-              </div>
 
-              {/* Stats Section */}
-              <div className="grid md:grid-cols-4 gap-6 mb-16">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">50K+</div>
-                  <p className="text-sm text-muted-foreground">Active job postings</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">95%</div>
-                  <p className="text-sm text-muted-foreground">Match accuracy</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">72h</div>
-                  <p className="text-sm text-muted-foreground">Average response time</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">89%</div>
-                  <p className="text-sm text-muted-foreground">Interview success rate</p>
-                </div>
-              </div>
-
-              {/* Features Grid */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Why Choose Our Job Platform</h2>
-                <div className="grid md:grid-cols-3 gap-8">
-                  <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
-                    <CardHeader>
-                      <Target className="h-10 w-10 text-brand-purple mb-4" />
-                      <CardTitle>AI-Powered Matching</CardTitle>
-                      <CardDescription>
-                        Our advanced AI analyzes your skills, experience, and preferences to find jobs that truly match your career goals.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Smart skill matching
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Salary compatibility
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Culture fit analysis
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
-                    <CardHeader>
-                      <Video className="h-10 w-10 text-brand-blue mb-4" />
-                      <CardTitle>Video Job Descriptions</CardTitle>
-                      <CardDescription>
-                        Get a real feel for the role with video job descriptions from actual hiring managers and team members.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Meet your future team
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Office culture preview
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Day-in-the-life insights
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="border-primary/20 hover:border-primary/40 transition-colors">
-                    <CardHeader>
-                      <Zap className="h-10 w-10 text-primary mb-4" />
-                      <CardTitle>Direct Connections</CardTitle>
-                      <CardDescription>
-                        Skip the black hole of traditional applications. Connect directly with hiring managers and decision makers.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Direct messaging
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Real-time notifications
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          Interview scheduling
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Featured Jobs Preview */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Featured Opportunities</h2>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">Senior Software Engineer</CardTitle>
-                          <CardDescription className="flex items-center gap-2 mt-1">
-                            <Building2 className="h-4 w-4" />
-                            TechCorp Inc.
-                          </CardDescription>
-                        </div>
-                        <Badge variant="secondary">New</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          San Francisco, CA
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />
-                          $120k - $180k
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          Full-time
-                        </div>
-                      </div>
-                      <p className="text-sm mb-4">
-                        Join our innovative team building next-generation web applications. Work with React, Node.js, and cloud technologies.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">React</Badge>
-                        <Badge variant="outline">Node.js</Badge>
-                        <Badge variant="outline">AWS</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">Product Marketing Manager</CardTitle>
-                          <CardDescription className="flex items-center gap-2 mt-1">
-                            <Building2 className="h-4 w-4" />
-                            Growth Dynamics
-                          </CardDescription>
-                        </div>
-                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Hot</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          Remote
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />
-                          $90k - $130k
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          Full-time
-                        </div>
-                      </div>
-                      <p className="text-sm mb-4">
-                        Drive go-to-market strategy for our SaaS platform. Lead product launches and develop compelling marketing campaigns.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline">SaaS</Badge>
-                        <Badge variant="outline">B2B Marketing</Badge>
-                        <Badge variant="outline">Analytics</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="text-center mt-8">
-                  <Link to="/signup">
-                    <Button variant="outline" size="lg">
-                      View All 50,000+ Jobs
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-
-              {/* How It Works */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">How Our Job Matching Works</h2>
-                <div className="grid md:grid-cols-4 gap-8">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">1. Create Profile</h3>
-                    <p className="text-sm text-muted-foreground">Tell us about your skills, experience, and preferences</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Target className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">2. AI Matching</h3>
-                    <p className="text-sm text-muted-foreground">Our AI finds jobs that match your unique profile</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Video className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">3. Explore Jobs</h3>
-                    <p className="text-sm text-muted-foreground">Watch video job descriptions and company culture</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <TrendingUp className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-semibold mb-2">4. Connect & Apply</h3>
-                    <p className="text-sm text-muted-foreground">Connect directly with hiring managers</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Success Stories */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Success Stories</h2>
-                <div className="grid md:grid-cols-3 gap-8">
+                {showFilters && (
                   <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center mb-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        ))}
-                      </div>
-                      <p className="text-sm mb-4">
-                        "Found my dream job in just 2 weeks! The AI matching was incredibly accurate and the video job descriptions helped me understand the role perfectly."
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
-                          <p className="font-medium text-sm">Alex Thompson</p>
-                          <p className="text-xs text-muted-foreground">Data Scientist</p>
+                          <label className="text-sm font-medium mb-2 block">Location</label>
+                          <Input 
+                            placeholder="City, State"
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Employment Type</label>
+                          <Select value={employmentTypeFilter} onValueChange={setEmploymentTypeFilter}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="All types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">All types</SelectItem>
+                              <SelectItem value="full-time">Full-time</SelectItem>
+                              <SelectItem value="part-time">Part-time</SelectItem>
+                              <SelectItem value="contract">Contract</SelectItem>
+                              <SelectItem value="internship">Internship</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Experience Level</label>
+                          <Select value={experienceLevelFilter} onValueChange={setExperienceLevelFilter}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="All levels" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">All levels</SelectItem>
+                              <SelectItem value="entry">Entry</SelectItem>
+                              <SelectItem value="mid">Mid-level</SelectItem>
+                              <SelectItem value="senior">Senior</SelectItem>
+                              <SelectItem value="executive">Executive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Remote</label>
+                          <Select value={remoteFilter?.toString() || ""} onValueChange={(value) => setRemoteFilter(value ? value === "true" : undefined)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="All locations" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">All locations</SelectItem>
+                              <SelectItem value="true">Remote only</SelectItem>
+                              <SelectItem value="false">On-site only</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
+                      <Button variant="outline" size="sm" onClick={clearFilters}>
+                        <X className="h-3 w-3 mr-1" />
+                        Clear Filters
+                      </Button>
                     </CardContent>
                   </Card>
-                  
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center mb-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        ))}
-                      </div>
-                      <p className="text-sm mb-4">
-                        "The direct connection feature was a game-changer. I could speak directly with the hiring manager and got an offer within days."
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-brand-blue to-brand-purple rounded-full" />
-                        <div>
-                          <p className="font-medium text-sm">Maria Garcia</p>
-                          <p className="text-xs text-muted-foreground">UX Designer</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center mb-4">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        ))}
-                      </div>
-                      <p className="text-sm mb-4">
-                        "Increased my salary by 40% with my new role. The platform helped me discover opportunities I never would have found elsewhere."
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
-                        <div>
-                          <p className="font-medium text-sm">James Wilson</p>
-                          <p className="text-xs text-muted-foreground">Product Manager</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                )}
               </div>
 
-              {/* Final CTA */}
-              <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold mb-4">Ready to Find Your Perfect Job?</h3>
-                <p className="text-muted-foreground mb-6">
-                  Join thousands of professionals who have found their dream careers through our platform.
-                </p>
-                <Link to="/signup">
-                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                    Start Your Job Search Today
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
+              {/* Job Listings */}
+              <div className="space-y-6">
+                {/* Owned Jobs (for recruiters/business) */}
+                {isRecruiterOrBusiness && 'owned' in jobsData && jobsData.owned.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                      <Briefcase className="h-5 w-5" />
+                      Your Job Postings ({jobsData.owned.length})
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {jobsData.owned.map((job) => (
+                        <JobCard 
+                          key={job.id} 
+                          job={job} 
+                          showOwnership={true}
+                          onTrack={handleTrackJob}
+                          onUntrack={handleUntrackJob}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tracked Jobs */}
+                {('tracked' in jobsData ? jobsData.tracked.length > 0 : false) && (
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Tracked Jobs ({(jobsData as any).tracked.length})
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {(jobsData as any).tracked.map((job: JobWithOwnership) => (
+                        <JobCard 
+                          key={job.id} 
+                          job={job} 
+                          showOwnership={true}
+                          onTrack={handleTrackJob}
+                          onUntrack={handleUntrackJob}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* All Available Jobs */}
+                <div>
+                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    {isJobSeeker ? "Available Jobs" : "All Jobs"}
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {getJobsByFilters({
+                      search: searchQuery,
+                      location: locationFilter,
+                      employmentType: employmentTypeFilter,
+                      experienceLevel: experienceLevelFilter,
+                      remote: remoteFilter
+                    }).map((job) => {
+                      const jobMetadata = {
+                        id: job.id,
+                        title: job.data.title,
+                        company: job.data.company.name,
+                        location: job.data.location.remote 
+                          ? 'Remote' 
+                          : `${job.data.location.city}, ${job.data.location.state}`,
+                        salary: job.data.salaryMin && job.data.salaryMax 
+                          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+                          : undefined,
+                        employmentType: job.data.employmentType,
+                        experienceLevel: job.data.experienceLevel,
+                        status: job.status,
+                        privacy: job.privacy,
+                        createdAt: job.createdAt,
+                        updatedAt: job.updatedAt,
+                        expiresAt: job.expiresAt,
+                        views: job.views,
+                        applications: job.applications,
+                        summary: job.data.summary,
+                        userId: job.userId,
+                        companyId: job.companyId
+                      };
+                      
+                      return (
+                        <JobCard 
+                          key={job.id} 
+                          job={jobMetadata}
+                          onTrack={handleTrackJob}
+                          onUntrack={handleUntrackJob}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
-            <Footer />
           </div>
+          <Footer />
         </div>
       </div>
     );
   }
 
-  // If user is authenticated, show the actual jobs page (placeholder for now)
+  // If user is not authenticated, show marketing page
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={closeSidebar} 
@@ -435,22 +404,158 @@ export default function Jobs() {
           sidebarCollapsed={sidebarCollapsed}
         />
         
-        <div className="pt-16 p-6">
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">Job Board</h1>
-            <p className="text-muted-foreground mb-8">Find and apply to jobs that match your skills.</p>
-            
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Job board coming soon</h3>
-                <p className="text-muted-foreground mb-4">We're building an amazing job search experience for you</p>
-                <Button>Set Job Alerts</Button>
-              </CardContent>
-            </Card>
+        <div className="pt-16">
+          <div className="max-w-6xl mx-auto px-4 py-16">
+            {/* Hero Section */}
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center space-x-2 mb-6">
+                <div className="relative">
+                  <Briefcase className="h-12 w-12 text-primary" />
+                  <Video className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                </div>
+                <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                  Smart Jobs
+                </span>
+              </div>
+              <h1 className="text-5xl font-bold mb-6">
+                Discover Your Perfect Career Match
+              </h1>
+              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                Find jobs that truly fit your skills and aspirations with AI-powered matching, video job descriptions, and direct connections to hiring managers.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/signup">
+                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
+                    Find Your Dream Job
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Button size="lg" variant="outline" className="text-lg px-8">
+                  <Play className="mr-2 h-5 w-5" />
+                  See How It Works
+                </Button>
+              </div>
+            </div>
+
+            {/* Stats Section */}
+            <div className="grid md:grid-cols-4 gap-6 mb-16">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">50K+</div>
+                <p className="text-sm text-muted-foreground">Active job postings</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">95%</div>
+                <p className="text-sm text-muted-foreground">Match accuracy</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">72h</div>
+                <p className="text-sm text-muted-foreground">Average response time</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary mb-2">89%</div>
+                <p className="text-sm text-muted-foreground">Interview success rate</p>
+              </div>
+            </div>
+
+            {/* Featured Jobs Preview using shared JobCard */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-12">Featured Opportunities</h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                {getPublicJobs().slice(0, 2).map((job) => {
+                  const jobMetadata = {
+                    id: job.id,
+                    title: job.data.title,
+                    company: job.data.company.name,
+                    location: job.data.location.remote 
+                      ? 'Remote' 
+                      : `${job.data.location.city}, ${job.data.location.state}`,
+                    salary: job.data.salaryMin && job.data.salaryMax 
+                      ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+                      : undefined,
+                    employmentType: job.data.employmentType,
+                    experienceLevel: job.data.experienceLevel,
+                    status: job.status,
+                    privacy: job.privacy,
+                    createdAt: job.createdAt,
+                    updatedAt: job.updatedAt,
+                    expiresAt: job.expiresAt,
+                    views: job.views,
+                    applications: job.applications,
+                    summary: job.data.summary,
+                    userId: job.userId,
+                    companyId: job.companyId
+                  };
+                  
+                  return (
+                    <JobCard 
+                      key={job.id} 
+                      job={jobMetadata}
+                    />
+                  );
+                })}
+              </div>
+              <div className="text-center mt-8">
+                <Link to="/signup">
+                  <Button variant="outline" size="lg">
+                    View All 50,000+ Jobs
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Features and other marketing content */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-12">Why Choose Our Job Platform</h2>
+              <div className="grid md:grid-cols-3 gap-8">
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <Target className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>AI-Powered Matching</CardTitle>
+                    <CardDescription>
+                      Our advanced AI analyzes your skills, experience, and preferences to find jobs that truly match your career goals.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+                
+                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                  <CardHeader>
+                    <Video className="h-10 w-10 text-brand-blue mb-4" />
+                    <CardTitle>Video Job Descriptions</CardTitle>
+                    <CardDescription>
+                      Get a real feel for the role with video job descriptions from actual hiring managers and team members.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+                
+                <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                  <CardHeader>
+                    <Zap className="h-10 w-10 text-primary mb-4" />
+                    <CardTitle>Direct Connections</CardTitle>
+                    <CardDescription>
+                      Skip the black hole of traditional applications. Connect directly with hiring managers and decision makers.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </div>
+            </div>
+
+            {/* Final CTA */}
+            <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
+              <h3 className="text-2xl font-bold mb-4">Ready to Find Your Perfect Job?</h3>
+              <p className="text-muted-foreground mb-6">
+                Join thousands of professionals who have found their dream careers through our platform.
+              </p>
+              <Link to="/signup">
+                <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                  Start Your Job Search Today
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
           </div>
+          <Footer />
         </div>
-        <Footer />
       </div>
     </div>
   );
