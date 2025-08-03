@@ -3,11 +3,22 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import JobCard from "@/components/JobCard";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
+import {
+  getAllJobsForUser,
+  addTrackedJob,
+  removeTrackedJob,
+  getPublicJobs,
+  getJobsByFilters
+} from "@/data/mockJobs";
+import { JobWithOwnership } from "@/types/job";
 import {
   Briefcase,
   Video,
@@ -26,6 +37,10 @@ import {
   Target,
   Zap,
   BarChart3,
+  Plus,
+  Upload,
+  Filter,
+  X
 } from "lucide-react";
 
 export default function Jobs() {
