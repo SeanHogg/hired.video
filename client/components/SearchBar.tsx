@@ -139,12 +139,12 @@ export default function SearchBar({
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Role</label>
-            <Select value={filters.role || ""} onValueChange={(value) => handleFilterChange('role', value)}>
+            <Select value={filters.role || "all"} onValueChange={(value) => handleFilterChange('role', value === 'all' ? undefined : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="All roles" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All roles</SelectItem>
+                <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="job_seeker">Job Seekers</SelectItem>
                 <SelectItem value="recruiter">Recruiters</SelectItem>
                 <SelectItem value="business">Business Leaders</SelectItem>
