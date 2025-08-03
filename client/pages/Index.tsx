@@ -160,17 +160,17 @@ export default function Index() {
       ownerId: "user789",
     },
     {
-      id: "3a",
-      name: "Marcus Rodriguez",
-      title: "Senior Data Scientist",
-      summary: "PhD in Machine Learning with 6 years of industry experience in predictive modeling, deep learning, and big data analytics. Expertise in Python, TensorFlow, and cloud platforms.",
-      views: 2156,
+      id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
+      name: "Michael Rodriguez",
+      title: "Senior Marketing Manager",
+      summary: "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy. Proven track record of increasing brand awareness and driving revenue growth.",
+      views: 2,
       type: "resume" as const,
       contentType: "text" as const,
-      profession: "Data Scientist",
-      company: "Tech Company",
-      createdAt: "2024-12-20",
-      ownerId: "user456", // Different user
+      profession: "Marketing Manager",
+      company: "GrowthCo",
+      createdAt: "2024-01-28",
+      ownerId: "user_3", // Different user
     },
     {
       id: "4",
