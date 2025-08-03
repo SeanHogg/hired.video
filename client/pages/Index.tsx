@@ -215,28 +215,7 @@ export default function Index() {
     { id: "job_description", label: "Jobs", icon: Briefcase },
   ];
 
-  // Get real job data and convert to content items
-  const realJobs = getPublicJobs().slice(0, 4).map(job => ({
-    id: job.id,
-    title: job.data.title,
-    description: job.data.summary,
-    thumbnail: "",
-    duration: "",
-    views: job.views,
-    type: "job_listing" as const,
-    contentType: "job" as const,
-    profession: job.data.title,
-    company: job.data.company.name,
-    createdAt: job.createdAt,
-    ownerId: job.userId,
-    jobData: job
-  }));
-
-  // Combine mock content with real jobs
-  const allContentItems = [
-    ...contentItems.filter(item => item.type !== "job_description"), // Remove mock job descriptions
-    ...realJobs
-  ];
+  const allContentItems = contentItems;
 
   const handleSearch = (query: string) => {
     setSearchFilters(prev => ({ ...prev, search: query }));
