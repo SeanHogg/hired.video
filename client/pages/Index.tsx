@@ -251,6 +251,26 @@ export default function Index() {
     return matchesCategory && matchesSearch;
   });
 
+  // Pagination logic
+  const {
+    currentPage,
+    itemsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange
+  } = usePagination(filteredItems.length, 12);
+
+  // Update pagination when filtered items change
+  React.useEffect(() => {
+    handleTotalItemsChange(filteredItems.length);
+  }, [filteredItems.length, handleTotalItemsChange]);
+
+  // Get paginated items
+  const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
   const totalViews = allContentItems.reduce((sum, item) => sum + (item.views || 0), 0);
   const formatTotalViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
