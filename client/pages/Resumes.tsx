@@ -107,7 +107,7 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
-      const resumeMetadata = sampleResumes.find(r => r.id === resumeId);
+      const resumeMetadata = getUserResumes().find(r => r.id === resumeId);
       const mockResume: Resume = {
         id: resumeId,
         name: resumeMetadata?.name || 'Software Engineer Resume',
