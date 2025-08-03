@@ -331,14 +331,21 @@ export default function Pricing() {
                     {!isAuthenticated ? (
                       <Link to="/signup" className="block">
                         <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90" size="lg">
-                          Start Free Trial
+                          Get Started
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                       </Link>
                     ) : (
-                      <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90" size="lg">
-                        Upgrade Now
-                        <ArrowRight className="ml-2 h-4 w-4" />
+                      <Button
+                        className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                        size="lg"
+                        onClick={handleAddToCart}
+                      >
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        Add to Cart - ${isAnnual
+                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(2)
+                          : calculatePrice(selectedUsers, false).toFixed(2)
+                        }/month
                       </Button>
                     )}
                   </div>
