@@ -394,6 +394,7 @@ export const MOCK_COMPANIES: Company[] = [
   },
   {
     id: MOCK_COMPANY_IDS.STARTUP_INNOVATE,
+    slug: 'startup-innovate',
     data: {
       name: 'Startup Innovate',
       logo: 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=100&h=100&fit=crop',
