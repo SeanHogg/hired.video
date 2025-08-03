@@ -117,7 +117,7 @@ export interface ResumeData {
   Projects: Project[];
 }
 
-export type ResumePrivacy = 'public' | 'recruiter_only' | 'private';
+export type ResumePrivacy = 'public' | 'recruiter_only' | 'private' | 'draft';
 
 export interface Resume {
   id: string;
