@@ -8,7 +8,9 @@ import { Separator } from '@/components/ui/separator';
 import Navigation from '@/components/Navigation';
 import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import LoginModal from '@/components/LoginModal';
 import { useAuth } from '@/lib/auth';
+import { generateFakeJobData } from '@/lib/fakeData';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { getJobById, addTrackedJob, removeTrackedJob, isJobTrackedByUser } from '@/data/mockJobs';
 import {
