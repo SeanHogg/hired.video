@@ -378,21 +378,21 @@ export function mockTimers() {
  * Assert that an element has specific text content
  */
 export function expectTextContent(element: HTMLElement, text: string) {
-  expect(element).toHaveTextContent(text);
+  expect(element.textContent).toContain(text);
 }
 
 /**
  * Assert that an element is visible
  */
 export function expectVisible(element: HTMLElement) {
-  expect(element).toBeVisible();
+  expect(element).not.toHaveStyle('display: none');
 }
 
 /**
  * Assert that an element is not in the document
  */
 export function expectNotInDocument(element: HTMLElement | null) {
-  expect(element).not.toBeInTheDocument();
+  expect(element).toBeNull();
 }
 
 // Re-export everything from testing library

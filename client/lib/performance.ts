@@ -102,7 +102,7 @@ class PerformanceMonitor {
     // Import web-vitals dynamically to avoid bundle size impact
     import('web-vitals').then((webVitals) => {
       if (webVitals.onCLS) webVitals.onCLS(this.handleWebVital.bind(this));
-      if (webVitals.onFID) webVitals.onFID(this.handleWebVital.bind(this));
+      if (webVitals.onINP) webVitals.onINP(this.handleWebVital.bind(this));
       if (webVitals.onFCP) webVitals.onFCP(this.handleWebVital.bind(this));
       if (webVitals.onLCP) webVitals.onLCP(this.handleWebVital.bind(this));
       if (webVitals.onTTFB) webVitals.onTTFB(this.handleWebVital.bind(this));
@@ -164,7 +164,7 @@ class PerformanceMonitor {
         value: entry.duration,
         unit: 'ms',
         timestamp: Date.now(),
-        context: resourceTiming as Record<string, unknown>,
+        context: resourceTiming as unknown as Record<string, unknown>,
       });
     }
   }
@@ -232,7 +232,7 @@ class PerformanceMonitor {
     this.metrics.push(metric);
 
     // Log performance metrics
-    logger.debug('Performance metric recorded', metric as Record<string, unknown>);
+    logger.debug('Performance metric recorded', metric as unknown as Record<string, unknown>);
 
     // Keep only recent metrics to prevent memory leaks
     if (this.metrics.length > 1000) {

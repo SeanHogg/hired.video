@@ -5,6 +5,7 @@ export interface JobLocation {
   country?: string;
   remote: boolean;
   hybrid: boolean;
+  timezone?: string;
 }
 
 export interface JobCompany {
@@ -35,6 +36,7 @@ export interface JobData {
   responsibilities: string[];
   requirements: JobRequirement[];
   qualifications: string[];
+  skills: string[];
   benefits: JobBenefit[];
   salaryMin?: number;
   salaryMax?: number;

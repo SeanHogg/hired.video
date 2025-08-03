@@ -1,6 +1,6 @@
 import { Company } from "@/types/company";
 import { Job } from "@/types/job";
-import { User } from "@/types/people";
+import { User } from "@/lib/auth";
 import { Resume } from "@/types/resume";
 
 export const generateFakeCompanyData = (realCompany: Company): Company => {
@@ -12,7 +12,7 @@ export const generateFakeCompanyData = (realCompany: Company): Company => {
       tagline: "Building the future, one innovation at a time",
       industry: "Technology & Innovation",
       size: "100-500",
-      founded: "2018",
+      founded: 2018,
       mission: "To revolutionize how people connect and work together through innovative technology solutions.",
       vision: "A world where technology empowers every individual to reach their full potential.",
       culture: ["Innovation", "Collaboration", "Growth", "Transparency", "Work-Life Balance"],
@@ -107,10 +107,26 @@ export const generateFakeJobData = (realJob: Job): Job => {
 </ul>
       `,
       requirements: [
-        "Bachelor's degree in relevant field",
-        "3+ years of professional experience",
-        "Strong technical and communication skills",
-        "Experience with modern development tools"
+        {
+          skill: "Bachelor's degree in relevant field",
+          level: "Beginner",
+          required: true
+        },
+        {
+          skill: "3+ years of professional experience",
+          level: "Intermediate",
+          required: true
+        },
+        {
+          skill: "Strong technical and communication skills",
+          level: "Intermediate",
+          required: true
+        },
+        {
+          skill: "Experience with modern development tools",
+          level: "Intermediate",
+          required: false
+        }
       ],
       responsibilities: [
         "Develop high-quality software solutions",
@@ -126,11 +142,26 @@ export const generateFakeJobData = (realJob: Job): Job => {
       ],
       skills: ["JavaScript", "React", "Node.js", "TypeScript", "AWS"],
       benefits: [
-        "Competitive salary and equity package",
-        "Comprehensive health, dental, and vision insurance",
-        "Flexible work arrangements and remote options",
-        "Professional development budget",
-        "Generous PTO and parental leave"
+        {
+          type: "Compensation",
+          description: "Competitive salary and equity package"
+        },
+        {
+          type: "Health Insurance",
+          description: "Comprehensive health, dental, and vision insurance"
+        },
+        {
+          type: "Work Flexibility",
+          description: "Flexible work arrangements and remote options"
+        },
+        {
+          type: "Professional Development",
+          description: "Professional development budget"
+        },
+        {
+          type: "Time Off",
+          description: "Generous PTO and parental leave"
+        }
       ],
       salaryMin: 80000,
       salaryMax: 120000,
@@ -437,7 +468,8 @@ export const generateFakeResumeData = (realResume: Resume): Resume => {
           Url: "https://portfolio.com/digital-transformation",
           Roles: ["Project Lead", "Strategy Development", "Change Management"],
           Entity: "Tech Innovation Corp",
-          Type: "Professional"
+          Type: "Professional",
+          Keywords: ["Digital Transformation", "Enterprise", "Technology"]
         }
       ]
     },

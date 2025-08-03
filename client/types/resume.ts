@@ -115,6 +115,11 @@ export interface ResumeData {
   Interests: Interest[];
   References: Reference[];
   Projects: Project[];
+  Meta?: {
+    template?: string;
+    version?: string;
+    lastModified?: string;
+  };
 }
 
 export type ResumePrivacy = 'public' | 'recruiter_only' | 'private' | 'draft';

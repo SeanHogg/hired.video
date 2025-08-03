@@ -19,6 +19,7 @@ export interface CompanyContact {
 export interface CompanyFinancials {
   fundingStage?: 'pre-seed' | 'seed' | 'series-a' | 'series-b' | 'series-c' | 'series-d' | 'ipo' | 'acquired' | 'private';
   fundingAmount?: number;
+  totalFunding?: number;
   currency?: string;
   valuation?: number;
   revenue?: number;
@@ -30,6 +31,7 @@ export interface CompanyBenefits {
   dentalInsurance: boolean;
   visionInsurance: boolean;
   retirement401k: boolean;
+  retirementPlan: boolean;
   stockOptions: boolean;
   paidTimeOff: boolean;
   parentalLeave: boolean;
@@ -45,6 +47,7 @@ export interface CompanyBenefits {
 export interface CompanyData {
   name: string;
   logo?: string;
+  website?: string;
   tagline?: string;
   description: string;
   industry: string;

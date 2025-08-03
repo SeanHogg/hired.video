@@ -485,7 +485,7 @@ export const MOCK_USERS: UserProfile[] = [
       experience: [
         {
           company: 'DataTech Solutions',
-          position: 'Senior Data Scientist',
+          title: 'Senior Data Scientist',
           startDate: '2020-03-01',
           endDate: 'Present',
           location: "Austin, TX, USA (Remote)",
@@ -499,7 +499,7 @@ export const MOCK_USERS: UserProfile[] = [
         },
         {
           company: 'FinanceAI Corp',
-          position: 'Data Scientist',
+          title: 'Data Scientist',
           startDate: '2017-06-01',
           endDate: '2020-02-28',
           location: "San Francisco, CA, USA",
