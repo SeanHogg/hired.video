@@ -133,17 +133,17 @@ export default function Index() {
       ownerId: "company789", // Company owns this
     },
     {
-      id: "2a",
+      id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
       name: "Sarah Chen",
-      title: "UX/UI Designer",
-      summary: "Creative designer with 8 years of experience in user interface design, user experience research, and product strategy. Specialized in mobile app design and design systems.",
-      views: 1230,
+      title: "Senior Software Engineer",
+      summary: "Passionate software engineer with 8 years of experience building scalable web applications. Expertise in React, Node.js, and cloud technologies.",
+      views: 67,
       type: "resume" as const,
       contentType: "text" as const,
-      profession: "UX Designer",
-      company: "Design Studio",
-      createdAt: "2024-12-28",
-      ownerId: "user789", // Different user
+      profession: "Software Engineer",
+      company: "TechCorp Inc",
+      createdAt: "2024-01-10",
+      ownerId: "user_2", // Different user
     },
     {
       id: "3",
