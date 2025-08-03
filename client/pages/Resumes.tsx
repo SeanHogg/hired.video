@@ -16,6 +16,7 @@ import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import ActionsModal from "@/components/ActionsModal";
 import SearchBar, { SearchFilters } from "@/components/SearchBar";
+import Pagination, { usePagination } from "@/components/Pagination";
 import { useAuth } from "@/lib/auth";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Resume, ResumeMetadata, ResumePrivacy, CreateResumeRequest, UpdateResumeRequest, ResumeUploadResponse, ResumeSearchFilters, ResumeWithOwnership } from "@/types/resume";
