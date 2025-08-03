@@ -366,6 +366,7 @@ export const MOCK_RESUMES: Resume[] = [
   },
   {
     id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
+    slug: 'sarah-chen-software-engineer',
     name: 'Sarah Chen - Software Engineer',
     data: {
       Basics: {
