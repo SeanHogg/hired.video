@@ -828,9 +828,10 @@ export default function Resumes() {
                     <p className="text-muted-foreground mt-4">Loading resumes...</p>
                   </div>
                 ) : filteredResumes.length > 0 ? (
-                  viewMode === 'grid' ? (
+                  <>
+                  {viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredResumes.map((resume) => (
+                      {paginatedResumes.map((resume) => (
                         <ResumeCard
                           key={resume.id}
                           id={resume.id}
@@ -851,7 +852,7 @@ export default function Resumes() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {resumeTree.map((masterResume) => (
+                      {paginatedResumeTree.map((masterResume) => (
                         <div key={masterResume.id} className="border rounded-lg overflow-hidden">
                           {/* Master Resume */}
                           <div className="bg-muted/30">
@@ -1053,7 +1054,17 @@ export default function Resumes() {
                         </div>
                       ))}
                     </div>
-                  )
+                  )}
+
+                  {/* Pagination */}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredResumes.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
+                  </>
                 ) : (
                   <Card>
                     <CardContent className="p-12 text-center">
