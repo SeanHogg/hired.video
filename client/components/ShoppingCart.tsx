@@ -17,6 +17,7 @@ import { useCart } from '@/lib/cart-context';
 import { ShoppingCart, Plus, Minus, X, CreditCard, Users } from 'lucide-react';
 
 export default function ShoppingCart() {
+  const navigate = useNavigate();
   const {
     items,
     isOpen,
@@ -31,16 +32,9 @@ export default function ShoppingCart() {
     getItemCount,
   } = useCart();
 
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
-
-  const handleCheckout = async () => {
-    setIsCheckingOut(true);
-    // Simulate checkout process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    alert('Checkout successful! (This is a demo)');
-    clearCart();
+  const handleCheckout = () => {
     closeCart();
-    setIsCheckingOut(false);
+    navigate('/checkout');
   };
 
   const formatPrice = (price: number, billingCycle: 'monthly' | 'annual') => {
