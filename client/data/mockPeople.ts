@@ -14,16 +14,17 @@ import {
 
 // Generate consistent UUIDs for mock people data
 export const MOCK_PEOPLE_IDS = {
-  JOHN_SEEKER: '1', // Existing user from auth
-  SARAH_RECRUITER: '2', // Existing user from auth
-  MICHAEL_BUSINESS: '3', // Existing user from auth
+  JOHN_SEEKER: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890', // Updated to UUID
+  SARAH_RECRUITER: 'u2b3c4d5-e6f7-8901-bcde-f23456789012', // Updated to UUID
+  MICHAEL_BUSINESS: 'u3c4d5e6-f7g8-9012-cdef-345678901234', // Updated to UUID
   ALEX_THOMPSON: 'u4a5b6c7-d8e9-0123-4567-890123456789',
   MARIA_GARCIA: 'u5b6c7d8-e9f0-1234-5678-901234567890',
   JAMES_WILSON: 'u6c7d8e9-f0g1-2345-6789-012345678901',
   LISA_CHEN: 'u7d8e9f0-g1h2-3456-7890-123456789012',
   DAVID_KUMAR: 'u8e9f0g1-h2i3-4567-8901-234567890123',
   EMILY_RODRIGUEZ: 'u9f0g1h2-i3j4-5678-9012-345678901234',
-  CHRIS_TAYLOR: 'u0g1h2i3-j4k5-6789-0123-456789012345'
+  CHRIS_TAYLOR: 'u0g1h2i3-j4k5-6789-0123-456789012345',
+  JENNIFER_MARTINEZ: 'u1f2g3h4-i5j6-7890-1234-567890123456' // New user with private resume
 } as const;
 
 export const MOCK_USERS: UserProfile[] = [
