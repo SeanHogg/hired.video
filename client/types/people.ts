@@ -89,6 +89,42 @@ export interface UserData {
 export type UserVisibility = 'public' | 'network_only' | 'private';
 export type UserStatus = 'active' | 'inactive' | 'busy' | 'looking';
 
+export interface UserSettings {
+  notifications: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+    jobAlerts: boolean;
+    messageAlerts: boolean;
+    connectionRequests: boolean;
+  };
+  privacy: {
+    profileVisibility: UserVisibility;
+    showEmail: boolean;
+    showPhone: boolean;
+    showLocation: boolean;
+    allowSearchEngineIndexing: boolean;
+  };
+  preferences: {
+    language: string;
+    timezone: string;
+    currency: string;
+    dateFormat: string;
+    theme: 'light' | 'dark' | 'system';
+  };
+  jobSearch?: {
+    openToWork: boolean;
+    jobTypes: string[];
+    salaryRange: {
+      min: number;
+      max: number;
+      currency: string;
+    };
+    preferredLocations: string[];
+    remoteWork: boolean;
+  };
+}
+
 export interface UserProfile {
   id: string;
   slug: string; // User-friendly URL identifier (e.g., "john-seeker" or "jane-doe-123")
@@ -105,6 +141,7 @@ export interface UserProfile {
   followerCount: number;
   isVerified: boolean;
   isPremium: boolean;
+  settings?: UserSettings;
 }
 
 export interface UserMetadata {

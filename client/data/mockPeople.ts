@@ -563,10 +563,39 @@ export const MOCK_USERS: UserProfile[] = [
     status: 'looking',
     visibility: 'public',
     settings: {
-      emailNotifications: true,
-      profileDiscoverable: true,
-      showContactInfo: false,
-      allowMessaging: true
+      notifications: {
+        email: true,
+        push: true,
+        sms: false,
+        jobAlerts: true,
+        messageAlerts: true,
+        connectionRequests: true,
+      },
+      privacy: {
+        profileVisibility: 'public',
+        showEmail: false,
+        showPhone: false,
+        showLocation: true,
+        allowSearchEngineIndexing: true,
+      },
+      preferences: {
+        language: 'en',
+        timezone: 'America/New_York',
+        currency: 'USD',
+        dateFormat: 'MM/DD/YYYY',
+        theme: 'system',
+      },
+      jobSearch: {
+        openToWork: true,
+        jobTypes: ['full-time', 'contract'],
+        salaryRange: {
+          min: 80000,
+          max: 120000,
+          currency: 'USD',
+        },
+        preferredLocations: ['New York, NY', 'Remote'],
+        remoteWork: true,
+      },
     },
     createdAt: '2023-11-15T00:00:00Z',
     updatedAt: '2024-01-29T10:30:00Z',

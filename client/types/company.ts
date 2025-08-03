@@ -5,6 +5,7 @@ export interface CompanyLocation {
   country?: string;
   postalCode?: string;
   timezone?: string;
+  remote?: boolean;
 }
 
 export interface CompanyContact {
@@ -62,6 +63,7 @@ export interface CompanyData {
   benefits: CompanyBenefits;
   culture: string[];
   technologies: string[];
+  techStack?: string[]; // Alternative name for technologies
   perks: string[];
   mission?: string;
   vision?: string;

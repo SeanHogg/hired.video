@@ -187,7 +187,8 @@ export class ApiClient {
     // Validate response structure
     const validationResult = validateApiResponse(responseData, ApiResponseSchema);
     if (!validationResult.success) {
-      throw new ValidationError(`Invalid API response structure: ${validationResult.error}`);
+      const errorMessage = 'error' in validationResult ? validationResult.error : 'Unknown validation error';
+      throw new ValidationError(`Invalid API response structure: ${errorMessage}`);
     }
 
     const apiResponse = validationResult.data as ApiResponse;
@@ -204,7 +205,8 @@ export class ApiClient {
     if (schema) {
       const dataValidation = validateApiResponse(successResponse.data, schema);
       if (!dataValidation.success) {
-        throw new ValidationError(`Invalid response data: ${dataValidation.error}`);
+        const errorMessage = 'error' in dataValidation ? dataValidation.error : 'Unknown validation error';
+        throw new ValidationError(`Invalid response data: ${errorMessage}`);
       }
       successResponse.data = dataValidation.data;
     }

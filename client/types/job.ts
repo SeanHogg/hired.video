@@ -63,6 +63,7 @@ export interface Job {
   data: JobData;
   status: JobStatus;
   privacy: JobPrivacy;
+  visibility?: JobPrivacy; // Alternative name for privacy
   createdAt: string;
   updatedAt: string;
   expiresAt?: string;

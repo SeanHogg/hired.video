@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { apiClient, ApiClient } from './api-client';
-import { logger, logPerformance } from './logger';
+import { logger, logAsyncPerformance } from './logger';
 import { validateOrThrow, ValidationError } from './errors';
 import { ApiSuccessResponse } from '@shared/api';
 
@@ -226,11 +226,11 @@ export class DataManager {
     }
 
     // Fetch from API
-    const response = await logPerformance(`API GET ${endpoint}`, async () => {
+    const response = await logAsyncPerformance(`API GET ${endpoint}`, async () => {
       return this.client.get(endpoint, schema);
     });
 
-    const data = response.data;
+    const data = response.data as ListResponse<T>;
 
     // Cache the result
     if (options.useCache !== false) {
@@ -288,11 +288,11 @@ export class DataManager {
     });
 
     // Fetch from API
-    const response = await logPerformance(`API LIST ${endpoint}`, async () => {
+    const response = await logAsyncPerformance(`API LIST ${endpoint}`, async () => {
       return this.client.get(fullEndpoint, responseSchema);
     });
 
-    const data = response.data;
+    const data = response.data as ListResponse<T>;
 
     // Cache the result
     if (options.useCache !== false) {
@@ -314,7 +314,7 @@ export class DataManager {
     const validatedData = validateOrThrow(data, inputSchema);
 
     // Create via API
-    const response = await logPerformance(`API CREATE ${endpoint}`, async () => {
+    const response = await logAsyncPerformance(`API CREATE ${endpoint}`, async () => {
       return this.client.post(endpoint, validatedData, outputSchema);
     });
 
@@ -338,7 +338,7 @@ export class DataManager {
     const fullEndpoint = `${endpoint}/${id}`;
 
     // Update via API
-    const response = await logPerformance(`API UPDATE ${fullEndpoint}`, async () => {
+    const response = await logAsyncPerformance(`API UPDATE ${fullEndpoint}`, async () => {
       return this.client.put(fullEndpoint, validatedData, outputSchema);
     });
 
@@ -357,7 +357,7 @@ export class DataManager {
     const fullEndpoint = `${endpoint}/${id}`;
 
     // Delete via API
-    await logPerformance(`API DELETE ${fullEndpoint}`, async () => {
+    await logAsyncPerformance(`API DELETE ${fullEndpoint}`, async () => {
       return this.client.delete(fullEndpoint, z.object({}));
     });
 
