@@ -13,6 +13,7 @@ import { UserProfile } from '@/types/people';
 import { Company } from '@/types/company';
 import { Job } from '@/types/job';
 import { Resume } from '@/types/resume';
+import { vi, expect } from 'vitest';
 
 // ============================================================================
 // RENDER UTILITIES
@@ -63,7 +64,7 @@ export function createTestQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
+        gcTime: 0, // Renamed from cacheTime in newer versions
         staleTime: 0,
       },
       mutations: {
@@ -129,9 +130,9 @@ export function createMockUser(overrides: Partial<UserProfile> = {}): UserProfil
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     lastActiveAt: '2024-01-01T00:00:00Z',
-    views: 0,
-    connections: 0,
-    followers: 0,
+    profileViews: 0,
+    connectionCount: 0,
+    followerCount: 0,
     ...overrides,
   };
 }
@@ -162,7 +163,21 @@ export function createMockCompany(overrides: Partial<Company> = {}): Company {
         phone: '+1234567890',
         website: 'https://mockcompany.com',
       },
-      benefits: ['Health Insurance'],
+      benefits: {
+        healthInsurance: true,
+        dentalInsurance: true,
+        visionInsurance: false,
+        retirement401k: true,
+        stockOptions: false,
+        paidTimeOff: true,
+        parentalLeave: true,
+        flexibleSchedule: true,
+        remoteWork: true,
+        learningBudget: false,
+        gymMembership: false,
+        freeFood: false,
+        commuteBenefits: false,
+      },
       culture: ['Innovation'],
       techStack: ['React', 'TypeScript'],
     },
@@ -191,7 +206,13 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
     data: {
       title: 'Mock Job Title',
       description: 'A mock job description',
-      requirements: ['Requirement 1'],
+      requirements: [
+        {
+          skill: 'React',
+          level: 'Intermediate',
+          required: true,
+        },
+      ],
       responsibilities: ['Responsibility 1'],
       skills: ['React', 'TypeScript'],
       experienceLevel: 'mid',
@@ -201,6 +222,7 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
         state: 'Mock State',
         country: 'Mock Country',
         remote: true,
+        hybrid: false,
       },
       remote: true,
       salary: {
@@ -209,7 +231,12 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
         currency: 'USD',
         period: 'yearly',
       },
-      benefits: ['Health Insurance'],
+      benefits: [
+        {
+          type: 'Health Insurance',
+          description: 'Comprehensive health coverage',
+        },
+      ],
       applicationDeadline: '2024-12-31T23:59:59Z',
     },
     status: 'active',
@@ -311,9 +338,9 @@ export function mockFetch(responses: Record<string, any> = {}) {
   return vi.fn().mockImplementation((url: string, options?: RequestInit) => {
     const method = options?.method || 'GET';
     const key = `${method} ${url}`;
-    
+
     const response = responses[key] || responses[url] || { data: null };
-    
+
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -335,7 +362,7 @@ export function waitForAsync(ms: number = 0): Promise<void> {
  */
 export function mockTimers() {
   vi.useFakeTimers();
-  
+
   return {
     advanceTimersByTime: vi.advanceTimersByTime,
     runAllTimers: vi.runAllTimers,

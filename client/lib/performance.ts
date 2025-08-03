@@ -100,12 +100,12 @@ class PerformanceMonitor {
 
   private trackWebVitals(): void {
     // Import web-vitals dynamically to avoid bundle size impact
-    import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
-      getCLS(this.handleWebVital.bind(this));
-      getFID(this.handleWebVital.bind(this));
-      getFCP(this.handleWebVital.bind(this));
-      getLCP(this.handleWebVital.bind(this));
-      getTTFB(this.handleWebVital.bind(this));
+    import('web-vitals').then((webVitals) => {
+      if (webVitals.onCLS) webVitals.onCLS(this.handleWebVital.bind(this));
+      if (webVitals.onFID) webVitals.onFID(this.handleWebVital.bind(this));
+      if (webVitals.onFCP) webVitals.onFCP(this.handleWebVital.bind(this));
+      if (webVitals.onLCP) webVitals.onLCP(this.handleWebVital.bind(this));
+      if (webVitals.onTTFB) webVitals.onTTFB(this.handleWebVital.bind(this));
     }).catch((error) => {
       logger.warn('Failed to load web-vitals library', { error });
     });
@@ -131,13 +131,13 @@ class PerformanceMonitor {
       },
       {
         name: 'navigation.domInteractive',
-        value: entry.domInteractive - entry.navigationStart,
+        value: entry.domInteractive - entry.fetchStart,
         unit: 'ms',
         timestamp: Date.now(),
       },
       {
         name: 'navigation.domComplete',
-        value: entry.domComplete - entry.navigationStart,
+        value: entry.domComplete - entry.fetchStart,
         unit: 'ms',
         timestamp: Date.now(),
       },
@@ -164,7 +164,7 @@ class PerformanceMonitor {
         value: entry.duration,
         unit: 'ms',
         timestamp: Date.now(),
-        context: resourceTiming,
+        context: resourceTiming as Record<string, unknown>,
       });
     }
   }
@@ -232,7 +232,7 @@ class PerformanceMonitor {
     this.metrics.push(metric);
 
     // Log performance metrics
-    logger.debug('Performance metric recorded', metric);
+    logger.debug('Performance metric recorded', metric as Record<string, unknown>);
 
     // Keep only recent metrics to prevent memory leaks
     if (this.metrics.length > 1000) {

@@ -358,7 +358,7 @@ export class DataManager {
 
     // Delete via API
     await logPerformance(`API DELETE ${fullEndpoint}`, async () => {
-      return this.client.delete(fullEndpoint);
+      return this.client.delete(fullEndpoint, z.object({}));
     });
 
     // Invalidate cache entries

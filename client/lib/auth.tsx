@@ -54,16 +54,23 @@ const mockUsers: Array<User & { password: string }> = [
   }
 ];
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+interface AuthProviderProps {
+  children: React.ReactNode;
+  initialUser?: User | null;
+}
+
+export function AuthProvider({ children, initialUser }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(initialUser || null);
 
   useEffect(() => {
-    // Check if user is logged in from localStorage
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Only check localStorage if no initial user is provided (for testing)
+    if (initialUser === undefined) {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
     }
-  }, []);
+  }, [initialUser]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Simulate API call delay
