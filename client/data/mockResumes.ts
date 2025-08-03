@@ -494,13 +494,13 @@ export const MOCK_RESUMES: Resume[] = [
       References: [],
       Projects: []
     },
-    privacy: 'draft',
+    privacy: 'public',
     isMaster: true,
     isActive: false,
     createdAt: '2024-01-28T14:00:00Z',
     updatedAt: '2024-01-28T14:00:00Z',
     views: 2,
-    userId: 'user_3'
+    userId: '5' // Different job seeker
   }
 ];
 
