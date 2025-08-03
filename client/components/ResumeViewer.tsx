@@ -1,7 +1,6 @@
 import {
   Edit,
   Eye,
-  Download,
   Share2,
   Copy,
   Star,
@@ -9,11 +8,9 @@ import {
   Lock,
   Globe,
   Calendar,
-  MapPin,
   Mail,
   Phone,
   ExternalLink,
-  Award,
   CheckCircle2
 } from 'lucide-react';
 import { useState } from 'react';
@@ -22,14 +19,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import type { Resume, ResumePrivacy, UpdateResumeRequest } from '@/types/resume';
+import type { Resume, ResumePrivacy, UpdateResumeRequest, CreateResumeRequest } from '@/types/resume';
 import ResumeBuilder from './ResumeBuilder';
 
 interface ResumeViewerProps {
   resume: Resume;
-  onUpdate: (request: UpdateResumeRequest) => void;
-  onCreateVariation?: (parentId: string) => void;
+  onUpdate: (_request: UpdateResumeRequest) => void;
+  onCreateVariation?: (_parentId: string) => void;
   canEdit?: boolean;
 }
 
@@ -43,7 +39,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
     onUpdate({ privacy: newPrivacy });
   };
 
-  const handleEditComplete = (request: any) => {
+  const handleEditComplete = (request: CreateResumeRequest) => {
     onUpdate({
       data: request.data,
       name: request.name,

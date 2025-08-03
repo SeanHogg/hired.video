@@ -21,8 +21,8 @@ import type { JobMetadata, JobWithOwnership } from '@/types/job';
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;
   showOwnership?: boolean;
-  onTrack?: (jobId: string) => void;
-  onUntrack?: (jobId: string) => void;
+  onTrack?: (_jobId: string) => void;
+  onUntrack?: (_jobId: string) => void;
 }
 
 export default function JobCard({ job, showOwnership = false, onTrack, onUntrack }: JobCardProps) {

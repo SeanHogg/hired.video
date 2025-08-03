@@ -1,7 +1,7 @@
-import { 
-  MapPin, 
-  Users, 
-  Eye, 
+import {
+  MapPin,
+  Users,
+  Eye,
   Briefcase,
   UserCheck,
   Edit,
@@ -11,8 +11,7 @@ import {
   Calendar,
   Building2,
   TrendingUp,
-  AlertCircle,
-  CheckCircle
+  AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';

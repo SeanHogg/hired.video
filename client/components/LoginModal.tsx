@@ -7,14 +7,12 @@ import {
   ArrowRight,
   CheckCircle,
   Sparkles,
-  Users,
   Building2,
   Briefcase,
   FileText
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";

@@ -1,7 +1,6 @@
-import { 
-  MapPin, 
-  Users, 
-  Eye, 
+import {
+  MapPin,
+  Users,
   Briefcase,
   UserCheck,
   ExternalLink,
@@ -28,12 +27,12 @@ interface PeopleCardProps {
   person: UserMetadata | UserWithOwnership;
   connectionStatus?: ConnectionStatus;
   showOwnership?: boolean;
-  onTrack?: (personId: string) => void;
-  onUntrack?: (personId: string) => void;
-  onConnect?: (personId: string) => void;
-  onMessage?: (personId: string) => void;
-  onAcceptConnection?: (personId: string) => void;
-  onRejectConnection?: (personId: string) => void;
+  onTrack?: (_personId: string) => void;
+  onUntrack?: (_personId: string) => void;
+  onConnect?: (_personId: string) => void;
+  onMessage?: (_personId: string) => void;
+  onAcceptConnection?: (_personId: string) => void;
+  onRejectConnection?: (_personId: string) => void;
 }
 
 export default function PeopleCard({ 

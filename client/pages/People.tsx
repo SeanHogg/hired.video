@@ -11,7 +11,6 @@ import {
   Play,
   Globe,
   Handshake,
-  Award,
   TrendingUp,
   Search,
   Filter,
@@ -47,8 +46,19 @@ import {
 } from "@/data/mockPeople";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import type { UserWithOwnership} from "@/types/people";
+import type { UserWithOwnership, UserProfile } from "@/types/people";
 import { ConnectionStatus } from "@/types/people";
+
+// Type for the people data structure
+type PeopleData =
+  | { tracked: UserWithOwnership[] } // Authenticated user data
+  | (UserProfile & { // Unauthenticated user data (transformed UserProfile)
+      fullName: string;
+      location: string;
+      experienceLevel: string;
+      currentPosition?: string;
+      currentCompany?: string;
+    })[];
 
 export default function People() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
@@ -140,8 +150,8 @@ export default function People() {
   };
 
   // Helper functions
-  const getExperienceLevel = (person: any): string => {
-    const totalYears = person.data.experience.reduce((total: number, exp: any) => {
+  const getExperienceLevel = (person: UserProfile): string => {
+    const totalYears = person.data.experience.reduce((total: number, exp) => {
       const start = new Date(exp.startDate);
       const end = exp.endDate ? new Date(exp.endDate) : new Date();
       const years = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
@@ -154,12 +164,12 @@ export default function People() {
     return 'Executive Level';
   };
 
-  const getCurrentPosition = (person: any): string | undefined => {
-    const currentExp = person.data.experience.find((exp: any) => exp.isCurrent);
+  const getCurrentPosition = (person: UserProfile): string | undefined => {
+    const currentExp = person.data.experience.find((exp) => exp.isCurrent);
     return currentExp ? `${currentExp.title} at ${currentExp.company}` : undefined;
   };
 
-  const getCompanyNameByUser = (person: any): string | undefined => {
+  const getCompanyNameByUser = (person: UserProfile): string | undefined => {
     const companyMap: { [key: string]: string } = {
       'techcorp-inc': 'TechCorp Inc.',
       'growth-dynamics': 'Growth Dynamics',
@@ -230,7 +240,7 @@ export default function People() {
 
   // If user is authenticated, show the actual people page
   if (isAuthenticated && user) {
-    const peopleData = getPeopleForUser();
+    const peopleData: PeopleData = getPeopleForUser();
     const isJobSeeker = user.role === 'job_seeker';
     const isRecruiterOrBusiness = user.role === 'recruiter' || user.role === 'business';
 
@@ -289,10 +299,10 @@ export default function People() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Eye className="h-5 w-5" />
-                      Following ({(peopleData as any).tracked.length})
+                      Following ({('tracked' in peopleData ? peopleData.tracked.length : 0)})
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(peopleData as any).tracked.map((person: UserWithOwnership) => (
+                      {('tracked' in peopleData ? peopleData.tracked : []).map((person: UserWithOwnership) => (
                         <PeopleCard 
                           key={person.id} 
                           person={person}

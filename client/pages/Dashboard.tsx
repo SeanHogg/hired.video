@@ -37,6 +37,47 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
+// Content item types
+interface VideoItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  duration: string;
+  views: number;
+}
+
+interface ResumeItem {
+  id: string;
+  title: string;
+  type: string;
+  size: string;
+  lastModified: string;
+}
+
+interface JobItem {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  posted: string;
+}
+
+interface CompanyItem {
+  id: string;
+  name: string;
+  industry: string;
+  employees: string;
+}
+
+interface ProfileItem {
+  id: string;
+  name: string;
+  role: string;
+  location: string;
+}
+
+type ContentItem = VideoItem | ResumeItem | JobItem | CompanyItem | ProfileItem;
+
 // Content data for the activity section
 const contentTypes = [
   { id: "videos", label: "Videos", icon: Video },
@@ -375,42 +416,44 @@ export default function Dashboard() {
   const progressPercentage = Math.round((completedTasksCount / onboardingTasks.length) * 100);
 
   // Helper function to render content items
-  const renderContentItem = (item: any, type: string) => {
+  const renderContentItem = (item: ContentItem, type: string) => {
     switch (type) {
       case "videos":
+        const videoItem = item as VideoItem;
         return (
-          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={videoItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="relative mb-3">
                 <img
-                  src={item.thumbnail}
-                  alt={item.title}
+                  src={videoItem.thumbnail}
+                  alt={videoItem.title}
                   className="w-full h-32 object-cover rounded-md bg-muted"
                 />
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md">
                   <Play className="h-8 w-8 text-white" />
                 </div>
                 <Badge className="absolute bottom-2 right-2 bg-black/70 text-white">
-                  {item.duration}
+                  {videoItem.duration}
                 </Badge>
               </div>
-              <h3 className="font-medium text-sm mb-1 line-clamp-2">{item.title}</h3>
-              <p className="text-xs text-muted-foreground">{item.views} views</p>
+              <h3 className="font-medium text-sm mb-1 line-clamp-2">{videoItem.title}</h3>
+              <p className="text-xs text-muted-foreground">{videoItem.views} views</p>
             </CardContent>
           </Card>
         );
       case "resumes":
+        const resumeItem = item as ResumeItem;
         return (
-          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={resumeItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <FileText className="h-5 w-5 text-red-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground">{item.type} • {item.size}</p>
-                  <p className="text-xs text-muted-foreground">{item.lastModified}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{resumeItem.title}</h3>
+                  <p className="text-xs text-muted-foreground">{resumeItem.type} • {resumeItem.size}</p>
+                  <p className="text-xs text-muted-foreground">{resumeItem.lastModified}</p>
                 </div>
                 <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
                   <MoreHorizontal className="h-4 w-4" />
@@ -420,51 +463,54 @@ export default function Dashboard() {
           </Card>
         );
       case "jobs":
+        const jobItem = item as JobItem;
         return (
-          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={jobItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <Briefcase className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground">{item.company}</p>
-                  <p className="text-xs text-muted-foreground">{item.location} • {item.posted}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{jobItem.title}</h3>
+                  <p className="text-xs text-muted-foreground">{jobItem.company}</p>
+                  <p className="text-xs text-muted-foreground">{jobItem.location} • {jobItem.posted}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         );
       case "companies":
+        const companyItem = item as CompanyItem;
         return (
-          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={companyItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <Building2 className="h-5 w-5 text-green-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.name}</h3>
-                  <p className="text-xs text-muted-foreground">{item.industry}</p>
-                  <p className="text-xs text-muted-foreground">{item.employees} employees</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{companyItem.name}</h3>
+                  <p className="text-xs text-muted-foreground">{companyItem.industry}</p>
+                  <p className="text-xs text-muted-foreground">{companyItem.employees} employees</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         );
       case "profiles":
+        const profileItem = item as ProfileItem;
         return (
-          <Card key={item.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={profileItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-purple-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <User className="h-5 w-5 text-purple-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{item.name}</h3>
-                  <p className="text-xs text-muted-foreground">{item.role}</p>
-                  <p className="text-xs text-muted-foreground">{item.location}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{profileItem.name}</h3>
+                  <p className="text-xs text-muted-foreground">{profileItem.role}</p>
+                  <p className="text-xs text-muted-foreground">{profileItem.location}</p>
                 </div>
               </div>
             </CardContent>

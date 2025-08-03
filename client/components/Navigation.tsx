@@ -4,7 +4,6 @@ import {
   Video,
   Sparkles,
   ChevronDown,
-  Home,
   TrendingUp,
   FileText,
   Briefcase,

@@ -10,14 +10,12 @@ import {
   X
 } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type { ResumeData, ResumePrivacy, CreateResumeRequest, WorkExperience, Education, Skill } from '@/types/resume';
@@ -61,7 +59,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
     }]);
   };
 
-  const updateWorkExperience = (index: number, field: keyof WorkExperience, value: any) => {
+  const updateWorkExperience = (index: number, field: keyof WorkExperience, value: string | string[]) => {
     const updatedWork = [...work];
     updatedWork[index] = { ...updatedWork[index], [field]: value };
     setWork(updatedWork);
@@ -84,7 +82,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
     }]);
   };
 
-  const updateEducation = (index: number, field: keyof Education, value: any) => {
+  const updateEducation = (index: number, field: keyof Education, value: string | string[] | null) => {
     const updatedEducation = [...education];
     updatedEducation[index] = { ...updatedEducation[index], [field]: value };
     setEducation(updatedEducation);
@@ -102,7 +100,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
     }]);
   };
 
-  const updateSkill = (index: number, field: keyof Skill, value: any) => {
+  const updateSkill = (index: number, field: keyof Skill, value: string | string[]) => {
     const updatedSkills = [...skills];
     updatedSkills[index] = { ...updatedSkills[index], [field]: value };
     setSkills(updatedSkills);

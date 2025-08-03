@@ -10,8 +10,7 @@ import {
   Calendar,
   Users,
   Building2,
-  FileText,
-  UserCheck
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -59,8 +58,8 @@ export interface SearchBarProps {
   filters?: SearchFilters;
   showAdvanced?: boolean;
   className?: string;
-  onSearch?: (query: string) => void;
-  onFilterChange?: (filters: SearchFilters) => void;
+  onSearch?: (_query: string) => void;
+  onFilterChange?: (_filters: SearchFilters) => void;
   onClearFilters?: () => void;
 }
 

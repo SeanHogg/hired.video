@@ -9,8 +9,8 @@ export interface PaginationProps {
   currentPage: number;
   totalItems: number;
   itemsPerPage: number;
-  onPageChange: (page: number) => void;
-  onItemsPerPageChange?: (itemsPerPage: number) => void;
+  onPageChange: (_page: number) => void;
+  onItemsPerPageChange?: (_itemsPerPage: number) => void;
   showItemsPerPage?: boolean;
   itemsPerPageOptions?: number[];
   showTotalText?: boolean;

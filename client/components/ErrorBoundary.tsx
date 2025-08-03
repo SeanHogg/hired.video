@@ -4,11 +4,9 @@
  */
 
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import type { ErrorInfo, ReactNode } from 'react';
-import React, { Component } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import type { AppError} from '@/lib/errors';
-import { normalizeError, handleError } from '@/lib/errors';
+import { normalizeError, handleError, type AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 // ============================================================================
@@ -17,8 +15,8 @@ import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: (error: AppError, retry: () => void) => ReactNode;
-  onError?: (error: AppError, errorInfo: ErrorInfo) => void;
+  fallback?: (_error: AppError, _retry: () => void) => ReactNode;
+  onError?: (_error: AppError, _errorInfo: ErrorInfo) => void;
   level?: 'page' | 'component' | 'critical';
 }
 
