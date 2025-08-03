@@ -409,21 +409,23 @@ export default function Index() {
                       />
                     );
                   } else if (item.type === "companies") {
+                    const companyData = {
+                      id: item.id,
+                      name: item.name,
+                      tagline: item.title,
+                      logo: item.logo,
+                      industry: item.profession,
+                      location: item.location,
+                      size: item.size,
+                      activeJobCount: item.activeJobCount,
+                      followers: item.followers,
+                      views: item.views,
+                      fullName: item.name
+                    };
                     return (
                       <CompanyCard
                         key={item.id}
-                        id={item.id}
-                        name={item.name}
-                        tagline={item.title}
-                        logo={item.logo}
-                        industry={item.profession}
-                        location={item.location}
-                        size={item.size}
-                        activeJobCount={item.activeJobCount}
-                        followers={item.followers}
-                        views={item.views}
-                        onView={() => navigate(`/companies/view/${item.id}`)}
-                        onActions={() => handleOpenActions(item)}
+                        company={companyData}
                       />
                     );
                   } else if (item.type === "resume") {
