@@ -24,7 +24,7 @@ import People from "./pages/People";
 import Tools from "./pages/Tools";
 import Tasks from "./pages/Tasks";
 import Outreach from "./pages/Outreach";
-import Watch from "./pages/Watch";
+
 import Settings from "./pages/Settings";
 import Help from "./pages/Help";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -91,7 +91,7 @@ const App = () => (
               <Route path="/tools" element={<Tools />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/outreach" element={<Outreach />} />
-              <Route path="/watch" element={<Watch />} />
+
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
