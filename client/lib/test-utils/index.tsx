@@ -152,7 +152,7 @@ export function createMockCompany(overrides: Partial<Company> = {}): Company {
       industry: 'Technology',
       size: '51-200',
       founded: 2020,
-      location: {
+      headquarters: {
         city: 'Mock City',
         state: 'Mock State',
         country: 'Mock Country',
@@ -207,6 +207,7 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
     slug: 'mock-job',
     data: {
       title: 'Mock Job Title',
+      summary: 'Mock job summary',
       description: 'A mock job description',
       requirements: [
         {
@@ -216,6 +217,7 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
         },
       ],
       responsibilities: ['Responsibility 1'],
+      qualifications: ['Qualification 1', 'Qualification 2'],
       skills: ['React', 'TypeScript'],
       experienceLevel: 'mid',
       employmentType: 'full-time',
@@ -235,6 +237,13 @@ export function createMockJob(overrides: Partial<Job> = {}): Job {
           description: 'Comprehensive health coverage',
         },
       ],
+      company: {
+        name: 'Mock Company',
+        logo: 'https://example.com/logo.jpg',
+        website: 'https://mockcompany.com',
+        size: '51-200',
+        industry: 'Technology',
+      },
       applicationDeadline: '2024-12-31T23:59:59Z',
     },
     status: 'active',

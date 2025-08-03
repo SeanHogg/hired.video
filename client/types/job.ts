@@ -38,6 +38,7 @@ export interface JobData {
   requirements: JobRequirement[];
   qualifications: string[];
   skills: string[];
+  tags?: string[];
   benefits: JobBenefit[];
   salaryMin?: number;
   salaryMax?: number;

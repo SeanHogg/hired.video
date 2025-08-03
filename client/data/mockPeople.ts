@@ -555,7 +555,9 @@ export const MOCK_USERS: UserProfile[] = [
       certifications: [
         'AWS Certified Machine Learning - Specialty (2021-2024)'
       ],
-      interests: ['Machine Learning Research', 'Open Source Contributions', 'Mentoring', 'Rock Climbing']
+      interests: ['Machine Learning Research', 'Open Source Contributions', 'Mentoring', 'Rock Climbing'],
+      openToWork: true,
+      openToOpportunities: ['full-time', 'contract']
     },
     role: 'job_seeker',
     status: 'looking',

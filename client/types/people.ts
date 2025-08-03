@@ -26,11 +26,12 @@ export interface UserExperience {
   skills?: string[];
   technologies?: string[];
   highlights?: string[];
+  achievements?: string[];
   isCurrent: boolean;
 }
 
 export interface UserEducation {
-  institution: string;
+  institution?: string;
   school?: string; // Alternative name for institution
   degree: string;
   field: string;
