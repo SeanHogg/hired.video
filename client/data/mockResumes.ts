@@ -339,6 +339,7 @@ export const MOCK_RESUMES: Resume[] = [
   },
   {
     id: MOCK_RESUME_IDS.DEVOPS_ENGINEER,
+    slug: 'john-seeker-devops-engineer',
     name: 'DevOps Engineer Resume',
     data: {
       ...SEAN_HOGG_RESUME_DATA,
