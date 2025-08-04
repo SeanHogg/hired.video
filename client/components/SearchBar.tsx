@@ -10,41 +10,47 @@ import {
   Calendar,
   Users,
   Building2,
-  FileText
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-export type SearchContext = 'people' | 'companies' | 'resumes' | 'jobs' | 'all';
+export type SearchContext = "people" | "companies" | "resumes" | "jobs" | "all";
 
 export interface SearchFilters {
   // Common filters
   search?: string;
   location?: string;
-  
+
   // People filters
   role?: string;
   skills?: string;
   openToWork?: boolean;
   experienceLevel?: string;
-  
+
   // Company filters
   industry?: string;
   size?: string;
-  
+
   // Resume filters
   privacy?: string;
   isMaster?: boolean;
-  
+
   // Job filters
   employmentType?: string;
   remote?: boolean;
   salaryMin?: number;
   salaryMax?: number;
-  
+
   // Advanced filters
   searchRadius?: string;
   education?: string;
@@ -67,28 +73,40 @@ const contextConfig = {
   people: {
     placeholder: "Search professionals by name, role, or skills...",
     icon: Users,
-    filterSections: ['role', 'location', 'skills', 'availability', 'experience']
+    filterSections: [
+      "role",
+      "location",
+      "skills",
+      "availability",
+      "experience",
+    ],
   },
   companies: {
     placeholder: "Search companies, industries, or locations...",
     icon: Building2,
-    filterSections: ['industry', 'size', 'location']
+    filterSections: ["industry", "size", "location"],
   },
   resumes: {
     placeholder: "Search resumes by name, title, or skills...",
     icon: FileText,
-    filterSections: ['privacy', 'type', 'experience', 'skills']
+    filterSections: ["privacy", "type", "experience", "skills"],
   },
   jobs: {
     placeholder: "Search jobs, companies, or skills...",
     icon: Briefcase,
-    filterSections: ['location', 'employmentType', 'experience', 'remote', 'salary']
+    filterSections: [
+      "location",
+      "employmentType",
+      "experience",
+      "remote",
+      "salary",
+    ],
   },
   all: {
     placeholder: "Search videos, professions, companies...",
     icon: Search,
-    filterSections: ['location', 'experience', 'education', 'datePosted']
-  }
+    filterSections: ["location", "experience", "education", "datePosted"],
+  },
 };
 
 export default function SearchBar({
@@ -100,12 +118,12 @@ export default function SearchBar({
   className = "",
   onSearch,
   onFilterChange,
-  onClearFilters
+  onClearFilters,
 }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState(value);
   const [showFilters, setShowFilters] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(showAdvanced);
-  
+
   const config = contextConfig[context];
   const IconComponent = config.icon;
 
@@ -127,18 +145,23 @@ export default function SearchBar({
   };
 
   const getActiveFilterCount = () => {
-    return Object.values(filters).filter(value => 
-      value !== undefined && value !== "" && value !== null
+    return Object.values(filters).filter(
+      (value) => value !== undefined && value !== "" && value !== null,
     ).length;
   };
 
   const renderFilterSection = (section: string) => {
     switch (section) {
-      case 'role':
+      case "role":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Role</label>
-            <Select value={filters.role || "all"} onValueChange={(value) => handleFilterChange('role', value === 'all' ? undefined : value)}>
+            <Select
+              value={filters.role || "all"}
+              onValueChange={(value) =>
+                handleFilterChange("role", value === "all" ? undefined : value)
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All roles" />
               </SelectTrigger>
@@ -152,19 +175,31 @@ export default function SearchBar({
           </div>
         );
 
-      case 'industry':
+      case "industry":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Industry</label>
-            <Select value={filters.industry || "all"} onValueChange={(value) => handleFilterChange('industry', value === 'all' ? undefined : value)}>
+            <Select
+              value={filters.industry || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "industry",
+                  value === "all" ? undefined : value,
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All industries" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All industries</SelectItem>
                 <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Marketing Technology">Marketing Technology</SelectItem>
-                <SelectItem value="Cloud Infrastructure">Cloud Infrastructure</SelectItem>
+                <SelectItem value="Marketing Technology">
+                  Marketing Technology
+                </SelectItem>
+                <SelectItem value="Cloud Infrastructure">
+                  Cloud Infrastructure
+                </SelectItem>
                 <SelectItem value="Web Development">Web Development</SelectItem>
                 <SelectItem value="Venture Capital">Venture Capital</SelectItem>
               </SelectContent>
@@ -172,11 +207,18 @@ export default function SearchBar({
           </div>
         );
 
-      case 'size':
+      case "size":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Company Size</label>
-            <Select value={filters.size || "all"} onValueChange={(value) => handleFilterChange('size', value === 'all' ? undefined : value)}>
+            <label className="text-sm font-medium mb-2 block">
+              Company Size
+            </label>
+            <Select
+              value={filters.size || "all"}
+              onValueChange={(value) =>
+                handleFilterChange("size", value === "all" ? undefined : value)
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All sizes" />
               </SelectTrigger>
@@ -192,35 +234,45 @@ export default function SearchBar({
           </div>
         );
 
-      case 'location':
+      case "location":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Location</label>
-            <Input 
+            <Input
               placeholder="City, State"
               value={filters.location || ""}
-              onChange={(e) => handleFilterChange('location', e.target.value)}
+              onChange={(e) => handleFilterChange("location", e.target.value)}
             />
           </div>
         );
 
-      case 'skills':
+      case "skills":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Skills</label>
-            <Input 
+            <Input
               placeholder="e.g. React, Python"
               value={filters.skills || ""}
-              onChange={(e) => handleFilterChange('skills', e.target.value)}
+              onChange={(e) => handleFilterChange("skills", e.target.value)}
             />
           </div>
         );
 
-      case 'availability':
+      case "availability":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Availability</label>
-            <Select value={filters.openToWork?.toString() || "all"} onValueChange={(value) => handleFilterChange('openToWork', value === 'all' ? undefined : value === "true")}>
+            <label className="text-sm font-medium mb-2 block">
+              Availability
+            </label>
+            <Select
+              value={filters.openToWork?.toString() || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "openToWork",
+                  value === "all" ? undefined : value === "true",
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All professionals" />
               </SelectTrigger>
@@ -233,14 +285,22 @@ export default function SearchBar({
           </div>
         );
 
-      case 'experience':
+      case "experience":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block flex items-center gap-1">
               <Briefcase className="w-3 h-3" />
               Experience Level
             </label>
-            <Select value={filters.experienceLevel || "all"} onValueChange={(value) => handleFilterChange('experienceLevel', value === 'all' ? undefined : value)}>
+            <Select
+              value={filters.experienceLevel || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "experienceLevel",
+                  value === "all" ? undefined : value,
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All levels" />
               </SelectTrigger>
@@ -255,11 +315,19 @@ export default function SearchBar({
           </div>
         );
 
-      case 'privacy':
+      case "privacy":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Privacy</label>
-            <Select value={filters.privacy || "all"} onValueChange={(value) => handleFilterChange('privacy', value === 'all' ? undefined : value)}>
+            <Select
+              value={filters.privacy || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "privacy",
+                  value === "all" ? undefined : value,
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All privacy levels" />
               </SelectTrigger>
@@ -273,11 +341,25 @@ export default function SearchBar({
           </div>
         );
 
-      case 'type':
+      case "type":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Type</label>
-            <Select value={filters.isMaster === undefined ? "all" : filters.isMaster ? "master" : "variation"} onValueChange={(value) => handleFilterChange('isMaster', value === "all" ? undefined : value === "master")}>
+            <Select
+              value={
+                filters.isMaster === undefined
+                  ? "all"
+                  : filters.isMaster
+                    ? "master"
+                    : "variation"
+              }
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "isMaster",
+                  value === "all" ? undefined : value === "master",
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
@@ -290,11 +372,21 @@ export default function SearchBar({
           </div>
         );
 
-      case 'employmentType':
+      case "employmentType":
         return (
           <div>
-            <label className="text-sm font-medium mb-2 block">Employment Type</label>
-            <Select value={filters.employmentType || "all"} onValueChange={(value) => handleFilterChange('employmentType', value === 'all' ? undefined : value)}>
+            <label className="text-sm font-medium mb-2 block">
+              Employment Type
+            </label>
+            <Select
+              value={filters.employmentType || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "employmentType",
+                  value === "all" ? undefined : value,
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All types" />
               </SelectTrigger>
@@ -309,11 +401,19 @@ export default function SearchBar({
           </div>
         );
 
-      case 'remote':
+      case "remote":
         return (
           <div>
             <label className="text-sm font-medium mb-2 block">Remote</label>
-            <Select value={filters.remote?.toString() || "all"} onValueChange={(value) => handleFilterChange('remote', value === 'all' ? undefined : value === "true")}>
+            <Select
+              value={filters.remote?.toString() || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "remote",
+                  value === "all" ? undefined : value === "true",
+                )
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All locations" />
               </SelectTrigger>
@@ -326,22 +426,34 @@ export default function SearchBar({
           </div>
         );
 
-      case 'salary':
+      case "salary":
         return (
           <div className="col-span-2">
-            <label className="text-sm font-medium mb-2 block">Salary Range</label>
+            <label className="text-sm font-medium mb-2 block">
+              Salary Range
+            </label>
             <div className="flex gap-2">
-              <Input 
+              <Input
                 type="number"
                 placeholder="Min salary"
                 value={filters.salaryMin || ""}
-                onChange={(e) => handleFilterChange('salaryMin', e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "salaryMin",
+                    e.target.value ? parseInt(e.target.value) : undefined,
+                  )
+                }
               />
-              <Input 
+              <Input
                 type="number"
                 placeholder="Max salary"
                 value={filters.salaryMax || ""}
-                onChange={(e) => handleFilterChange('salaryMax', e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "salaryMax",
+                    e.target.value ? parseInt(e.target.value) : undefined,
+                  )
+                }
               />
             </div>
           </div>
@@ -368,7 +480,7 @@ export default function SearchBar({
 
         {/* Quick Filter Buttons */}
         <div className="flex gap-2">
-          {context !== 'all' && (
+          {context !== "all" && (
             <Button
               variant="outline"
               size="sm"
@@ -385,7 +497,7 @@ export default function SearchBar({
             </Button>
           )}
 
-          {context === 'all' && (
+          {context === "all" && (
             <Button
               variant="outline"
               size="sm"
@@ -394,14 +506,16 @@ export default function SearchBar({
             >
               <SlidersHorizontal className="w-4 h-4" />
               Advanced
-              <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`}
+              />
             </Button>
           )}
         </div>
       </div>
 
       {/* Basic Filters Panel */}
-      {showFilters && context !== 'all' && (
+      {showFilters && context !== "all" && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
@@ -421,9 +535,7 @@ export default function SearchBar({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {config.filterSections.map((section) => (
-                <div key={section}>
-                  {renderFilterSection(section)}
-                </div>
+                <div key={section}>{renderFilterSection(section)}</div>
               ))}
             </div>
           </CardContent>
@@ -431,11 +543,13 @@ export default function SearchBar({
       )}
 
       {/* Advanced Filters Panel (for homepage) */}
-      {showAdvancedFilters && context === 'all' && (
+      {showAdvancedFilters && context === "all" && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-foreground">Advanced Filters</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Advanced Filters
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -453,7 +567,12 @@ export default function SearchBar({
                   <MapPin className="w-3 h-3" />
                   Search Radius
                 </label>
-                <Select value={filters.searchRadius || "25"} onValueChange={(value) => handleFilterChange('searchRadius', value)}>
+                <Select
+                  value={filters.searchRadius || "25"}
+                  onValueChange={(value) =>
+                    handleFilterChange("searchRadius", value)
+                  }
+                >
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -474,7 +593,15 @@ export default function SearchBar({
                   <Briefcase className="w-3 h-3" />
                   Experience Level
                 </label>
-                <Select value={filters.experienceLevel || "all"} onValueChange={(value) => handleFilterChange('experienceLevel', value === 'all' ? undefined : value)}>
+                <Select
+                  value={filters.experienceLevel || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "experienceLevel",
+                      value === "all" ? undefined : value,
+                    )
+                  }
+                >
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -494,7 +621,15 @@ export default function SearchBar({
                   <GraduationCap className="w-3 h-3" />
                   Education
                 </label>
-                <Select value={filters.education || "all"} onValueChange={(value) => handleFilterChange('education', value === 'all' ? undefined : value)}>
+                <Select
+                  value={filters.education || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "education",
+                      value === "all" ? undefined : value,
+                    )
+                  }
+                >
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -515,7 +650,15 @@ export default function SearchBar({
                   <Calendar className="w-3 h-3" />
                   Date Posted
                 </label>
-                <Select value={filters.datePosted || "all"} onValueChange={(value) => handleFilterChange('datePosted', value === 'all' ? undefined : value)}>
+                <Select
+                  value={filters.datePosted || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "datePosted",
+                      value === "all" ? undefined : value,
+                    )
+                  }
+                >
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -532,8 +675,6 @@ export default function SearchBar({
           </CardContent>
         </Card>
       )}
-
-
     </div>
   );
 }

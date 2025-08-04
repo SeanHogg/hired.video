@@ -2,8 +2,8 @@
  * Performance monitoring and optimization utilities
  */
 
-import { config, getPerformanceConfig } from './config';
-import { logger } from './logger';
+import { config, getPerformanceConfig } from "./config";
+import { logger } from "./logger";
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -12,13 +12,13 @@ import { logger } from './logger';
 export interface PerformanceMetric {
   name: string;
   value: number;
-  unit: 'ms' | 'bytes' | 'count';
+  unit: "ms" | "bytes" | "count";
   timestamp: number;
   context?: Record<string, unknown>;
 }
 
 export interface WebVitalsMetric {
-  name: 'CLS' | 'FID' | 'FCP' | 'LCP' | 'TTFB';
+  name: "CLS" | "FID" | "FCP" | "LCP" | "TTFB";
   value: number;
   delta: number;
   id: string;
@@ -45,7 +45,7 @@ class PerformanceMonitor {
   private config = getPerformanceConfig();
 
   constructor() {
-    if (this.config.enabled && typeof window !== 'undefined') {
+    if (this.config.enabled && typeof window !== "undefined") {
       this.initializeObservers();
       this.trackWebVitals();
     }
@@ -57,17 +57,17 @@ class PerformanceMonitor {
 
   private initializeObservers(): void {
     // Navigation timing observer
-    if ('PerformanceObserver' in window) {
+    if ("PerformanceObserver" in window) {
       try {
         const navigationObserver = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
             this.handleNavigationEntry(entry as PerformanceNavigationTiming);
           }
         });
-        navigationObserver.observe({ entryTypes: ['navigation'] });
+        navigationObserver.observe({ entryTypes: ["navigation"] });
         this.observers.push(navigationObserver);
       } catch (error) {
-        logger.warn('Failed to initialize navigation observer', { error });
+        logger.warn("Failed to initialize navigation observer", { error });
       }
 
       // Resource timing observer
@@ -77,10 +77,10 @@ class PerformanceMonitor {
             this.handleResourceEntry(entry as PerformanceResourceTiming);
           }
         });
-        resourceObserver.observe({ entryTypes: ['resource'] });
+        resourceObserver.observe({ entryTypes: ["resource"] });
         this.observers.push(resourceObserver);
       } catch (error) {
-        logger.warn('Failed to initialize resource observer', { error });
+        logger.warn("Failed to initialize resource observer", { error });
       }
 
       // Long task observer
@@ -90,25 +90,27 @@ class PerformanceMonitor {
             this.handleLongTaskEntry(entry);
           }
         });
-        longTaskObserver.observe({ entryTypes: ['longtask'] });
+        longTaskObserver.observe({ entryTypes: ["longtask"] });
         this.observers.push(longTaskObserver);
       } catch (error) {
-        logger.warn('Failed to initialize long task observer', { error });
+        logger.warn("Failed to initialize long task observer", { error });
       }
     }
   }
 
   private trackWebVitals(): void {
     // Import web-vitals dynamically to avoid bundle size impact
-    import('web-vitals').then((webVitals) => {
-      if (webVitals.onCLS) webVitals.onCLS(this.handleWebVital.bind(this));
-      if (webVitals.onINP) webVitals.onINP(this.handleWebVital.bind(this));
-      if (webVitals.onFCP) webVitals.onFCP(this.handleWebVital.bind(this));
-      if (webVitals.onLCP) webVitals.onLCP(this.handleWebVital.bind(this));
-      if (webVitals.onTTFB) webVitals.onTTFB(this.handleWebVital.bind(this));
-    }).catch((error) => {
-      logger.warn('Failed to load web-vitals library', { error });
-    });
+    import("web-vitals")
+      .then((webVitals) => {
+        if (webVitals.onCLS) webVitals.onCLS(this.handleWebVital.bind(this));
+        if (webVitals.onINP) webVitals.onINP(this.handleWebVital.bind(this));
+        if (webVitals.onFCP) webVitals.onFCP(this.handleWebVital.bind(this));
+        if (webVitals.onLCP) webVitals.onLCP(this.handleWebVital.bind(this));
+        if (webVitals.onTTFB) webVitals.onTTFB(this.handleWebVital.bind(this));
+      })
+      .catch((error) => {
+        logger.warn("Failed to load web-vitals library", { error });
+      });
   }
 
   // ============================================================================
@@ -118,32 +120,33 @@ class PerformanceMonitor {
   private handleNavigationEntry(entry: PerformanceNavigationTiming): void {
     const metrics: PerformanceMetric[] = [
       {
-        name: 'navigation.domContentLoaded',
-        value: entry.domContentLoadedEventEnd - entry.domContentLoadedEventStart,
-        unit: 'ms',
+        name: "navigation.domContentLoaded",
+        value:
+          entry.domContentLoadedEventEnd - entry.domContentLoadedEventStart,
+        unit: "ms",
         timestamp: Date.now(),
       },
       {
-        name: 'navigation.loadComplete',
+        name: "navigation.loadComplete",
         value: entry.loadEventEnd - entry.loadEventStart,
-        unit: 'ms',
+        unit: "ms",
         timestamp: Date.now(),
       },
       {
-        name: 'navigation.domInteractive',
+        name: "navigation.domInteractive",
         value: entry.domInteractive - entry.fetchStart,
-        unit: 'ms',
+        unit: "ms",
         timestamp: Date.now(),
       },
       {
-        name: 'navigation.domComplete',
+        name: "navigation.domComplete",
         value: entry.domComplete - entry.fetchStart,
-        unit: 'ms',
+        unit: "ms",
         timestamp: Date.now(),
       },
     ];
 
-    metrics.forEach(metric => this.recordMetric(metric));
+    metrics.forEach((metric) => this.recordMetric(metric));
   }
 
   private handleResourceEntry(entry: PerformanceResourceTiming): void {
@@ -160,9 +163,9 @@ class PerformanceMonitor {
       };
 
       this.recordMetric({
-        name: 'resource.load',
+        name: "resource.load",
         value: entry.duration,
-        unit: 'ms',
+        unit: "ms",
         timestamp: Date.now(),
         context: resourceTiming as unknown as Record<string, unknown>,
       });
@@ -171,9 +174,9 @@ class PerformanceMonitor {
 
   private handleLongTaskEntry(entry: PerformanceEntry): void {
     this.recordMetric({
-      name: 'longtask.duration',
+      name: "longtask.duration",
       value: entry.duration,
-      unit: 'ms',
+      unit: "ms",
       timestamp: Date.now(),
       context: {
         startTime: entry.startTime,
@@ -183,7 +186,7 @@ class PerformanceMonitor {
 
     // Log warning for very long tasks
     if (entry.duration > 100) {
-      logger.warn('Long task detected', {
+      logger.warn("Long task detected", {
         duration: entry.duration,
         startTime: entry.startTime,
       });
@@ -194,7 +197,7 @@ class PerformanceMonitor {
     this.recordMetric({
       name: `webvital.${metric.name.toLowerCase()}`,
       value: metric.value,
-      unit: 'ms',
+      unit: "ms",
       timestamp: Date.now(),
       context: {
         delta: metric.delta,
@@ -232,7 +235,10 @@ class PerformanceMonitor {
     this.metrics.push(metric);
 
     // Log performance metrics
-    logger.debug('Performance metric recorded', metric as unknown as Record<string, unknown>);
+    logger.debug(
+      "Performance metric recorded",
+      metric as unknown as Record<string, unknown>,
+    );
 
     // Keep only recent metrics to prevent memory leaks
     if (this.metrics.length > 1000) {
@@ -250,10 +256,10 @@ class PerformanceMonitor {
   private sendToMonitoringService(metric: PerformanceMetric): void {
     // TODO: Integrate with external monitoring service
     // Example: DataDog, New Relic, etc.
-    
+
     // For now, just log to console in development
-    if (config.NODE_ENV === 'development') {
-      console.debug('Performance metric:', metric);
+    if (config.NODE_ENV === "development") {
+      console.debug("Performance metric:", metric);
     }
   }
 
@@ -263,32 +269,29 @@ class PerformanceMonitor {
 
   startTiming(name: string): () => void {
     const startTime = performance.now();
-    
+
     return () => {
       const duration = performance.now() - startTime;
       this.recordMetric({
         name: `timing.${name}`,
         value: duration,
-        unit: 'ms',
+        unit: "ms",
         timestamp: Date.now(),
       });
     };
   }
 
-  measureFunction<T extends (...args: any[]) => any>(
-    name: string,
-    fn: T
-  ): T {
+  measureFunction<T extends (...args: any[]) => any>(name: string, fn: T): T {
     return ((...args: Parameters<T>) => {
       const endTiming = this.startTiming(name);
       try {
         const result = fn(...args);
-        
+
         // Handle async functions
         if (result instanceof Promise) {
           return result.finally(endTiming);
         }
-        
+
         endTiming();
         return result;
       } catch (error) {
@@ -300,7 +303,7 @@ class PerformanceMonitor {
 
   measureAsyncFunction<T extends (...args: any[]) => Promise<any>>(
     name: string,
-    fn: T
+    fn: T,
   ): T {
     return (async (...args: Parameters<T>) => {
       const endTiming = this.startTiming(name);
@@ -320,13 +323,13 @@ class PerformanceMonitor {
   // ============================================================================
 
   recordMemoryUsage(): void {
-    if ('memory' in performance) {
+    if ("memory" in performance) {
       const memory = (performance as any).memory;
-      
+
       this.recordMetric({
-        name: 'memory.used',
+        name: "memory.used",
         value: memory.usedJSHeapSize,
-        unit: 'bytes',
+        unit: "bytes",
         timestamp: Date.now(),
         context: {
           total: memory.totalJSHeapSize,
@@ -345,13 +348,13 @@ class PerformanceMonitor {
   }
 
   getMetricsByName(name: string): PerformanceMetric[] {
-    return this.metrics.filter(metric => metric.name === name);
+    return this.metrics.filter((metric) => metric.name === name);
   }
 
   getAverageMetric(name: string): number | null {
     const metrics = this.getMetricsByName(name);
     if (metrics.length === 0) return null;
-    
+
     const sum = metrics.reduce((acc, metric) => acc + metric.value, 0);
     return sum / metrics.length;
   }
@@ -365,7 +368,7 @@ class PerformanceMonitor {
   // ============================================================================
 
   destroy(): void {
-    this.observers.forEach(observer => observer.disconnect());
+    this.observers.forEach((observer) => observer.disconnect());
     this.observers = [];
     this.clearMetrics();
   }
@@ -384,14 +387,20 @@ export const performanceMonitor = new PerformanceMonitor();
 /**
  * Measure the performance of a function
  */
-export function measure<T extends (...args: any[]) => any>(name: string, fn: T): T {
+export function measure<T extends (...args: any[]) => any>(
+  name: string,
+  fn: T,
+): T {
   return performanceMonitor.measureFunction(name, fn);
 }
 
 /**
  * Measure the performance of an async function
  */
-export function measureAsync<T extends (...args: any[]) => Promise<any>>(name: string, fn: T): T {
+export function measureAsync<T extends (...args: any[]) => Promise<any>>(
+  name: string,
+  fn: T,
+): T {
   return performanceMonitor.measureAsyncFunction(name, fn);
 }
 

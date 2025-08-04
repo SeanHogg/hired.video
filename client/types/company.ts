@@ -18,13 +18,22 @@ export interface CompanyContact {
 }
 
 export interface CompanyFinancials {
-  fundingStage?: 'pre-seed' | 'seed' | 'series-a' | 'series-b' | 'series-c' | 'series-d' | 'ipo' | 'acquired' | 'private';
+  fundingStage?:
+    | "pre-seed"
+    | "seed"
+    | "series-a"
+    | "series-b"
+    | "series-c"
+    | "series-d"
+    | "ipo"
+    | "acquired"
+    | "private";
   fundingAmount?: number;
   totalFunding?: number;
   currency?: string;
   valuation?: number;
   revenue?: number;
-  profitability?: 'profitable' | 'break-even' | 'burning' | 'unknown';
+  profitability?: "profitable" | "break-even" | "burning" | "unknown";
   investors?: string[];
 }
 
@@ -70,8 +79,13 @@ export interface CompanyData {
   values?: string[];
 }
 
-export type CompanyStatus = 'draft' | 'onboarding' | 'active' | 'paused' | 'inactive';
-export type CompanyVisibility = 'public' | 'private' | 'draft';
+export type CompanyStatus =
+  | "draft"
+  | "onboarding"
+  | "active"
+  | "paused"
+  | "inactive";
+export type CompanyVisibility = "public" | "private" | "draft";
 
 export interface OnboardingTask {
   id: string;
@@ -121,7 +135,7 @@ export interface CompanyMetadata {
   onboardingProgress: number; // Percentage of completed onboarding tasks
 }
 
-export type CompanyOwnership = 'owned' | 'tracked';
+export type CompanyOwnership = "owned" | "tracked";
 
 export interface CompanyWithOwnership extends CompanyMetadata {
   ownership: CompanyOwnership;
@@ -156,7 +170,7 @@ export interface CompanyFollower {
   companyId: string;
   userId: string;
   followedAt: string;
-  source?: 'direct' | 'job_tracking' | 'referral'; // How they started following
+  source?: "direct" | "job_tracking" | "referral"; // How they started following
 }
 
 export interface CompanyStats {
@@ -171,33 +185,37 @@ export interface CompanyStats {
 }
 
 // Default onboarding tasks
-export const DEFAULT_ONBOARDING_TASKS: Array<Omit<OnboardingTask, 'completed'>> = [
+export const DEFAULT_ONBOARDING_TASKS: Array<
+  Omit<OnboardingTask, "completed">
+> = [
   {
-    id: 'update_profile',
-    title: 'Update Business Profile',
-    description: 'Complete your company profile with description, culture, and benefits',
+    id: "update_profile",
+    title: "Update Business Profile",
+    description:
+      "Complete your company profile with description, culture, and benefits",
     required: true,
-    order: 1
+    order: 1,
   },
   {
-    id: 'post_job',
-    title: 'Post Your First Job',
-    description: 'Create and publish your first job posting to attract talent',
+    id: "post_job",
+    title: "Post Your First Job",
+    description: "Create and publish your first job posting to attract talent",
     required: true,
-    order: 2
+    order: 2,
   },
   {
-    id: 'add_team_members',
-    title: 'Invite Team Members',
-    description: 'Add other team members to help manage your company profile',
+    id: "add_team_members",
+    title: "Invite Team Members",
+    description: "Add other team members to help manage your company profile",
     required: false,
-    order: 3
+    order: 3,
   },
   {
-    id: 'setup_branding',
-    title: 'Setup Company Branding',
-    description: 'Upload your company logo and customize your profile appearance',
+    id: "setup_branding",
+    title: "Setup Company Branding",
+    description:
+      "Upload your company logo and customize your profile appearance",
     required: false,
-    order: 4
-  }
+    order: 4,
+  },
 ];

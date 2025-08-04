@@ -28,30 +28,42 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function Outreach() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          
+
           <div className="pt-16">
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
@@ -69,17 +81,26 @@ export default function Outreach() {
                   Connect, Engage, and Follow Up
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Streamline your networking and communication with AI-powered outreach tools. Send personalized messages, track engagement, and automate follow-ups to accelerate your career.
+                  Streamline your networking and communication with AI-powered
+                  outreach tools. Send personalized messages, track engagement,
+                  and automate follow-ups to accelerate your career.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
-                    <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
                       Start Networking Today
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
-                    <Button size="lg" variant="outline" className="text-lg px-8">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-lg px-8"
+                    >
                       Sign In
                     </Button>
                   </Link>
@@ -93,7 +114,8 @@ export default function Outreach() {
                     <MessageSquare className="h-10 w-10 text-brand-purple mb-4" />
                     <CardTitle>Smart Messaging</CardTitle>
                     <CardDescription>
-                      AI-powered message templates and personalization to help you craft compelling outreach that gets responses.
+                      AI-powered message templates and personalization to help
+                      you craft compelling outreach that gets responses.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -103,7 +125,8 @@ export default function Outreach() {
                     <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
                     <CardTitle>Engagement Tracking</CardTitle>
                     <CardDescription>
-                      Monitor response rates, track conversations, and analyze which outreach strategies work best for your career goals.
+                      Monitor response rates, track conversations, and analyze
+                      which outreach strategies work best for your career goals.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -113,7 +136,9 @@ export default function Outreach() {
                     <Clock className="h-10 w-10 text-primary mb-4" />
                     <CardTitle>Follow-up Automation</CardTitle>
                     <CardDescription>
-                      Never miss a follow-up opportunity with automated reminders and sequence scheduling tailored to your networking strategy.
+                      Never miss a follow-up opportunity with automated
+                      reminders and sequence scheduling tailored to your
+                      networking strategy.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -121,14 +146,18 @@ export default function Outreach() {
 
               {/* Persona-specific Benefits */}
               <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Outreach for Every Professional</h2>
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Outreach for Every Professional
+                </h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   <Card className="text-center">
                     <CardHeader>
                       <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
                       <CardTitle>Job Seekers</CardTitle>
                       <CardDescription>
-                        Reach out to hiring managers, request informational interviews, and build relationships that lead to opportunities.
+                        Reach out to hiring managers, request informational
+                        interviews, and build relationships that lead to
+                        opportunities.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -154,7 +183,8 @@ export default function Outreach() {
                       <Target className="h-12 w-12 mx-auto text-blue-600 mb-4" />
                       <CardTitle>Recruiters</CardTitle>
                       <CardDescription>
-                        Engage top talent, nurture candidate relationships, and maintain a pipeline of qualified professionals.
+                        Engage top talent, nurture candidate relationships, and
+                        maintain a pipeline of qualified professionals.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -180,7 +210,8 @@ export default function Outreach() {
                       <Network className="h-12 w-12 mx-auto text-purple-600 mb-4" />
                       <CardTitle>Businesses</CardTitle>
                       <CardDescription>
-                        Build partnerships, connect with vendors, and maintain professional relationships that drive growth.
+                        Build partnerships, connect with vendors, and maintain
+                        professional relationships that drive growth.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -205,7 +236,9 @@ export default function Outreach() {
 
               {/* Communication Channels */}
               <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Multi-Channel Communication</h2>
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Multi-Channel Communication
+                </h2>
                 <div className="grid md:grid-cols-4 gap-6">
                   <Card className="text-center">
                     <CardHeader>
@@ -251,12 +284,19 @@ export default function Outreach() {
 
               {/* Final CTA */}
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold mb-4">Ready to Supercharge Your Networking?</h3>
+                <h3 className="text-2xl font-bold mb-4">
+                  Ready to Supercharge Your Networking?
+                </h3>
                 <p className="text-muted-foreground mb-6">
-                  Join thousands of professionals who are building meaningful connections and accelerating their careers with smart outreach.
+                  Join thousands of professionals who are building meaningful
+                  connections and accelerating their careers with smart
+                  outreach.
                 </p>
                 <Link to="/signup">
-                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                  >
                     Start Your Outreach Campaign
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -273,28 +313,32 @@ export default function Outreach() {
   // Authenticated user view - Outreach dashboard
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Outreach & Communication</h1>
-                <p className="text-muted-foreground mt-1">Manage your networking campaigns and follow-ups</p>
+                <h1 className="text-3xl font-bold text-foreground">
+                  Outreach & Communication
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                  Manage your networking campaigns and follow-ups
+                </p>
               </div>
               <Badge variant="secondary" className="capitalize">
-                {user.role?.replace('_', ' ')}
+                {user.role?.replace("_", " ")}
               </Badge>
             </div>
 
@@ -374,15 +418,24 @@ export default function Outreach() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full justify-start gap-3" variant="outline">
+                  <Button
+                    className="w-full justify-start gap-3"
+                    variant="outline"
+                  >
                     <MessageSquare className="h-4 w-4" />
                     Send LinkedIn Message
                   </Button>
-                  <Button className="w-full justify-start gap-3" variant="outline">
+                  <Button
+                    className="w-full justify-start gap-3"
+                    variant="outline"
+                  >
                     <Mail className="h-4 w-4" />
                     Create Email Campaign
                   </Button>
-                  <Button className="w-full justify-start gap-3" variant="outline">
+                  <Button
+                    className="w-full justify-start gap-3"
+                    variant="outline"
+                  >
                     <Calendar className="h-4 w-4" />
                     Schedule Follow-up
                   </Button>
@@ -400,15 +453,23 @@ export default function Outreach() {
                   <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
                     <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Follow up with Sarah Chen (Google)</p>
-                      <p className="text-xs text-muted-foreground">Due today at 2:00 PM</p>
+                      <p className="text-sm font-medium">
+                        Follow up with Sarah Chen (Google)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due today at 2:00 PM
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Thank John for the referral</p>
-                      <p className="text-xs text-muted-foreground">Due tomorrow</p>
+                      <p className="text-sm font-medium">
+                        Thank John for the referral
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due tomorrow
+                      </p>
                     </div>
                   </div>
                   <Button variant="outline" className="w-full">

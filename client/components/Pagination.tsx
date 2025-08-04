@@ -1,7 +1,13 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Import useState at the top of the file
 
@@ -24,7 +30,7 @@ export default function Pagination({
   onItemsPerPageChange,
   showItemsPerPage = true,
   itemsPerPageOptions = [12, 24, 48],
-  showTotalText = true
+  showTotalText = true,
 }: PaginationProps) {
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -189,6 +195,6 @@ export const usePagination = (totalItems: number, initialItemsPerPage = 12) => {
     endIndex,
     setCurrentPage,
     handleItemsPerPageChange,
-    handleTotalItemsChange
+    handleTotalItemsChange,
   };
 };

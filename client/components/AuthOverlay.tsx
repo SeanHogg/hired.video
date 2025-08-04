@@ -5,43 +5,47 @@ import {
   FileText,
   User,
   LogIn,
-  UserPlus
+  UserPlus,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface AuthOverlayProps {
-  contentType?: 'company' | 'job' | 'resume' | 'person';
+  contentType?: "company" | "job" | "resume" | "person";
   title?: string;
   message?: string;
 }
 
 export default function AuthOverlay({
-  contentType = 'company',
+  contentType = "company",
   title,
-  message
+  message,
 }: AuthOverlayProps) {
-
   const getContentIcon = () => {
     switch (contentType) {
-      case 'company': return <Building2 className="h-5 w-5" />;
-      case 'job': return <Briefcase className="h-5 w-5" />;
-      case 'resume': return <FileText className="h-5 w-5" />;
-      case 'person': return <User className="h-5 w-5" />;
-      default: return <Lock className="h-5 w-5" />;
+      case "company":
+        return <Building2 className="h-5 w-5" />;
+      case "job":
+        return <Briefcase className="h-5 w-5" />;
+      case "resume":
+        return <FileText className="h-5 w-5" />;
+      case "person":
+        return <User className="h-5 w-5" />;
+      default:
+        return <Lock className="h-5 w-5" />;
     }
   };
 
   const getDefaultMessage = () => {
     switch (contentType) {
-      case 'company': 
+      case "company":
         return "Sign in to view complete company details, benefits, and connect with hiring managers.";
-      case 'job':
+      case "job":
         return "Sign in to view full job descriptions, salary information, and apply directly.";
-      case 'resume':
+      case "resume":
         return "Sign in to view complete professional profiles and detailed work experience.";
-      case 'person':
+      case "person":
         return "Sign in to view full professional profiles and connect with industry professionals.";
       default:
         return "Sign in to access complete details and unlock all features.";
@@ -68,7 +72,8 @@ export default function AuthOverlay({
               {/* Title */}
               <div>
                 <h3 className="text-lg font-semibold mb-2">
-                  {title || `Access Full ${contentType === 'person' ? 'Profile' : contentType.charAt(0).toUpperCase() + contentType.slice(1)} Details`}
+                  {title ||
+                    `Access Full ${contentType === "person" ? "Profile" : contentType.charAt(0).toUpperCase() + contentType.slice(1)} Details`}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   {message || getDefaultMessage()}
@@ -101,8 +106,6 @@ export default function AuthOverlay({
           </CardContent>
         </Card>
       </div>
-
-
     </>
   );
 }

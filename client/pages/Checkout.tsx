@@ -67,7 +67,6 @@ export default function Checkout() {
   useEffect(() => {
     if (!isAuthenticated) {
       navigate("/login?redirect=/checkout");
-      
     }
   }, [isAuthenticated, navigate]);
 
@@ -75,7 +74,6 @@ export default function Checkout() {
   useEffect(() => {
     if (isAuthenticated && items.length === 0) {
       navigate("/pricing");
-      
     }
   }, [items.length, isAuthenticated, navigate]);
 

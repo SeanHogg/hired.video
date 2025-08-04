@@ -11,16 +11,27 @@ import {
   Mail,
   Phone,
   ExternalLink,
-  CheckCircle2
-} from 'lucide-react';
-import { useState } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Resume, ResumePrivacy, UpdateResumeRequest, CreateResumeRequest } from '@/types/resume';
-import ResumeBuilder from './ResumeBuilder';
+  CheckCircle2,
+} from "lucide-react";
+import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type {
+  Resume,
+  ResumePrivacy,
+  UpdateResumeRequest,
+  CreateResumeRequest,
+} from "@/types/resume";
+import ResumeBuilder from "./ResumeBuilder";
 
 interface ResumeViewerProps {
   resume: Resume;
@@ -29,7 +40,12 @@ interface ResumeViewerProps {
   canEdit?: boolean;
 }
 
-export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canEdit = true }: ResumeViewerProps) {
+export default function ResumeViewer({
+  resume,
+  onUpdate,
+  onCreateVariation,
+  canEdit = true,
+}: ResumeViewerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume.privacy);
   const [showShareAlert, setShowShareAlert] = useState(false);
@@ -44,7 +60,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
       data: request.data,
       name: request.name,
       privacy: request.privacy,
-      isMaster: request.isMaster
+      isMaster: request.isMaster,
     });
     setIsEditing(false);
   };
@@ -57,34 +73,43 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Present';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short'
+    if (!dateString) return "Present";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
     });
   };
 
   const getPrivacyIcon = (privacy: ResumePrivacy) => {
     switch (privacy) {
-      case 'public': return <Globe className="h-4 w-4" />;
-      case 'recruiter_only': return <Users className="h-4 w-4" />;
-      case 'private': return <Lock className="h-4 w-4" />;
+      case "public":
+        return <Globe className="h-4 w-4" />;
+      case "recruiter_only":
+        return <Users className="h-4 w-4" />;
+      case "private":
+        return <Lock className="h-4 w-4" />;
     }
   };
 
   const getPrivacyText = (privacy: ResumePrivacy) => {
     switch (privacy) {
-      case 'public': return 'Public';
-      case 'recruiter_only': return 'Recruiter Only';
-      case 'private': return 'Private';
+      case "public":
+        return "Public";
+      case "recruiter_only":
+        return "Recruiter Only";
+      case "private":
+        return "Private";
     }
   };
 
   const getPrivacyColor = (privacy: ResumePrivacy) => {
     switch (privacy) {
-      case 'public': return 'bg-green-100 text-green-800';
-      case 'recruiter_only': return 'bg-blue-100 text-blue-800';
-      case 'private': return 'bg-gray-100 text-gray-800';
+      case "public":
+        return "bg-green-100 text-green-800";
+      case "recruiter_only":
+        return "bg-blue-100 text-blue-800";
+      case "private":
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -105,7 +130,10 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{resume.name}</h1>
           {resume.isMaster && (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            <Badge
+              variant="secondary"
+              className="bg-yellow-100 text-yellow-800"
+            >
               <Star className="h-3 w-3 mr-1" />
               Master
             </Badge>
@@ -115,7 +143,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
             <span className="ml-1">{getPrivacyText(privacy)}</span>
           </Badge>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {canEdit && (
             <Select value={privacy} onValueChange={handlePrivacyChange}>
@@ -144,19 +172,19 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
               </SelectContent>
             </Select>
           )}
-          
+
           <Button variant="outline" onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" />
             Share
           </Button>
-          
+
           {canEdit && (
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
           )}
-          
+
           {resume.isMaster && onCreateVariation && (
             <Button onClick={() => onCreateVariation(resume.id)}>
               <Copy className="h-4 w-4 mr-2" />
@@ -170,9 +198,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
       {showShareAlert && (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
-            Resume link copied to clipboard!
-          </AlertDescription>
+          <AlertDescription>Resume link copied to clipboard!</AlertDescription>
         </Alert>
       )}
 
@@ -184,7 +210,7 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
             <div className="text-center space-y-4">
               <h1 className="text-4xl font-bold">{resume.data.Basics.Name}</h1>
               <p className="text-xl opacity-90">{resume.data.Basics.Label}</p>
-              
+
               <div className="flex flex-wrap justify-center gap-4 text-sm opacity-80">
                 {resume.data.Basics.Email && (
                   <div className="flex items-center gap-1">
@@ -201,7 +227,11 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
                 {resume.data.Basics.Url && (
                   <div className="flex items-center gap-1">
                     <ExternalLink className="h-4 w-4" />
-                    <a href={resume.data.Basics.Url} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={resume.data.Basics.Url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       Portfolio
                     </a>
                   </div>
@@ -214,7 +244,9 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
             {/* Summary */}
             {resume.data.Basics.Summary && (
               <section>
-                <h2 className="text-2xl font-bold mb-4">Professional Summary</h2>
+                <h2 className="text-2xl font-bold mb-4">
+                  Professional Summary
+                </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   {resume.data.Basics.Summary}
                 </p>
@@ -227,25 +259,35 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
                 <h2 className="text-2xl font-bold mb-6">Work Experience</h2>
                 <div className="space-y-6">
                   {resume.data.Work.map((work, index) => (
-                    <div key={index} className="border-l-2 border-primary/20 pl-6 relative">
+                    <div
+                      key={index}
+                      className="border-l-2 border-primary/20 pl-6 relative"
+                    >
                       <div className="absolute w-3 h-3 bg-primary rounded-full -left-2 top-2" />
                       <div className="space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                          <h3 className="text-lg font-semibold">{work.Position}</h3>
+                          <h3 className="text-lg font-semibold">
+                            {work.Position}
+                          </h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />
-                            {formatDate(work.StartDate)} - {formatDate(work.EndDate)}
+                            {formatDate(work.StartDate)} -{" "}
+                            {formatDate(work.EndDate)}
                           </div>
                         </div>
                         <p className="text-primary font-medium">{work.Name}</p>
                         {work.Summary && (
-                          <p className="text-muted-foreground">{work.Summary}</p>
+                          <p className="text-muted-foreground">
+                            {work.Summary}
+                          </p>
                         )}
                         {work.Highlights.length > 0 && (
                           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
-                            {work.Highlights.map((highlight, highlightIndex) => (
-                              <li key={highlightIndex}>{highlight}</li>
-                            ))}
+                            {work.Highlights.map(
+                              (highlight, highlightIndex) => (
+                                <li key={highlightIndex}>{highlight}</li>
+                              ),
+                            )}
                           </ul>
                         )}
                       </div>
@@ -264,14 +306,19 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
-                          <h3 className="font-semibold">{edu.StudyType} in {edu.Area}</h3>
+                          <h3 className="font-semibold">
+                            {edu.StudyType} in {edu.Area}
+                          </h3>
                           <p className="text-primary">{edu.Institution}</p>
                           {edu.Score && (
-                            <p className="text-sm text-muted-foreground">GPA: {edu.Score}</p>
+                            <p className="text-sm text-muted-foreground">
+                              GPA: {edu.Score}
+                            </p>
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {formatDate(edu.StartDate)} - {formatDate(edu.EndDate)}
+                          {formatDate(edu.StartDate)} -{" "}
+                          {formatDate(edu.EndDate)}
                         </div>
                       </div>
                     </div>
@@ -286,7 +333,10 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
                 <h2 className="text-2xl font-bold mb-6">Skills</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {resume.data.Skills.map((skill, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                       <span className="font-medium">{skill.Name}</span>
                       <Badge variant="secondary">{skill.Level}</Badge>
                     </div>
@@ -306,11 +356,15 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Created</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Created
+              </p>
               <p>{new Date(resume.createdAt).toLocaleDateString()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Last Updated
+              </p>
               <p>{new Date(resume.updatedAt).toLocaleDateString()}</p>
             </div>
             <div>
@@ -321,10 +375,12 @@ export default function ResumeViewer({ resume, onUpdate, onCreateVariation, canE
               </p>
             </div>
           </div>
-          
+
           {resume.parentId && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">Variation of</p>
+              <p className="text-sm font-medium text-muted-foreground mb-2">
+                Variation of
+              </p>
               <Badge variant="outline">Master Resume</Badge>
             </div>
           )}

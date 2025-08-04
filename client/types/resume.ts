@@ -122,7 +122,7 @@ export interface ResumeData {
   };
 }
 
-export type ResumePrivacy = 'public' | 'recruiter_only' | 'private' | 'draft';
+export type ResumePrivacy = "public" | "recruiter_only" | "private" | "draft";
 
 export interface Resume {
   id: string;
@@ -155,7 +155,7 @@ export interface ResumeMetadata {
   userId: string;
 }
 
-export type ResumeOwnership = 'owned' | 'tracked';
+export type ResumeOwnership = "owned" | "tracked";
 
 export interface ResumeWithOwnership extends ResumeMetadata {
   ownership: ResumeOwnership;

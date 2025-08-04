@@ -23,30 +23,32 @@ export default function FloatingAIButton({ className }: FloatingAIButtonProps) {
       >
         <div className="relative">
           <Brain className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
-          <Sparkles 
+          <Sparkles
             className={cn(
               "h-3 w-3 text-white/80 absolute -top-1 -right-1 transition-all duration-300",
-              isHovered ? "animate-pulse scale-110" : ""
-            )} 
+              isHovered ? "animate-pulse scale-110" : "",
+            )}
           />
         </div>
-        
+
         {/* Floating animation rings */}
         <div className="absolute inset-0 rounded-full">
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-brand-purple/20 to-brand-blue/20 animate-pulse" />
         </div>
       </Button>
-      
+
       {/* Tooltip */}
-      <div 
+      <div
         className={cn(
           "absolute bottom-16 right-0 bg-background border rounded-lg px-3 py-2 shadow-lg transition-all duration-300 whitespace-nowrap",
-          isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+          isHovered
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-2 pointer-events-none",
         )}
       >
         <div className="text-sm font-medium">Ask AI Assistant</div>
         <div className="text-xs text-muted-foreground">Get instant HR help</div>
-        
+
         {/* Arrow */}
         <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-border" />
       </div>

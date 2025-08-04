@@ -61,12 +61,13 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
       refetchOnWindowFocus: isProduction,
-
     },
     mutations: {
       retry: isProduction ? 2 : 0,
       onError: (error) => {
-        logger.error('Mutation error', { error: error instanceof Error ? error.message : String(error) });
+        logger.error("Mutation error", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       },
     },
   },
@@ -83,8 +84,8 @@ if (isProduction) {
 }
 
 // Global error handler for unhandled promise rejections
-window.addEventListener('unhandledrejection', (event) => {
-  logger.error('Unhandled promise rejection', {
+window.addEventListener("unhandledrejection", (event) => {
+  logger.error("Unhandled promise rejection", {
     reason: event.reason,
     promise: event.promise,
   });
@@ -94,8 +95,8 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 // Global error handler for uncaught errors
-window.addEventListener('error', (event) => {
-  logger.error('Uncaught error', {
+window.addEventListener("error", (event) => {
+  logger.error("Uncaught error", {
     message: event.message,
     filename: event.filename,
     lineno: event.lineno,
@@ -108,11 +109,11 @@ const App = () => (
   <ErrorBoundary
     level="critical"
     onError={(error, errorInfo) => {
-    logger.error('Critical application error', {
-      error: error.toJSON(),
-      errorInfo,
-    });
-  }}
+      logger.error("Critical application error", {
+        error: error.toJSON(),
+        errorInfo,
+      });
+    }}
   >
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -141,12 +142,18 @@ const App = () => (
                   <Route path="/for-recruiters" element={<ForRecruiters />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/resumes" element={<Resumes />} />
-                  <Route path="/resumes/upload" element={<ResumeUploadPage />} />
+                  <Route
+                    path="/resumes/upload"
+                    element={<ResumeUploadPage />}
+                  />
                   <Route
                     path="/resumes/create/:id"
                     element={<ResumeCreatePage />}
                   />
-                  <Route path="/resumes/edit/:id" element={<ResumeEditPage />} />
+                  <Route
+                    path="/resumes/edit/:id"
+                    element={<ResumeEditPage />}
+                  />
                   <Route path="/resumes/:id" element={<ResumeDetail />} />
                   <Route path="/jobs" element={<Jobs />} />
                   <Route path="/jobs/upload" element={<JobUploadPage />} />
@@ -180,7 +187,10 @@ const App = () => (
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
-                  <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route
+                    path="/terms-of-service"
+                    element={<TermsOfService />}
+                  />
                   <Route path="/cookies" element={<CookiePolicy />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

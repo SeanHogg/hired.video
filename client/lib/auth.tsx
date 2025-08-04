@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-export type UserRole = 'job_seeker' | 'recruiter' | 'business';
+export type UserRole = "job_seeker" | "recruiter" | "business";
 
 export interface User {
   id: string;
@@ -8,7 +8,7 @@ export interface User {
   name: string;
   role?: UserRole;
   onboardingComplete: boolean;
-  subscription?: 'free' | 'pro' | 'enterprise';
+  subscription?: "free" | "pro" | "enterprise";
   avatar?: string;
 }
 
@@ -27,32 +27,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Mock users
 const mockUsers: Array<User & { password: string }> = [
   {
-    id: 'u1a2b3c4-d5e6-7890-abcd-ef1234567890',
-    email: 'john.seeker@example.com',
-    password: 'password123',
-    name: 'John Seeker',
-    role: 'job_seeker',
+    id: "u1a2b3c4-d5e6-7890-abcd-ef1234567890",
+    email: "john.seeker@example.com",
+    password: "password123",
+    name: "John Seeker",
+    role: "job_seeker",
     onboardingComplete: true,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
   },
   {
-    id: 'u2b3c4d5-e6f7-8901-bcde-f23456789012',
-    email: 'sarah.recruiter@example.com',
-    password: 'password123',
-    name: 'Sarah Recruiter',
-    role: 'recruiter',
+    id: "u2b3c4d5-e6f7-8901-bcde-f23456789012",
+    email: "sarah.recruiter@example.com",
+    password: "password123",
+    name: "Sarah Recruiter",
+    role: "recruiter",
     onboardingComplete: true,
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face'
+    avatar:
+      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
   },
   {
-    id: 'u3c4d5e6-f7g8-9012-cdef-345678901234',
-    email: 'michael.business@example.com',
-    password: 'password123',
-    name: 'Michael Business',
-    role: 'business',
+    id: "u3c4d5e6-f7g8-9012-cdef-345678901234",
+    email: "michael.business@example.com",
+    password: "password123",
+    name: "Michael Business",
+    role: "business",
     onboardingComplete: true,
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face'
-  }
+    avatar:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+  },
 ];
 
 interface AuthProviderProps {
@@ -66,7 +69,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   useEffect(() => {
     // Only check localStorage if no initial user is provided (for testing)
     if (initialUser === undefined) {
-      const savedUser = localStorage.getItem('user');
+      const savedUser = localStorage.getItem("user");
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
@@ -75,24 +78,30 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const mockUser = mockUsers.find(u => u.email === email && u.password === password);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const mockUser = mockUsers.find(
+      (u) => u.email === email && u.password === password,
+    );
     if (mockUser) {
       const { password: _, ...userWithoutPassword } = mockUser;
       setUser(userWithoutPassword);
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+      localStorage.setItem("user", JSON.stringify(userWithoutPassword));
       return true;
     }
     return false;
   };
 
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<boolean> => {
     // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     // Check if user already exists
-    if (mockUsers.find(u => u.email === email)) {
+    if (mockUsers.find((u) => u.email === email)) {
       return false;
     }
 
@@ -101,24 +110,24 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       id: Date.now().toString(),
       email,
       name,
-      onboardingComplete: false
+      onboardingComplete: false,
     };
 
     setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem("user", JSON.stringify(newUser));
     return true;
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
+    localStorage.removeItem("user");
   };
 
   const updateUserRole = (role: UserRole) => {
     if (user) {
       const updatedUser = { ...user, role };
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem("user", JSON.stringify(updatedUser));
     }
   };
 
@@ -126,7 +135,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     if (user) {
       const updatedUser = { ...user, onboardingComplete: true };
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem("user", JSON.stringify(updatedUser));
     }
   };
 
@@ -137,20 +146,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     logout,
     updateUserRole,
     completeOnboarding,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

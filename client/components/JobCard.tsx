@@ -1,22 +1,28 @@
-import { 
-  MapPin, 
-  DollarSign, 
-  Clock, 
-  Building2, 
-  Eye, 
-  Users, 
+import {
+  MapPin,
+  DollarSign,
+  Clock,
+  Building2,
+  Eye,
+  Users,
   UserCheck,
   Edit,
   ExternalLink,
   Bookmark,
-  BookmarkCheck
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/lib/auth';
-import type { JobMetadata, JobWithOwnership } from '@/types/job';
+  BookmarkCheck,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/lib/auth";
+import type { JobMetadata, JobWithOwnership } from "@/types/job";
 
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;
@@ -25,38 +31,44 @@ interface JobCardProps {
   onUntrack?: (_jobId: string) => void;
 }
 
-export default function JobCard({ job, showOwnership = false, onTrack, onUntrack }: JobCardProps) {
+export default function JobCard({
+  job,
+  showOwnership = false,
+  onTrack,
+  onUntrack,
+}: JobCardProps) {
   const { user } = useAuth();
-  
-  const ownership = 'ownership' in job ? job.ownership : undefined;
-  const isOwned = ownership === 'owned' || (!ownership && job.userId === user?.id);
-  const isTracked = ownership === 'tracked';
+
+  const ownership = "ownership" in job ? job.ownership : undefined;
+  const isOwned =
+    ownership === "owned" || (!ownership && job.userId === user?.id);
+  const isTracked = ownership === "tracked";
   const canEdit = isOwned;
-  
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'closed':
-        return 'bg-gray-100 text-gray-800';
-      case 'draft':
-        return 'bg-orange-100 text-orange-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "paused":
+        return "bg-yellow-100 text-yellow-800";
+      case "closed":
+        return "bg-gray-100 text-gray-800";
+      case "draft":
+        return "bg-orange-100 text-orange-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
-      case 'public':
+      case "public":
         return null;
-      case 'company_only':
+      case "company_only":
         return <Building2 className="h-3 w-3" />;
-      case 'recruiter_only':
+      case "recruiter_only":
         return <UserCheck className="h-3 w-3" />;
-      case 'private':
+      case "private":
         return <Eye className="h-3 w-3" />;
       default:
         return null;
@@ -70,18 +82,22 @@ export default function JobCard({ job, showOwnership = false, onTrack, onUntrack
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <CardTitle className="text-lg hover:text-primary">
-                <Link to={`/jobs/${job.id}`}>
-                  {job.title}
-                </Link>
+                <Link to={`/jobs/${job.id}`}>{job.title}</Link>
               </CardTitle>
               {showOwnership && isTracked && (
-                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-blue-50 text-blue-700"
+                >
                   <UserCheck className="h-3 w-3 mr-1" />
                   Tracked
                 </Badge>
               )}
-              {canEdit && job.status === 'draft' && (
-                <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
+              {canEdit && job.status === "draft" && (
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-orange-50 text-orange-700"
+                >
                   <Edit className="h-3 w-3 mr-1" />
                   Draft
                 </Badge>
@@ -104,7 +120,7 @@ export default function JobCard({ job, showOwnership = false, onTrack, onUntrack
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-3">
           {/* Job Details */}
@@ -162,7 +178,7 @@ export default function JobCard({ job, showOwnership = false, onTrack, onUntrack
                 <ExternalLink className="h-3 w-3 ml-1" />
               </Link>
             </Button>
-            
+
             {canEdit && (
               <Button asChild variant="outline" size="sm">
                 <Link to={`/jobs/edit/${job.id}`}>
@@ -171,20 +187,20 @@ export default function JobCard({ job, showOwnership = false, onTrack, onUntrack
                 </Link>
               </Button>
             )}
-            
+
             {!isOwned && user && (
               <div>
                 {isTracked ? (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => onUntrack?.(job.id)}
                   >
                     <BookmarkCheck className="h-3 w-3" />
                   </Button>
                 ) : (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => onTrack?.(job.id)}
                   >

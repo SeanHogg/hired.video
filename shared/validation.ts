@@ -3,7 +3,7 @@
  * Using Zod for runtime type validation and TypeScript inference
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================================
 // COMMON VALIDATION SCHEMAS
@@ -12,27 +12,27 @@ import { z } from 'zod';
 /**
  * UUID Schema
  */
-export const UuidSchema = z.string().uuid('Invalid UUID format');
+export const UuidSchema = z.string().uuid("Invalid UUID format");
 
 /**
  * Email Schema
  */
-export const EmailSchema = z.string().email('Invalid email format');
+export const EmailSchema = z.string().email("Invalid email format");
 
 /**
  * URL Schema
  */
-export const UrlSchema = z.string().url('Invalid URL format');
+export const UrlSchema = z.string().url("Invalid URL format");
 
 /**
  * Date Schema (ISO string)
  */
-export const DateSchema = z.string().datetime('Invalid date format');
+export const DateSchema = z.string().datetime("Invalid date format");
 
 /**
  * Non-empty string schema
  */
-export const NonEmptyStringSchema = z.string().min(1, 'Field cannot be empty');
+export const NonEmptyStringSchema = z.string().min(1, "Field cannot be empty");
 
 /**
  * Optional non-empty string schema
@@ -100,7 +100,7 @@ export const UserEducationSchema = z.object({
 export const UserSkillSchema = z.object({
   id: UuidSchema,
   name: NonEmptyStringSchema,
-  level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
+  level: z.enum(["beginner", "intermediate", "advanced", "expert"]),
   category: NonEmptyStringSchema,
   yearsOfExperience: z.number().min(0).optional(),
 });
@@ -140,13 +140,21 @@ export const UserDataSchema = z.object({
   achievements: z.array(NonEmptyStringSchema).default([]),
   certifications: z.array(NonEmptyStringSchema).default([]),
   openToWork: z.boolean(),
-  openToOpportunities: z.array(z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship'])).default([]),
+  openToOpportunities: z
+    .array(
+      z.enum(["full-time", "part-time", "contract", "freelance", "internship"]),
+    )
+    .default([]),
   preferredRoles: z.array(NonEmptyStringSchema).default([]),
-  salaryExpectation: z.object({
-    min: z.number().min(0).optional(),
-    max: z.number().min(0).optional(),
-    currency: z.string().length(3, 'Currency must be 3 characters (e.g., USD)'),
-  }).optional(),
+  salaryExpectation: z
+    .object({
+      min: z.number().min(0).optional(),
+      max: z.number().min(0).optional(),
+      currency: z
+        .string()
+        .length(3, "Currency must be 3 characters (e.g., USD)"),
+    })
+    .optional(),
 });
 
 // ============================================================================
@@ -162,7 +170,7 @@ export const CompanyDataSchema = z.object({
   website: UrlSchema.optional(),
   logo: UrlSchema.optional(),
   industry: NonEmptyStringSchema,
-  size: z.enum(['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+']),
+  size: z.enum(["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]),
   founded: z.number().min(1800).max(new Date().getFullYear()),
   location: UserLocationSchema,
   contact: UserContactSchema,
@@ -184,16 +192,24 @@ export const JobDataSchema = z.object({
   requirements: z.array(NonEmptyStringSchema).default([]),
   responsibilities: z.array(NonEmptyStringSchema).default([]),
   skills: z.array(NonEmptyStringSchema).default([]),
-  experienceLevel: z.enum(['entry', 'mid', 'senior', 'lead', 'executive']),
-  employmentType: z.enum(['full-time', 'part-time', 'contract', 'freelance', 'internship']),
+  experienceLevel: z.enum(["entry", "mid", "senior", "lead", "executive"]),
+  employmentType: z.enum([
+    "full-time",
+    "part-time",
+    "contract",
+    "freelance",
+    "internship",
+  ]),
   location: UserLocationSchema,
   remote: z.boolean(),
-  salary: z.object({
-    min: z.number().min(0).optional(),
-    max: z.number().min(0).optional(),
-    currency: z.string().length(3),
-    period: z.enum(['hourly', 'daily', 'weekly', 'monthly', 'yearly']),
-  }).optional(),
+  salary: z
+    .object({
+      min: z.number().min(0).optional(),
+      max: z.number().min(0).optional(),
+      currency: z.string().length(3),
+      period: z.enum(["hourly", "daily", "weekly", "monthly", "yearly"]),
+    })
+    .optional(),
   benefits: z.array(NonEmptyStringSchema).default([]),
   applicationDeadline: DateSchema.optional(),
 });
@@ -219,11 +235,15 @@ export const ResumeBasicsSchema = z.object({
     PostalCode: OptionalNonEmptyStringSchema,
     CountryCode: z.string().length(2),
   }),
-  Profiles: z.array(z.object({
-    Network: NonEmptyStringSchema,
-    Username: NonEmptyStringSchema,
-    Url: UrlSchema,
-  })).default([]),
+  Profiles: z
+    .array(
+      z.object({
+        Network: NonEmptyStringSchema,
+        Username: NonEmptyStringSchema,
+        Url: UrlSchema,
+      }),
+    )
+    .default([]),
   Image: UrlSchema.optional(),
 });
 
@@ -259,7 +279,7 @@ export const ResumeEducationSchema = z.object({
  */
 export const ResumeSkillsSchema = z.object({
   Name: NonEmptyStringSchema,
-  Level: z.enum(['Beginner', 'Intermediate', 'Advanced', 'Expert']),
+  Level: z.enum(["Beginner", "Intermediate", "Advanced", "Expert"]),
   Keywords: z.array(NonEmptyStringSchema).default([]),
 });
 
@@ -271,54 +291,84 @@ export const ResumeDataSchema = z.object({
   Work: z.array(ResumeWorkSchema).default([]),
   Education: z.array(ResumeEducationSchema).default([]),
   Skills: z.array(ResumeSkillsSchema).default([]),
-  Projects: z.array(z.object({
-    Name: NonEmptyStringSchema,
-    Description: NonEmptyStringSchema,
-    Highlights: z.array(NonEmptyStringSchema).default([]),
-    Keywords: z.array(NonEmptyStringSchema).default([]),
-    StartDate: DateSchema,
-    EndDate: DateSchema.optional(),
-    Url: UrlSchema.optional(),
-    Roles: z.array(NonEmptyStringSchema).default([]),
-    Entity: OptionalNonEmptyStringSchema,
-    Type: OptionalNonEmptyStringSchema,
-  })).default([]),
-  Awards: z.array(z.object({
-    Title: NonEmptyStringSchema,
-    Date: DateSchema,
-    Awarder: NonEmptyStringSchema,
-    Summary: OptionalNonEmptyStringSchema,
-  })).default([]),
-  Certificates: z.array(z.object({
-    Name: NonEmptyStringSchema,
-    Date: DateSchema,
-    Issuer: NonEmptyStringSchema,
-    Url: UrlSchema.optional(),
-  })).default([]),
-  Publications: z.array(z.object({
-    Name: NonEmptyStringSchema,
-    Publisher: NonEmptyStringSchema,
-    ReleaseDate: DateSchema,
-    Url: UrlSchema.optional(),
-    Summary: OptionalNonEmptyStringSchema,
-  })).default([]),
-  Languages: z.array(z.object({
-    Language: NonEmptyStringSchema,
-    Fluency: z.enum(['Native', 'Fluent', 'Conversational', 'Basic']),
-  })).default([]),
-  Interests: z.array(z.object({
-    Name: NonEmptyStringSchema,
-    Keywords: z.array(NonEmptyStringSchema).default([]),
-  })).default([]),
-  References: z.array(z.object({
-    Name: NonEmptyStringSchema,
-    Reference: NonEmptyStringSchema,
-  })).default([]),
-  Meta: z.object({
-    Canonical: UrlSchema.optional(),
-    Version: NonEmptyStringSchema.default('1.0.0'),
-    LastModified: DateSchema.optional(),
-  }).default({}),
+  Projects: z
+    .array(
+      z.object({
+        Name: NonEmptyStringSchema,
+        Description: NonEmptyStringSchema,
+        Highlights: z.array(NonEmptyStringSchema).default([]),
+        Keywords: z.array(NonEmptyStringSchema).default([]),
+        StartDate: DateSchema,
+        EndDate: DateSchema.optional(),
+        Url: UrlSchema.optional(),
+        Roles: z.array(NonEmptyStringSchema).default([]),
+        Entity: OptionalNonEmptyStringSchema,
+        Type: OptionalNonEmptyStringSchema,
+      }),
+    )
+    .default([]),
+  Awards: z
+    .array(
+      z.object({
+        Title: NonEmptyStringSchema,
+        Date: DateSchema,
+        Awarder: NonEmptyStringSchema,
+        Summary: OptionalNonEmptyStringSchema,
+      }),
+    )
+    .default([]),
+  Certificates: z
+    .array(
+      z.object({
+        Name: NonEmptyStringSchema,
+        Date: DateSchema,
+        Issuer: NonEmptyStringSchema,
+        Url: UrlSchema.optional(),
+      }),
+    )
+    .default([]),
+  Publications: z
+    .array(
+      z.object({
+        Name: NonEmptyStringSchema,
+        Publisher: NonEmptyStringSchema,
+        ReleaseDate: DateSchema,
+        Url: UrlSchema.optional(),
+        Summary: OptionalNonEmptyStringSchema,
+      }),
+    )
+    .default([]),
+  Languages: z
+    .array(
+      z.object({
+        Language: NonEmptyStringSchema,
+        Fluency: z.enum(["Native", "Fluent", "Conversational", "Basic"]),
+      }),
+    )
+    .default([]),
+  Interests: z
+    .array(
+      z.object({
+        Name: NonEmptyStringSchema,
+        Keywords: z.array(NonEmptyStringSchema).default([]),
+      }),
+    )
+    .default([]),
+  References: z
+    .array(
+      z.object({
+        Name: NonEmptyStringSchema,
+        Reference: NonEmptyStringSchema,
+      }),
+    )
+    .default([]),
+  Meta: z
+    .object({
+      Canonical: UrlSchema.optional(),
+      Version: NonEmptyStringSchema.default("1.0.0"),
+      LastModified: DateSchema.optional(),
+    })
+    .default({}),
 });
 
 // ============================================================================

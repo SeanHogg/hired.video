@@ -1,35 +1,48 @@
-import { Upload, FileText, Loader2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
-import { useState, useCallback } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { ResumePrivacy, UploadResumeRequest, ResumeUploadResponse } from '@/types/resume';
+import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type {
+  ResumePrivacy,
+  UploadResumeRequest,
+  ResumeUploadResponse,
+} from "@/types/resume";
 
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;
   onCancel: () => void;
 }
 
-export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUploadProps) {
+export default function ResumeUpload({
+  onUploadSuccess,
+  onCancel,
+}: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [name, setName] = useState('');
-  const [privacy, setPrivacy] = useState<ResumePrivacy>('private');
+  const [name, setName] = useState("");
+  const [privacy, setPrivacy] = useState<ResumePrivacy>("private");
   const [isMaster, setIsMaster] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const allowedTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain'
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
   ];
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -42,21 +55,24 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    setError(null);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      setError(null);
 
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && allowedTypes.includes(droppedFile.type)) {
-      setFile(droppedFile);
-      if (!name) {
-        setName(droppedFile.name.replace(/\.[^/.]+$/, ''));
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile && allowedTypes.includes(droppedFile.type)) {
+        setFile(droppedFile);
+        if (!name) {
+          setName(droppedFile.name.replace(/\.[^/.]+$/, ""));
+        }
+      } else {
+        setError("Please upload a PDF, Word document, or text file.");
       }
-    } else {
-      setError('Please upload a PDF, Word document, or text file.');
-    }
-  }, [name, allowedTypes]);
+    },
+    [name, allowedTypes],
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -65,18 +81,27 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
     if (selectedFile && allowedTypes.includes(selectedFile.type)) {
       setFile(selectedFile);
       if (!name) {
-        setName(selectedFile.name.replace(/\.[^/.]+$/, ''));
+        setName(selectedFile.name.replace(/\.[^/.]+$/, ""));
       }
     } else {
-      setError('Please upload a PDF, Word document, or text file.');
+      setError("Please upload a PDF, Word document, or text file.");
     }
   };
 
-  const simulateUpload = async (uploadRequest: UploadResumeRequest): Promise<ResumeUploadResponse> => {
+  const simulateUpload = async (
+    uploadRequest: UploadResumeRequest,
+  ): Promise<ResumeUploadResponse> => {
+    console.log(
+      "Starting upload for:",
+      uploadRequest.name,
+      "Privacy:",
+      uploadRequest.privacy,
+    );
+
     // Simulate upload progress
     for (let i = 0; i <= 100; i += 10) {
       setUploadProgress(i);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     // Simulate API response with sample data
@@ -91,7 +116,7 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
           Phone: "555-0123",
           Url: "",
           Summary: "Extracted professional summary from the uploaded resume...",
-          Location: null
+          Location: null,
         },
         Work: [],
         Volunteer: [],
@@ -103,10 +128,10 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
         Languages: [],
         Interests: [],
         References: [],
-        Projects: []
+        Projects: [],
       },
       message: "Resume successfully uploaded and processed",
-      confidence: 0.85
+      confidence: 0.85,
     };
   };
 
@@ -122,13 +147,18 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
         name: name.trim(),
         file,
         privacy,
-        isMaster
+        isMaster,
       };
 
       const response = await simulateUpload(uploadRequest);
       onUploadSuccess(response);
-    } catch (err) {
-      setError('Failed to upload resume. Please try again.');
+    } catch (_err) {
+      console.error("Resume upload failed:", _err);
+      const errorMessage =
+        _err instanceof Error
+          ? _err.message
+          : "Failed to upload resume. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -141,9 +171,9 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
   };
 
   const getFileIcon = (file: File) => {
-    if (file.type.includes('pdf')) return '📄';
-    if (file.type.includes('word')) return '📝';
-    return '📄';
+    if (file.type.includes("pdf")) return "📄";
+    if (file.type.includes("word")) return "📝";
+    return "📄";
   };
 
   return (
@@ -161,9 +191,9 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
           {!file ? (
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging 
-                  ? 'border-primary bg-primary/5' 
-                  : 'border-border hover:border-primary/50'
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
               }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -201,9 +231,9 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
                     </p>
                   </div>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={removeFile}
                   disabled={isUploading}
                 >
@@ -229,14 +259,24 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
 
           <div className="space-y-2">
             <Label>Privacy Setting</Label>
-            <Select value={privacy} onValueChange={(value: ResumePrivacy) => setPrivacy(value)} disabled={isUploading}>
+            <Select
+              value={privacy}
+              onValueChange={(value: ResumePrivacy) => setPrivacy(value)}
+              disabled={isUploading}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="private">Private - Only visible to you</SelectItem>
-                <SelectItem value="recruiter_only">Recruiter Only - Visible to verified recruiters</SelectItem>
-                <SelectItem value="public">Public - Searchable by anyone</SelectItem>
+                <SelectItem value="private">
+                  Private - Only visible to you
+                </SelectItem>
+                <SelectItem value="recruiter_only">
+                  Recruiter Only - Visible to verified recruiters
+                </SelectItem>
+                <SelectItem value="public">
+                  Public - Searchable by anyone
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -254,7 +294,8 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
           </div>
           {isMaster && (
             <p className="text-xs text-muted-foreground ml-6">
-              Master resumes can be used as templates to create targeted variations.
+              Master resumes can be used as templates to create targeted
+              variations.
             </p>
           )}
         </div>
@@ -264,7 +305,9 @@ export default function ResumeUpload({ onUploadSuccess, onCancel }: ResumeUpload
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Processing resume...</span>
-              <span className="text-sm text-muted-foreground">{uploadProgress}%</span>
+              <span className="text-sm text-muted-foreground">
+                {uploadProgress}%
+              </span>
             </div>
             <Progress value={uploadProgress} className="w-full" />
           </div>

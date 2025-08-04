@@ -14,7 +14,7 @@ import {
   Send,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { Link , useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

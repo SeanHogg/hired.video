@@ -30,9 +30,21 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
@@ -97,29 +109,95 @@ const filterTypes = [
 // Mock data for activity content
 const mockContent = {
   videos: [
-    { id: 1, title: "React Best Practices", duration: "15:30", views: 1200, thumbnail: "/placeholder.svg" },
-    { id: 2, title: "TypeScript Advanced Tips", duration: "22:45", views: 850, thumbnail: "/placeholder.svg" },
+    {
+      id: 1,
+      title: "React Best Practices",
+      duration: "15:30",
+      views: 1200,
+      thumbnail: "/placeholder.svg",
+    },
+    {
+      id: 2,
+      title: "TypeScript Advanced Tips",
+      duration: "22:45",
+      views: 850,
+      thumbnail: "/placeholder.svg",
+    },
   ],
   resumes: [
-    { id: 1, title: "John Doe - Software Engineer", type: "PDF", size: "2.3 MB", lastModified: "2 days ago" },
-    { id: 2, title: "Jane Smith - Product Manager", type: "PDF", size: "1.8 MB", lastModified: "1 week ago" },
+    {
+      id: 1,
+      title: "John Doe - Software Engineer",
+      type: "PDF",
+      size: "2.3 MB",
+      lastModified: "2 days ago",
+    },
+    {
+      id: 2,
+      title: "Jane Smith - Product Manager",
+      type: "PDF",
+      size: "1.8 MB",
+      lastModified: "1 week ago",
+    },
   ],
   jobs: [
-    { id: 1, title: "Senior Frontend Developer", company: "TechCorp", location: "Remote", posted: "3 days ago" },
-    { id: 2, title: "Product Designer", company: "StartupXYZ", location: "San Francisco", posted: "1 week ago" },
+    {
+      id: 1,
+      title: "Senior Frontend Developer",
+      company: "TechCorp",
+      location: "Remote",
+      posted: "3 days ago",
+    },
+    {
+      id: 2,
+      title: "Product Designer",
+      company: "StartupXYZ",
+      location: "San Francisco",
+      posted: "1 week ago",
+    },
   ],
   companies: [
-    { id: 1, name: "TechCorp", industry: "Technology", employees: "1000+", logo: "/placeholder.svg" },
-    { id: 2, name: "StartupXYZ", industry: "SaaS", employees: "50-100", logo: "/placeholder.svg" },
+    {
+      id: 1,
+      name: "TechCorp",
+      industry: "Technology",
+      employees: "1000+",
+      logo: "/placeholder.svg",
+    },
+    {
+      id: 2,
+      name: "StartupXYZ",
+      industry: "SaaS",
+      employees: "50-100",
+      logo: "/placeholder.svg",
+    },
   ],
   profiles: [
-    { id: 1, name: "John Doe", role: "Software Engineer", location: "New York", avatar: "/placeholder.svg" },
-    { id: 2, name: "Jane Smith", role: "Product Manager", location: "San Francisco", avatar: "/placeholder.svg" },
+    {
+      id: 1,
+      name: "John Doe",
+      role: "Software Engineer",
+      location: "New York",
+      avatar: "/placeholder.svg",
+    },
+    {
+      id: 2,
+      name: "Jane Smith",
+      role: "Product Manager",
+      location: "San Francisco",
+      avatar: "/placeholder.svg",
+    },
   ],
 };
 
 export default function Dashboard() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { user, isAuthenticated } = useAuth();
 
   // Activity content state
@@ -160,17 +238,26 @@ export default function Dashboard() {
                   Your HR Command Center
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Comprehensive talent management dashboard with social recruiting, ATS analytics, CRM insights, and recruitment marketing metrics all in one place.
+                  Comprehensive talent management dashboard with social
+                  recruiting, ATS analytics, CRM insights, and recruitment
+                  marketing metrics all in one place.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
-                    <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
                       Get Started
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
-                    <Button size="lg" variant="outline" className="text-lg px-8">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-lg px-8"
+                    >
                       Sign In
                     </Button>
                   </Link>
@@ -184,7 +271,8 @@ export default function Dashboard() {
                     <BarChart3 className="h-10 w-10 text-brand-purple mb-4" />
                     <CardTitle>Real-time Analytics</CardTitle>
                     <CardDescription>
-                      Track your profile views, application success rates, and career progress with detailed metrics.
+                      Track your profile views, application success rates, and
+                      career progress with detailed metrics.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -194,7 +282,8 @@ export default function Dashboard() {
                     <Target className="h-10 w-10 text-brand-blue mb-4" />
                     <CardTitle>Goal Tracking</CardTitle>
                     <CardDescription>
-                      Set and monitor your career goals with personalized recommendations and progress insights.
+                      Set and monitor your career goals with personalized
+                      recommendations and progress insights.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -204,7 +293,8 @@ export default function Dashboard() {
                     <CheckCircle2 className="h-10 w-10 text-primary mb-4" />
                     <CardTitle>Task Management</CardTitle>
                     <CardDescription>
-                      Stay organized with guided onboarding tasks and personalized action items for your persona.
+                      Stay organized with guided onboarding tasks and
+                      personalized action items for your persona.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -212,14 +302,17 @@ export default function Dashboard() {
 
               {/* Persona-specific Benefits */}
               <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Tailored for Your Role</h2>
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Tailored for Your Role
+                </h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   <Card className="text-center">
                     <CardHeader>
                       <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
                       <CardTitle>Job Seekers</CardTitle>
                       <CardDescription>
-                        Track resume views, application status, interview requests, and career progress all in one place.
+                        Track resume views, application status, interview
+                        requests, and career progress all in one place.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -245,7 +338,8 @@ export default function Dashboard() {
                       <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
                       <CardTitle>Recruiters</CardTitle>
                       <CardDescription>
-                        Manage candidate pipelines, track placement rates, and optimize your recruitment workflow.
+                        Manage candidate pipelines, track placement rates, and
+                        optimize your recruitment workflow.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -271,7 +365,8 @@ export default function Dashboard() {
                       <Building2 className="h-12 w-12 mx-auto text-purple-600 mb-4" />
                       <CardTitle>Businesses</CardTitle>
                       <CardDescription>
-                        Monitor hiring operations, team growth, and recruitment ROI with comprehensive business insights.
+                        Monitor hiring operations, team growth, and recruitment
+                        ROI with comprehensive business insights.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -296,12 +391,18 @@ export default function Dashboard() {
 
               {/* Final CTA */}
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold mb-4">Ready to Take Control of Your Career?</h3>
+                <h3 className="text-2xl font-bold mb-4">
+                  Ready to Take Control of Your Career?
+                </h3>
                 <p className="text-muted-foreground mb-6">
-                  Join thousands of professionals who are already using MyVideoResume to accelerate their careers.
+                  Join thousands of professionals who are already using
+                  MyVideoResume to accelerate their careers.
                 </p>
                 <Link to="/signup">
-                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                  >
                     Start Your Dashboard Today
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -323,15 +424,51 @@ export default function Dashboard() {
           title: "Job Seeker Dashboard",
           description: "Track your job search progress and opportunities",
           metrics: [
-            { title: "Resume Views", value: "2,847", change: "+12%", icon: Eye, trend: "up" },
-            { title: "Applications Sent", value: "45", change: "+8", icon: FileText, trend: "up" },
-            { title: "Interview Requests", value: "12", change: "+3", icon: Calendar, trend: "up" },
-            { title: "Profile Matches", value: "89%", change: "+5%", icon: Target, trend: "up" },
+            {
+              title: "Resume Views",
+              value: "2,847",
+              change: "+12%",
+              icon: Eye,
+              trend: "up",
+            },
+            {
+              title: "Applications Sent",
+              value: "45",
+              change: "+8",
+              icon: FileText,
+              trend: "up",
+            },
+            {
+              title: "Interview Requests",
+              value: "12",
+              change: "+3",
+              icon: Calendar,
+              trend: "up",
+            },
+            {
+              title: "Profile Matches",
+              value: "89%",
+              change: "+5%",
+              icon: Target,
+              trend: "up",
+            },
           ],
           recentActivity: [
-            { type: "view", content: "Your resume was viewed by Google", time: "2 hours ago" },
-            { type: "match", content: "New job match: Senior Developer at Meta", time: "5 hours ago" },
-            { type: "application", content: "Application submitted to Stripe", time: "1 day ago" },
+            {
+              type: "view",
+              content: "Your resume was viewed by Google",
+              time: "2 hours ago",
+            },
+            {
+              type: "match",
+              content: "New job match: Senior Developer at Meta",
+              time: "5 hours ago",
+            },
+            {
+              type: "application",
+              content: "Application submitted to Stripe",
+              time: "1 day ago",
+            },
           ],
         };
       case "recruiter":
@@ -339,15 +476,51 @@ export default function Dashboard() {
           title: "Recruiter Dashboard",
           description: "Manage candidates and track recruitment metrics",
           metrics: [
-            { title: "Active Candidates", value: "1,247", change: "+18%", icon: Users, trend: "up" },
-            { title: "Open Positions", value: "34", change: "+5", icon: Briefcase, trend: "up" },
-            { title: "Interviews Scheduled", value: "28", change: "+12", icon: Calendar, trend: "up" },
-            { title: "Placement Rate", value: "76%", change: "+3%", icon: TrendingUp, trend: "up" },
+            {
+              title: "Active Candidates",
+              value: "1,247",
+              change: "+18%",
+              icon: Users,
+              trend: "up",
+            },
+            {
+              title: "Open Positions",
+              value: "34",
+              change: "+5",
+              icon: Briefcase,
+              trend: "up",
+            },
+            {
+              title: "Interviews Scheduled",
+              value: "28",
+              change: "+12",
+              icon: Calendar,
+              trend: "up",
+            },
+            {
+              title: "Placement Rate",
+              value: "76%",
+              change: "+3%",
+              icon: TrendingUp,
+              trend: "up",
+            },
           ],
           recentActivity: [
-            { type: "candidate", content: "New candidate: John Smith applied for Senior Dev role", time: "1 hour ago" },
-            { type: "interview", content: "Interview scheduled with candidate for PM role", time: "3 hours ago" },
-            { type: "placement", content: "Successful placement: Sarah Chen at Design Corp", time: "1 day ago" },
+            {
+              type: "candidate",
+              content: "New candidate: John Smith applied for Senior Dev role",
+              time: "1 hour ago",
+            },
+            {
+              type: "interview",
+              content: "Interview scheduled with candidate for PM role",
+              time: "3 hours ago",
+            },
+            {
+              type: "placement",
+              content: "Successful placement: Sarah Chen at Design Corp",
+              time: "1 day ago",
+            },
           ],
         };
       case "business":
@@ -355,15 +528,51 @@ export default function Dashboard() {
           title: "Business Dashboard",
           description: "Overview of hiring operations and team metrics",
           metrics: [
-            { title: "Total Employees", value: "485", change: "+12", icon: Building2, trend: "up" },
-            { title: "Open Positions", value: "23", change: "-2", icon: Briefcase, trend: "down" },
-            { title: "Time to Hire", value: "18 days", change: "-3 days", icon: Clock, trend: "up" },
-            { title: "Hiring Success Rate", value: "82%", change: "+7%", icon: Target, trend: "up" },
+            {
+              title: "Total Employees",
+              value: "485",
+              change: "+12",
+              icon: Building2,
+              trend: "up",
+            },
+            {
+              title: "Open Positions",
+              value: "23",
+              change: "-2",
+              icon: Briefcase,
+              trend: "down",
+            },
+            {
+              title: "Time to Hire",
+              value: "18 days",
+              change: "-3 days",
+              icon: Clock,
+              trend: "up",
+            },
+            {
+              title: "Hiring Success Rate",
+              value: "82%",
+              change: "+7%",
+              icon: Target,
+              trend: "up",
+            },
           ],
           recentActivity: [
-            { type: "hire", content: "New hire: Marcus Rodriguez joined as Data Scientist", time: "2 hours ago" },
-            { type: "posting", content: "New job posting created: UX Designer", time: "4 hours ago" },
-            { type: "team", content: "Engineering team reached 50 members milestone", time: "2 days ago" },
+            {
+              type: "hire",
+              content: "New hire: Marcus Rodriguez joined as Data Scientist",
+              time: "2 hours ago",
+            },
+            {
+              type: "posting",
+              content: "New job posting created: UX Designer",
+              time: "4 hours ago",
+            },
+            {
+              type: "team",
+              content: "Engineering team reached 50 members milestone",
+              time: "2 days ago",
+            },
           ],
         };
       default:
@@ -387,8 +596,16 @@ export default function Dashboard() {
           ...baseTasks,
           { id: "resume", title: "Upload your resume", completed: true },
           { id: "video", title: "Create your video resume", completed: false },
-          { id: "skills", title: "Add your skills and experience", completed: true },
-          { id: "preferences", title: "Set job search preferences", completed: true },
+          {
+            id: "skills",
+            title: "Add your skills and experience",
+            completed: true,
+          },
+          {
+            id: "preferences",
+            title: "Set job search preferences",
+            completed: true,
+          },
         ];
       case "recruiter":
         return [
@@ -396,15 +613,31 @@ export default function Dashboard() {
           { id: "company", title: "Set up company profile", completed: true },
           { id: "team", title: "Invite team members", completed: false },
           { id: "jobs", title: "Post your first job", completed: true },
-          { id: "sourcing", title: "Set up candidate sourcing", completed: false },
+          {
+            id: "sourcing",
+            title: "Set up candidate sourcing",
+            completed: false,
+          },
         ];
       case "business":
         return [
           ...baseTasks,
-          { id: "company", title: "Complete company information", completed: true },
-          { id: "billing", title: "Set up billing information", completed: true },
+          {
+            id: "company",
+            title: "Complete company information",
+            completed: true,
+          },
+          {
+            id: "billing",
+            title: "Set up billing information",
+            completed: true,
+          },
           { id: "team", title: "Add team members", completed: false },
-          { id: "integration", title: "Configure integrations", completed: false },
+          {
+            id: "integration",
+            title: "Configure integrations",
+            completed: false,
+          },
         ];
       default:
         return baseTasks;
@@ -412,8 +645,12 @@ export default function Dashboard() {
   };
 
   const onboardingTasks = getOnboardingTasks();
-  const completedTasksCount = onboardingTasks.filter(task => task.completed).length;
-  const progressPercentage = Math.round((completedTasksCount / onboardingTasks.length) * 100);
+  const completedTasksCount = onboardingTasks.filter(
+    (task) => task.completed,
+  ).length;
+  const progressPercentage = Math.round(
+    (completedTasksCount / onboardingTasks.length) * 100,
+  );
 
   // Helper function to render content items
   const renderContentItem = (item: ContentItem, type: string) => {
@@ -421,7 +658,10 @@ export default function Dashboard() {
       case "videos":
         const videoItem = item as VideoItem;
         return (
-          <Card key={videoItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            key={videoItem.id}
+            className="group cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="relative mb-3">
                 <img
@@ -436,26 +676,43 @@ export default function Dashboard() {
                   {videoItem.duration}
                 </Badge>
               </div>
-              <h3 className="font-medium text-sm mb-1 line-clamp-2">{videoItem.title}</h3>
-              <p className="text-xs text-muted-foreground">{videoItem.views} views</p>
+              <h3 className="font-medium text-sm mb-1 line-clamp-2">
+                {videoItem.title}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {videoItem.views} views
+              </p>
             </CardContent>
           </Card>
         );
       case "resumes":
         const resumeItem = item as ResumeItem;
         return (
-          <Card key={resumeItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            key={resumeItem.id}
+            className="group cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <FileText className="h-5 w-5 text-red-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{resumeItem.title}</h3>
-                  <p className="text-xs text-muted-foreground">{resumeItem.type} • {resumeItem.size}</p>
-                  <p className="text-xs text-muted-foreground">{resumeItem.lastModified}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                    {resumeItem.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {resumeItem.type} • {resumeItem.size}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {resumeItem.lastModified}
+                  </p>
                 </div>
-                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100"
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </div>
@@ -465,16 +722,25 @@ export default function Dashboard() {
       case "jobs":
         const jobItem = item as JobItem;
         return (
-          <Card key={jobItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            key={jobItem.id}
+            className="group cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <Briefcase className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{jobItem.title}</h3>
-                  <p className="text-xs text-muted-foreground">{jobItem.company}</p>
-                  <p className="text-xs text-muted-foreground">{jobItem.location} • {jobItem.posted}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                    {jobItem.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {jobItem.company}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {jobItem.location} • {jobItem.posted}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -483,16 +749,25 @@ export default function Dashboard() {
       case "companies":
         const companyItem = item as CompanyItem;
         return (
-          <Card key={companyItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            key={companyItem.id}
+            className="group cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <Building2 className="h-5 w-5 text-green-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{companyItem.name}</h3>
-                  <p className="text-xs text-muted-foreground">{companyItem.industry}</p>
-                  <p className="text-xs text-muted-foreground">{companyItem.employees} employees</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                    {companyItem.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {companyItem.industry}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {companyItem.employees} employees
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -501,16 +776,25 @@ export default function Dashboard() {
       case "profiles":
         const profileItem = item as ProfileItem;
         return (
-          <Card key={profileItem.id} className="group cursor-pointer hover:shadow-md transition-shadow">
+          <Card
+            key={profileItem.id}
+            className="group cursor-pointer hover:shadow-md transition-shadow"
+          >
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-purple-100 rounded-md flex items-center justify-center flex-shrink-0">
                   <User className="h-5 w-5 text-purple-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">{profileItem.name}</h3>
-                  <p className="text-xs text-muted-foreground">{profileItem.role}</p>
-                  <p className="text-xs text-muted-foreground">{profileItem.location}</p>
+                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                    {profileItem.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {profileItem.role}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {profileItem.location}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -521,8 +805,10 @@ export default function Dashboard() {
     }
   };
 
-  const currentFilter = filterTypes.find(f => f.id === selectedFilter);
-  const currentContentType = contentTypes.find(c => c.id === selectedContentType);
+  const currentFilter = filterTypes.find((f) => f.id === selectedFilter);
+  const currentContentType = contentTypes.find(
+    (c) => c.id === selectedContentType,
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -537,17 +823,21 @@ export default function Dashboard() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-foreground">{dashboardData.title}</h1>
-                <p className="text-muted-foreground mt-1">{dashboardData.description}</p>
+                <h1 className="text-3xl font-bold text-foreground">
+                  {dashboardData.title}
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                  {dashboardData.description}
+                </p>
               </div>
               <Badge variant="secondary" className="capitalize">
-                {user.role?.replace('_', ' ')}
+                {user.role?.replace("_", " ")}
               </Badge>
             </div>
 
@@ -562,35 +852,52 @@ export default function Dashboard() {
                         Complete Your Setup
                       </CardTitle>
                       <CardDescription>
-                        {completedTasksCount} of {onboardingTasks.length} tasks completed
+                        {completedTasksCount} of {onboardingTasks.length} tasks
+                        completed
                       </CardDescription>
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{progressPercentage}%</div>
-                      <div className="text-xs text-muted-foreground">Complete</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {progressPercentage}%
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Complete
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Progress value={progressPercentage} className="h-3 mb-4" />
                   <div className="grid gap-2">
-                    {onboardingTasks.filter(task => !task.completed).slice(0, 2).map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-3 bg-background rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 border-2 border-muted-foreground rounded-full" />
-                          <span className="font-medium">{task.title}</span>
+                    {onboardingTasks
+                      .filter((task) => !task.completed)
+                      .slice(0, 2)
+                      .map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center justify-between p-3 bg-background rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 border-2 border-muted-foreground rounded-full" />
+                            <span className="font-medium">{task.title}</span>
+                          </div>
+                          <Button size="sm" variant="outline">
+                            Complete
+                            <ArrowRight className="h-3 w-3 ml-1" />
+                          </Button>
                         </div>
-                        <Button size="sm" variant="outline">
-                          Complete
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))}
                   </div>
-                  {onboardingTasks.filter(task => !task.completed).length > 2 && (
+                  {onboardingTasks.filter((task) => !task.completed).length >
+                    2 && (
                     <Link to="/onboarding">
                       <Button variant="link" className="mt-2 p-0">
-                        View all tasks ({onboardingTasks.filter(task => !task.completed).length} remaining)
+                        View all tasks (
+                        {
+                          onboardingTasks.filter((task) => !task.completed)
+                            .length
+                        }{" "}
+                        remaining)
                       </Button>
                     </Link>
                   )}
@@ -610,11 +917,16 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{metric.value}</div>
-                    <div className={`text-xs flex items-center gap-1 ${
-                      metric.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                    }`}
+                    <div
+                      className={`text-xs flex items-center gap-1 ${
+                        metric.trend === "up"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
                     >
-                      <TrendingUp className={`h-3 w-3 ${metric.trend === 'down' ? 'rotate-180' : ''}`} />
+                      <TrendingUp
+                        className={`h-3 w-3 ${metric.trend === "down" ? "rotate-180" : ""}`}
+                      />
                       {metric.change} from last month
                     </div>
                   </CardContent>
@@ -634,11 +946,18 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dashboardData.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
+                    >
                       <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{activity.content}</p>
-                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                        <p className="text-sm font-medium">
+                          {activity.content}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.time}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -659,15 +978,24 @@ export default function Dashboard() {
                 <CardContent className="space-y-3">
                   {user.role === "job_seeker" && (
                     <>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <FileText className="h-4 w-4" />
                         Update Resume
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Eye className="h-4 w-4" />
                         View Applications
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Target className="h-4 w-4" />
                         Find New Jobs
                       </Button>
@@ -675,15 +1003,24 @@ export default function Dashboard() {
                   )}
                   {user.role === "recruiter" && (
                     <>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Briefcase className="h-4 w-4" />
                         Post New Job
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Users className="h-4 w-4" />
                         Review Candidates
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Calendar className="h-4 w-4" />
                         Schedule Interviews
                       </Button>
@@ -691,15 +1028,24 @@ export default function Dashboard() {
                   )}
                   {user.role === "business" && (
                     <>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Building2 className="h-4 w-4" />
                         View Team Analytics
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <UserPlus className="h-4 w-4" />
                         Invite Team Members
                       </Button>
-                      <Button className="w-full justify-start gap-3" variant="outline">
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
                         <Download className="h-4 w-4" />
                         Export Reports
                       </Button>
@@ -714,13 +1060,18 @@ export default function Dashboard() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {currentFilter?.icon && <currentFilter.icon className="h-5 w-5" />}
+                    {currentFilter?.icon && (
+                      <currentFilter.icon className="h-5 w-5" />
+                    )}
                     <CardTitle>Your Content Library</CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2">
                       <Filter className="h-4 w-4" />
-                      <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                      <Select
+                        value={selectedFilter}
+                        onValueChange={setSelectedFilter}
+                      >
                         <SelectTrigger className="w-40">
                           <SelectValue />
                         </SelectTrigger>
@@ -761,10 +1112,17 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs value={selectedContentType} onValueChange={setSelectedContentType}>
+                <Tabs
+                  value={selectedContentType}
+                  onValueChange={setSelectedContentType}
+                >
                   <TabsList className="grid w-full grid-cols-5">
                     {contentTypes.map((type) => (
-                      <TabsTrigger key={type.id} value={type.id} className="flex items-center gap-2">
+                      <TabsTrigger
+                        key={type.id}
+                        value={type.id}
+                        className="flex items-center gap-2"
+                      >
                         <type.icon className="h-4 w-4" />
                         <span className="hidden sm:inline">{type.label}</span>
                       </TabsTrigger>
@@ -773,25 +1131,34 @@ export default function Dashboard() {
 
                   {contentTypes.map((type) => (
                     <TabsContent key={type.id} value={type.id} className="mt-6">
-                      <div className={viewMode === "grid"
-                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                        : "space-y-2"
-                      }
+                      <div
+                        className={
+                          viewMode === "grid"
+                            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                            : "space-y-2"
+                        }
                       >
-                        {mockContent[type.id as keyof typeof mockContent]?.map((item) =>
-                          renderContentItem(item, type.id)
+                        {mockContent[type.id as keyof typeof mockContent]?.map(
+                          (item) => renderContentItem(item, type.id),
                         )}
                       </div>
 
-                      {mockContent[type.id as keyof typeof mockContent]?.length === 0 && (
+                      {mockContent[type.id as keyof typeof mockContent]
+                        ?.length === 0 && (
                         <div className="text-center py-12">
                           <type.icon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">No {type.label.toLowerCase()} found</h3>
+                          <h3 className="text-lg font-medium mb-2">
+                            No {type.label.toLowerCase()} found
+                          </h3>
                           <p className="text-muted-foreground">
-                            {selectedFilter === "my-content" && `You haven't created any ${type.label.toLowerCase()} yet.`}
-                            {selectedFilter === "watch-later" && `You haven't saved any ${type.label.toLowerCase()} to watch later.`}
-                            {selectedFilter === "favorites" && `You haven't favorited any ${type.label.toLowerCase()} yet.`}
-                            {selectedFilter === "recent" && `You haven't viewed any ${type.label.toLowerCase()} recently.`}
+                            {selectedFilter === "my-content" &&
+                              `You haven't created any ${type.label.toLowerCase()} yet.`}
+                            {selectedFilter === "watch-later" &&
+                              `You haven't saved any ${type.label.toLowerCase()} to watch later.`}
+                            {selectedFilter === "favorites" &&
+                              `You haven't favorited any ${type.label.toLowerCase()} yet.`}
+                            {selectedFilter === "recent" &&
+                              `You haven't viewed any ${type.label.toLowerCase()} recently.`}
                           </p>
                         </div>
                       )}

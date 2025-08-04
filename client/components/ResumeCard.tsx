@@ -10,7 +10,7 @@ import {
   Copy,
   Target,
   Edit,
-  UserCheck
+  UserCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,11 @@ interface ResumeCardProps {
   summary: string;
   createdAt: string;
   views?: number;
-  privacy?: 'public' | 'recruiter_only' | 'private' | 'draft';
+  privacy?: "public" | "recruiter_only" | "private" | "draft";
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
-  ownership?: 'owned' | 'tracked';
+  ownership?: "owned" | "tracked";
   onView?: () => void;
   onActions?: () => void;
 }
@@ -38,19 +38,19 @@ export default function ResumeCard({
   summary,
   createdAt,
   views = 0,
-  privacy = 'private',
+  privacy = "private",
   isMaster = false,
   isActive = false,
   parentId,
-  ownership = 'owned',
+  ownership = "owned",
   onView,
   onActions,
 }: ResumeCardProps) {
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     });
   };
 
@@ -60,31 +60,46 @@ export default function ResumeCard({
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
-      case 'public': return <Globe className="w-3 h-3" />;
-      case 'recruiter_only': return <Users className="w-3 h-3" />;
-      case 'private': return <Lock className="w-3 h-3" />;
-      case 'draft': return <Edit className="w-3 h-3" />;
-      default: return <Lock className="w-3 h-3" />;
+      case "public":
+        return <Globe className="w-3 h-3" />;
+      case "recruiter_only":
+        return <Users className="w-3 h-3" />;
+      case "private":
+        return <Lock className="w-3 h-3" />;
+      case "draft":
+        return <Edit className="w-3 h-3" />;
+      default:
+        return <Lock className="w-3 h-3" />;
     }
   };
 
   const getPrivacyText = (privacy: string) => {
     switch (privacy) {
-      case 'public': return 'Public';
-      case 'recruiter_only': return 'Recruiter Only';
-      case 'private': return 'Private';
-      case 'draft': return 'Draft';
-      default: return 'Private';
+      case "public":
+        return "Public";
+      case "recruiter_only":
+        return "Recruiter Only";
+      case "private":
+        return "Private";
+      case "draft":
+        return "Draft";
+      default:
+        return "Private";
     }
   };
 
   const getPrivacyColor = (privacy: string) => {
     switch (privacy) {
-      case 'public': return 'bg-green-100 text-green-800';
-      case 'recruiter_only': return 'bg-blue-100 text-blue-800';
-      case 'private': return 'bg-gray-100 text-gray-800';
-      case 'draft': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "public":
+        return "bg-green-100 text-green-800";
+      case "recruiter_only":
+        return "bg-blue-100 text-blue-800";
+      case "private":
+        return "bg-gray-100 text-gray-800";
+      case "draft":
+        return "bg-orange-100 text-orange-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -92,32 +107,48 @@ export default function ResumeCard({
     <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300 border hover:border-primary/30 overflow-hidden">
       <CardContent className="p-0">
         {/* Header with Name and Date */}
-        <div className="p-4 border-b border-border bg-muted/30" onClick={handleCardClick}>
+        <div
+          className="p-4 border-b border-border bg-muted/30"
+          onClick={handleCardClick}
+        >
           <div className="space-y-2">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">NAME</p>
-                <h3 className="font-bold text-lg text-foreground leading-tight">{name}</h3>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  NAME
+                </p>
+                <h3 className="font-bold text-lg text-foreground leading-tight">
+                  {name}
+                </h3>
                 {title && (
                   <p className="text-sm text-muted-foreground mt-1">{title}</p>
                 )}
 
                 {/* Status badges */}
                 <div className="flex items-center gap-2 mt-2">
-                  {ownership === 'tracked' && (
-                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                  {ownership === "tracked" && (
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-blue-100 text-blue-800"
+                    >
                       <UserCheck className="w-3 h-3 mr-1" />
                       Tracked
                     </Badge>
                   )}
                   {isActive && (
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-green-100 text-green-800"
+                    >
                       <Target className="w-3 h-3 mr-1" />
                       Active
                     </Badge>
                   )}
                   {isMaster && (
-                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-yellow-100 text-yellow-800"
+                    >
                       <Star className="w-3 h-3 mr-1" />
                       Master
                     </Badge>
@@ -139,14 +170,16 @@ export default function ResumeCard({
                 Resume
               </Badge>
             </div>
-            
+
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
                   <span>CREATED</span>
                 </div>
-                <span className="font-medium text-foreground">{formatDate(createdAt)}</span>
+                <span className="font-medium text-foreground">
+                  {formatDate(createdAt)}
+                </span>
               </div>
 
               {views > 0 && (
@@ -160,7 +193,10 @@ export default function ResumeCard({
         </div>
 
         {/* Details Section */}
-        <div className="p-4 bg-primary text-primary-foreground" onClick={handleCardClick}>
+        <div
+          className="p-4 bg-primary text-primary-foreground"
+          onClick={handleCardClick}
+        >
           <div className="space-y-3">
             <h4 className="font-bold text-lg">Professional Summary</h4>
             <div>

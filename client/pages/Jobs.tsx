@@ -19,7 +19,7 @@ import {
   Plus,
   Upload,
   Filter,
-  X
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -32,21 +32,33 @@ import SearchBar from "@/components/SearchBar";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { trackCompanyFromJobData } from "@/data/mockCompanies";
 import {
   getAllJobsForUser,
   addTrackedJob,
   removeTrackedJob,
   getPublicJobs,
-  getJobsByFilters
+  getJobsByFilters,
 } from "@/data/mockJobs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
 
 export default function Jobs() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
 
@@ -57,7 +69,7 @@ export default function Jobs() {
       location: searchFilters.location,
       employmentType: searchFilters.employmentType,
       experienceLevel: searchFilters.experienceLevel,
-      remote: searchFilters.remote
+      remote: searchFilters.remote,
     });
   };
 
@@ -72,7 +84,7 @@ export default function Jobs() {
     endIndex,
     setCurrentPage,
     handleItemsPerPageChange,
-    handleTotalItemsChange
+    handleTotalItemsChange,
   } = usePagination(filteredJobs.length, 9);
 
   // Update pagination when filtered jobs change
@@ -86,34 +98,36 @@ export default function Jobs() {
   // Get jobs based on user role and authentication
   const getJobsForUser = () => {
     if (!user) {
-      return getPublicJobs().map(job => ({
+      return getPublicJobs().map((job) => ({
         ...job,
         title: job.data.title,
         company: job.data.company.name,
-        location: job.data.location.remote 
-          ? 'Remote' 
+        location: job.data.location.remote
+          ? "Remote"
           : `${job.data.location.city}, ${job.data.location.state}`,
-        salary: job.data.salaryMin && job.data.salaryMax 
-          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-          : undefined,
+        salary:
+          job.data.salaryMin && job.data.salaryMax
+            ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+            : undefined,
         employmentType: job.data.employmentType,
         experienceLevel: job.data.experienceLevel,
-        summary: job.data.summary
+        summary: job.data.summary,
       }));
     }
 
     const { owned, tracked } = getAllJobsForUser(user.id);
-    const ownedWithOwnership: JobWithOwnership[] = owned.map(job => ({
+    const ownedWithOwnership: JobWithOwnership[] = owned.map((job) => ({
       id: job.id,
       slug: job.slug,
       title: job.data.title,
       company: job.data.company.name,
-      location: job.data.location.remote 
-        ? 'Remote' 
+      location: job.data.location.remote
+        ? "Remote"
         : `${job.data.location.city}, ${job.data.location.state}`,
-      salary: job.data.salaryMin && job.data.salaryMax 
-        ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-        : undefined,
+      salary:
+        job.data.salaryMin && job.data.salaryMax
+          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+          : undefined,
       employmentType: job.data.employmentType,
       experienceLevel: job.data.experienceLevel,
       status: job.status,
@@ -126,20 +140,21 @@ export default function Jobs() {
       summary: job.data.summary,
       userId: job.userId,
       companyId: job.companyId,
-      ownership: 'owned' as const
+      ownership: "owned" as const,
     }));
 
-    const trackedWithOwnership: JobWithOwnership[] = tracked.map(job => ({
+    const trackedWithOwnership: JobWithOwnership[] = tracked.map((job) => ({
       id: job.id,
       slug: job.slug,
       title: job.data.title,
       company: job.data.company.name,
-      location: job.data.location.remote 
-        ? 'Remote' 
+      location: job.data.location.remote
+        ? "Remote"
         : `${job.data.location.city}, ${job.data.location.state}`,
-      salary: job.data.salaryMin && job.data.salaryMax 
-        ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-        : undefined,
+      salary:
+        job.data.salaryMin && job.data.salaryMax
+          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+          : undefined,
       employmentType: job.data.employmentType,
       experienceLevel: job.data.experienceLevel,
       status: job.status,
@@ -152,7 +167,7 @@ export default function Jobs() {
       summary: job.data.summary,
       userId: job.userId,
       companyId: job.companyId,
-      ownership: 'tracked' as const
+      ownership: "tracked" as const,
     }));
 
     return { owned: ownedWithOwnership, tracked: trackedWithOwnership };
@@ -174,7 +189,7 @@ export default function Jobs() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchFilters(prev => ({ ...prev, search: query }));
+    setSearchFilters((prev) => ({ ...prev, search: query }));
   };
 
   const handleFilterChange = (filters: SearchFilters) => {
@@ -188,23 +203,24 @@ export default function Jobs() {
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
     const jobsData = getJobsForUser();
-    const isJobSeeker = user.role === 'job_seeker';
-    const isRecruiterOrBusiness = user.role === 'recruiter' || user.role === 'business';
+    const isJobSeeker = user.role === "job_seeker";
+    const isRecruiterOrBusiness =
+      user.role === "recruiter" || user.role === "business";
 
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          
+
           <div className="pt-16 p-6">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
@@ -212,8 +228,8 @@ export default function Jobs() {
                 <div>
                   <h1 className="text-3xl font-bold mb-2">Jobs</h1>
                   <p className="text-muted-foreground">
-                    {isJobSeeker 
-                      ? "Discover and track job opportunities that match your skills" 
+                    {isJobSeeker
+                      ? "Discover and track job opportunities that match your skills"
                       : "Manage your job postings and discover talent"}
                   </p>
                 </div>
@@ -252,43 +268,49 @@ export default function Jobs() {
               {/* Job Listings */}
               <div className="space-y-6">
                 {/* Owned Jobs (for recruiters/business) */}
-                {isRecruiterOrBusiness && 'owned' in jobsData && jobsData.owned.length > 0 && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Briefcase className="h-5 w-5" />
-                      Your Job Postings ({jobsData.owned.length})
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {jobsData.owned.map((job) => (
-                        <JobCard 
-                          key={job.id} 
-                          job={job} 
-                          showOwnership
-                          onTrack={handleTrackJob}
-                          onUntrack={handleUntrackJob}
-                        />
-                      ))}
+                {isRecruiterOrBusiness &&
+                  "owned" in jobsData &&
+                  jobsData.owned.length > 0 && (
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Briefcase className="h-5 w-5" />
+                        Your Job Postings ({jobsData.owned.length})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {jobsData.owned.map((job) => (
+                          <JobCard
+                            key={job.id}
+                            job={job}
+                            showOwnership
+                            onTrack={handleTrackJob}
+                            onUntrack={handleUntrackJob}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Tracked Jobs */}
-                {('tracked' in jobsData ? jobsData.tracked.length > 0 : false) && (
+                {("tracked" in jobsData
+                  ? jobsData.tracked.length > 0
+                  : false) && (
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       Tracked Jobs ({(jobsData as any).tracked.length})
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(jobsData as any).tracked.map((job: JobWithOwnership) => (
-                        <JobCard 
-                          key={job.id} 
-                          job={job} 
-                          showOwnership
-                          onTrack={handleTrackJob}
-                          onUntrack={handleUntrackJob}
-                        />
-                      ))}
+                      {(jobsData as any).tracked.map(
+                        (job: JobWithOwnership) => (
+                          <JobCard
+                            key={job.id}
+                            job={job}
+                            showOwnership
+                            onTrack={handleTrackJob}
+                            onUntrack={handleUntrackJob}
+                          />
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -306,12 +328,13 @@ export default function Jobs() {
                         slug: job.slug,
                         title: job.data.title,
                         company: job.data.company.name,
-                        location: job.data.location.remote 
-                          ? 'Remote' 
+                        location: job.data.location.remote
+                          ? "Remote"
                           : `${job.data.location.city}, ${job.data.location.state}`,
-                        salary: job.data.salaryMin && job.data.salaryMax 
-                          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-                          : undefined,
+                        salary:
+                          job.data.salaryMin && job.data.salaryMax
+                            ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+                            : undefined,
                         employmentType: job.data.employmentType,
                         experienceLevel: job.data.experienceLevel,
                         status: job.status,
@@ -323,12 +346,12 @@ export default function Jobs() {
                         applications: job.applications,
                         summary: job.data.summary,
                         userId: job.userId,
-                        companyId: job.companyId
+                        companyId: job.companyId,
                       };
-                      
+
                       return (
-                        <JobCard 
-                          key={job.id} 
+                        <JobCard
+                          key={job.id}
                           job={jobMetadata}
                           onTrack={handleTrackJob}
                           onUntrack={handleUntrackJob}
@@ -358,18 +381,18 @@ export default function Jobs() {
   // If user is not authenticated, show marketing page
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
@@ -387,11 +410,16 @@ export default function Jobs() {
                 Discover Your Perfect Career Match
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Find jobs that truly fit your skills and aspirations with AI-powered matching, video job descriptions, and direct connections to hiring managers.
+                Find jobs that truly fit your skills and aspirations with
+                AI-powered matching, video job descriptions, and direct
+                connections to hiring managers.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
-                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                  >
                     Find Your Dream Job
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -407,7 +435,9 @@ export default function Jobs() {
             <div className="grid md:grid-cols-4 gap-6 mb-16">
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">50K+</div>
-                <p className="text-sm text-muted-foreground">Active job postings</p>
+                <p className="text-sm text-muted-foreground">
+                  Active job postings
+                </p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">95%</div>
@@ -415,51 +445,55 @@ export default function Jobs() {
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">72h</div>
-                <p className="text-sm text-muted-foreground">Average response time</p>
+                <p className="text-sm text-muted-foreground">
+                  Average response time
+                </p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-primary mb-2">89%</div>
-                <p className="text-sm text-muted-foreground">Interview success rate</p>
+                <p className="text-sm text-muted-foreground">
+                  Interview success rate
+                </p>
               </div>
             </div>
 
             {/* Featured Jobs Preview using shared JobCard */}
             <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-12">Featured Opportunities</h2>
+              <h2 className="text-3xl font-bold text-center mb-12">
+                Featured Opportunities
+              </h2>
               <div className="grid md:grid-cols-2 gap-6">
-                {getPublicJobs().slice(0, 2).map((job) => {
-                  const jobMetadata = {
-                    id: job.id,
-                    slug: job.slug,
-                    title: job.data.title,
-                    company: job.data.company.name,
-                    location: job.data.location.remote 
-                      ? 'Remote' 
-                      : `${job.data.location.city}, ${job.data.location.state}`,
-                    salary: job.data.salaryMin && job.data.salaryMax 
-                      ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-                      : undefined,
-                    employmentType: job.data.employmentType,
-                    experienceLevel: job.data.experienceLevel,
-                    status: job.status,
-                    privacy: job.privacy,
-                    createdAt: job.createdAt,
-                    updatedAt: job.updatedAt,
-                    expiresAt: job.expiresAt,
-                    views: job.views,
-                    applications: job.applications,
-                    summary: job.data.summary,
-                    userId: job.userId,
-                    companyId: job.companyId
-                  };
-                  
-                  return (
-                    <JobCard 
-                      key={job.id} 
-                      job={jobMetadata}
-                    />
-                  );
-                })}
+                {getPublicJobs()
+                  .slice(0, 2)
+                  .map((job) => {
+                    const jobMetadata = {
+                      id: job.id,
+                      slug: job.slug,
+                      title: job.data.title,
+                      company: job.data.company.name,
+                      location: job.data.location.remote
+                        ? "Remote"
+                        : `${job.data.location.city}, ${job.data.location.state}`,
+                      salary:
+                        job.data.salaryMin && job.data.salaryMax
+                          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+                          : undefined,
+                      employmentType: job.data.employmentType,
+                      experienceLevel: job.data.experienceLevel,
+                      status: job.status,
+                      privacy: job.privacy,
+                      createdAt: job.createdAt,
+                      updatedAt: job.updatedAt,
+                      expiresAt: job.expiresAt,
+                      views: job.views,
+                      applications: job.applications,
+                      summary: job.data.summary,
+                      userId: job.userId,
+                      companyId: job.companyId,
+                    };
+
+                    return <JobCard key={job.id} job={jobMetadata} />;
+                  })}
               </div>
               <div className="text-center mt-8">
                 <Link to="/signup">
@@ -473,34 +507,40 @@ export default function Jobs() {
 
             {/* Features and other marketing content */}
             <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-12">Why Choose Our Job Platform</h2>
+              <h2 className="text-3xl font-bold text-center mb-12">
+                Why Choose Our Job Platform
+              </h2>
               <div className="grid md:grid-cols-3 gap-8">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Target className="h-10 w-10 text-brand-purple mb-4" />
                     <CardTitle>AI-Powered Matching</CardTitle>
                     <CardDescription>
-                      Our advanced AI analyzes your skills, experience, and preferences to find jobs that truly match your career goals.
+                      Our advanced AI analyzes your skills, experience, and
+                      preferences to find jobs that truly match your career
+                      goals.
                     </CardDescription>
                   </CardHeader>
                 </Card>
-                
+
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Video className="h-10 w-10 text-brand-blue mb-4" />
                     <CardTitle>Video Job Descriptions</CardTitle>
                     <CardDescription>
-                      Get a real feel for the role with video job descriptions from actual hiring managers and team members.
+                      Get a real feel for the role with video job descriptions
+                      from actual hiring managers and team members.
                     </CardDescription>
                   </CardHeader>
                 </Card>
-                
+
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <Zap className="h-10 w-10 text-primary mb-4" />
                     <CardTitle>Direct Connections</CardTitle>
                     <CardDescription>
-                      Skip the black hole of traditional applications. Connect directly with hiring managers and decision makers.
+                      Skip the black hole of traditional applications. Connect
+                      directly with hiring managers and decision makers.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -509,12 +549,18 @@ export default function Jobs() {
 
             {/* Final CTA */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-              <h3 className="text-2xl font-bold mb-4">Ready to Find Your Perfect Job?</h3>
+              <h3 className="text-2xl font-bold mb-4">
+                Ready to Find Your Perfect Job?
+              </h3>
               <p className="text-muted-foreground mb-6">
-                Join thousands of professionals who have found their dream careers through our platform.
+                Join thousands of professionals who have found their dream
+                careers through our platform.
               </p>
               <Link to="/signup">
-                <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                >
                   Start Your Job Search Today
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

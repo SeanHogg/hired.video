@@ -1,24 +1,36 @@
-import { Video, Sparkles, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { useAuth } from '@/lib/auth';
+import { Video, Sparkles, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const [error, setError] = useState("");
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -26,17 +38,17 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
       const success = await login(email, password);
       if (success) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
-        setError('Invalid email or password. Please try again.');
+        setError("Invalid email or password. Please try again.");
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -46,15 +58,15 @@ export default function Login() {
     setEmail(demoEmail);
     setPassword(demoPassword);
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
       const success = await login(demoEmail, demoPassword);
       if (success) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       }
     } catch (err) {
-      setError('Demo login failed. Please try again.');
+      setError("Demo login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -85,10 +97,10 @@ export default function Login() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-            )}
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -108,7 +120,7 @@ export default function Login() {
                     <div className="relative">
                       <Input
                         id="password"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -123,19 +135,19 @@ export default function Login() {
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </Button>
                     </div>
                   </div>
 
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign in'}
+                    {isLoading ? "Signing in..." : "Sign in"}
                   </Button>
                 </form>
 
@@ -144,14 +156,18 @@ export default function Login() {
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or try demo accounts</span>
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or try demo accounts
+                    </span>
                   </div>
                 </div>
 
                 <div className="grid gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => handleDemoLogin('john.seeker@example.com', 'password123')}
+                    onClick={() =>
+                      handleDemoLogin("john.seeker@example.com", "password123")
+                    }
                     disabled={isLoading}
                     className="text-left justify-start"
                   >
@@ -159,7 +175,12 @@ export default function Login() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => handleDemoLogin('sarah.recruiter@example.com', 'password123')}
+                    onClick={() =>
+                      handleDemoLogin(
+                        "sarah.recruiter@example.com",
+                        "password123",
+                      )
+                    }
                     disabled={isLoading}
                     className="text-left justify-start"
                   >
@@ -167,7 +188,12 @@ export default function Login() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => handleDemoLogin('michael.business@example.com', 'password123')}
+                    onClick={() =>
+                      handleDemoLogin(
+                        "michael.business@example.com",
+                        "password123",
+                      )
+                    }
                     disabled={isLoading}
                     className="text-left justify-start"
                   >
@@ -177,8 +203,11 @@ export default function Login() {
 
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">
-                    Don't have an account?{' '}
-                    <Link to="/signup" className="text-primary hover:underline font-medium">
+                    Don't have an account?{" "}
+                    <Link
+                      to="/signup"
+                      className="text-primary hover:underline font-medium"
+                    >
                       Sign up
                     </Link>
                   </p>

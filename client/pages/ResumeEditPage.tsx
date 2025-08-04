@@ -1,46 +1,52 @@
-import { ArrowLeft } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import ResumeViewer from '@/components/ResumeViewer';
-import Sidebar from '@/components/Sidebar';
-import { Button } from '@/components/ui/button';
-import { getResumeById } from '@/data/mockResumes';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { useAuth } from '@/lib/auth';
-import type { Resume, UpdateResumeRequest } from '@/types/resume';
+import { ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import ResumeViewer from "@/components/ResumeViewer";
+import Sidebar from "@/components/Sidebar";
+import { Button } from "@/components/ui/button";
+import { getResumeById } from "@/data/mockResumes";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import type { Resume, UpdateResumeRequest } from "@/types/resume";
 
 export default function ResumeEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  
+
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadResume = async () => {
       if (!id) {
-        navigate('/resumes');
+        navigate("/resumes");
         return;
       }
 
       setLoading(true);
       try {
         // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         const foundResume = getResumeById(id);
         if (foundResume) {
           setResume(foundResume);
         } else {
-          navigate('/resumes');
+          navigate("/resumes");
         }
       } catch (error) {
-        console.error('Failed to load resume:', error);
-        navigate('/resumes');
+        console.error("Failed to load resume:", error);
+        navigate("/resumes");
       } finally {
         setLoading(false);
       }
@@ -54,7 +60,7 @@ export default function ResumeEditPage() {
       // In a real app, this would update the backend
       const updatedResume = { ...resume, ...request };
       setResume(updatedResume);
-      
+
       // Navigate back to view mode
       navigate(`/resumes/${resume.id}`);
     }
@@ -64,25 +70,25 @@ export default function ResumeEditPage() {
     if (resume) {
       navigate(`/resumes/${resume.id}`);
     } else {
-      navigate('/resumes');
+      navigate("/resumes");
     }
   };
 
   if (!isAuthenticated || !user) {
-    navigate('/login');
+    navigate("/login");
     return null;
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
@@ -103,13 +109,13 @@ export default function ResumeEditPage() {
   if (!resume) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
@@ -117,8 +123,10 @@ export default function ResumeEditPage() {
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
-              <p className="text-muted-foreground mb-6">The resume you're trying to edit doesn't exist.</p>
-              <Button onClick={() => navigate('/resumes')}>
+              <p className="text-muted-foreground mb-6">
+                The resume you're trying to edit doesn't exist.
+              </p>
+              <Button onClick={() => navigate("/resumes")}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Resumes
               </Button>
@@ -138,18 +146,18 @@ export default function ResumeEditPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}

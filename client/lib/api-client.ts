@@ -2,35 +2,35 @@
  * Comprehensive API client with type safety, error handling, and interceptors
  */
 
-import type { z } from 'zod';
-import type { 
-  ApiResponse, 
-  ApiErrorResponse, 
-  ApiSuccessResponse} from '@shared/api';
-import { 
+import type { z } from "zod";
+import type {
+  ApiResponse,
+  ApiErrorResponse,
+  ApiSuccessResponse,
+} from "@shared/api";
+import {
   validateApiResponse,
   createApiError,
   ApiResponseSchema,
-  ApiErrorResponseSchema 
-} from '@shared/api';
-import type { 
-  AppError} from './errors';
-import { 
-  NetworkError, 
-  ValidationError, 
-  AuthenticationError, 
-  AuthorizationError, 
+  ApiErrorResponseSchema,
+} from "@shared/api";
+import type { AppError } from "./errors";
+import {
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
   NotFoundError,
-  normalizeError 
-} from './errors';
-import { logger, logApiCall } from './logger';
+  normalizeError,
+} from "./errors";
+import { logger, logApiCall } from "./logger";
 
 // ============================================================================
 // TYPES AND INTERFACES
 // ============================================================================
 
 export interface RequestConfig {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   headers?: Record<string, string>;
   body?: unknown;
   timeout?: number;
@@ -44,7 +44,9 @@ export interface ApiClientConfig {
   retries?: number;
   headers?: Record<string, string>;
   onRequest?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
-  onResponse?: <T>(response: ApiSuccessResponse<T>) => ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
+  onResponse?: <T>(
+    response: ApiSuccessResponse<T>,
+  ) => ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
   onError?: (error: AppError) => AppError | Promise<AppError>;
 }
 
@@ -53,7 +55,9 @@ export interface RequestInterceptor {
 }
 
 export interface ResponseInterceptor {
-  <T>(response: ApiSuccessResponse<T>): ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
+  <T>(
+    response: ApiSuccessResponse<T>,
+  ): ApiSuccessResponse<T> | Promise<ApiSuccessResponse<T>>;
 }
 
 export interface ErrorInterceptor {
@@ -74,11 +78,11 @@ export class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || '/api';
+    this.baseUrl = config.baseUrl || "/api";
     this.timeout = config.timeout || 10000;
     this.retries = config.retries || 3;
     this.defaultHeaders = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...config.headers,
     };
 
@@ -108,49 +112,63 @@ export class ApiClient {
   // PRIVATE METHODS
   // ============================================================================
 
-  private async applyRequestInterceptors(config: RequestConfig): Promise<RequestConfig> {
+  private async applyRequestInterceptors(
+    config: RequestConfig,
+  ): Promise<RequestConfig> {
     let processedConfig = config;
-    
+
     for (const interceptor of this.requestInterceptors) {
       processedConfig = await interceptor(processedConfig);
     }
-    
+
     return processedConfig;
   }
 
-  private async applyResponseInterceptors<T>(response: ApiSuccessResponse<T>): Promise<ApiSuccessResponse<T>> {
+  private async applyResponseInterceptors<T>(
+    response: ApiSuccessResponse<T>,
+  ): Promise<ApiSuccessResponse<T>> {
     let processedResponse = response;
-    
+
     for (const interceptor of this.responseInterceptors) {
       processedResponse = await interceptor(processedResponse);
     }
-    
+
     return processedResponse;
   }
 
   private async applyErrorInterceptors(error: AppError): Promise<AppError> {
     let processedError = error;
-    
+
     for (const interceptor of this.errorInterceptors) {
       processedError = await interceptor(processedError);
     }
-    
+
     return processedError;
   }
 
   private createUrl(endpoint: string): string {
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-    const cleanBaseUrl = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
+    const cleanEndpoint = endpoint.startsWith("/")
+      ? endpoint.slice(1)
+      : endpoint;
+    const cleanBaseUrl = this.baseUrl.endsWith("/")
+      ? this.baseUrl.slice(0, -1)
+      : this.baseUrl;
     return `${cleanBaseUrl}/${cleanEndpoint}`;
   }
 
-  private async executeRequest(url: string, config: RequestConfig): Promise<Response> {
+  private async executeRequest(
+    url: string,
+    config: RequestConfig,
+  ): Promise<Response> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout || this.timeout);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      config.timeout || this.timeout,
+    );
 
     try {
       const response = await fetch(url, {
-        method: config.method || 'GET',
+        method: config.method || "GET",
         headers: {
           ...this.defaultHeaders,
           ...config.headers,
@@ -163,22 +181,31 @@ export class ApiClient {
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new NetworkError('Request timeout', error);
+
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new NetworkError("Request timeout", error);
       }
-      
-      throw new NetworkError('Network request failed', error instanceof Error ? error : undefined);
+
+      throw new NetworkError(
+        "Network request failed",
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
-  private async handleResponse<T>(response: Response, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
+  private async handleResponse<T>(
+    response: Response,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
     let responseData: unknown;
 
     try {
       responseData = await response.json();
     } catch (error) {
-      throw new NetworkError('Invalid JSON response', error instanceof Error ? error : undefined);
+      throw new NetworkError(
+        "Invalid JSON response",
+        error instanceof Error ? error : undefined,
+      );
     }
 
     // Handle HTTP error status codes
@@ -187,10 +214,18 @@ export class ApiClient {
     }
 
     // Validate response structure
-    const validationResult = validateApiResponse(responseData, ApiResponseSchema);
+    const validationResult = validateApiResponse(
+      responseData,
+      ApiResponseSchema,
+    );
     if (!validationResult.success) {
-      const errorMessage = 'error' in validationResult ? validationResult.error : 'Unknown validation error';
-      throw new ValidationError(`Invalid API response structure: ${errorMessage}`);
+      const errorMessage =
+        "error" in validationResult
+          ? validationResult.error
+          : "Unknown validation error";
+      throw new ValidationError(
+        `Invalid API response structure: ${errorMessage}`,
+      );
     }
 
     const apiResponse = validationResult.data as ApiResponse;
@@ -203,11 +238,14 @@ export class ApiClient {
 
     // Extract and validate data
     const successResponse = apiResponse as ApiSuccessResponse<T>;
-    
+
     if (schema) {
       const dataValidation = validateApiResponse(successResponse.data, schema);
       if (!dataValidation.success) {
-        const errorMessage = 'error' in dataValidation ? dataValidation.error : 'Unknown validation error';
+        const errorMessage =
+          "error" in dataValidation
+            ? dataValidation.error
+            : "Unknown validation error";
         throw new ValidationError(`Invalid response data: ${errorMessage}`);
       }
       successResponse.data = dataValidation.data;
@@ -219,7 +257,7 @@ export class ApiClient {
   private handleErrorResponse(status: number, data: unknown): never {
     // Try to parse as API error response
     const errorValidation = validateApiResponse(data, ApiErrorResponseSchema);
-    
+
     if (errorValidation.success) {
       throw this.createErrorFromResponse(errorValidation.data);
     }
@@ -227,11 +265,11 @@ export class ApiClient {
     // Fallback to HTTP status-based errors
     switch (status) {
       case 401:
-        throw new AuthenticationError('Authentication required');
+        throw new AuthenticationError("Authentication required");
       case 403:
-        throw new AuthorizationError('Access forbidden');
+        throw new AuthorizationError("Access forbidden");
       case 404:
-        throw new NotFoundError('Resource not found');
+        throw new NotFoundError("Resource not found");
       default:
         throw new NetworkError(`HTTP ${status}: Request failed`);
     }
@@ -239,15 +277,15 @@ export class ApiClient {
 
   private createErrorFromResponse(errorResponse: ApiErrorResponse): AppError {
     const { error } = errorResponse;
-    
+
     switch (error.code) {
-      case 'VALIDATION_ERROR':
+      case "VALIDATION_ERROR":
         return new ValidationError(error.message, undefined, error.details);
-      case 'AUTHENTICATION_ERROR':
+      case "AUTHENTICATION_ERROR":
         return new AuthenticationError(error.message, error.details);
-      case 'AUTHORIZATION_ERROR':
+      case "AUTHORIZATION_ERROR":
         return new AuthorizationError(error.message, error.details);
-      case 'NOT_FOUND_ERROR':
+      case "NOT_FOUND_ERROR":
         return new NotFoundError(error.message, error.details);
       default:
         return new NetworkError(error.message, undefined, error.details);
@@ -259,9 +297,9 @@ export class ApiClient {
   // ============================================================================
 
   async request<T>(
-    endpoint: string, 
+    endpoint: string,
     config: RequestConfig = {},
-    schema?: z.ZodSchema<T>
+    schema?: z.ZodSchema<T>,
   ): Promise<ApiSuccessResponse<T>> {
     const url = this.createUrl(endpoint);
     let attempt = 0;
@@ -272,25 +310,27 @@ export class ApiClient {
 
     while (attempt < maxAttempts) {
       try {
-        logApiCall(processedConfig.method || 'GET', url, undefined, { attempt: attempt + 1 });
+        logApiCall(processedConfig.method || "GET", url, undefined, {
+          attempt: attempt + 1,
+        });
 
         const response = await this.executeRequest(url, processedConfig);
         const apiResponse = await this.handleResponse<T>(response, schema);
 
-        logApiCall(processedConfig.method || 'GET', url, response.status);
+        logApiCall(processedConfig.method || "GET", url, response.status);
 
         // Apply response interceptors
-        const processedResponse = await this.applyResponseInterceptors(apiResponse);
-        
-        return processedResponse;
+        const processedResponse =
+          await this.applyResponseInterceptors(apiResponse);
 
+        return processedResponse;
       } catch (error) {
         attempt++;
         const normalizedError = normalizeError(error);
 
-        logApiCall(processedConfig.method || 'GET', url, undefined, { 
+        logApiCall(processedConfig.method || "GET", url, undefined, {
           attempt,
-          error: normalizedError.message 
+          error: normalizedError.message,
         });
 
         // Don't retry on certain error types
@@ -300,39 +340,58 @@ export class ApiClient {
           normalizedError instanceof AuthorizationError ||
           attempt >= maxAttempts
         ) {
-          const processedError = await this.applyErrorInterceptors(normalizedError);
+          const processedError =
+            await this.applyErrorInterceptors(normalizedError);
           throw processedError;
         }
 
         // Wait before retry (exponential backoff)
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
     // This should never be reached, but TypeScript requires it
-    throw new NetworkError('Maximum retry attempts exceeded');
+    throw new NetworkError("Maximum retry attempts exceeded");
   }
 
   // Convenience methods
-  async get<T>(endpoint: string, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: 'GET' }, schema);
+  async get<T>(
+    endpoint: string,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    return this.request(endpoint, { method: "GET" }, schema);
   }
 
-  async post<T>(endpoint: string, body?: unknown, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: 'POST', body }, schema);
+  async post<T>(
+    endpoint: string,
+    body?: unknown,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    return this.request(endpoint, { method: "POST", body }, schema);
   }
 
-  async put<T>(endpoint: string, body?: unknown, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: 'PUT', body }, schema);
+  async put<T>(
+    endpoint: string,
+    body?: unknown,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    return this.request(endpoint, { method: "PUT", body }, schema);
   }
 
-  async patch<T>(endpoint: string, body?: unknown, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: 'PATCH', body }, schema);
+  async patch<T>(
+    endpoint: string,
+    body?: unknown,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    return this.request(endpoint, { method: "PATCH", body }, schema);
   }
 
-  async delete<T>(endpoint: string, schema?: z.ZodSchema<T>): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: 'DELETE' }, schema);
+  async delete<T>(
+    endpoint: string,
+    schema?: z.ZodSchema<T>,
+  ): Promise<ApiSuccessResponse<T>> {
+    return this.request(endpoint, { method: "DELETE" }, schema);
   }
 }
 
@@ -344,7 +403,7 @@ export class ApiClient {
 export const apiClient = new ApiClient({
   onRequest: async (config) => {
     // Add authentication token if available
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     if (token) {
       config.headers = {
         ...config.headers,
@@ -353,12 +412,12 @@ export const apiClient = new ApiClient({
     }
     return config;
   },
-  
+
   onError: async (error) => {
     // Handle authentication errors by redirecting to login
     if (error instanceof AuthenticationError) {
-      localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      localStorage.removeItem("auth_token");
+      window.location.href = "/login";
     }
     return error;
   },

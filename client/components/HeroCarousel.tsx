@@ -22,7 +22,10 @@ interface HeroCarouselProps {
   totalItems: number;
 }
 
-export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselProps) {
+export default function HeroCarousel({
+  totalViews,
+  totalItems,
+}: HeroCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [dragActive, setDragActive] = useState(false);
 
@@ -38,7 +41,8 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
           </span>
         </>
       ),
-      description: "Employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.",
+      description:
+        "Employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.",
       badge: "All-in-One AI HR Platform",
       stats: [
         { icon: Eye, label: `${totalViews} total views` },
@@ -46,15 +50,24 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
         { icon: Clock, label: "Updated daily" },
       ],
       actions: [
-        { label: "Get Started", variant: "default" as const, size: "lg" as const },
-        { label: "Watch Demo", variant: "outline" as const, size: "lg" as const },
+        {
+          label: "Get Started",
+          variant: "default" as const,
+          size: "lg" as const,
+        },
+        {
+          label: "Watch Demo",
+          variant: "outline" as const,
+          size: "lg" as const,
+        },
       ],
     },
     {
       id: 2,
       type: "upload",
       title: "Upload Your Resume",
-      description: "Drop your resume here and let our AI create a stunning video presentation that stands out from the crowd.",
+      description:
+        "Drop your resume here and let our AI create a stunning video presentation that stands out from the crowd.",
       badge: "AI-Powered Resume Videos",
     },
     {
@@ -68,7 +81,8 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
           </span>
         </>
       ),
-      description: "From talent acquisition to employee engagement, our comprehensive platform covers every aspect of human resources management.",
+      description:
+        "From talent acquisition to employee engagement, our comprehensive platform covers every aspect of human resources management.",
       badge: "End-to-End Platform",
       features: [
         { icon: Users, label: "Talent Network" },
@@ -77,8 +91,16 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
         { icon: Briefcase, label: "Job Management" },
       ],
       actions: [
-        { label: "Explore Features", variant: "default" as const, size: "lg" as const },
-        { label: "See Pricing", variant: "outline" as const, size: "lg" as const },
+        {
+          label: "Explore Features",
+          variant: "default" as const,
+          size: "lg" as const,
+        },
+        {
+          label: "See Pricing",
+          variant: "outline" as const,
+          size: "lg" as const,
+        },
       ],
     },
   ];
@@ -119,7 +141,10 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
 
   const handleFiles = (files: FileList) => {
     const file = files[0];
-    if (file && (file.type === "application/pdf" || file.type.includes("word"))) {
+    if (
+      file &&
+      (file.type === "application/pdf" || file.type.includes("word"))
+    ) {
       console.log("Resume uploaded:", file.name);
       // Here you would handle the file upload
     }
@@ -137,7 +162,7 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        
+
         <button
           onClick={nextSlide}
           className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 transition-colors"
@@ -147,7 +172,10 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
 
         {/* Slide Content */}
         <div className="text-center max-w-4xl mx-auto">
-          <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark">
+          <Badge
+            variant="secondary"
+            className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark"
+          >
             <Sparkles className="w-4 h-4 mr-2" />
             {currentSlideData.badge}
           </Badge>
@@ -181,7 +209,7 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
                       "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
                       dragActive
                         ? "border-primary bg-primary/10"
-                        : "border-muted-foreground/30 hover:border-primary/50"
+                        : "border-muted-foreground/30 hover:border-primary/50",
                     )}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
@@ -205,35 +233,41 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
             </div>
           )}
 
-          {currentSlideData.type === "features" && currentSlideData.features && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 max-w-2xl mx-auto">
-              {currentSlideData.features.map((feature, index) => (
-                <div key={index} className="flex flex-col items-center p-4 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
-                  <feature.icon className="w-6 h-6 mb-2 text-brand-purple" />
-                  <span className="text-sm font-medium">{feature.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {currentSlideData.type === "features" &&
+            currentSlideData.features && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 max-w-2xl mx-auto">
+                {currentSlideData.features.map((feature, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col items-center p-4 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
+                  >
+                    <feature.icon className="w-6 h-6 mb-2 text-brand-purple" />
+                    <span className="text-sm font-medium">{feature.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
           {/* Action Buttons */}
           {currentSlideData.type === "upload" ? (
             <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8 py-3">
               Generate AI Video
             </Button>
-          ) : currentSlideData.actions && (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {currentSlideData.actions.map((action, index) => (
-                <Button
-                  key={index}
-                  size={action.size}
-                  variant={action.variant}
-                  className="text-lg px-8 py-3"
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </div>
+          ) : (
+            currentSlideData.actions && (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                {currentSlideData.actions.map((action, index) => (
+                  <Button
+                    key={index}
+                    size={action.size}
+                    variant={action.variant}
+                    className="text-lg px-8 py-3"
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+            )
           )}
         </div>
 
@@ -247,7 +281,7 @@ export default function HeroCarousel({ totalViews, totalItems }: HeroCarouselPro
                 "w-3 h-3 rounded-full transition-colors",
                 index === currentSlide
                   ? "bg-brand-purple"
-                  : "bg-white/30 hover:bg-white/50"
+                  : "bg-white/30 hover:bg-white/50",
               )}
             />
           ))}

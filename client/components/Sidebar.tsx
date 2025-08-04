@@ -36,7 +36,11 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
-export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarProps) {
+export default function Sidebar({
+  isOpen,
+  onClose,
+  collapsed = false,
+}: SidebarProps) {
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
 
@@ -52,8 +56,6 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
     { name: "Outreach", href: "/outreach", icon: Send },
   ];
 
-
-
   const categories = [
     { name: "Software Engineering", count: 156 },
     { name: "Product Management", count: 89 },
@@ -62,8 +64,6 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
     { name: "Marketing", count: 92 },
     { name: "Sales", count: 67 },
   ];
-
-
 
   return (
     <>
@@ -81,7 +81,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
           "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-80 overflow-y-auto",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0 lg:fixed lg:z-auto"
+          "lg:translate-x-0 lg:fixed lg:z-auto",
         )}
       >
         <div className="flex flex-col h-full">
@@ -105,13 +105,12 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
             </Button>
           </div>
 
-          <div className={cn(
-            "flex-1 p-4 space-y-6",
-            collapsed ? "overflow-hidden" : "overflow-y-auto"
-          )}
+          <div
+            className={cn(
+              "flex-1 p-4 space-y-6",
+              collapsed ? "overflow-hidden" : "overflow-y-auto",
+            )}
           >
-
-
             {/* Navigation */}
             <div>
               {!collapsed && (
@@ -129,19 +128,19 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                       collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                       location.pathname === item.href
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
                     )}
                     onClick={onClose}
                     title={collapsed ? item.name : undefined}
                   >
-                    <item.icon className={cn("h-4 w-4", !collapsed && "mr-3")} />
+                    <item.icon
+                      className={cn("h-4 w-4", !collapsed && "mr-3")}
+                    />
                     {!collapsed && item.name}
                   </Link>
                 ))}
               </nav>
             </div>
-
-
 
             {/* Categories - Show only in expanded state */}
             {!collapsed && (
@@ -153,7 +152,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                   {categories.map((category) => (
                     <Link
                       key={category.name}
-                      to={`/category/${category.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                      to={`/category/${category.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
                       className="flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       onClick={onClose}
                     >
@@ -189,7 +188,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                   to="/profile"
                   className={cn(
                     "flex items-center text-sm hover:bg-accent rounded-md transition-colors p-2",
-                    collapsed ? "justify-center" : "gap-3"
+                    collapsed ? "justify-center" : "gap-3",
                   )}
                   onClick={onClose}
                   title={collapsed ? `Profile: ${user.name}` : undefined}
@@ -197,14 +196,20 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user.avatar} />
                     <AvatarFallback className="text-xs">
-                      {user.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      {user.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   {!collapsed && (
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{user.name}</p>
+                      <p className="text-sm font-medium truncate">
+                        {user.name}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate capitalize">
-                        {user.role?.replace('_', ' ')}
+                        {user.role?.replace("_", " ")}
                       </p>
                     </div>
                   )}
@@ -218,7 +223,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     location.pathname === "/settings"
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
                   title={collapsed ? "Settings" : undefined}
@@ -235,7 +240,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                   }}
                   className={cn(
                     "w-full flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
-                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
+                    collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                   )}
                   title={collapsed ? "Sign Out" : undefined}
                 >
@@ -253,7 +258,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     location.pathname === "/settings"
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
                   title={collapsed ? "Settings" : undefined}
@@ -268,7 +273,7 @@ export default function Sidebar({ isOpen, onClose, collapsed = false }: SidebarP
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                     location.pathname === "/help"
                       ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
                   title={collapsed ? "Help & Support" : undefined}

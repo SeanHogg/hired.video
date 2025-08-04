@@ -11,16 +11,22 @@ import {
   Calendar,
   Building2,
   TrendingUp,
-  AlertCircle
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { useAuth } from '@/lib/auth';
-import type { CompanyMetadata, CompanyWithOwnership } from '@/types/company';
+  AlertCircle,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/lib/auth";
+import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 
 interface CompanyCardProps {
   company: CompanyMetadata | CompanyWithOwnership;
@@ -29,7 +35,12 @@ interface CompanyCardProps {
   onUntrack?: (companyId: string) => void;
 }
 
-export default function CompanyCard({ company, showOwnership = false, onTrack, onUntrack }: CompanyCardProps) {
+export default function CompanyCard({
+  company,
+  showOwnership = false,
+  onTrack,
+  onUntrack,
+}: CompanyCardProps) {
   const { user } = useAuth();
 
   // Early return if company is undefined
@@ -37,35 +48,39 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
     return null;
   }
 
-  const ownership = 'ownership' in company ? company.ownership : undefined;
-  const isOwned = ownership === 'owned' || (!ownership && (company.userId === user?.id || company.teamMembers?.includes(user?.id || '')));
-  const isTracked = ownership === 'tracked';
+  const ownership = "ownership" in company ? company.ownership : undefined;
+  const isOwned =
+    ownership === "owned" ||
+    (!ownership &&
+      (company.userId === user?.id ||
+        company.teamMembers?.includes(user?.id || "")));
+  const isTracked = ownership === "tracked";
   const canEdit = isOwned;
-  
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'onboarding':
-        return 'bg-blue-100 text-blue-800';
-      case 'draft':
-        return 'bg-orange-100 text-orange-800';
-      case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "onboarding":
+        return "bg-blue-100 text-blue-800";
+      case "draft":
+        return "bg-orange-100 text-orange-800";
+      case "paused":
+        return "bg-yellow-100 text-yellow-800";
+      case "inactive":
+        return "bg-gray-100 text-gray-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
-      case 'public':
+      case "public":
         return null;
-      case 'private':
+      case "private":
         return <Eye className="h-3 w-3" />;
-      case 'draft':
+      case "draft":
         return <Edit className="h-3 w-3" />;
       default:
         return null;
@@ -73,15 +88,16 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
   };
 
   const getOnboardingStatus = () => {
-    if (company.status === 'draft' || company.status === 'onboarding') {
+    if (company.status === "draft" || company.status === "onboarding") {
       const progress = company.onboardingProgress || 0;
       return {
         show: true,
         progress,
-        message: progress === 100 ? 'Ready to publish' : `${progress}% complete`
+        message:
+          progress === 100 ? "Ready to publish" : `${progress}% complete`,
       };
     }
-    return { show: false, progress: 0, message: '' };
+    return { show: false, progress: 0, message: "" };
   };
 
   const onboardingStatus = getOnboardingStatus();
@@ -103,24 +119,30 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg hover:text-primary truncate">
-                  <Link to={`/companies/${company.id}`}>
-                    {company.name}
-                  </Link>
+                  <Link to={`/companies/${company.id}`}>{company.name}</Link>
                 </CardTitle>
                 {showOwnership && isTracked && (
-                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 flex-shrink-0">
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
+                  >
                     <UserCheck className="h-3 w-3 mr-1" />
                     Following
                   </Badge>
                 )}
-                {canEdit && (company.status === 'draft' || company.status === 'onboarding') && (
-                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 flex-shrink-0">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Setup Required
-                  </Badge>
-                )}
+                {canEdit &&
+                  (company.status === "draft" ||
+                    company.status === "onboarding") && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-orange-50 text-orange-700 flex-shrink-0"
+                    >
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Setup Required
+                    </Badge>
+                  )}
               </div>
-              
+
               {company.tagline && (
                 <CardDescription className="text-sm mb-2 line-clamp-1">
                   {company.tagline}
@@ -146,7 +168,10 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
 
           {/* Status and Visibility */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Badge variant="secondary" className={getStatusColor(company.status)}>
+            <Badge
+              variant="secondary"
+              className={getStatusColor(company.status)}
+            >
               {company.status}
             </Badge>
             {getVisibilityIcon(company.visibility) && (
@@ -172,7 +197,7 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
           </div>
         )}
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-3">
           {/* Job Statistics */}
@@ -215,7 +240,7 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
                 <ExternalLink className="h-3 w-3 ml-1" />
               </Link>
             </Button>
-            
+
             {canEdit ? (
               <Button asChild variant="outline" size="sm">
                 <Link to={`/companies/edit/${company.id}`}>
@@ -224,19 +249,20 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
                 </Link>
               </Button>
             ) : (
-              !isOwned && user && (
+              !isOwned &&
+              user && (
                 <div>
                   {isTracked ? (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => onUntrack?.(company.id)}
                     >
                       <BookmarkCheck className="h-3 w-3" />
                     </Button>
                   ) : (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => onTrack?.(company.id)}
                     >
@@ -251,9 +277,15 @@ export default function CompanyCard({ company, showOwnership = false, onTrack, o
           {/* Quick Actions for Jobs */}
           {company.activeJobCount > 0 && (
             <div className="pt-2 border-t">
-              <Button asChild variant="ghost" size="sm" className="w-full text-xs">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+              >
                 <Link to={`/jobs?company=${encodeURIComponent(company.name)}`}>
-                  View {company.activeJobCount} Open Position{company.activeJobCount !== 1 ? 's' : ''}
+                  View {company.activeJobCount} Open Position
+                  {company.activeJobCount !== 1 ? "s" : ""}
                 </Link>
               </Button>
             </div>

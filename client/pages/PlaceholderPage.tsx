@@ -2,7 +2,13 @@ import { Construction, ArrowLeft, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface PlaceholderPageProps {
   title: string;
@@ -10,15 +16,15 @@ interface PlaceholderPageProps {
   suggestedPrompt?: string;
 }
 
-export default function PlaceholderPage({ 
-  title, 
-  description, 
-  suggestedPrompt 
+export default function PlaceholderPage({
+  title,
+  description,
+  suggestedPrompt,
 }: PlaceholderPageProps) {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <Card className="border-dashed border-2 border-muted-foreground/30">
@@ -34,13 +40,15 @@ export default function PlaceholderPage({
             <CardContent className="text-center pb-12">
               {suggestedPrompt && (
                 <div className="bg-muted/50 rounded-lg p-6 mb-6 max-w-2xl mx-auto">
-                  <p className="text-sm text-muted-foreground mb-2">Suggested prompt:</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Suggested prompt:
+                  </p>
                   <p className="font-mono text-sm bg-background p-3 rounded border">
                     "{suggestedPrompt}"
                   </p>
                 </div>
               )}
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/">
                   <Button variant="outline" className="gap-2">
@@ -53,9 +61,10 @@ export default function PlaceholderPage({
                   Continue Building
                 </Button>
               </div>
-              
+
               <p className="text-sm text-muted-foreground mt-6">
-                This page is ready to be built! Continue prompting to add the content you need.
+                This page is ready to be built! Continue prompting to add the
+                content you need.
               </p>
             </CardContent>
           </Card>

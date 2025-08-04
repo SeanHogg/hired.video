@@ -43,7 +43,7 @@ export interface UserEducation {
 
 export interface UserSkill {
   name: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  level: "Beginner" | "Intermediate" | "Advanced" | "Expert";
   yearsOfExperience?: number;
   endorsed?: boolean;
   endorsements?: number;
@@ -86,8 +86,8 @@ export interface UserData {
   };
 }
 
-export type UserVisibility = 'public' | 'network_only' | 'private';
-export type UserStatus = 'active' | 'inactive' | 'busy' | 'looking';
+export type UserVisibility = "public" | "network_only" | "private";
+export type UserStatus = "active" | "inactive" | "busy" | "looking";
 
 export interface UserSettings {
   notifications: {
@@ -110,7 +110,7 @@ export interface UserSettings {
     timezone: string;
     currency: string;
     dateFormat: string;
-    theme: 'light' | 'dark' | 'system';
+    theme: "light" | "dark" | "system";
   };
   jobSearch?: {
     openToWork: boolean;
@@ -129,7 +129,7 @@ export interface UserProfile {
   id: string;
   slug: string; // User-friendly URL identifier (e.g., "john-seeker" or "jane-doe-123")
   data: UserData;
-  role: 'job_seeker' | 'recruiter' | 'business'; // System role
+  role: "job_seeker" | "recruiter" | "business"; // System role
   visibility: UserVisibility;
   status: UserStatus;
   companyId?: string; // For recruiters/business users
@@ -172,13 +172,18 @@ export interface UserMetadata {
   currentCompany?: string; // Current employer
 }
 
-export type UserOwnership = 'owned' | 'tracked' | 'connected';
+export type UserOwnership = "owned" | "tracked" | "connected";
 
 export interface UserWithOwnership extends UserMetadata {
   ownership: UserOwnership;
 }
 
-export type ConnectionStatus = 'none' | 'pending_sent' | 'pending_received' | 'connected' | 'blocked';
+export type ConnectionStatus =
+  | "none"
+  | "pending_sent"
+  | "pending_received"
+  | "connected"
+  | "blocked";
 
 export interface Connection {
   id: string;
@@ -199,7 +204,7 @@ export interface Message {
   content: string;
   createdAt: string;
   readAt?: string;
-  messageType: 'text' | 'image' | 'file' | 'system';
+  messageType: "text" | "image" | "file" | "system";
 }
 
 export interface Conversation {
@@ -249,34 +254,37 @@ export interface ConnectionResponse {
 export interface SendMessageRequest {
   toUserId: string;
   content: string;
-  messageType?: 'text' | 'image' | 'file';
+  messageType?: "text" | "image" | "file";
 }
 
 // Derived data helpers
 export const getUserFullName = (user: UserProfile | UserMetadata): string => {
-  if ('data' in user) {
+  if ("data" in user) {
     return `${user.data.firstName} ${user.data.lastName}`;
   }
   return user.fullName;
 };
 
 export const getCurrentPosition = (user: UserProfile): string | undefined => {
-  const currentExp = user.data.experience.find(exp => exp.isCurrent);
-  return currentExp ? `${currentExp.title} at ${currentExp.company}` : undefined;
+  const currentExp = user.data.experience.find((exp) => exp.isCurrent);
+  return currentExp
+    ? `${currentExp.title} at ${currentExp.company}`
+    : undefined;
 };
 
 export const getExperienceLevel = (user: UserProfile): string => {
   const totalYears = user.data.experience.reduce((total, exp) => {
     const start = new Date(exp.startDate);
     const end = exp.endDate ? new Date(exp.endDate) : new Date();
-    const years = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
+    const years =
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
     return total + years;
   }, 0);
 
-  if (totalYears < 2) return 'Entry Level';
-  if (totalYears < 5) return 'Mid Level';
-  if (totalYears < 10) return 'Senior Level';
-  return 'Executive Level';
+  if (totalYears < 2) return "Entry Level";
+  if (totalYears < 5) return "Mid Level";
+  if (totalYears < 10) return "Senior Level";
+  return "Executive Level";
 };
 
 export const getProfileCompleteness = (user: UserProfile): number => {
@@ -288,11 +296,16 @@ export const getProfileCompleteness = (user: UserProfile): number => {
     experience: 25,
     education: 15,
     skills: 15,
-    projects: 10
+    projects: 10,
   };
 
   // Basic info
-  if (user.data.firstName && user.data.lastName && user.data.headline && user.data.summary) {
+  if (
+    user.data.firstName &&
+    user.data.lastName &&
+    user.data.headline &&
+    user.data.summary
+  ) {
     score += weights.basicInfo;
   }
 

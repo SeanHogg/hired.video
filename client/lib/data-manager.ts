@@ -3,12 +3,12 @@
  * Provides caching, CRUD operations, and data transformation utilities
  */
 
-import { z } from 'zod';
-import { ApiSuccessResponse } from '@shared/api';
-import type { ApiClient } from './api-client';
-import { apiClient } from './api-client';
-import { validateOrThrow, ValidationError } from './errors';
-import { logger, logAsyncPerformance } from './logger';
+import { z } from "zod";
+import { ApiSuccessResponse } from "@shared/api";
+import type { ApiClient } from "./api-client";
+import { apiClient } from "./api-client";
+import { validateOrThrow, ValidationError } from "./errors";
+import { logger, logAsyncPerformance } from "./logger";
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -17,7 +17,7 @@ import { logger, logAsyncPerformance } from './logger';
 export interface CacheConfig {
   ttl?: number; // Time to live in milliseconds
   maxSize?: number; // Maximum number of items in cache
-  strategy?: 'lru' | 'fifo'; // Cache eviction strategy
+  strategy?: "lru" | "fifo"; // Cache eviction strategy
 }
 
 export interface QueryOptions {
@@ -32,7 +32,7 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface FilterParams {
@@ -62,14 +62,15 @@ class DataCache {
   private cache = new Map<string, CacheEntry<unknown>>();
   private accessOrder: string[] = []; // For LRU tracking
   private maxSize: number;
-  private strategy: 'lru' | 'fifo';
+  private strategy: "lru" | "fifo";
 
   constructor(config: CacheConfig = {}) {
     this.maxSize = config.maxSize || 1000;
-    this.strategy = config.strategy || 'lru';
+    this.strategy = config.strategy || "lru";
   }
 
-  set<T>(key: string, data: T, ttl = 300000): void { // Default 5 minutes
+  set<T>(key: string, data: T, ttl = 300000): void {
+    // Default 5 minutes
     // Remove expired entries
     this.cleanup();
 
@@ -85,20 +86,20 @@ class DataCache {
     };
 
     this.cache.set(key, entry);
-    
+
     // Update access order for LRU
-    if (this.strategy === 'lru') {
+    if (this.strategy === "lru") {
       this.updateAccessOrder(key);
     }
 
-    logger.debug('Cache set', { key, ttl, cacheSize: this.cache.size });
+    logger.debug("Cache set", { key, ttl, cacheSize: this.cache.size });
   }
 
   get<T>(key: string): T | null {
     const entry = this.cache.get(key) as CacheEntry<T> | undefined;
-    
+
     if (!entry) {
-      logger.debug('Cache miss', { key });
+      logger.debug("Cache miss", { key });
       return null;
     }
 
@@ -106,16 +107,16 @@ class DataCache {
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
       this.removeFromAccessOrder(key);
-      logger.debug('Cache expired', { key });
+      logger.debug("Cache expired", { key });
       return null;
     }
 
     // Update access order for LRU
-    if (this.strategy === 'lru') {
+    if (this.strategy === "lru") {
       this.updateAccessOrder(key);
     }
 
-    logger.debug('Cache hit', { key });
+    logger.debug("Cache hit", { key });
     return entry.data;
   }
 
@@ -123,7 +124,7 @@ class DataCache {
     const deleted = this.cache.delete(key);
     if (deleted) {
       this.removeFromAccessOrder(key);
-      logger.debug('Cache delete', { key });
+      logger.debug("Cache delete", { key });
     }
     return deleted;
   }
@@ -131,7 +132,7 @@ class DataCache {
   clear(): void {
     this.cache.clear();
     this.accessOrder = [];
-    logger.debug('Cache cleared');
+    logger.debug("Cache cleared");
   }
 
   private cleanup(): void {
@@ -150,7 +151,7 @@ class DataCache {
     }
 
     if (expiredKeys.length > 0) {
-      logger.debug('Cache cleanup', { expiredCount: expiredKeys.length });
+      logger.debug("Cache cleanup", { expiredCount: expiredKeys.length });
     }
   }
 
@@ -158,8 +159,8 @@ class DataCache {
     if (this.cache.size === 0) return;
 
     let keyToEvict: string;
-    
-    if (this.strategy === 'lru') {
+
+    if (this.strategy === "lru") {
       keyToEvict = this.accessOrder[0]; // Least recently used
     } else {
       keyToEvict = this.cache.keys().next().value; // First in (FIFO)
@@ -167,8 +168,11 @@ class DataCache {
 
     this.cache.delete(keyToEvict);
     this.removeFromAccessOrder(keyToEvict);
-    
-    logger.debug('Cache eviction', { key: keyToEvict, strategy: this.strategy });
+
+    logger.debug("Cache eviction", {
+      key: keyToEvict,
+      strategy: this.strategy,
+    });
   }
 
   private updateAccessOrder(key: string): void {
@@ -214,10 +218,10 @@ export class DataManager {
   async get<T>(
     endpoint: string,
     schema: z.ZodSchema<T>,
-    options: QueryOptions = {}
+    options: QueryOptions = {},
   ): Promise<T> {
     const cacheKey = options.cacheKey || `get:${endpoint}`;
-    
+
     // Try cache first
     if (options.useCache !== false) {
       const cached = this.cache.get<T>(cacheKey);
@@ -227,9 +231,12 @@ export class DataManager {
     }
 
     // Fetch from API
-    const response = await logAsyncPerformance(`API GET ${endpoint}`, async () => {
-      return this.client.get(endpoint, schema);
-    });
+    const response = await logAsyncPerformance(
+      `API GET ${endpoint}`,
+      async () => {
+        return this.client.get(endpoint, schema);
+      },
+    );
 
     const data = response.data;
 
@@ -247,16 +254,17 @@ export class DataManager {
     itemSchema: z.ZodSchema<T>,
     pagination: PaginationParams = {},
     filters: FilterParams = {},
-    options: QueryOptions = {}
+    options: QueryOptions = {},
   ): Promise<ListResponse<T>> {
     const queryParams = new URLSearchParams();
-    
+
     // Add pagination params
-    if (pagination.page) queryParams.set('page', pagination.page.toString());
-    if (pagination.limit) queryParams.set('limit', pagination.limit.toString());
-    if (pagination.sortBy) queryParams.set('sortBy', pagination.sortBy);
-    if (pagination.sortOrder) queryParams.set('sortOrder', pagination.sortOrder);
-    
+    if (pagination.page) queryParams.set("page", pagination.page.toString());
+    if (pagination.limit) queryParams.set("limit", pagination.limit.toString());
+    if (pagination.sortBy) queryParams.set("sortBy", pagination.sortBy);
+    if (pagination.sortOrder)
+      queryParams.set("sortOrder", pagination.sortOrder);
+
     // Add filter params
     for (const [key, value] of Object.entries(filters)) {
       if (value !== undefined && value !== null) {
@@ -264,12 +272,12 @@ export class DataManager {
       }
     }
 
-    const fullEndpoint = queryParams.toString() 
+    const fullEndpoint = queryParams.toString()
       ? `${endpoint}?${queryParams.toString()}`
       : endpoint;
 
     const cacheKey = options.cacheKey || `list:${fullEndpoint}`;
-    
+
     // Try cache first
     if (options.useCache !== false) {
       const cached = this.cache.get<ListResponse<T>>(cacheKey);
@@ -289,9 +297,12 @@ export class DataManager {
     });
 
     // Fetch from API
-    const response = await logAsyncPerformance(`API LIST ${endpoint}`, async () => {
-      return this.client.get(fullEndpoint, responseSchema);
-    });
+    const response = await logAsyncPerformance(
+      `API LIST ${endpoint}`,
+      async () => {
+        return this.client.get(fullEndpoint, responseSchema);
+      },
+    );
 
     const data = response.data as ListResponse<T>;
 
@@ -309,19 +320,22 @@ export class DataManager {
     data: TInput,
     inputSchema: z.ZodSchema<TInput>,
     outputSchema: z.ZodSchema<TOutput>,
-    options: QueryOptions = {}
+    options: QueryOptions = {},
   ): Promise<TOutput> {
     // Validate input data
     const validatedData = validateOrThrow(data, inputSchema);
 
     // Create via API
-    const response = await logAsyncPerformance(`API CREATE ${endpoint}`, async () => {
-      return this.client.post(endpoint, validatedData, outputSchema);
-    });
+    const response = await logAsyncPerformance(
+      `API CREATE ${endpoint}`,
+      async () => {
+        return this.client.post(endpoint, validatedData, outputSchema);
+      },
+    );
 
     // Invalidate related cache entries
     this.invalidateCache(`list:${endpoint}`);
-    
+
     return response.data;
   }
 
@@ -331,7 +345,7 @@ export class DataManager {
     data: Partial<TInput>,
     inputSchema: z.ZodSchema<Partial<TInput>>,
     outputSchema: z.ZodSchema<TOutput>,
-    options: QueryOptions = {}
+    options: QueryOptions = {},
   ): Promise<TOutput> {
     // Validate input data
     const validatedData = validateOrThrow(data, inputSchema);
@@ -339,21 +353,24 @@ export class DataManager {
     const fullEndpoint = `${endpoint}/${id}`;
 
     // Update via API
-    const response = await logAsyncPerformance(`API UPDATE ${fullEndpoint}`, async () => {
-      return this.client.put(fullEndpoint, validatedData, outputSchema);
-    });
+    const response = await logAsyncPerformance(
+      `API UPDATE ${fullEndpoint}`,
+      async () => {
+        return this.client.put(fullEndpoint, validatedData, outputSchema);
+      },
+    );
 
     // Invalidate cache entries
     this.invalidateCache(`get:${fullEndpoint}`);
     this.invalidateCache(`list:${endpoint}`);
-    
+
     return response.data;
   }
 
   async delete(
     endpoint: string,
     id: string,
-    options: QueryOptions = {}
+    options: QueryOptions = {},
   ): Promise<void> {
     const fullEndpoint = `${endpoint}/${id}`;
 
@@ -374,12 +391,12 @@ export class DataManager {
   invalidateCache(pattern: string): void {
     // Simple pattern matching - in production, you might want more sophisticated pattern matching
     const keysToDelete: string[] = [];
-    
+
     // Get all cache keys and find matches
     // Note: This is a simplified implementation
     // In a real app, you might want to track cache keys more efficiently
-    
-    logger.debug('Cache invalidation', { pattern });
+
+    logger.debug("Cache invalidation", { pattern });
   }
 
   clearCache(): void {

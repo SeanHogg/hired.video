@@ -19,27 +19,33 @@ import {
   Globe,
   Users,
   Lock,
-  Star
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import AuthOverlay from '@/components/AuthOverlay';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import ResumeViewer from '@/components/ResumeViewer';
-import Sidebar from '@/components/Sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
-import { getResumeById } from '@/data/mockResumes';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { useAuth } from '@/lib/auth';
-import { generateFakeResumeData } from '@/lib/fakeData';
-import type { Resume} from '@/types/resume';
-import { ResumeData } from '@/types/resume';
+  Star,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import AuthOverlay from "@/components/AuthOverlay";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import ResumeViewer from "@/components/ResumeViewer";
+import Sidebar from "@/components/Sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { getResumeById } from "@/data/mockResumes";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import { generateFakeResumeData } from "@/lib/fakeData";
+import type { Resume } from "@/types/resume";
+import { ResumeData } from "@/types/resume";
 
 interface TimelineItemProps {
   title: string;
@@ -52,26 +58,40 @@ interface TimelineItemProps {
   isLast?: boolean;
 }
 
-function TimelineItem({ title, subtitle, startDate, endDate, description, highlights, icon: Icon, isLast = false }: TimelineItemProps) {
+function TimelineItem({
+  title,
+  subtitle,
+  startDate,
+  endDate,
+  description,
+  highlights,
+  icon: Icon,
+  isLast = false,
+}: TimelineItemProps) {
   const [expanded, setExpanded] = useState(false);
 
   const formatDate = (dateString: string) => {
-    if (dateString === 'Present') return 'Present';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short'
+    if (dateString === "Present") return "Present";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
     });
   };
 
   return (
     <div className="relative">
-      {!isLast && <div className="absolute left-6 top-12 w-0.5 h-full bg-gradient-to-b from-primary to-primary/20" />}
-      
-      <div className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      {!isLast && (
+        <div className="absolute left-6 top-12 w-0.5 h-full bg-gradient-to-b from-primary to-primary/20" />
+      )}
+
+      <div
+        className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
         <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center relative z-10">
           <Icon className="w-6 h-6 text-primary" />
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -81,19 +101,25 @@ function TimelineItem({ title, subtitle, startDate, endDate, description, highli
             <div className="text-right">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(startDate)} - {formatDate(endDate)}</span>
+                <span>
+                  {formatDate(startDate)} - {formatDate(endDate)}
+                </span>
               </div>
-              <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`} />
+              <ChevronRight
+                className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
+              />
             </div>
           </div>
-          
+
           {description && (
             <p className="text-muted-foreground mt-2">{description}</p>
           )}
-          
+
           {expanded && highlights && highlights.length > 0 && (
             <div className="mt-4 space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Key Achievements</h4>
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                Key Achievements
+              </h4>
               <ul className="space-y-2">
                 {highlights.map((highlight, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
@@ -113,33 +139,38 @@ function TimelineItem({ title, subtitle, startDate, endDate, description, highli
 export default function ResumeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  
+
   const [resume, setResume] = useState<Resume | null>(null);
   const [rawResume, setRawResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [showVideo, setShowVideo] = useState(false);
-
-
-
 
   useEffect(() => {
     const loadResume = async () => {
       setLoading(true);
       try {
         // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         const foundResume = getResumeById(id);
         if (!foundResume) {
-          throw new Error('Resume not found');
+          throw new Error("Resume not found");
         }
 
         setRawResume(foundResume);
-        setResume(isAuthenticated ? foundResume : generateFakeResumeData(foundResume));
+        setResume(
+          isAuthenticated ? foundResume : generateFakeResumeData(foundResume),
+        );
       } catch (error) {
-        console.error('Failed to load resume:', error);
+        console.error("Failed to load resume:", error);
       } finally {
         setLoading(false);
       }
@@ -160,32 +191,40 @@ export default function ResumeDetail() {
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
-      case 'public': return <Globe className="w-4 h-4" />;
-      case 'recruiter_only': return <Users className="w-4 h-4" />;
-      case 'private': return <Lock className="w-4 h-4" />;
-      default: return <Lock className="w-4 h-4" />;
+      case "public":
+        return <Globe className="w-4 h-4" />;
+      case "recruiter_only":
+        return <Users className="w-4 h-4" />;
+      case "private":
+        return <Lock className="w-4 h-4" />;
+      default:
+        return <Lock className="w-4 h-4" />;
     }
   };
 
   const getPrivacyText = (privacy: string) => {
     switch (privacy) {
-      case 'public': return 'Public';
-      case 'recruiter_only': return 'Recruiter Only';
-      case 'private': return 'Private';
-      default: return 'Private';
+      case "public":
+        return "Public";
+      case "recruiter_only":
+        return "Recruiter Only";
+      case "private":
+        return "Private";
+      default:
+        return "Private";
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
@@ -210,13 +249,13 @@ export default function ResumeDetail() {
   if (!resume) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
@@ -224,8 +263,10 @@ export default function ResumeDetail() {
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
-              <p className="text-muted-foreground mb-6">The resume you're looking for doesn't exist or has been removed.</p>
-              <Button onClick={() => navigate('/resumes')}>
+              <p className="text-muted-foreground mb-6">
+                The resume you're looking for doesn't exist or has been removed.
+              </p>
+              <Button onClick={() => navigate("/resumes")}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Resumes
               </Button>
@@ -240,19 +281,19 @@ export default function ResumeDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
-        <div className={`pt-16 ${!isAuthenticated ? 'relative' : ''}`}>
+
+        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && (
             <AuthOverlay
               contentType="resume"
@@ -265,37 +306,48 @@ export default function ResumeDetail() {
             <div className="relative max-w-6xl mx-auto px-6 py-12">
               {/* Navigation */}
               <div className="flex items-center justify-between mb-8">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => navigate('/resumes')}
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate("/resumes")}
                   className="text-primary-foreground hover:bg-primary-foreground/10"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Resumes
                 </Button>
-                
+
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2">
                     {resume.isActive && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                      <Badge
+                        variant="secondary"
+                        className="bg-green-100 text-green-800"
+                      >
                         <Target className="w-3 h-3 mr-1" />
                         Active
                       </Badge>
                     )}
                     {resume.isMaster && (
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                      <Badge
+                        variant="secondary"
+                        className="bg-yellow-100 text-yellow-800"
+                      >
                         <Star className="w-3 h-3 mr-1" />
                         Master
                       </Badge>
                     )}
-                    <Badge variant="secondary" className="bg-white/20 text-primary-foreground">
+                    <Badge
+                      variant="secondary"
+                      className="bg-white/20 text-primary-foreground"
+                    >
                       {getPrivacyIcon(resume.privacy)}
-                      <span className="ml-1">{getPrivacyText(resume.privacy)}</span>
+                      <span className="ml-1">
+                        {getPrivacyText(resume.privacy)}
+                      </span>
                     </Badge>
                   </div>
-                  
+
                   {isOwner && (
-                    <Button 
+                    <Button
                       variant="secondary"
                       onClick={() => navigate(`/resumes/edit/${resume.id}`)}
                       className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
@@ -304,8 +356,8 @@ export default function ResumeDetail() {
                       Edit Resume
                     </Button>
                   )}
-                  
-                  <Button 
+
+                  <Button
                     variant="secondary"
                     className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                   >
@@ -322,21 +374,29 @@ export default function ResumeDetail() {
                     <Avatar className="w-20 h-20 border-4 border-white/30">
                       <AvatarImage src={resume.data.Basics.Image} />
                       <AvatarFallback className="text-2xl bg-white/20">
-                        {resume.data.Basics.Name.split(' ').map(n => n[0]).join('')}
+                        {resume.data.Basics.Name.split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h1 className="text-4xl font-bold">{resume.data.Basics.Name}</h1>
-                      <p className="text-xl opacity-90">{resume.data.Basics.Label}</p>
+                      <h1 className="text-4xl font-bold">
+                        {resume.data.Basics.Name}
+                      </h1>
+                      <p className="text-xl opacity-90">
+                        {resume.data.Basics.Label}
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-3">
                     {resume.data.Basics.Email && (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.open(`mailto:${resume.data.Basics.Email}`)}
+                        onClick={() =>
+                          window.open(`mailto:${resume.data.Basics.Email}`)
+                        }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
                         <Mail className="w-4 h-4 mr-2" />
@@ -347,7 +407,9 @@ export default function ResumeDetail() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.open(`tel:${resume.data.Basics.Phone}`)}
+                        onClick={() =>
+                          window.open(`tel:${resume.data.Basics.Phone}`)
+                        }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
                         <Phone className="w-4 h-4 mr-2" />
@@ -358,7 +420,9 @@ export default function ResumeDetail() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.open(resume.data.Basics.Url, '_blank')}
+                        onClick={() =>
+                          window.open(resume.data.Basics.Url, "_blank")
+                        }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
                         <ExternalLink className="w-4 h-4 mr-2" />
@@ -374,12 +438,12 @@ export default function ResumeDetail() {
                       Download PDF
                     </Button>
                   </div>
-                  
+
                   <p className="text-lg leading-relaxed opacity-95">
                     {resume.data.Basics.Summary}
                   </p>
                 </div>
-                
+
                 {/* Video Preview */}
                 <div className="relative">
                   <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
@@ -388,20 +452,30 @@ export default function ResumeDetail() {
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
                         <Dialog open={showVideo} onOpenChange={setShowVideo}>
                           <DialogTrigger asChild>
-                            <Button size="lg" variant="secondary" className="relative z-10">
+                            <Button
+                              size="lg"
+                              variant="secondary"
+                              className="relative z-10"
+                            >
                               <Play className="w-6 h-6 mr-2" />
                               Play Video Resume
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-4xl">
                             <DialogHeader>
-                              <DialogTitle>Video Resume - {resume.data.Basics.Name}</DialogTitle>
+                              <DialogTitle>
+                                Video Resume - {resume.data.Basics.Name}
+                              </DialogTitle>
                             </DialogHeader>
                             <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
                               <div className="text-center">
                                 <Play className="w-16 h-16 mx-auto mb-4 text-white/60" />
-                                <p className="text-white/80">AI-Generated Video Resume</p>
-                                <p className="text-white/60 text-sm">Video would be generated and displayed here</p>
+                                <p className="text-white/80">
+                                  AI-Generated Video Resume
+                                </p>
+                                <p className="text-white/60 text-sm">
+                                  Video would be generated and displayed here
+                                </p>
                               </div>
                             </div>
                           </DialogContent>
@@ -428,24 +502,26 @@ export default function ResumeDetail() {
                   </div>
                   <h2 className="text-3xl font-bold">Work Experience</h2>
                 </div>
-                
+
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Work
-                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
-                        .map((work, index) => (
-                          <TimelineItem
-                            key={index}
-                            title={work.Position}
-                            subtitle={work.Name}
-                            startDate={work.StartDate}
-                            endDate={work.EndDate || 'Present'}
-                            description={work.Summary}
-                            highlights={work.Highlights}
-                            icon={Building}
-                            isLast={index === resume.data.Work.length - 1}
-                          />
+                      {resume.data.Work.sort(
+                        (a, b) =>
+                          new Date(b.StartDate).getTime() -
+                          new Date(a.StartDate).getTime(),
+                      ).map((work, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={work.Position}
+                          subtitle={work.Name}
+                          startDate={work.StartDate}
+                          endDate={work.EndDate || "Present"}
+                          description={work.Summary}
+                          highlights={work.Highlights}
+                          icon={Building}
+                          isLast={index === resume.data.Work.length - 1}
+                        />
                       ))}
                     </div>
                   </CardContent>
@@ -462,23 +538,27 @@ export default function ResumeDetail() {
                   </div>
                   <h2 className="text-3xl font-bold">Education</h2>
                 </div>
-                
+
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Education
-                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
-                        .map((edu, index) => (
-                          <TimelineItem
-                            key={index}
-                            title={`${edu.StudyType} in ${edu.Area}`}
-                            subtitle={edu.Institution}
-                            startDate={edu.StartDate}
-                            endDate={edu.EndDate}
-                            description={edu.Score ? `GPA: ${edu.Score}` : undefined}
-                            icon={GraduationCap}
-                            isLast={index === resume.data.Education.length - 1}
-                          />
+                      {resume.data.Education.sort(
+                        (a, b) =>
+                          new Date(b.StartDate).getTime() -
+                          new Date(a.StartDate).getTime(),
+                      ).map((edu, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={`${edu.StudyType} in ${edu.Area}`}
+                          subtitle={edu.Institution}
+                          startDate={edu.StartDate}
+                          endDate={edu.EndDate}
+                          description={
+                            edu.Score ? `GPA: ${edu.Score}` : undefined
+                          }
+                          icon={GraduationCap}
+                          isLast={index === resume.data.Education.length - 1}
+                        />
                       ))}
                     </div>
                   </CardContent>
@@ -495,24 +575,26 @@ export default function ResumeDetail() {
                   </div>
                   <h2 className="text-3xl font-bold">Volunteer Experience</h2>
                 </div>
-                
+
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Volunteer
-                        .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
-                        .map((volunteer, index) => (
-                          <TimelineItem
-                            key={index}
-                            title={volunteer.Position}
-                            subtitle={volunteer.Organization}
-                            startDate={volunteer.StartDate}
-                            endDate={volunteer.EndDate || 'Present'}
-                            description={volunteer.Summary}
-                            highlights={volunteer.Highlights || undefined}
-                            icon={Heart}
-                            isLast={index === resume.data.Volunteer.length - 1}
-                          />
+                      {resume.data.Volunteer.sort(
+                        (a, b) =>
+                          new Date(b.StartDate).getTime() -
+                          new Date(a.StartDate).getTime(),
+                      ).map((volunteer, index) => (
+                        <TimelineItem
+                          key={index}
+                          title={volunteer.Position}
+                          subtitle={volunteer.Organization}
+                          startDate={volunteer.StartDate}
+                          endDate={volunteer.EndDate || "Present"}
+                          description={volunteer.Summary}
+                          highlights={volunteer.Highlights || undefined}
+                          icon={Heart}
+                          isLast={index === resume.data.Volunteer.length - 1}
+                        />
                       ))}
                     </div>
                   </CardContent>
@@ -528,7 +610,9 @@ export default function ResumeDetail() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">{resume.views}</div>
+                    <div className="text-3xl font-bold text-primary mb-2">
+                      {resume.views}
+                    </div>
                     <p className="text-sm text-muted-foreground">Total Views</p>
                   </div>
                   <div className="text-center">
@@ -541,12 +625,17 @@ export default function ResumeDetail() {
                     <div className="text-3xl font-bold text-primary mb-2">
                       {new Date(resume.updatedAt).toLocaleDateString()}
                     </div>
-                    <p className="text-sm text-muted-foreground">Last Updated</p>
+                    <p className="text-sm text-muted-foreground">
+                      Last Updated
+                    </p>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-primary mb-2">
-                      {resume.privacy === 'public' ? 'Public' : 
-                       resume.privacy === 'recruiter_only' ? 'Recruiters' : 'Private'}
+                      {resume.privacy === "public"
+                        ? "Public"
+                        : resume.privacy === "recruiter_only"
+                          ? "Recruiters"
+                          : "Private"}
                     </div>
                     <p className="text-sm text-muted-foreground">Visibility</p>
                   </div>
@@ -554,12 +643,10 @@ export default function ResumeDetail() {
               </CardContent>
             </Card>
           </div>
-          
+
           <Footer />
         </div>
       </div>
-
-
     </div>
   );
 }

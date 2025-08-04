@@ -1,26 +1,23 @@
-import { 
-  Eye, 
-  Share2, 
-  Edit, 
-  Download, 
-  Trash2, 
-  UserPlus,
-  X
-} from "lucide-react";
+import { Eye, Share2, Edit, Download, Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface User {
   id: string;
   isAuthenticated: boolean;
-  role: 'job_seeker' | 'recruiter' | 'business';
+  role: "job_seeker" | "recruiter" | "business";
 }
 
 interface ContentItem {
   id: string;
   ownerId?: string;
-  type: 'resume' | 'job_description';
-  contentType: 'video' | 'text';
+  type: "resume" | "job_description";
+  contentType: "video" | "text";
 }
 
 interface ActionsModalProps {
@@ -62,7 +59,7 @@ export default function ActionsModal({
   }
 
   const isOwner = user?.isAuthenticated && user.id === item.ownerId;
-  const isRecruiter = user?.isAuthenticated && user.role === 'recruiter';
+  const isRecruiter = user?.isAuthenticated && user.role === "recruiter";
   const isAuthenticated = user?.isAuthenticated;
 
   const getAvailableActions = () => {
@@ -70,86 +67,86 @@ export default function ActionsModal({
 
     // View - available to everyone
     actions.push({
-      id: 'view',
-      label: 'View',
+      id: "view",
+      label: "View",
       icon: Eye,
       onClick: () => {
         onView?.();
         onClose();
       },
-      variant: 'outline' as const,
+      variant: "outline" as const,
     });
 
     // Share - available to everyone
     actions.push({
-      id: 'share',
-      label: 'Share',
+      id: "share",
+      label: "Share",
       icon: Share2,
       onClick: () => {
         onShare?.();
         onClose();
       },
-      variant: 'default' as const,
+      variant: "default" as const,
     });
 
     // Owner actions
     if (isOwner) {
       actions.push({
-        id: 'edit',
-        label: 'Edit',
+        id: "edit",
+        label: "Edit",
         icon: Edit,
         onClick: () => {
           onEdit?.();
           onClose();
         },
-        variant: 'outline' as const,
+        variant: "outline" as const,
       });
 
       actions.push({
-        id: 'download',
-        label: 'Download',
+        id: "download",
+        label: "Download",
         icon: Download,
         onClick: () => {
           onDownload?.();
           onClose();
         },
-        variant: 'outline' as const,
+        variant: "outline" as const,
       });
 
       actions.push({
-        id: 'delete',
-        label: 'Delete',
+        id: "delete",
+        label: "Delete",
         icon: Trash2,
         onClick: () => {
           onDelete?.();
           onClose();
         },
-        variant: 'destructive' as const,
+        variant: "destructive" as const,
       });
     }
 
     // Recruiter actions (for resumes they don't own)
-    if (isRecruiter && !isOwner && item && item.type === 'resume') {
+    if (isRecruiter && !isOwner && item && item.type === "resume") {
       actions.push({
-        id: 'download',
-        label: 'Download Resume',
+        id: "download",
+        label: "Download Resume",
         icon: Download,
         onClick: () => {
           onDownload?.();
           onClose();
         },
-        variant: 'outline' as const,
+        variant: "outline" as const,
       });
 
       actions.push({
-        id: 'track',
-        label: 'Track Candidate',
+        id: "track",
+        label: "Track Candidate",
         icon: UserPlus,
         onClick: () => {
           onTrack?.();
           onClose();
         },
-        variant: 'default' as const,
+        variant: "default" as const,
       });
     }
 
@@ -174,7 +171,7 @@ export default function ActionsModal({
             </Button>
           </div>
         </DialogHeader>
-        
+
         <div className="space-y-3 pt-4">
           {actions.map((action) => (
             <Button
@@ -193,7 +190,8 @@ export default function ActionsModal({
         {!isAuthenticated && (
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground text-center">
-              <strong>Sign in</strong> to access more actions like downloading and tracking candidates.
+              <strong>Sign in</strong> to access more actions like downloading
+              and tracking candidates.
             </p>
           </div>
         )}

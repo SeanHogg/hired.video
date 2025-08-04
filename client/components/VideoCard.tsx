@@ -42,7 +42,7 @@ export default function VideoCard({
     const videoDate = new Date(date);
     const diffTime = Math.abs(now.getTime() - videoDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return "1 day ago";
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
@@ -74,7 +74,10 @@ export default function VideoCard({
 
           {/* Type badge */}
           <div className="absolute top-2 left-2">
-            <Badge variant={type === "resume" ? "default" : "secondary"} className="text-xs">
+            <Badge
+              variant={type === "resume" ? "default" : "secondary"}
+              className="text-xs"
+            >
               {type === "resume" ? (
                 <>
                   <User className="w-3 h-3 mr-1" />

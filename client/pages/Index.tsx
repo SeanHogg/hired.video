@@ -15,7 +15,7 @@ import {
   ChevronDown,
   Building2,
   Grid,
-  List
+  List,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
@@ -31,7 +31,13 @@ import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import VideoCard from "@/components/VideoCard";
 import PeopleCard from "@/components/PeopleCard";
 import type { SearchFilters } from "@/components/SearchBar";
@@ -40,21 +46,26 @@ import Pagination, { usePagination } from "@/components/Pagination";
 import { MOCK_COMPANIES } from "@/data/mockCompanies";
 import { getPublicJobs } from "@/data/mockJobs";
 import { MOCK_USERS } from "@/data/mockPeople";
-import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from '@/data/mockResumes';
+import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from "@/data/mockResumes";
 import { useSidebar } from "@/hooks/use-sidebar";
-
 
 export default function Index() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchRadius: "25",
     experienceLevel: "all",
     education: "all",
-    datePosted: "all"
+    datePosted: "all",
   });
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
 
   // Mock user state - in real app this would come from auth context
   const [currentUser] = useState(null);
@@ -68,8 +79,6 @@ export default function Index() {
     item: null,
   });
 
-
-
   // Action handlers
   const handleOpenActions = (item: any) => {
     setActionsModal({ isOpen: true, item });
@@ -80,31 +89,31 @@ export default function Index() {
   };
 
   const handleView = (item: any) => {
-    if (item.type === 'resume') {
+    if (item.type === "resume") {
       navigate(`/resumes/${item.id}`);
     } else {
-      console.log('View item:', item.id);
+      console.log("View item:", item.id);
     }
   };
 
   const handleShare = (item: any) => {
-    console.log('Share item:', item.id);
+    console.log("Share item:", item.id);
   };
 
   const handleEdit = (item: any) => {
-    console.log('Edit item:', item.id);
+    console.log("Edit item:", item.id);
   };
 
   const handleDownload = (item: any) => {
-    console.log('Download item:', item.id);
+    console.log("Download item:", item.id);
   };
 
   const handleDelete = (item: any) => {
-    console.log('Delete item:', item.id);
+    console.log("Delete item:", item.id);
   };
 
   const handleTrack = (item: any) => {
-    console.log('Track candidate:', item.id);
+    console.log("Track candidate:", item.id);
   };
 
   // Get real data from mock sources
@@ -115,7 +124,7 @@ export default function Index() {
   // Convert to unified content items
   const contentItems = [
     // People
-    ...realPeople.map(person => ({
+    ...realPeople.map((person) => ({
       id: person.id,
       name: `${person.data.firstName} ${person.data.lastName}`,
       title: person.data.headline,
@@ -124,16 +133,16 @@ export default function Index() {
       views: Math.floor(Math.random() * 500) + 50,
       type: "people" as const,
       contentType: "profile" as const,
-      profession: person.data.headline.split(' | ')[0] || person.data.headline,
-      company: person.data.experience[0]?.company || 'Independent',
+      profession: person.data.headline.split(" | ")[0] || person.data.headline,
+      company: person.data.experience[0]?.company || "Independent",
       createdAt: person.createdAt,
       location: `${person.data.location.city}, ${person.data.location.state}`,
       role: person.role,
       isVerified: person.isVerified,
-      isPremium: person.isPremium
+      isPremium: person.isPremium,
     })),
     // Companies
-    ...realCompanies.map(company => ({
+    ...realCompanies.map((company) => ({
       id: company.id,
       name: company.data.name,
       title: company.data.tagline,
@@ -148,50 +157,53 @@ export default function Index() {
       location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
       size: company.data.size,
       activeJobCount: company.activeJobCount,
-      followers: company.followers
+      followers: company.followers,
     })),
     // Resumes
     {
       id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
       name: "Sean Hogg",
       title: "CTO and Technology Leader",
-      summary: "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
+      summary:
+        "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
       views: 45,
       type: "resume" as const,
       contentType: "text" as const,
       profession: "Technology Leader",
       company: "HireFractionalTalent.com",
       createdAt: "2024-01-15",
-      ownerId: "1"
+      ownerId: "1",
     },
     {
       id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
       name: "Sarah Chen",
       title: "Senior Software Engineer",
-      summary: "Passionate software engineer with 8 years of experience building scalable web applications. Expertise in React, Node.js, and cloud technologies.",
+      summary:
+        "Passionate software engineer with 8 years of experience building scalable web applications. Expertise in React, Node.js, and cloud technologies.",
       views: 67,
       type: "resume" as const,
       contentType: "text" as const,
       profession: "Software Engineer",
       company: "TechCorp Inc",
       createdAt: "2024-01-10",
-      ownerId: "4"
+      ownerId: "4",
     },
     {
       id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
       name: "Michael Rodriguez",
       title: "Senior Marketing Manager",
-      summary: "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy.",
+      summary:
+        "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy.",
       views: 2,
       type: "resume" as const,
       contentType: "text" as const,
       profession: "Marketing Manager",
       company: "GrowthCo",
       createdAt: "2024-01-28",
-      ownerId: "5"
+      ownerId: "5",
     },
     // Jobs
-    ...realJobs.map(job => ({
+    ...realJobs.map((job) => ({
       id: job.id,
       title: job.data.title,
       name: job.data.title,
@@ -202,12 +214,14 @@ export default function Index() {
       profession: job.data.title,
       company: job.data.company.name,
       createdAt: job.createdAt,
-      location: job.data.location.remote ? 'Remote' : `${job.data.location.city}, ${job.data.location.state}`,
+      location: job.data.location.remote
+        ? "Remote"
+        : `${job.data.location.city}, ${job.data.location.state}`,
       employmentType: job.data.employmentType,
       salaryMin: job.data.salaryMin,
       salaryMax: job.data.salaryMax,
-      jobData: job
-    }))
+      jobData: job,
+    })),
   ];
 
   const categories = [
@@ -221,7 +235,7 @@ export default function Index() {
   const allContentItems = contentItems;
 
   const handleSearch = (query: string) => {
-    setSearchFilters(prev => ({ ...prev, search: query }));
+    setSearchFilters((prev) => ({ ...prev, search: query }));
   };
 
   const handleFilterChange = (filters: SearchFilters) => {
@@ -233,22 +247,28 @@ export default function Index() {
       searchRadius: "25",
       experienceLevel: "all",
       education: "all",
-      datePosted: "all"
+      datePosted: "all",
     });
   };
 
   const filteredItems = allContentItems.filter((item) => {
     const searchQuery = searchFilters.search || "";
-    const matchesCategory = selectedCategory === "all" ||
-                           (selectedCategory === "job_description" && item.type === "job_listing") ||
-                           (selectedCategory === "people" && item.type === "resume") ||
-                           (selectedCategory === "companies" && false) || // No company data in current content
-                           item.type === selectedCategory;
-    const matchesSearch = searchQuery === "" ||
-      (item.title && item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.profession && item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.company && item.company.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory =
+      selectedCategory === "all" ||
+      (selectedCategory === "job_description" && item.type === "job_listing") ||
+      (selectedCategory === "people" && item.type === "resume") ||
+      (selectedCategory === "companies" && false) || // No company data in current content
+      item.type === selectedCategory;
+    const matchesSearch =
+      searchQuery === "" ||
+      (item.title &&
+        item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.name &&
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.profession &&
+        item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.company &&
+        item.company.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return matchesCategory && matchesSearch;
   });
@@ -262,7 +282,7 @@ export default function Index() {
     endIndex,
     setCurrentPage,
     handleItemsPerPageChange,
-    handleTotalItemsChange
+    handleTotalItemsChange,
   } = usePagination(filteredItems.length, 12);
 
   // Update pagination when filtered items change
@@ -273,7 +293,10 @@ export default function Index() {
   // Get paginated items
   const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
-  const totalViews = allContentItems.reduce((sum, item) => sum + (item.views || 0), 0);
+  const totalViews = allContentItems.reduce(
+    (sum, item) => sum + (item.views || 0),
+    0,
+  );
   const formatTotalViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
@@ -293,7 +316,7 @@ export default function Index() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-      
+
         {/* Hero Carousel */}
         <HeroCarousel
           totalViews={formatTotalViews(totalViews)}
@@ -319,7 +342,9 @@ export default function Index() {
                 {categories.map((category) => (
                   <Button
                     key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    variant={
+                      selectedCategory === category.id ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => setSelectedCategory(category.id)}
                     className="gap-2"
@@ -327,7 +352,7 @@ export default function Index() {
                     <category.icon className="w-4 h-4" />
                     {category.label}
                   </Button>
-              ))}
+                ))}
               </div>
             </div>
           </div>
@@ -341,34 +366,38 @@ export default function Index() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-foreground mb-2">
-                    {selectedCategory === "all" ? "All" :
-                   selectedCategory === "people" ? "People" :
-                   selectedCategory === "companies" ? "Companies" :
-                   selectedCategory === "resume" ? "Resumes" : "Jobs"}
+                    {selectedCategory === "all"
+                      ? "All"
+                      : selectedCategory === "people"
+                        ? "People"
+                        : selectedCategory === "companies"
+                          ? "Companies"
+                          : selectedCategory === "resume"
+                            ? "Resumes"
+                            : "Jobs"}
                   </h2>
                   <p className="text-muted-foreground">
                     {filteredItems.length} items found
                     {searchFilters.search && ` for "${searchFilters.search}"`}
                     {filteredItems.length > itemsPerPage &&
-                    ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`
-                  }
+                      ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`}
                   </p>
                 </div>
 
                 {/* View Toggle */}
                 <div className="flex rounded-md border">
                   <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    variant={viewMode === "grid" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode('grid')}
+                    onClick={() => setViewMode("grid")}
                     className="rounded-r-none"
                   >
                     <Grid className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    variant={viewMode === "list" ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode('list')}
+                    onClick={() => setViewMode("list")}
                     className="rounded-l-none"
                   >
                     <List className="h-4 w-4" />
@@ -380,183 +409,201 @@ export default function Index() {
             {/* Content Grid/List */}
             {filteredItems.length > 0 ? (
               <>
-                {viewMode === 'grid' ? (
+                {viewMode === "grid" ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {paginatedItems.map((item) => {
-                  if (item.type === "job_listing" && 'jobData' in item) {
-                    const jobMetadata = {
-                      id: item.jobData.id,
-                      slug: item.jobData.slug,
-                      title: item.jobData.data.title,
-                      company: item.jobData.data.company.name,
-                      location: item.jobData.data.location.remote
-                        ? 'Remote'
-                        : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
-                      salary: item.jobData.data.salaryMin && item.jobData.data.salaryMax
-                        ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
-                        : undefined,
-                      employmentType: item.jobData.data.employmentType,
-                      experienceLevel: item.jobData.data.experienceLevel,
-                      status: item.jobData.status,
-                      privacy: item.jobData.privacy,
-                      createdAt: item.jobData.createdAt,
-                      updatedAt: item.jobData.updatedAt,
-                      expiresAt: item.jobData.expiresAt,
-                      views: item.jobData.views,
-                      applications: item.jobData.applications,
-                      summary: item.jobData.data.summary,
-                      userId: item.jobData.userId,
-                      companyId: item.jobData.companyId
-                    };
+                      if (item.type === "job_listing" && "jobData" in item) {
+                        const jobMetadata = {
+                          id: item.jobData.id,
+                          slug: item.jobData.slug,
+                          title: item.jobData.data.title,
+                          company: item.jobData.data.company.name,
+                          location: item.jobData.data.location.remote
+                            ? "Remote"
+                            : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
+                          salary:
+                            item.jobData.data.salaryMin &&
+                            item.jobData.data.salaryMax
+                              ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
+                              : undefined,
+                          employmentType: item.jobData.data.employmentType,
+                          experienceLevel: item.jobData.data.experienceLevel,
+                          status: item.jobData.status,
+                          privacy: item.jobData.privacy,
+                          createdAt: item.jobData.createdAt,
+                          updatedAt: item.jobData.updatedAt,
+                          expiresAt: item.jobData.expiresAt,
+                          views: item.jobData.views,
+                          applications: item.jobData.applications,
+                          summary: item.jobData.data.summary,
+                          userId: item.jobData.userId,
+                          companyId: item.jobData.companyId,
+                        };
 
-                    return (
-                      <JobCard
-                        key={item.id}
-                        job={jobMetadata}
-                      />
-                    );
-                  } else if (item.type === "people") {
-                    const personData = {
-                      id: item.id,
-                      slug: `${item.name.toLowerCase().replace(/\s+/g, '-')}-${item.id.slice(-4)}`,
-                      firstName: item.name.split(' ')[0],
-                      lastName: item.name.split(' ')[1] || '',
-                      fullName: item.name,
-                      avatar: item.avatar,
-                      headline: item.title,
-                      location: item.location,
-                      role: item.role,
-                      visibility: 'public' as const,
-                      status: 'active' as const,
-                      companyId: undefined,
-                      companyName: item.company,
-                      createdAt: item.createdAt,
-                      updatedAt: item.createdAt,
-                      lastActiveAt: item.createdAt,
-                      profileViews: item.views,
-                      connectionCount: 0,
-                      followerCount: 0,
-                      isVerified: item.isVerified,
-                      isPremium: item.isPremium,
-                      openToWork: true,
-                      experienceLevel: 'mid',
-                      currentPosition: item.profession,
-                      currentCompany: item.company
-                    };
-                    return (
-                      <PeopleCard
-                        key={item.id}
-                        person={personData}
-                        onConnect={() => navigate(`/people/${item.id}`)}
-                      />
-                    );
-                  } else if (item.type === "companies") {
-                    const companyData = {
-                      id: item.id,
-                      slug: `${item.name.toLowerCase().replace(/\s+/g, '-')}-${item.id.slice(-4)}`,
-                      name: item.name,
-                      logo: item.logo,
-                      tagline: item.title,
-                      industry: item.profession,
-                      size: item.size,
-                      location: item.location,
-                      status: 'active' as const,
-                      visibility: 'public' as const,
-                      createdAt: item.createdAt || new Date().toISOString(),
-                      updatedAt: item.createdAt || new Date().toISOString(),
-                      views: item.views,
-                      followers: item.followers,
-                      jobCount: item.activeJobCount,
-                      activeJobCount: item.activeJobCount,
-                      userId: 'system',
-                      teamMembers: [],
-                      onboardingProgress: 100
-                    };
-                    return (
-                      <CompanyCard
-                        key={item.id}
-                        company={companyData}
-                      />
-                    );
-                  } else if (item.type === "resume") {
-                    return (
-                      <ResumeCard
-                        key={item.id}
-                        id={item.id}
-                        name={item.name}
-                        title={item.title}
-                        summary={item.summary}
-                        createdAt={item.createdAt}
-                        views={item.views}
-                        privacy="public"
-                        isMaster
-                        isActive
-                        parentId={null}
-                        ownership="tracked"
-                        onView={() => navigate(`/resumes/${item.id}`)}
-                        onActions={() => handleOpenActions(item)}
-                      />
-                    );
-                  }
-                  return null;
-                })}
+                        return <JobCard key={item.id} job={jobMetadata} />;
+                      } else if (item.type === "people") {
+                        const personData = {
+                          id: item.id,
+                          slug: `${item.name.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
+                          firstName: item.name.split(" ")[0],
+                          lastName: item.name.split(" ")[1] || "",
+                          fullName: item.name,
+                          avatar: item.avatar,
+                          headline: item.title,
+                          location: item.location,
+                          role: item.role,
+                          visibility: "public" as const,
+                          status: "active" as const,
+                          companyId: undefined,
+                          companyName: item.company,
+                          createdAt: item.createdAt,
+                          updatedAt: item.createdAt,
+                          lastActiveAt: item.createdAt,
+                          profileViews: item.views,
+                          connectionCount: 0,
+                          followerCount: 0,
+                          isVerified: item.isVerified,
+                          isPremium: item.isPremium,
+                          openToWork: true,
+                          experienceLevel: "mid",
+                          currentPosition: item.profession,
+                          currentCompany: item.company,
+                        };
+                        return (
+                          <PeopleCard
+                            key={item.id}
+                            person={personData}
+                            onConnect={() => navigate(`/people/${item.id}`)}
+                          />
+                        );
+                      } else if (item.type === "companies") {
+                        const companyData = {
+                          id: item.id,
+                          slug: `${item.name.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
+                          name: item.name,
+                          logo: item.logo,
+                          tagline: item.title,
+                          industry: item.profession,
+                          size: item.size,
+                          location: item.location,
+                          status: "active" as const,
+                          visibility: "public" as const,
+                          createdAt: item.createdAt || new Date().toISOString(),
+                          updatedAt: item.createdAt || new Date().toISOString(),
+                          views: item.views,
+                          followers: item.followers,
+                          jobCount: item.activeJobCount,
+                          activeJobCount: item.activeJobCount,
+                          userId: "system",
+                          teamMembers: [],
+                          onboardingProgress: 100,
+                        };
+                        return (
+                          <CompanyCard key={item.id} company={companyData} />
+                        );
+                      } else if (item.type === "resume") {
+                        return (
+                          <ResumeCard
+                            key={item.id}
+                            id={item.id}
+                            name={item.name}
+                            title={item.title}
+                            summary={item.summary}
+                            createdAt={item.createdAt}
+                            views={item.views}
+                            privacy="public"
+                            isMaster
+                            isActive
+                            parentId={null}
+                            ownership="tracked"
+                            onView={() => navigate(`/resumes/${item.id}`)}
+                            onActions={() => handleOpenActions(item)}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
-            ) : (
-              <div className="space-y-4">
-                {paginatedItems.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0">
-                        {item.type === "people" && item.avatar && (
-                          <img src={item.avatar} alt={item.name} className="w-12 h-12 rounded-full object-cover" />
-                        )}
-                        {item.type === "companies" && item.logo && (
-                          <img src={item.logo} alt={item.name} className="w-12 h-12 rounded-lg object-cover" />
-                        )}
-                        {(item.type === "resume" || item.type === "job_listing") && (
-                          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                            {item.type === "resume" ? (
-                              <User className="w-6 h-6 text-primary" />
-                            ) : (
-                              <Briefcase className="w-6 h-6 text-primary" />
+                ) : (
+                  <div className="space-y-4">
+                    {paginatedItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            {item.type === "people" && item.avatar && (
+                              <img
+                                src={item.avatar}
+                                alt={item.name}
+                                className="w-12 h-12 rounded-full object-cover"
+                              />
+                            )}
+                            {item.type === "companies" && item.logo && (
+                              <img
+                                src={item.logo}
+                                alt={item.name}
+                                className="w-12 h-12 rounded-lg object-cover"
+                              />
+                            )}
+                            {(item.type === "resume" ||
+                              item.type === "job_listing") && (
+                              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                {item.type === "resume" ? (
+                                  <User className="w-6 h-6 text-primary" />
+                                ) : (
+                                  <Briefcase className="w-6 h-6 text-primary" />
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-semibold text-lg truncate">{item.name || item.title}</h3>
-                            <p className="text-muted-foreground">{item.title}</p>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.summary}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-semibold text-lg truncate">
+                                  {item.name || item.title}
+                                </h3>
+                                <p className="text-muted-foreground">
+                                  {item.title}
+                                </p>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {item.summary}
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (item.type === "people")
+                                    navigate(`/people/${item.id}`);
+                                  else if (item.type === "companies")
+                                    navigate(`/companies/view/${item.id}`);
+                                  else if (item.type === "resume")
+                                    navigate(`/resumes/${item.id}`);
+                                  else if (item.type === "job_listing")
+                                    navigate(`/jobs/${item.id}`);
+                                }}
+                              >
+                                View
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                              {item.company && <span>{item.company}</span>}
+                              {"location" in item && item.location && (
+                                <span>{item.location}</span>
+                              )}
+                              <span className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                {item.views} views
+                              </span>
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                            if (item.type === "people") navigate(`/people/${item.id}`);
-                            else if (item.type === "companies") navigate(`/companies/view/${item.id}`);
-                            else if (item.type === "resume") navigate(`/resumes/${item.id}`);
-                            else if (item.type === "job_listing") navigate(`/jobs/${item.id}`);
-                          }}
-                          >
-                            View
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                          {item.company && <span>{item.company}</span>}
-                          {'location' in item && item.location && <span>{item.location}</span>}
-                          <span className="flex items-center gap-1">
-                            <Eye className="w-3 h-3" />
-                            {item.views} views
-                          </span>
                         </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
                 {/* Pagination */}
                 <Pagination
@@ -567,21 +614,22 @@ export default function Index() {
                   onItemsPerPageChange={handleItemsPerPageChange}
                 />
               </>
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="h-8 w-8 text-muted-foreground" />
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No content found
+                </h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search or filters to find more resumes and
+                  videos.
+                </p>
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">No content found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search or filters to find more resumes and videos.
-              </p>
-            </div>
-          )}
+            )}
           </div>
         </section>
-
-
 
         <Footer />
       </div>
@@ -595,12 +643,12 @@ export default function Index() {
         onView={() => actionsModal.item && handleView(actionsModal.item)}
         onShare={() => actionsModal.item && handleShare(actionsModal.item)}
         onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
-        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
+        onDownload={() =>
+          actionsModal.item && handleDownload(actionsModal.item)
+        }
         onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
       />
-
-
     </div>
   );
 }

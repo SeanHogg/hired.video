@@ -19,7 +19,7 @@ export interface JobCompany {
 
 export interface JobRequirement {
   skill: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  level: "Beginner" | "Intermediate" | "Advanced" | "Expert";
   required: boolean;
 }
 
@@ -43,8 +43,13 @@ export interface JobData {
   salaryMin?: number;
   salaryMax?: number;
   currency: string;
-  employmentType: 'full-time' | 'part-time' | 'contract' | 'internship' | 'temporary';
-  experienceLevel: 'entry' | 'mid' | 'senior' | 'executive';
+  employmentType:
+    | "full-time"
+    | "part-time"
+    | "contract"
+    | "internship"
+    | "temporary";
+  experienceLevel: "entry" | "mid" | "senior" | "executive";
   education?: string;
   location: JobLocation;
   company: JobCompany;
@@ -54,8 +59,12 @@ export interface JobData {
   applicationDeadline?: string;
 }
 
-export type JobStatus = 'active' | 'paused' | 'closed' | 'draft';
-export type JobPrivacy = 'public' | 'company_only' | 'recruiter_only' | 'private';
+export type JobStatus = "active" | "paused" | "closed" | "draft";
+export type JobPrivacy =
+  | "public"
+  | "company_only"
+  | "recruiter_only"
+  | "private";
 
 export interface Job {
   id: string;
@@ -94,7 +103,7 @@ export interface JobMetadata {
   companyId?: string;
 }
 
-export type JobOwnership = 'owned' | 'tracked';
+export type JobOwnership = "owned" | "tracked";
 
 export interface JobWithOwnership extends JobMetadata {
   ownership: JobOwnership;
@@ -135,7 +144,13 @@ export interface JobApplication {
   userId: string;
   resumeId?: string;
   coverLetter?: string;
-  status: 'pending' | 'reviewed' | 'interview' | 'offered' | 'rejected' | 'withdrawn';
+  status:
+    | "pending"
+    | "reviewed"
+    | "interview"
+    | "offered"
+    | "rejected"
+    | "withdrawn";
   appliedAt: string;
   updatedAt: string;
   notes?: string;

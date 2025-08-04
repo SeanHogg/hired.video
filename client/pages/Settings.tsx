@@ -20,10 +20,22 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +43,13 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function Settings() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { user, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState({
     email: true,
@@ -50,18 +68,18 @@ export default function Settings() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={closeSidebar} 
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation 
+          <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          
+
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto">
               <div className="text-center py-16">
@@ -84,47 +102,61 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar 
-        isOpen={sidebarOpen} 
-        onClose={closeSidebar} 
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
         collapsed={sidebarCollapsed}
       />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation 
+        <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-                <p className="text-muted-foreground mt-1">Manage your account settings and preferences</p>
+                <p className="text-muted-foreground mt-1">
+                  Manage your account settings and preferences
+                </p>
               </div>
               <Badge variant="secondary" className="capitalize">
-                {user.role?.replace('_', ' ')}
+                {user.role?.replace("_", " ")}
               </Badge>
             </div>
 
             {/* Settings Tabs */}
             <Tabs defaultValue="notifications" className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="notifications" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="notifications"
+                  className="flex items-center gap-2"
+                >
                   <Bell className="h-4 w-4" />
                   <span className="hidden sm:inline">Notifications</span>
                 </TabsTrigger>
-                <TabsTrigger value="privacy" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="privacy"
+                  className="flex items-center gap-2"
+                >
                   <Shield className="h-4 w-4" />
                   <span className="hidden sm:inline">Privacy</span>
                 </TabsTrigger>
-                <TabsTrigger value="appearance" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="appearance"
+                  className="flex items-center gap-2"
+                >
                   <Palette className="h-4 w-4" />
                   <span className="hidden sm:inline">Appearance</span>
                 </TabsTrigger>
-                <TabsTrigger value="account" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="account"
+                  className="flex items-center gap-2"
+                >
                   <CreditCard className="h-4 w-4" />
                   <span className="hidden sm:inline">Account</span>
                 </TabsTrigger>
@@ -136,59 +168,82 @@ export default function Settings() {
                   <CardHeader>
                     <CardTitle>Notification Preferences</CardTitle>
                     <CardDescription>
-                      Choose how you want to be notified about updates and activities.
+                      Choose how you want to be notified about updates and
+                      activities.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Email Notifications</Label>
+                        <Label className="text-sm font-medium">
+                          Email Notifications
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Receive notifications via email
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={notifications.email}
-                        onCheckedChange={(checked) => setNotifications({...notifications, email: checked})}
+                        onCheckedChange={(checked) =>
+                          setNotifications({ ...notifications, email: checked })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Push Notifications</Label>
+                        <Label className="text-sm font-medium">
+                          Push Notifications
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Receive browser push notifications
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={notifications.push}
-                        onCheckedChange={(checked) => setNotifications({...notifications, push: checked})}
+                        onCheckedChange={(checked) =>
+                          setNotifications({ ...notifications, push: checked })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Marketing Communications</Label>
+                        <Label className="text-sm font-medium">
+                          Marketing Communications
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Receive updates about new features and tips
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={notifications.marketing}
-                        onCheckedChange={(checked) => setNotifications({...notifications, marketing: checked})}
+                        onCheckedChange={(checked) =>
+                          setNotifications({
+                            ...notifications,
+                            marketing: checked,
+                          })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Weekly Summary</Label>
+                        <Label className="text-sm font-medium">
+                          Weekly Summary
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Get a weekly summary of your activity
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={notifications.weekly}
-                        onCheckedChange={(checked) => setNotifications({...notifications, weekly: checked})}
+                        onCheckedChange={(checked) =>
+                          setNotifications({
+                            ...notifications,
+                            weekly: checked,
+                          })
+                        }
                       />
                     </div>
                   </CardContent>
@@ -207,53 +262,69 @@ export default function Settings() {
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Public Profile</Label>
+                        <Label className="text-sm font-medium">
+                          Public Profile
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Make your profile visible to other users
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={privacy.profileVisible}
-                        onCheckedChange={(checked) => setPrivacy({...privacy, profileVisible: checked})}
+                        onCheckedChange={(checked) =>
+                          setPrivacy({ ...privacy, profileVisible: checked })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Show Email Address</Label>
+                        <Label className="text-sm font-medium">
+                          Show Email Address
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Display email on your public profile
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={privacy.showEmail}
-                        onCheckedChange={(checked) => setPrivacy({...privacy, showEmail: checked})}
+                        onCheckedChange={(checked) =>
+                          setPrivacy({ ...privacy, showEmail: checked })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Show Phone Number</Label>
+                        <Label className="text-sm font-medium">
+                          Show Phone Number
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Display phone number on your public profile
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={privacy.showPhone}
-                        onCheckedChange={(checked) => setPrivacy({...privacy, showPhone: checked})}
+                        onCheckedChange={(checked) =>
+                          setPrivacy({ ...privacy, showPhone: checked })
+                        }
                       />
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
-                        <Label className="text-sm font-medium">Search Engine Indexing</Label>
+                        <Label className="text-sm font-medium">
+                          Search Engine Indexing
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           Allow search engines to index your profile
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={privacy.indexable}
-                        onCheckedChange={(checked) => setPrivacy({...privacy, indexable: checked})}
+                        onCheckedChange={(checked) =>
+                          setPrivacy({ ...privacy, indexable: checked })
+                        }
                       />
                     </div>
                   </CardContent>
@@ -304,10 +375,18 @@ export default function Settings() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="utc-8">Pacific Time (UTC-8)</SelectItem>
-                          <SelectItem value="utc-7">Mountain Time (UTC-7)</SelectItem>
-                          <SelectItem value="utc-6">Central Time (UTC-6)</SelectItem>
-                          <SelectItem value="utc-5">Eastern Time (UTC-5)</SelectItem>
+                          <SelectItem value="utc-8">
+                            Pacific Time (UTC-8)
+                          </SelectItem>
+                          <SelectItem value="utc-7">
+                            Mountain Time (UTC-7)
+                          </SelectItem>
+                          <SelectItem value="utc-6">
+                            Central Time (UTC-6)
+                          </SelectItem>
+                          <SelectItem value="utc-5">
+                            Eastern Time (UTC-5)
+                          </SelectItem>
                           <SelectItem value="utc+0">GMT (UTC+0)</SelectItem>
                         </SelectContent>
                       </Select>
@@ -329,7 +408,8 @@ export default function Settings() {
                     <div>
                       <h4 className="text-sm font-medium mb-2">Data Export</h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Download a copy of your data including profile, resumes, and activity.
+                        Download a copy of your data including profile, resumes,
+                        and activity.
                       </p>
                       <Button variant="outline" className="gap-2">
                         <Download className="h-4 w-4" />
@@ -349,9 +429,12 @@ export default function Settings() {
                     </div>
                     <Separator />
                     <div>
-                      <h4 className="text-sm font-medium mb-2 text-destructive">Delete Account</h4>
+                      <h4 className="text-sm font-medium mb-2 text-destructive">
+                        Delete Account
+                      </h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Permanently delete your account and all associated data. This action cannot be undone.
+                        Permanently delete your account and all associated data.
+                        This action cannot be undone.
                       </p>
                       <Button variant="destructive" className="gap-2">
                         <Trash2 className="h-4 w-4" />

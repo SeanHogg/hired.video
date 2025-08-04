@@ -1,24 +1,37 @@
-import { 
-  User, 
-  Briefcase, 
-  GraduationCap, 
-  Award, 
-  FileText, 
-  Plus, 
-  Trash2, 
+import {
+  User,
+  Briefcase,
+  GraduationCap,
+  Award,
+  FileText,
+  Plus,
+  Trash2,
   Save,
-  X
-} from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import type { ResumeData, ResumePrivacy, CreateResumeRequest, WorkExperience, Education, Skill } from '@/types/resume';
+  X,
+} from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import type {
+  ResumeData,
+  ResumePrivacy,
+  CreateResumeRequest,
+  WorkExperience,
+  Education,
+  Skill,
+} from "@/types/resume";
 
 interface ResumeBuilderProps {
   onSave: (request: CreateResumeRequest) => void;
@@ -26,40 +39,53 @@ interface ResumeBuilderProps {
   initialData?: Partial<ResumeData>;
 }
 
-export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeBuilderProps) {
-  const [resumeName, setResumeName] = useState('');
-  const [privacy, setPrivacy] = useState<ResumePrivacy>('private');
+export default function ResumeBuilder({
+  onSave,
+  onCancel,
+  initialData,
+}: ResumeBuilderProps) {
+  const [resumeName, setResumeName] = useState("");
+  const [privacy, setPrivacy] = useState<ResumePrivacy>("private");
   const [isMaster, setIsMaster] = useState(false);
-  
+
   const [basics, setBasics] = useState({
-    Name: '',
-    Label: '',
-    Image: '',
-    Email: '',
-    Phone: '',
-    Url: '',
-    Summary: '',
+    Name: "",
+    Label: "",
+    Image: "",
+    Email: "",
+    Phone: "",
+    Url: "",
+    Summary: "",
     Location: null,
-    ...initialData?.Basics
+    ...initialData?.Basics,
   });
 
   const [work, setWork] = useState<WorkExperience[]>(initialData?.Work || []);
-  const [education, setEducation] = useState<Education[]>(initialData?.Education || []);
+  const [education, setEducation] = useState<Education[]>(
+    initialData?.Education || [],
+  );
   const [skills, setSkills] = useState<Skill[]>(initialData?.Skills || []);
 
   const addWorkExperience = () => {
-    setWork([...work, {
-      Name: '',
-      Position: '',
-      Summary: '',
-      StartDate: '',
-      EndDate: '',
-      Highlights: [],
-      Url: ''
-    }]);
+    setWork([
+      ...work,
+      {
+        Name: "",
+        Position: "",
+        Summary: "",
+        StartDate: "",
+        EndDate: "",
+        Highlights: [],
+        Url: "",
+      },
+    ]);
   };
 
-  const updateWorkExperience = (index: number, field: keyof WorkExperience, value: string | string[]) => {
+  const updateWorkExperience = (
+    index: number,
+    field: keyof WorkExperience,
+    value: string | string[],
+  ) => {
     const updatedWork = [...work];
     updatedWork[index] = { ...updatedWork[index], [field]: value };
     setWork(updatedWork);
@@ -70,19 +96,26 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
   };
 
   const addEducation = () => {
-    setEducation([...education, {
-      Institution: '',
-      Area: '',
-      StudyType: '',
-      StartDate: '',
-      EndDate: '',
-      Score: '',
-      Courses: null,
-      Url: ''
-    }]);
+    setEducation([
+      ...education,
+      {
+        Institution: "",
+        Area: "",
+        StudyType: "",
+        StartDate: "",
+        EndDate: "",
+        Score: "",
+        Courses: null,
+        Url: "",
+      },
+    ]);
   };
 
-  const updateEducation = (index: number, field: keyof Education, value: string | string[] | null) => {
+  const updateEducation = (
+    index: number,
+    field: keyof Education,
+    value: string | string[] | null,
+  ) => {
     const updatedEducation = [...education];
     updatedEducation[index] = { ...updatedEducation[index], [field]: value };
     setEducation(updatedEducation);
@@ -93,14 +126,21 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
   };
 
   const addSkill = () => {
-    setSkills([...skills, {
-      Name: '',
-      Level: '',
-      Keywords: []
-    }]);
+    setSkills([
+      ...skills,
+      {
+        Name: "",
+        Level: "",
+        Keywords: [],
+      },
+    ]);
   };
 
-  const updateSkill = (index: number, field: keyof Skill, value: string | string[]) => {
+  const updateSkill = (
+    index: number,
+    field: keyof Skill,
+    value: string | string[],
+  ) => {
     const updatedSkills = [...skills];
     updatedSkills[index] = { ...updatedSkills[index], [field]: value };
     setSkills(updatedSkills);
@@ -112,11 +152,15 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
 
   const addHighlight = (workIndex: number) => {
     const updatedWork = [...work];
-    updatedWork[workIndex].Highlights.push('');
+    updatedWork[workIndex].Highlights.push("");
     setWork(updatedWork);
   };
 
-  const updateHighlight = (workIndex: number, highlightIndex: number, value: string) => {
+  const updateHighlight = (
+    workIndex: number,
+    highlightIndex: number,
+    value: string,
+  ) => {
     const updatedWork = [...work];
     updatedWork[workIndex].Highlights[highlightIndex] = value;
     setWork(updatedWork);
@@ -143,14 +187,14 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
       Languages: [],
       Interests: [],
       References: [],
-      Projects: []
+      Projects: [],
     };
 
     const request: CreateResumeRequest = {
       name: resumeName.trim(),
       data: resumeData,
       privacy,
-      isMaster
+      isMaster,
     };
 
     onSave(request);
@@ -179,7 +223,10 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
             </div>
             <div className="space-y-2">
               <Label>Privacy Setting</Label>
-              <Select value={privacy} onValueChange={(value: ResumePrivacy) => setPrivacy(value)}>
+              <Select
+                value={privacy}
+                onValueChange={(value: ResumePrivacy) => setPrivacy(value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -191,7 +238,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
               </Select>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Checkbox
               id="master-resume"
@@ -237,7 +284,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   <Input
                     id="name"
                     value={basics.Name}
-                    onChange={(e) => setBasics({ ...basics, Name: e.target.value })}
+                    onChange={(e) =>
+                      setBasics({ ...basics, Name: e.target.value })
+                    }
                     placeholder="John Doe"
                   />
                 </div>
@@ -246,7 +295,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   <Input
                     id="label"
                     value={basics.Label}
-                    onChange={(e) => setBasics({ ...basics, Label: e.target.value })}
+                    onChange={(e) =>
+                      setBasics({ ...basics, Label: e.target.value })
+                    }
                     placeholder="Software Engineer"
                   />
                 </div>
@@ -256,7 +307,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                     id="email"
                     type="email"
                     value={basics.Email}
-                    onChange={(e) => setBasics({ ...basics, Email: e.target.value })}
+                    onChange={(e) =>
+                      setBasics({ ...basics, Email: e.target.value })
+                    }
                     placeholder="john@example.com"
                   />
                 </div>
@@ -265,7 +318,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   <Input
                     id="phone"
                     value={basics.Phone}
-                    onChange={(e) => setBasics({ ...basics, Phone: e.target.value })}
+                    onChange={(e) =>
+                      setBasics({ ...basics, Phone: e.target.value })
+                    }
                     placeholder="(555) 123-4567"
                   />
                 </div>
@@ -274,7 +329,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   <Input
                     id="url"
                     value={basics.Url}
-                    onChange={(e) => setBasics({ ...basics, Url: e.target.value })}
+                    onChange={(e) =>
+                      setBasics({ ...basics, Url: e.target.value })
+                    }
                     placeholder="https://johndoe.dev"
                   />
                 </div>
@@ -284,7 +341,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                 <Textarea
                   id="summary"
                   value={basics.Summary}
-                  onChange={(e) => setBasics({ ...basics, Summary: e.target.value })}
+                  onChange={(e) =>
+                    setBasics({ ...basics, Summary: e.target.value })
+                  }
                   placeholder="Brief overview of your professional background and key achievements..."
                   rows={4}
                 />
@@ -315,13 +374,15 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Company</Label>
                       <Input
                         value={exp.Name}
-                        onChange={(e) => updateWorkExperience(index, 'Name', e.target.value)}
+                        onChange={(e) =>
+                          updateWorkExperience(index, "Name", e.target.value)
+                        }
                         placeholder="Company Name"
                       />
                     </div>
@@ -329,7 +390,13 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Label>Position</Label>
                       <Input
                         value={exp.Position}
-                        onChange={(e) => updateWorkExperience(index, 'Position', e.target.value)}
+                        onChange={(e) =>
+                          updateWorkExperience(
+                            index,
+                            "Position",
+                            e.target.value,
+                          )
+                        }
                         placeholder="Job Title"
                       />
                     </div>
@@ -338,7 +405,13 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Input
                         type="month"
                         value={exp.StartDate}
-                        onChange={(e) => updateWorkExperience(index, 'StartDate', e.target.value)}
+                        onChange={(e) =>
+                          updateWorkExperience(
+                            index,
+                            "StartDate",
+                            e.target.value,
+                          )
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -346,17 +419,21 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Input
                         type="month"
                         value={exp.EndDate}
-                        onChange={(e) => updateWorkExperience(index, 'EndDate', e.target.value)}
+                        onChange={(e) =>
+                          updateWorkExperience(index, "EndDate", e.target.value)
+                        }
                         placeholder="Leave empty if current"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Job Summary</Label>
                     <Textarea
                       value={exp.Summary}
-                      onChange={(e) => updateWorkExperience(index, 'Summary', e.target.value)}
+                      onChange={(e) =>
+                        updateWorkExperience(index, "Summary", e.target.value)
+                      }
                       placeholder="Brief description of your role and responsibilities..."
                       rows={2}
                     />
@@ -379,14 +456,22 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                         <div key={highlightIndex} className="flex gap-2">
                           <Input
                             value={highlight}
-                            onChange={(e) => updateHighlight(index, highlightIndex, e.target.value)}
+                            onChange={(e) =>
+                              updateHighlight(
+                                index,
+                                highlightIndex,
+                                e.target.value,
+                              )
+                            }
                             placeholder="Achievement or responsibility..."
                             className="flex-1"
                           />
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeHighlight(index, highlightIndex)}
+                            onClick={() =>
+                              removeHighlight(index, highlightIndex)
+                            }
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -396,12 +481,14 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   </div>
                 </div>
               ))}
-              
+
               {work.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No work experience added yet.</p>
-                  <p className="text-sm">Click "Add Experience" to get started.</p>
+                  <p className="text-sm">
+                    Click "Add Experience" to get started.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -430,13 +517,15 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Institution</Label>
                       <Input
                         value={edu.Institution}
-                        onChange={(e) => updateEducation(index, 'Institution', e.target.value)}
+                        onChange={(e) =>
+                          updateEducation(index, "Institution", e.target.value)
+                        }
                         placeholder="University Name"
                       />
                     </div>
@@ -444,7 +533,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Label>Degree Type</Label>
                       <Select
                         value={edu.StudyType}
-                        onValueChange={(value) => updateEducation(index, 'StudyType', value)}
+                        onValueChange={(value) =>
+                          updateEducation(index, "StudyType", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select degree type" />
@@ -454,7 +545,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                           <SelectItem value="Master">Master's</SelectItem>
                           <SelectItem value="PhD">PhD</SelectItem>
                           <SelectItem value="Associate">Associate</SelectItem>
-                          <SelectItem value="Certificate">Certificate</SelectItem>
+                          <SelectItem value="Certificate">
+                            Certificate
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -462,7 +555,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Label>Field of Study</Label>
                       <Input
                         value={edu.Area}
-                        onChange={(e) => updateEducation(index, 'Area', e.target.value)}
+                        onChange={(e) =>
+                          updateEducation(index, "Area", e.target.value)
+                        }
                         placeholder="Computer Science"
                       />
                     </div>
@@ -470,7 +565,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Label>GPA/Score</Label>
                       <Input
                         value={edu.Score}
-                        onChange={(e) => updateEducation(index, 'Score', e.target.value)}
+                        onChange={(e) =>
+                          updateEducation(index, "Score", e.target.value)
+                        }
                         placeholder="3.8 / 4.0"
                       />
                     </div>
@@ -479,7 +576,9 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Input
                         type="month"
                         value={edu.StartDate}
-                        onChange={(e) => updateEducation(index, 'StartDate', e.target.value)}
+                        onChange={(e) =>
+                          updateEducation(index, "StartDate", e.target.value)
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -487,18 +586,22 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Input
                         type="month"
                         value={edu.EndDate}
-                        onChange={(e) => updateEducation(index, 'EndDate', e.target.value)}
+                        onChange={(e) =>
+                          updateEducation(index, "EndDate", e.target.value)
+                        }
                       />
                     </div>
                   </div>
                 </div>
               ))}
-              
+
               {education.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No education added yet.</p>
-                  <p className="text-sm">Click "Add Education" to get started.</p>
+                  <p className="text-sm">
+                    Click "Add Education" to get started.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -527,13 +630,15 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Skill Name</Label>
                       <Input
                         value={skill.Name}
-                        onChange={(e) => updateSkill(index, 'Name', e.target.value)}
+                        onChange={(e) =>
+                          updateSkill(index, "Name", e.target.value)
+                        }
                         placeholder="JavaScript"
                       />
                     </div>
@@ -541,14 +646,18 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                       <Label>Proficiency Level</Label>
                       <Select
                         value={skill.Level}
-                        onValueChange={(value) => updateSkill(index, 'Level', value)}
+                        onValueChange={(value) =>
+                          updateSkill(index, "Level", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select level" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Beginner">Beginner</SelectItem>
-                          <SelectItem value="Intermediate">Intermediate</SelectItem>
+                          <SelectItem value="Intermediate">
+                            Intermediate
+                          </SelectItem>
                           <SelectItem value="Advanced">Advanced</SelectItem>
                           <SelectItem value="Expert">Expert</SelectItem>
                         </SelectContent>
@@ -557,7 +666,7 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
                   </div>
                 </div>
               ))}
-              
+
               {skills.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -575,7 +684,10 @@ export default function ResumeBuilder({ onSave, onCancel, initialData }: ResumeB
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={handleSave} disabled={!resumeName.trim() || !basics.Name.trim()}>
+        <Button
+          onClick={handleSave}
+          disabled={!resumeName.trim() || !basics.Name.trim()}
+        >
           <Save className="mr-2 h-4 w-4" />
           Save Resume
         </Button>

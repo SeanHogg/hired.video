@@ -18,16 +18,28 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  
+
   // Mock user data
   const [user] = useState({
     id: "user123",
@@ -38,7 +50,9 @@ export default function Onboarding() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [completedTasks, setCompletedTasks] = useState<string[]>([
-    "profile", "preferences", "verification"
+    "profile",
+    "preferences",
+    "verification",
   ]);
 
   // Persona-specific onboarding tasks
@@ -161,7 +175,9 @@ export default function Onboarding() {
   };
 
   const steps = getOnboardingSteps();
-  const progressPercentage = Math.round((completedTasks.length / steps.length) * 100);
+  const progressPercentage = Math.round(
+    (completedTasks.length / steps.length) * 100,
+  );
   const CurrentStepComponent = steps[currentStep]?.component || ProfileStep;
 
   const handleCompleteTask = (taskId: string) => {
@@ -200,10 +216,11 @@ export default function Onboarding() {
               <h1 className="text-3xl font-bold">Welcome to MyVideoResume!</h1>
             </div>
             <p className="text-muted-foreground text-lg">
-              Let's get your {user.persona.replace('_', ' ')} profile set up in just a few steps
+              Let's get your {user.persona.replace("_", " ")} profile set up in
+              just a few steps
             </p>
             <Badge variant="secondary" className="capitalize mt-2">
-              {user.persona.replace('_', ' ')} Setup
+              {user.persona.replace("_", " ")} Setup
             </Badge>
           </div>
 
@@ -221,14 +238,16 @@ export default function Onboarding() {
                   </CardDescription>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-primary">{progressPercentage}%</div>
+                  <div className="text-3xl font-bold text-primary">
+                    {progressPercentage}%
+                  </div>
                   <div className="text-sm text-muted-foreground">Complete</div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <Progress value={progressPercentage} className="h-3 mb-6" />
-              
+
               {/* Steps List */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {steps.map((step, index) => (
@@ -238,19 +257,20 @@ export default function Onboarding() {
                       index === currentStep
                         ? "border-primary bg-primary/5 shadow-sm"
                         : step.completed
-                        ? "border-green-200 bg-green-50"
-                        : "border-muted bg-muted/20"
+                          ? "border-green-200 bg-green-50"
+                          : "border-muted bg-muted/20"
                     }`}
                     onClick={() => setCurrentStep(index)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${
-                        step.completed
-                          ? "bg-green-500 text-white"
-                          : index === currentStep
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      <div
+                        className={`p-2 rounded-full ${
+                          step.completed
+                            ? "bg-green-500 text-white"
+                            : index === currentStep
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                        }`}
                       >
                         {step.completed ? (
                           <CheckCircle2 className="h-4 w-4" />
@@ -260,7 +280,9 @@ export default function Onboarding() {
                       </div>
                       <div className="flex-1">
                         <h4 className="font-medium text-sm">{step.title}</h4>
-                        <p className="text-xs text-muted-foreground">{step.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {step.description}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -273,13 +295,17 @@ export default function Onboarding() {
           <Card className="mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {React.createElement(steps[currentStep].icon, { className: "h-5 w-5" })}
+                {React.createElement(steps[currentStep].icon, {
+                  className: "h-5 w-5",
+                })}
                 {steps[currentStep].title}
               </CardTitle>
-              <CardDescription>{steps[currentStep].description}</CardDescription>
+              <CardDescription>
+                {steps[currentStep].description}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <CurrentStepComponent 
+              <CurrentStepComponent
                 onComplete={() => handleCompleteTask(steps[currentStep].id)}
                 isCompleted={steps[currentStep].completed}
                 user={user}
@@ -308,7 +334,9 @@ export default function Onboarding() {
                 className="gap-2"
                 disabled={!steps[currentStep].completed}
               >
-                {currentStep === steps.length - 1 ? "Complete Setup" : "Continue"}
+                {currentStep === steps.length - 1
+                  ? "Complete Setup"
+                  : "Continue"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -349,7 +377,9 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
             id="title"
             placeholder="e.g. Senior Software Engineer"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, title: e.target.value })
+            }
           />
         </div>
       </div>
@@ -359,7 +389,9 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
           id="location"
           placeholder="e.g. San Francisco, CA"
           value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, location: e.target.value })
+          }
         />
       </div>
       <div>
@@ -383,7 +415,9 @@ function ProfileStep({ onComplete, isCompleted, user }: any) {
 function PreferencesStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Set your notification and privacy preferences.</p>
+      <p className="text-muted-foreground">
+        Set your notification and privacy preferences.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Save Preferences
@@ -396,7 +430,9 @@ function PreferencesStep({ onComplete, isCompleted }: any) {
 function VerificationStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">We've sent a verification email. Please check your inbox.</p>
+      <p className="text-muted-foreground">
+        We've sent a verification email. Please check your inbox.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Mark as Verified
@@ -427,7 +463,9 @@ function ResumeUploadStep({ onComplete, isCompleted }: any) {
 function VideoResumeStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Create a video resume to stand out from other candidates.</p>
+      <p className="text-muted-foreground">
+        Create a video resume to stand out from other candidates.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Create Video Resume
@@ -440,7 +478,9 @@ function VideoResumeStep({ onComplete, isCompleted }: any) {
 function SkillsStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Add your skills and experience level.</p>
+      <p className="text-muted-foreground">
+        Add your skills and experience level.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Add Skills
@@ -453,7 +493,9 @@ function SkillsStep({ onComplete, isCompleted }: any) {
 function CompanyStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Set up your company profile and information.</p>
+      <p className="text-muted-foreground">
+        Set up your company profile and information.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Complete Company Setup
@@ -466,7 +508,9 @@ function CompanyStep({ onComplete, isCompleted }: any) {
 function TeamStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Invite team members to collaborate on hiring.</p>
+      <p className="text-muted-foreground">
+        Invite team members to collaborate on hiring.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Invite Team Members
@@ -479,7 +523,9 @@ function TeamStep({ onComplete, isCompleted }: any) {
 function JobPostStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Create your first job posting to start finding candidates.</p>
+      <p className="text-muted-foreground">
+        Create your first job posting to start finding candidates.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Post First Job
@@ -492,7 +538,9 @@ function JobPostStep({ onComplete, isCompleted }: any) {
 function IntegrationsStep({ onComplete, isCompleted }: any) {
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground">Connect your existing tools and platforms.</p>
+      <p className="text-muted-foreground">
+        Connect your existing tools and platforms.
+      </p>
       {!isCompleted && (
         <Button onClick={onComplete} className="w-full">
           Configure Integrations

@@ -11,7 +11,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAI } from "@/lib/ai-context";
-import { sendHRMessage, isAIServiceConfigured, type ChatMessage } from "@/lib/services/ai-service";
+import {
+  sendHRMessage,
+  isAIServiceConfigured,
+  type ChatMessage,
+} from "@/lib/services/ai-service";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -27,14 +31,17 @@ export default function AIChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      content: "👋 Hi! I'm your AI HR Assistant. I can help you with recruiting, talent management, resume optimization, job matching, and more. What would you like to know?",
+      content:
+        "👋 Hi! I'm your AI HR Assistant. I can help you with recruiting, talent management, resume optimization, job matching, and more. What would you like to know?",
       sender: "ai",
       timestamp: new Date(),
-    }
+    },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>(
+    [],
+  );
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
 
@@ -63,7 +70,7 @@ export default function AIChatPanel() {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsTyping(true);
 
@@ -74,8 +81,8 @@ export default function AIChatPanel() {
       // Update conversation history
       const newHistory: ChatMessage[] = [
         ...conversationHistory,
-        { role: 'user', content: content.trim() },
-        { role: 'assistant', content: response.message },
+        { role: "user", content: content.trim() },
+        { role: "assistant", content: response.message },
       ];
       setConversationHistory(newHistory);
 
@@ -86,26 +93,24 @@ export default function AIChatPanel() {
         sender: "ai",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, aiMessage]);
-
+      setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Unexpected error in AI chat:', error);
+      console.error("Unexpected error in AI chat:", error);
 
       // This should rarely happen since AI service has internal fallbacks
       // But provide a user-friendly message just in case
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm experiencing a technical issue. Let me try to help you anyway! What would you like to know about resumes, job searching, or recruitment?",
+        content:
+          "I'm experiencing a technical issue. Let me try to help you anyway! What would you like to know about resumes, job searching, or recruitment?",
         sender: "ai",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
     } finally {
       setIsTyping(false);
     }
   };
-
-
 
   const handleQuickSuggestion = (suggestion: string) => {
     handleSendMessage(suggestion);
@@ -120,7 +125,7 @@ export default function AIChatPanel() {
         className="flex-1 bg-black/20 backdrop-blur-sm"
         onClick={closeAIChat}
       />
-      
+
       {/* Panel */}
       <div className="w-[60%] bg-background border-l shadow-2xl flex flex-col">
         {/* Header */}
@@ -131,7 +136,9 @@ export default function AIChatPanel() {
             </div>
             <div>
               <h3 className="font-semibold">AI HR Assistant</h3>
-              <p className="text-xs text-muted-foreground">Always here to help</p>
+              <p className="text-xs text-muted-foreground">
+                Always here to help
+              </p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={closeAIChat}>
@@ -147,7 +154,7 @@ export default function AIChatPanel() {
                 key={message.id}
                 className={cn(
                   "flex",
-                  message.sender === "user" ? "justify-end" : "justify-start"
+                  message.sender === "user" ? "justify-end" : "justify-start",
                 )}
               >
                 <div
@@ -155,29 +162,36 @@ export default function AIChatPanel() {
                     "max-w-[80%] rounded-lg p-3 text-sm",
                     message.sender === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      : "bg-muted",
                   )}
                 >
                   {message.sender === "ai" && (
                     <div className="flex items-center gap-2 mb-2">
                       <Brain className="h-3 w-3 text-primary" />
-                      <span className="text-xs font-medium text-primary">AI Assistant</span>
+                      <span className="text-xs font-medium text-primary">
+                        AI Assistant
+                      </span>
                     </div>
                   )}
                   <div className="whitespace-pre-wrap">{message.content}</div>
                   <div className="text-xs opacity-70 mt-1">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {message.timestamp.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </div>
                 </div>
               </div>
             ))}
-            
+
             {isTyping && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg p-3 text-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <Brain className="h-3 w-3 text-primary" />
-                    <span className="text-xs font-medium text-primary">AI Assistant</span>
+                    <span className="text-xs font-medium text-primary">
+                      AI Assistant
+                    </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
@@ -193,7 +207,9 @@ export default function AIChatPanel() {
         {/* Quick Suggestions */}
         {messages.length <= 1 && (
           <div className="p-4 border-t bg-muted/30">
-            <p className="text-xs text-muted-foreground mb-3">Quick suggestions:</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Quick suggestions:
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {quickSuggestions.map((suggestion, index) => {
                 const Icon = suggestion.icon;
@@ -228,7 +244,7 @@ export default function AIChatPanel() {
               }}
               className="flex-1"
             />
-            <Button 
+            <Button
               onClick={() => handleSendMessage(inputValue)}
               disabled={!inputValue.trim() || isTyping}
               size="icon"
@@ -239,8 +255,7 @@ export default function AIChatPanel() {
           <p className="text-xs text-muted-foreground mt-2 text-center">
             {isAIConfigured
               ? "Powered by OpenRouter AI"
-              : "AI service not configured - using demo responses"
-            }
+              : "AI service not configured - using demo responses"}
           </p>
         </div>
       </div>

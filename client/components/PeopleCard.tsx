@@ -13,15 +13,25 @@ import {
   Clock,
   CheckCircle,
   X,
-  Star
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/lib/auth';
-import type { UserMetadata, UserWithOwnership, ConnectionStatus } from '@/types/people';
+  Star,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/lib/auth";
+import type {
+  UserMetadata,
+  UserWithOwnership,
+  ConnectionStatus,
+} from "@/types/people";
 
 interface PeopleCardProps {
   person: UserMetadata | UserWithOwnership;
@@ -35,16 +45,16 @@ interface PeopleCardProps {
   onRejectConnection?: (_personId: string) => void;
 }
 
-export default function PeopleCard({ 
-  person, 
-  connectionStatus = 'none',
-  showOwnership = false, 
-  onTrack, 
-  onUntrack, 
+export default function PeopleCard({
+  person,
+  connectionStatus = "none",
+  showOwnership = false,
+  onTrack,
+  onUntrack,
   onConnect,
   onMessage,
   onAcceptConnection,
-  onRejectConnection
+  onRejectConnection,
 }: PeopleCardProps) {
   const { user } = useAuth();
 
@@ -53,34 +63,35 @@ export default function PeopleCard({
     return null;
   }
 
-  const ownership = 'ownership' in person ? person.ownership : undefined;
-  const isTracked = ownership === 'tracked';
-  const isConnected = ownership === 'connected' || connectionStatus === 'connected';
-  const isPendingSent = connectionStatus === 'pending_sent';
-  const isPendingReceived = connectionStatus === 'pending_received';
-  
+  const ownership = "ownership" in person ? person.ownership : undefined;
+  const isTracked = ownership === "tracked";
+  const isConnected =
+    ownership === "connected" || connectionStatus === "connected";
+  const isPendingSent = connectionStatus === "pending_sent";
+  const isPendingReceived = connectionStatus === "pending_received";
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'looking':
-        return 'bg-blue-100 text-blue-800';
-      case 'busy':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "looking":
+        return "bg-blue-100 text-blue-800";
+      case "busy":
+        return "bg-yellow-100 text-yellow-800";
+      case "inactive":
+        return "bg-gray-100 text-gray-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'job_seeker':
+      case "job_seeker":
         return <Users className="h-3 w-3" />;
-      case 'recruiter':
+      case "recruiter":
         return <UserCheck className="h-3 w-3" />;
-      case 'business':
+      case "business":
         return <Building2 className="h-3 w-3" />;
       default:
         return <Users className="h-3 w-3" />;
@@ -89,12 +100,12 @@ export default function PeopleCard({
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'job_seeker':
-        return 'Job Seeker';
-      case 'recruiter':
-        return 'Recruiter';
-      case 'business':
-        return 'Business';
+      case "job_seeker":
+        return "Job Seeker";
+      case "recruiter":
+        return "Recruiter";
+      case "business":
+        return "Business";
       default:
         return role;
     }
@@ -109,7 +120,8 @@ export default function PeopleCard({
             <Avatar className="w-12 h-12 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={person.fullName} />
               <AvatarFallback className="text-sm">
-                {person.firstName.charAt(0)}{person.lastName.charAt(0)}
+                {person.firstName.charAt(0)}
+                {person.lastName.charAt(0)}
               </AvatarFallback>
             </Avatar>
 
@@ -117,9 +129,7 @@ export default function PeopleCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg hover:text-primary truncate">
-                  <Link to={`/people/${person.id}`}>
-                    {person.fullName}
-                  </Link>
+                  <Link to={`/people/${person.id}`}>{person.fullName}</Link>
                 </CardTitle>
                 {person.isVerified && (
                   <CheckCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />
@@ -128,19 +138,25 @@ export default function PeopleCard({
                   <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
                 )}
                 {showOwnership && isTracked && (
-                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 flex-shrink-0">
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
+                  >
                     <UserCheck className="h-3 w-3 mr-1" />
                     Following
                   </Badge>
                 )}
                 {isConnected && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 flex-shrink-0">
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-green-50 text-green-700 flex-shrink-0"
+                  >
                     <Users className="h-3 w-3 mr-1" />
                     Connected
                   </Badge>
                 )}
               </div>
-              
+
               <CardDescription className="text-sm mb-2 line-clamp-2">
                 {person.headline}
               </CardDescription>
@@ -166,18 +182,24 @@ export default function PeopleCard({
 
           {/* Status Badge */}
           <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <Badge variant="secondary" className={getStatusColor(person.status)}>
+            <Badge
+              variant="secondary"
+              className={getStatusColor(person.status)}
+            >
               {person.status}
             </Badge>
             {person.openToWork && (
-              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+              <Badge
+                variant="outline"
+                className="text-xs bg-green-50 text-green-700"
+              >
                 Open to Work
               </Badge>
             )}
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="space-y-3">
           {/* Current Position */}
@@ -231,16 +253,16 @@ export default function PeopleCard({
               <>
                 {isPendingReceived ? (
                   <div className="flex gap-1 flex-1">
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       className="flex-1"
                       onClick={() => onAcceptConnection?.(person.id)}
                     >
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Accept
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => onRejectConnection?.(person.id)}
                     >
@@ -248,14 +270,19 @@ export default function PeopleCard({
                     </Button>
                   </div>
                 ) : isPendingSent ? (
-                  <Button variant="outline" size="sm" className="flex-1" disabled>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled
+                  >
                     <Clock className="h-3 w-3 mr-1" />
                     Pending
                   </Button>
                 ) : isConnected ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1"
                     onClick={() => onMessage?.(person.id)}
                   >
@@ -263,8 +290,8 @@ export default function PeopleCard({
                     Message
                   </Button>
                 ) : (
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="flex-1"
                     onClick={() => onConnect?.(person.id)}
                   >
@@ -284,16 +311,16 @@ export default function PeopleCard({
                 {!isConnected && (
                   <div>
                     {isTracked ? (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => onUntrack?.(person.id)}
                       >
                         <BookmarkCheck className="h-3 w-3" />
                       </Button>
                     ) : (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => onTrack?.(person.id)}
                       >

@@ -18,10 +18,14 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-muted-foreground mb-4 max-w-md">
-              All-in-one HR platform with employment-focused social media, referral network, ATS, Recruitment CRM, crowdsourcing, and recruitment marketing features to attract, retain, and promote talent.
+              All-in-one HR platform with employment-focused social media,
+              referral network, ATS, Recruitment CRM, crowdsourcing, and
+              recruitment marketing features to attract, retain, and promote
+              talent.
             </p>
             <p className="text-sm text-muted-foreground">
-              Empowering the future of talent acquisition and workforce management.
+              Empowering the future of talent acquisition and workforce
+              management.
             </p>
           </div>
 
@@ -30,27 +34,42 @@ export default function Footer() {
             <h3 className="font-semibold text-foreground mb-4">Product</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/features" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/features"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Features
                 </Link>
               </li>
               <li>
-                <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/pricing"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Pricing
                 </Link>
               </li>
               <li>
-                <Link to="/resumes" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/resumes"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Video Resumes
                 </Link>
               </li>
               <li>
-                <Link to="/jobs" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/jobs"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Job Board
                 </Link>
               </li>
               <li>
-                <Link to="/companies" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/companies"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   For Companies
                 </Link>
               </li>
@@ -62,22 +81,34 @@ export default function Footer() {
             <h3 className="font-semibold text-foreground mb-4">Support</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/help"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Help Center
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/contact"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Contact Us
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/about"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   About Us
                 </Link>
               </li>
               <li>
-                <Link to="/careers" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                  to="/careers"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
                   Careers
                 </Link>
               </li>
@@ -91,13 +122,22 @@ export default function Footer() {
             © 2024 MyVideoResu.ME. All rights reserved.
           </div>
           <div className="flex space-x-6 text-sm">
-            <Link to="/privacy-policy" className="text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              to="/privacy-policy"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
               Privacy Policy
             </Link>
-            <Link to="/terms-of-service" className="text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              to="/terms-of-service"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
               Terms of Service
             </Link>
-            <Link to="/cookies" className="text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              to="/cookies"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
               Cookie Policy
             </Link>
           </div>
