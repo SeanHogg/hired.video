@@ -13,10 +13,16 @@ import { z } from "zod";
 /**
  * Base API Response Schema
  */
-export const ApiResponseSchema = z.object({
+// Use a loose object so unmodeled properties (e.g., `data`, `error`) are preserved
+export const ApiResponseSchema = z.looseObject({
   success: z.boolean(),
-  message: z.string().optional(),
-  timestamp: z.string().datetime().optional(),
+  // Some backends return null for message; accept undefined or null
+  message: z.string().nullish(),
+  // Accept broad RFC3339/ISO8601-like timestamps (some backends emit >3 fractional seconds)
+  timestamp: z
+    .string()
+    .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid datetime")
+    .optional(),
 });
 
 /**
@@ -98,7 +104,8 @@ export const LoginResponseSchema = z.object({
     role: z.enum(["job_seeker", "recruiter", "business"]),
   }),
   token: z.string(),
-  expiresAt: z.string().datetime(),
+  // Accept any RFC3339/ISO8601-like string that Date.parse can read (some backends send >3 fractional seconds)
+  expiresAt: z.string().refine((s) => !Number.isNaN(Date.parse(s)), "Invalid datetime"),
 });
 
 export const SignupRequestSchema = z.object({
@@ -125,8 +132,8 @@ export const UserProfileResponseSchema = z.object({
   role: z.enum(["job_seeker", "recruiter", "business"]),
   isVerified: z.boolean(),
   isPremium: z.boolean(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const UpdateUserProfileRequestSchema = z.object({
@@ -149,8 +156,8 @@ export const ResumeListResponseSchema = z.object({
       privacy: z.enum(["public", "private", "unlisted"]),
       isMaster: z.boolean(),
       isActive: z.boolean(),
-      createdAt: z.string().datetime(),
-      updatedAt: z.string().datetime(),
+      createdAt: z.iso.datetime(),
+      updatedAt: z.iso.datetime(),
       views: z.number(),
     }),
   ),
@@ -199,8 +206,8 @@ export const JobListResponseSchema = z.object({
         ]),
       }),
       status: z.enum(["draft", "active", "paused", "closed"]),
-      createdAt: z.string().datetime(),
-      updatedAt: z.string().datetime(),
+      createdAt: z.iso.datetime(),
+      updatedAt: z.iso.datetime(),
       views: z.number(),
       applications: z.number(),
     }),
@@ -261,6 +268,41 @@ export type CreateJobRequest = z.infer<typeof CreateJobRequestSchema>;
 // ============================================================================
 
 /**
+ * Recursively converts null values to undefined in an object
+ */
+function nullToUndefined(obj: any): any {
+  if (obj === null) {
+    return undefined;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(nullToUndefined);
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = nullToUndefined(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
+ * Helper to create a nullable string schema that converts null to undefined
+ */
+export const nullableString = () => z.string().nullable().transform(val => val === null ? undefined : val).optional();
+
+/**
+ * Helper to create a nullable number schema that converts null to undefined
+ */
+export const nullableNumber = () => z.number().nullable().transform(val => val === null ? undefined : val).optional();
+
+/**
+ * Helper to create a nullable boolean schema that converts null to undefined
+ */
+export const nullableBoolean = () => z.boolean().nullable().transform(val => val === null ? undefined : val).optional();
+
+/**
  * Validates API response data against a schema
  */
 export function validateApiResponse<T>(
@@ -268,13 +310,19 @@ export function validateApiResponse<T>(
   schema: z.ZodSchema<T>,
 ): { success: true; data: T } | { success: false; error: string } {
   try {
-    const validatedData = schema.parse(data);
+    // Convert null values to undefined before validation
+    const preprocessedData = nullToUndefined(data);
+    const validatedData = schema.parse(preprocessedData);
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const issues = (error as z.ZodError).issues ?? [];
+      const details = issues.length
+        ? issues.map((i) => i.message).join(", ")
+        : (error as Error).message || "Invalid data";
       return {
         success: false,
-        error: `Validation failed: ${error.errors.map((e) => e.message).join(", ")}`,
+        error: `Validation failed: ${details}`,
       };
     }
     return {
@@ -283,6 +331,9 @@ export function validateApiResponse<T>(
     };
   }
 }
+
+// Export nullToUndefined so raw API calls can normalize backend nulls to undefined
+export { nullToUndefined };
 
 /**
  * Creates a typed API error response

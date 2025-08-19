@@ -18,12 +18,16 @@ import {
   Download,
   Share,
   ExternalLink,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
+import { uploadAvatar } from "@/lib/services/upload-service";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import ShareModal from "@/components/ShareModal";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,8 +47,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -57,47 +70,141 @@ export default function Profile() {
     toggleSidebar,
   } = useSidebar();
   const [isEditing, setIsEditing] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { user, isAuthenticated, refreshUser, logout } = useAuth();
+
+  // Ensure we have fresh user data only on /profile
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUser().catch((e) => console.warn("Profile: refreshUser failed", e));
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Form state for editing
   const [formData, setFormData] = useState({
-    firstName: user?.name?.split(" ")[0] || "",
-    lastName: user?.name?.split(" ")[1] || "",
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
     email: user?.email || "",
     phone: "",
     role: user?.role || "job_seeker",
-    location: "San Francisco, CA",
-    bio: `Passionate ${user?.role?.replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+    location: user?.location || "",
+    bio: `Passionate ${(user?.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
     company: "",
     title: "",
-    website: "",
+    website: user?.website || "",
   });
+
+  const joinedText = (() => {
+    const iso = (user as any)?.createdAt as string | undefined;
+    if (!iso) return "Joined today";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "Joined";
+    return `Joined ${d.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
+  })();
+
+  // Keep form in sync when user context updates
+  useEffect(() => {
+    if (!user) return;
+    console.info("Profile: syncing form from user context", user);
+    setFormData({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      role: user.role || "job_seeker",
+      location: user.location || "",
+      bio: `Passionate ${(user.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+      company: "",
+      title: "",
+      website: user.website || "",
+    });
+  }, [user]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    // Here you would typically save to your backend
-    console.log("Saving profile data:", formData);
-    setIsEditing(false);
+  const { updateProfile } = useAuth();
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      await updateProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        bio: formData.bio,
+        location: formData.location,
+        website: formData.website,
+        phone: formData.phone,
+        currentCompany: formData.company,
+        currentRole: formData.title,
+      });
+      // Immediately switch to read-only on successful update
+      setIsEditing(false);
+      // Refresh in background; don't block UI transition
+      refreshUser().catch((e) => console.warn("refreshUser failed after save", e));
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
     // Reset form data to original values
     setFormData({
-      firstName: user?.name?.split(" ")[0] || "",
-      lastName: user?.name?.split(" ")[1] || "",
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
       email: user?.email || "",
       phone: "",
       role: user?.role || "job_seeker",
-      location: "San Francisco, CA",
-      bio: `Passionate ${user?.role?.replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+      location: user?.location || "",
+      bio: `Passionate ${(user?.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
       company: "",
       title: "",
-      website: "",
+      website: user?.website || "",
     });
     setIsEditing(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("auth_token")}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        // Account deleted successfully - logout and redirect
+        await logout();
+        window.location.href = "/login?message=account-deleted";
+      } else {
+        const error = await response.json();
+        console.error("Failed to delete account:", error);
+        alert("Failed to delete account. Please try again or contact support.");
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      alert("An error occurred while deleting your account. Please try again.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setDeleteConfirmText("");
+    }
   };
 
   // If user is not authenticated, redirect to login
@@ -163,12 +270,38 @@ export default function Profile() {
                       </AvatarFallback>
                     </Avatar>
                     {isEditing && (
-                      <Button
-                        size="icon"
-                        className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full"
-                      >
-                        <Camera className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <input
+                          id="avatarInput"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              setSaving(true);
+                              await uploadAvatar(file);
+                              // Optimistically update UI
+                              await refreshUser();
+                            } catch (err) {
+                              console.error("Avatar upload failed", err);
+                            } finally {
+                              setSaving(false);
+                              // Clear input so same file can be re-selected
+                              e.currentTarget.value = "";
+                            }
+                          }}
+                        />
+                        <Button
+                          size="icon"
+                          className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full"
+                          onClick={() => document.getElementById("avatarInput")?.click()}
+                          disabled={saving}
+                        >
+                          <Camera className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
 
@@ -187,10 +320,11 @@ export default function Profile() {
                             </Button>
                             <Button
                               onClick={handleSave}
+                              disabled={saving}
                               className="flex items-center gap-2"
                             >
                               <Save className="h-4 w-4" />
-                              Save Changes
+                              {saving ? "Saving..." : "Save Changes"}
                             </Button>
                           </>
                         ) : (
@@ -210,7 +344,11 @@ export default function Profile() {
                       <Badge variant="outline" className="capitalize">
                         {formData.role.replace("_", " ")}
                       </Badge>
-                      <Badge variant="secondary">Pro Member</Badge>
+                      {user?.subscription && user.subscription !== "free" && (
+                        <Badge variant="secondary" className="capitalize">
+                          {user.subscription} Member
+                        </Badge>
+                      )}
                     </div>
 
                     {!isEditing ? (
@@ -231,7 +369,7 @@ export default function Profile() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          Joined December 2024
+                          {joinedText}
                         </div>
                       </div>
                     ) : null}
@@ -405,44 +543,7 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* Profile Stats */}
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Eye className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">2,847</div>
-                  <div className="text-sm text-muted-foreground">
-                    Profile Views
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Star className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
-                  <div className="text-2xl font-bold">4.9</div>
-                  <div className="text-sm text-muted-foreground">Rating</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  <div className="text-2xl font-bold">+12%</div>
-                  <div className="text-sm text-muted-foreground">Growth</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                  <div className="text-2xl font-bold">24h</div>
-                  <div className="text-sm text-muted-foreground">
-                    Response Time
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             {/* Quick Actions */}
             <Card>
@@ -454,110 +555,180 @@ export default function Profile() {
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col gap-2"
-                  >
-                    <FileText className="h-6 w-6" />
-                    <span className="font-medium">Update Resume</span>
-                    <span className="text-xs text-muted-foreground">
-                      Last updated 2 days ago
-                    </span>
-                  </Button>
+                  {/* Role-based quick actions */}
+                  {(() => {
+                    const role = user?.role || "job_seeker";
+                    if (role === "job_seeker") {
+                      return (
+                        <>
+                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                            <Link to="/resumes">
+                              <FileText className="h-6 w-6" />
+                              <span className="font-medium">Update Resume</span>
+                              <span className="text-xs text-muted-foreground">Upload or edit your resume</span>
+                            </Link>
+                          </Button>
 
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col gap-2"
-                  >
-                    <Briefcase className="h-6 w-6" />
-                    <span className="font-medium">Job Applications</span>
-                    <span className="text-xs text-muted-foreground">
-                      5 active applications
-                    </span>
-                  </Button>
+                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                            <Link to="/jobs">
+                              <Briefcase className="h-6 w-6" />
+                              <span className="font-medium">Job Applications</span>
+                              <span className="text-xs text-muted-foreground">Track your applications</span>
+                            </Link>
+                          </Button>
 
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col gap-2"
-                    asChild
-                  >
-                    <Link to="/settings">
-                      <Settings className="h-6 w-6" />
-                      <span className="font-medium">Account Settings</span>
-                      <span className="text-xs text-muted-foreground">
-                        Privacy & preferences
-                      </span>
-                    </Link>
-                  </Button>
+                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                            <Link to="/settings">
+                              <Settings className="h-6 w-6" />
+                              <span className="font-medium">Account Settings</span>
+                              <span className="text-xs text-muted-foreground">Privacy & preferences</span>
+                            </Link>
+                          </Button>
 
-                  <Button
-                    variant="outline"
-                    className="h-auto p-4 flex flex-col gap-2"
-                  >
-                    <Share className="h-6 w-6" />
-                    <span className="font-medium">Share Profile</span>
-                    <span className="text-xs text-muted-foreground">
-                      Get your profile link
-                    </span>
-                  </Button>
+                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" onClick={() => setShareOpen(true)}>
+                            <Share className="h-6 w-6" />
+                            <span className="font-medium">Share Profile</span>
+                            <span className="text-xs text-muted-foreground">Get your profile link</span>
+                          </Button>
+                        </>
+                      );
+                    }
+
+                    // recruiter/business
+                    return (
+                      <>
+                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Link to="/jobs/new">
+                            <Briefcase className="h-6 w-6" />
+                            <span className="font-medium">Post a Job</span>
+                            <span className="text-xs text-muted-foreground">Create a new job listing</span>
+                          </Link>
+                        </Button>
+
+                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Link to="/candidates">
+                            <Eye className="h-6 w-6" />
+                            <span className="font-medium">Browse Candidates</span>
+                            <span className="text-xs text-muted-foreground">Search profiles & resumes</span>
+                          </Link>
+                        </Button>
+
+                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Link to="/settings">
+                            <Settings className="h-6 w-6" />
+                            <span className="font-medium">Account Settings</span>
+                            <span className="text-xs text-muted-foreground">Team & preferences</span>
+                          </Link>
+                        </Button>
+
+                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2">
+                          <Share className="h-6 w-6" />
+                          <span className="font-medium">Share Company</span>
+                          <span className="text-xs text-muted-foreground">Invite or share your page</span>
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
-            <Card>
+            {/* Account Deletion Section */}
+            <Card className="border-destructive/20">
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
+                <CardTitle className="text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Delete Account
+                </CardTitle>
                 <CardDescription>
-                  Your latest profile and career activities
+                  Permanently delete your account and all associated data. This action cannot be undone.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Profile updated</p>
-                      <p className="text-xs text-muted-foreground">
-                        You updated your professional information • 2 hours ago
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Resume viewed</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your resume was viewed by Google • 5 hours ago
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full mt-2" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        Application submitted
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Applied to Senior Developer at Meta • 1 day ago
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Profile view</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your profile was viewed 15 times • 2 days ago
-                      </p>
-                    </div>
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                  <h4 className="font-medium text-destructive mb-2">Before you delete your account:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Download your resume and any important documents</li>
+                    <li>• This action is permanent and cannot be reversed</li>
+                    <li>• Your profile and all content will be removed</li>
+                    <li>• You will be immediately logged out</li>
+                  </ul>
                 </div>
+
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" className="w-full">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete My Account
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="text-destructive">Delete Account</DialogTitle>
+                      <DialogDescription>
+                        This action is permanent and cannot be undone. Your account and all associated data will be permanently deleted.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                        <p className="text-sm font-medium text-destructive mb-2">
+                          What happens when you delete your account:
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1">
+                          <li>• Your profile will be permanently removed</li>
+                          <li>• All your resumes and documents will be deleted</li>
+                          <li>• You will lose access to all your data</li>
+                          <li>• This action cannot be reversed</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="delete-confirm">
+                          Type <strong>DELETE</strong> to confirm:
+                        </Label>
+                        <Input
+                          id="delete-confirm"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder="Type DELETE to confirm"
+                          className="mt-2"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setDeleteDialogOpen(false);
+                          setDeleteConfirmText("");
+                        }}
+                        disabled={isDeleting}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteAccount}
+                        disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                      >
+                        {isDeleting ? "Deleting..." : "Delete Account"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
+
+            <ShareModal
+              open={shareOpen}
+              onOpenChange={setShareOpen}
+              shareUrl={`${window.location.origin}/people/${user?.id}`}
+              title="Share Options"
+              message="Please share by using an option below."
+            />
+
           </div>
         </div>
         <Footer />

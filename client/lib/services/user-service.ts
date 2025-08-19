@@ -1,388 +1,340 @@
 /**
- * User service - handles all user-related data operations
+ * User Service
+ * Handles user-related API operations including connections and profiles
  */
 
 import { z } from "zod";
-import type {
-  LoginRequest,
-  LoginResponse,
-  SignupRequest,
-  UserProfileResponse,
-  UpdateUserProfileRequest,
-} from "@shared/api";
-import {
-  LoginRequestSchema,
-  LoginResponseSchema,
-  SignupRequestSchema,
-  UserProfileResponseSchema,
-  UpdateUserProfileRequestSchema,
-} from "@shared/api";
-import { UserDataSchema } from "@shared/validation";
-import { dataManager } from "../data-manager";
-import type {
-  DataManager,
-  PaginationParams,
-  FilterParams,
-} from "../data-manager";
-import { logger } from "../logger";
+import { apiClient } from "../api-client";
+import type { ApiSuccessResponse } from "@shared/api";
+import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+
+// ============================================================================
+// SCHEMAS
+// ============================================================================
+
+export const UserProfileSchema = z.object({
+  id: nullableString(),
+  email: nullableString(),
+  firstName: nullableString(),
+  lastName: nullableString(),
+  // Backend may return numeric enum for role; accept string or number
+  role: z.union([z.string(), z.number()]).nullable().transform(val => val === null ? undefined : (typeof val === 'number' ? String(val) : val)).optional(),
+  profilePicture: nullableString(),
+  bio: nullableString(),
+  location: nullableString(),
+  website: nullableString(),
+  linkedIn: nullableString(),
+  github: nullableString(),
+  skills: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
+  openToWork: nullableBoolean(),
+  slug: nullableString(),
+  createdAt: nullableString(),
+  updatedAt: nullableString(),
+});
+
+// Public users list item (metadata) from GET /api/Users/public
+export const PublicUserSchema = z.object({
+  id: nullableString(),
+  slug: nullableString(),
+  fullName: nullableString(),
+  avatar: nullableString(),
+  headline: nullableString(),
+  location: nullableString(),
+  currentRole: nullableString(),
+  currentCompany: nullableString(),
+  role: z.union([z.string(), z.number()]).nullable().transform(val => val === null ? undefined : val).optional(),
+  isVerified: nullableBoolean(),
+  isPremium: nullableBoolean(),
+  openToWork: nullableBoolean(),
+  skills: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
+  profileViews: nullableNumber(),
+  createdAt: nullableString(),
+  updatedAt: nullableString(),
+});
+
+export const ConnectionSchema = z.object({
+  id: z.string(),
+  fromUserId: z.string(),
+  toUserId: z.string(),
+  status: z.enum(["pending", "accepted", "rejected"]),
+  message: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  fromUser: UserProfileSchema.optional(),
+  toUser: UserProfileSchema.optional(),
+});
+
+export const UserFiltersSchema = z.object({
+  search: z.string().optional(),
+  role: z.string().optional(),
+  location: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  openToWork: z.boolean().optional(),
+  page: z.number().optional(),
+  limit: z.number().optional(),
+});
+
+export const PaginatedUsersSchema = z.object({
+  items: z.array(UserProfileSchema).nullable().transform(val => val === null ? undefined : val).optional(),
+  total: nullableNumber(),
+  page: nullableNumber(),
+  limit: nullableNumber(),
+  hasNext: nullableBoolean(),
+  hasPrev: nullableBoolean(),
+});
+
+// Matches API pagination shape for public users
+export const PaginatedPublicUsersSchema = z.object({
+  items: z.array(PublicUserSchema).nullable().transform(val => val === null ? undefined : val).optional(),
+  total: nullableNumber(),
+  page: nullableNumber(),
+  limit: nullableNumber(),
+  totalPages: nullableNumber(),
+  hasNextPage: nullableBoolean(),
+  hasPreviousPage: nullableBoolean(),
+});
+
+export const SendConnectionRequestSchema = z.object({
+  toUserId: z.string(),
+  message: z.string().optional(),
+});
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type PublicUser = z.infer<typeof PublicUserSchema>;
+export type Connection = z.infer<typeof ConnectionSchema>;
+export type UserFilters = z.infer<typeof UserFiltersSchema>;
+export type PaginatedUsers = z.infer<typeof PaginatedUsersSchema>;
+export type PaginatedPublicUsers = z.infer<typeof PaginatedPublicUsersSchema>;
+export type SendConnectionRequest = z.infer<typeof SendConnectionRequestSchema>;
 
 // ============================================================================
 // USER SERVICE CLASS
 // ============================================================================
 
 export class UserService {
-  constructor(private dataManager: DataManager = dataManager) {}
+  /**
+   * Get all public users with optional filters
+   */
+  async getPublicUsers(filters?: UserFilters): Promise<PaginatedPublicUsers> {
+    const params = new URLSearchParams();
 
-  // ============================================================================
-  // AUTHENTICATION METHODS
-  // ============================================================================
-
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    logger.info("User login attempt", { email: credentials.email });
-
-    try {
-      const response = await this.dataManager.create(
-        "/auth/login",
-        credentials,
-        LoginRequestSchema,
-        LoginResponseSchema,
-      );
-
-      // Store auth token
-      localStorage.setItem("auth_token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      logger.info("User login successful", {
-        userId: response.user.id,
-        email: response.user.email,
-      });
-
-      return response;
-    } catch (error) {
-      logger.error("User login failed", {
-        email: credentials.email,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  async signup(userData: SignupRequest): Promise<LoginResponse> {
-    logger.info("User signup attempt", { email: userData.email });
-
-    try {
-      const response = await this.dataManager.create(
-        "/auth/signup",
-        userData,
-        SignupRequestSchema,
-        LoginResponseSchema,
-      );
-
-      // Store auth token
-      localStorage.setItem("auth_token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      logger.info("User signup successful", {
-        userId: response.user.id,
-        email: response.user.email,
-      });
-
-      return response;
-    } catch (error) {
-      logger.error("User signup failed", {
-        email: userData.email,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  async logout(): Promise<void> {
-    logger.info("User logout");
-
-    try {
-      // Call logout endpoint to invalidate token on server
-      await this.dataManager.create(
-        "/auth/logout",
-        {},
-        z.object({}),
-        z.object({}),
-      );
-    } catch (error) {
-      // Continue with local logout even if server call fails
-      logger.warn("Server logout failed, continuing with local logout", {
-        error: error instanceof Error ? error.message : String(error),
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            value.forEach(v => params.append(key, v.toString()));
+          } else {
+            params.append(key, value.toString());
+          }
+        }
       });
     }
 
-    // Clear local storage
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user");
+    const endpoint = `/Users/public${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiClient.get<PaginatedPublicUsers>(endpoint, PaginatedPublicUsersSchema);
 
-    // Clear user-related cache
-    this.dataManager.clearCache();
-
-    logger.info("User logout completed");
+    return response.data;
   }
 
-  async refreshToken(): Promise<LoginResponse> {
-    logger.info("Token refresh attempt");
+  /**
+   * Get user by ID
+   */
+  async getUserById(id: string): Promise<UserProfile> {
+    // Use raw client due to backend returning nested 'data' and mixed types
+    const response = await apiClient.getRaw<any>(`/Users/${id}`);
+    const payload = response.data?.data ?? response.data;
 
-    try {
-      const response = await this.dataManager.create(
-        "/auth/refresh",
-        {},
-        z.object({}),
-        LoginResponseSchema,
-      );
+    const dataBlock = payload?.data ?? {};
 
-      // Update stored token
-      localStorage.setItem("auth_token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      logger.info("Token refresh successful", { userId: response.user.id });
-
-      return response;
-    } catch (error) {
-      logger.error("Token refresh failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      // Clear invalid token
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user");
-
-      throw error;
-    }
-  }
-
-  // ============================================================================
-  // PROFILE METHODS
-  // ============================================================================
-
-  async getCurrentUser(): Promise<UserProfileResponse> {
-    logger.debug("Fetching current user profile");
-
-    return this.dataManager.get(
-      "/users/me",
-      UserProfileResponseSchema,
-      { useCache: true, cacheTtl: 300000 }, // 5 minutes
-    );
-  }
-
-  async getUserById(id: string): Promise<UserProfileResponse> {
-    logger.debug("Fetching user profile", { userId: id });
-
-    return this.dataManager.get(
-      `/users/${id}`,
-      UserProfileResponseSchema,
-      { useCache: true, cacheTtl: 600000 }, // 10 minutes
-    );
-  }
-
-  async getUserBySlug(slug: string): Promise<UserProfileResponse> {
-    logger.debug("Fetching user profile by slug", { slug });
-
-    return this.dataManager.get(
-      `/users/slug/${slug}`,
-      UserProfileResponseSchema,
-      { useCache: true, cacheTtl: 600000 }, // 10 minutes
-    );
-  }
-
-  async updateProfile(
-    updates: UpdateUserProfileRequest,
-  ): Promise<UserProfileResponse> {
-    logger.info("Updating user profile", { updates: Object.keys(updates) });
-
-    try {
-      const response = await this.dataManager.update(
-        "/users",
-        "me",
-        updates,
-        UpdateUserProfileRequestSchema,
-        UserProfileResponseSchema,
-      );
-
-      // Update stored user data
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        const updatedUser = { ...user, ...response };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-      }
-
-      logger.info("User profile updated successfully");
-
-      return response;
-    } catch (error) {
-      logger.error("User profile update failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  async uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
-    logger.info("Uploading user avatar", {
-      fileName: file.name,
-      fileSize: file.size,
-    });
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    try {
-      // Note: This would need a different API client method for file uploads
-      // For now, using fetch directly
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch("/api/users/me/avatar", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      logger.info("Avatar upload successful", { avatarUrl: result.avatarUrl });
-
-      return result;
-    } catch (error) {
-      logger.error("Avatar upload failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  // ============================================================================
-  // USER SEARCH AND LISTING
-  // ============================================================================
-
-  async searchUsers(
-    query: string,
-    filters: FilterParams = {},
-    pagination: PaginationParams = {},
-  ) {
-    logger.debug("Searching users", { query, filters, pagination });
-
-    const searchFilters = {
-      ...filters,
-      search: query,
+    const normalized: UserProfile = {
+      id: String(payload.id ?? ""),
+      email: payload.email ?? undefined,
+      firstName: (payload.firstName ?? dataBlock.firstName) ?? undefined,
+      lastName: (payload.lastName ?? dataBlock.lastName) ?? undefined,
+      role: typeof payload.role === "number" ? String(payload.role) : (payload.role ?? undefined),
+      profilePicture: (payload.profilePicture ?? dataBlock.avatar) || undefined,
+      bio: dataBlock.summary ?? undefined,
+      location: dataBlock.location ?? undefined,
+      website: dataBlock.website ?? undefined,
+      linkedIn: dataBlock.linkedIn ?? dataBlock.linkedin ?? undefined,
+      github: dataBlock.gitHub ?? dataBlock.github ?? undefined,
+      skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
+      openToWork: dataBlock.openToWork ?? undefined,
+      slug: payload.slug ?? undefined,
+      createdAt: payload.createdAt ?? undefined,
+      updatedAt: payload.updatedAt ?? undefined,
     };
 
-    return this.dataManager.list(
-      "/users/search",
-      UserProfileResponseSchema,
-      pagination,
-      searchFilters,
-      { useCache: true, cacheTtl: 180000 }, // 3 minutes
-    );
+    return normalized;
   }
 
-  async getUsers(
-    filters: FilterParams = {},
-    pagination: PaginationParams = {},
-  ) {
-    logger.debug("Fetching users list", { filters, pagination });
+  /**
+   * Get user by slug/username
+   */
+  async getUserBySlug(slug: string): Promise<UserProfile> {
+    const response = await apiClient.get<UserProfile>(`/Users/slug/${slug}`, UserProfileSchema);
+    return response.data;
+  }
 
-    return this.dataManager.list(
-      "/users",
-      UserProfileResponseSchema,
-      pagination,
-      filters,
-      { useCache: true, cacheTtl: 180000 }, // 3 minutes
-    );
+  /**
+   * Get current user profile
+   */
+  async getCurrentUser(): Promise<UserProfile> {
+    const response = await apiClient.get<UserProfile>("/Users/me", UserProfileSchema);
+    return response.data;
+  }
+
+
+
+  /**
+   * Update current user profile
+   */
+  async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+    const response = await apiClient.put<UserProfile>("/Users/me", updates, UserProfileSchema);
+    return response.data;
+  }
+
+  /**
+   * Search users with filters
+   */
+  async searchUsers(filters: UserFilters): Promise<PaginatedUsers> {
+    return this.getPublicUsers(filters);
   }
 
   // ============================================================================
-  // USER CONNECTIONS
+  // CONNECTION MANAGEMENT
   // ============================================================================
 
-  async sendConnectionRequest(userId: string, message?: string): Promise<void> {
-    logger.info("Sending connection request", {
-      userId,
-      hasMessage: !!message,
-    });
-
-    await this.dataManager.create(
-      "/connections",
-      { userId, message },
-      z.object({
-        userId: z.string().uuid(),
-        message: z.string().optional(),
-      }),
-      z.object({}),
+  /**
+   * Send connection request
+   */
+  async sendConnectionRequest(request: SendConnectionRequest): Promise<Connection> {
+    const response = await apiClient.post<Connection>(
+      "/Users/connections",
+      request,
+      ConnectionSchema
     );
-
-    logger.info("Connection request sent successfully", { userId });
+    return response.data;
   }
 
-  async acceptConnectionRequest(requestId: string): Promise<void> {
-    logger.info("Accepting connection request", { requestId });
-
-    await this.dataManager.update(
-      "/connections",
-      requestId,
-      { status: "accepted" },
-      z.object({ status: z.literal("accepted") }),
-      z.object({}),
+  /**
+   * Get current user's connections
+   */
+  async getMyConnections(): Promise<Connection[]> {
+    const response = await apiClient.get<Connection[]>(
+      "/Users/me/connections",
+      z.array(ConnectionSchema)
     );
-
-    logger.info("Connection request accepted", { requestId });
+    return response.data;
   }
 
-  async rejectConnectionRequest(requestId: string): Promise<void> {
-    logger.info("Rejecting connection request", { requestId });
-
-    await this.dataManager.update(
-      "/connections",
-      requestId,
-      { status: "rejected" },
-      z.object({ status: z.literal("rejected") }),
-      z.object({}),
+  /**
+   * Get pending connection requests
+   */
+  async getPendingConnectionRequests(): Promise<Connection[]> {
+    const response = await apiClient.get<Connection[]>(
+      "/Users/me/connections/pending",
+      z.array(ConnectionSchema)
     );
+    return response.data;
+  }
 
-    logger.info("Connection request rejected", { requestId });
+  /**
+   * Accept connection request
+   */
+  async acceptConnectionRequest(connectionId: string): Promise<void> {
+    await apiClient.put(`/Users/connections/${connectionId}/accept`);
+  }
+
+  /**
+   * Reject connection request
+   */
+  async rejectConnectionRequest(connectionId: string): Promise<void> {
+    await apiClient.delete(`/Users/connections/${connectionId}`);
+  }
+
+  /**
+   * Get connections for a specific user
+   */
+  async getUserConnections(userId: string): Promise<Connection[]> {
+    const response = await apiClient.get<Connection[]>(
+      `/Users/${userId}/connections`,
+      z.array(ConnectionSchema)
+    );
+    return response.data;
+  }
+
+  /**
+   * Check connection status between two users
+   */
+  async getConnectionStatus(fromUserId: string, toUserId: string): Promise<Connection | null> {
+    try {
+      const response = await apiClient.get<Connection>(
+        `/Users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
+        ConnectionSchema
+      );
+      return response.data;
+    } catch (error) {
+      // If no connection exists, return null
+      return null;
+    }
+  }
+
+  /**
+   * Get recommended connections for current user
+   */
+  async getRecommendedConnections(): Promise<UserProfile[]> {
+    const response = await apiClient.get<UserProfile[]>(
+      "/Users/me/recommendations",
+      z.array(UserProfileSchema)
+    );
+    return response.data;
   }
 
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
 
-  getCurrentUserId(): string | null {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        return user.id;
-      } catch {
-        return null;
-      }
+  /**
+   * Check if current user can message another user
+   */
+  async canMessageUser(userId: string): Promise<boolean> {
+    try {
+      const response = await apiClient.get<{ canMessage: boolean }>(
+        `/Users/${userId}/can-message`,
+        z.object({ canMessage: z.boolean() })
+      );
+      return response.data.canMessage;
+    } catch (error) {
+      return false;
     }
-    return null;
   }
 
-  isAuthenticated(): boolean {
-    return !!localStorage.getItem("auth_token");
-  }
-
-  getStoredUser(): any | null {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        return JSON.parse(storedUser);
-      } catch {
-        return null;
-      }
-    }
-    return null;
+  /**
+   * Get user's public activity/stats
+   */
+  async getUserStats(userId: string): Promise<{
+    resumeCount: number;
+    connectionCount: number;
+    jobApplicationCount: number;
+  }> {
+    const response = await apiClient.get<{
+      resumeCount: number;
+      connectionCount: number;
+      jobApplicationCount: number;
+    }>(
+      `/Users/${userId}/stats`,
+      z.object({
+        resumeCount: z.number(),
+        connectionCount: z.number(),
+        jobApplicationCount: z.number(),
+      })
+    );
+    return response.data;
   }
 }
 

@@ -1,4 +1,4 @@
-import { User } from "@/lib/auth";
+
 import type { Company } from "@/types/company";
 import type { Job } from "@/types/job";
 import type { UserProfile } from "@/types/people";

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, User, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, Users, Briefcase, Building2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
@@ -15,14 +15,17 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, type UserRole } from "@/lib/auth";
 
 export default function Signup() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("job_seeker");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,9 +60,10 @@ export default function Signup() {
     }
 
     try {
-      const success = await signup(email, password, name);
+      const success = await signup(email, password, firstName, lastName, role);
       if (success) {
-        navigate("/persona-selection");
+        // Redirect to success page with email confirmation instructions
+        navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`);
       } else {
         setError(
           "Account with this email already exists. Please sign in instead.",
@@ -103,19 +107,36 @@ export default function Signup() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="firstName"
+                          type="text"
+                          placeholder="Enter your first name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="lastName"
+                          type="text"
+                          placeholder="Enter your last name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="pl-10"
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -132,6 +153,26 @@ export default function Signup() {
                         className="pl-10"
                         required
                       />
+                    </div>
+                  </div>
+
+                  {/* Persona selection */}
+                  <div className="space-y-2">
+                    <Label>Registering as</Label>
+                    <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue inline-block">
+                      <div className="bg-background rounded-full p-1">
+                        <ToggleGroup type="single" value={role} onValueChange={(v) => v && setRole(v as UserRole)}>
+                          <ToggleGroupItem value="job_seeker" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                            <Users className="h-4 w-4 mr-2" /> Job Seeker
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="recruiter" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                            <Briefcase className="h-4 w-4 mr-2" /> Recruiter
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="business" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                            <Building2 className="h-4 w-4 mr-2" /> Business
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
                     </div>
                   </div>
 

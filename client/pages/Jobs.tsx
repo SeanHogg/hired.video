@@ -39,17 +39,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { trackCompanyFromJobData } from "@/data/mockCompanies";
-import {
-  getAllJobsForUser,
-  addTrackedJob,
-  removeTrackedJob,
-  getPublicJobs,
-  getJobsByFilters,
-} from "@/data/mockJobs";
+import { jobService, type JobFilters, type JobSummary } from "@/lib/services/job-service";
+import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
+
 
 export default function Jobs() {
   const {
@@ -61,19 +56,10 @@ export default function Jobs() {
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-
-  // Get filtered jobs data
-  const getFilteredJobs = () => {
-    return getJobsByFilters({
-      search: searchFilters.search || "",
-      location: searchFilters.location,
-      employmentType: searchFilters.employmentType,
-      experienceLevel: searchFilters.experienceLevel,
-      remote: searchFilters.remote,
-    });
-  };
-
-  const filteredJobs = getFilteredJobs();
+  const [jobs, setJobs] = useState<JobSummary[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalJobs, setTotalJobs] = useState<number>(0);
 
   // Pagination logic
   const {
@@ -85,106 +71,63 @@ export default function Jobs() {
     setCurrentPage,
     handleItemsPerPageChange,
     handleTotalItemsChange,
-  } = usePagination(filteredJobs.length, 9);
+  } = usePagination(totalJobs, 9);
 
-  // Update pagination when filtered jobs change
+  // Fetch jobs data
+  const fetchJobs = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const filters: JobFilters = {
+        search: searchFilters.search || undefined,
+        location: searchFilters.location || undefined,
+        employmentType: searchFilters.employmentType || undefined,
+        experienceLevel: searchFilters.experienceLevel || undefined,
+        isRemote: searchFilters.remote || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      const result = await jobService.getPublicJobs(filters);
+      setJobs(result.items);
+      setTotalJobs(result.total);
+      handleTotalItemsChange(result.total);
+    } catch (err) {
+      console.error("Failed to fetch jobs:", err);
+      setError("Failed to load jobs. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch jobs when filters or page changes
   useEffect(() => {
-    handleTotalItemsChange(filteredJobs.length);
-  }, [filteredJobs.length, handleTotalItemsChange]);
+    fetchJobs();
+  }, [searchFilters, currentPage, itemsPerPage]);
 
-  // Get paginated jobs
-  const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
-
-  // Get jobs based on user role and authentication
-  const getJobsForUser = () => {
-    if (!user) {
-      return getPublicJobs().map((job) => ({
-        ...job,
-        title: job.data.title,
-        company: job.data.company.name,
-        location: job.data.location.remote
-          ? "Remote"
-          : `${job.data.location.city}, ${job.data.location.state}`,
-        salary:
-          job.data.salaryMin && job.data.salaryMax
-            ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-            : undefined,
-        employmentType: job.data.employmentType,
-        experienceLevel: job.data.experienceLevel,
-        summary: job.data.summary,
-      }));
-    }
-
-    const { owned, tracked } = getAllJobsForUser(user.id);
-    const ownedWithOwnership: JobWithOwnership[] = owned.map((job) => ({
-      id: job.id,
-      slug: job.slug,
-      title: job.data.title,
-      company: job.data.company.name,
-      location: job.data.location.remote
-        ? "Remote"
-        : `${job.data.location.city}, ${job.data.location.state}`,
-      salary:
-        job.data.salaryMin && job.data.salaryMax
-          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-          : undefined,
-      employmentType: job.data.employmentType,
-      experienceLevel: job.data.experienceLevel,
-      status: job.status,
-      privacy: job.privacy,
-      createdAt: job.createdAt,
-      updatedAt: job.updatedAt,
-      expiresAt: job.expiresAt,
-      views: job.views,
-      applications: job.applications,
-      summary: job.data.summary,
-      userId: job.userId,
-      companyId: job.companyId,
-      ownership: "owned" as const,
-    }));
-
-    const trackedWithOwnership: JobWithOwnership[] = tracked.map((job) => ({
-      id: job.id,
-      slug: job.slug,
-      title: job.data.title,
-      company: job.data.company.name,
-      location: job.data.location.remote
-        ? "Remote"
-        : `${job.data.location.city}, ${job.data.location.state}`,
-      salary:
-        job.data.salaryMin && job.data.salaryMax
-          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-          : undefined,
-      employmentType: job.data.employmentType,
-      experienceLevel: job.data.experienceLevel,
-      status: job.status,
-      privacy: job.privacy,
-      createdAt: job.createdAt,
-      updatedAt: job.updatedAt,
-      expiresAt: job.expiresAt,
-      views: job.views,
-      applications: job.applications,
-      summary: job.data.summary,
-      userId: job.userId,
-      companyId: job.companyId,
-      ownership: "tracked" as const,
-    }));
-
-    return { owned: ownedWithOwnership, tracked: trackedWithOwnership };
-  };
-
-  const handleTrackJob = (jobId: string) => {
+  // Handle job tracking
+  const handleTrackJob = async (jobId: string) => {
     if (user) {
-      addTrackedJob(jobId, user.id);
-      // The addTrackedJob function will automatically track the company too
-      // In a real app, you'd trigger a re-render here
+      try {
+        await jobService.saveJob(jobId);
+        // Refresh jobs to show updated state
+        await fetchJobs();
+      } catch (error) {
+        console.error("Failed to save job:", error);
+      }
     }
   };
 
-  const handleUntrackJob = (jobId: string) => {
+  const handleUntrackJob = async (jobId: string) => {
     if (user) {
-      removeTrackedJob(jobId, user.id);
-      // In a real app, you'd trigger a re-render here
+      try {
+        await jobService.unsaveJob(jobId);
+        // Refresh jobs to show updated state
+        await fetchJobs();
+      } catch (error) {
+        console.error("Failed to unsave job:", error);
+      }
     }
   };
 
@@ -200,9 +143,18 @@ export default function Jobs() {
     setSearchFilters({});
   };
 
+  // Temporary stub until owned/tracked jobs are wired
+  const getJobsForUser = (): { owned: JobWithOwnership[]; tracked: JobWithOwnership[] } => {
+    return { owned: [], tracked: [] };
+  };
+
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    const jobsData = getJobsForUser();
+    const jobsOwnedTracked = getAllJobsForUser(user.id);
+    const jobsData: { owned: JobWithOwnership[]; tracked: JobWithOwnership[] } = {
+      owned: jobsOwnedTracked.owned.map((j) => ({ ...j, ownership: "owned" as const })),
+      tracked: jobsOwnedTracked.tracked.map((j) => ({ ...j, ownership: "tracked" as const })),
+    };
     const isJobSeeker = user.role === "job_seeker";
     const isRecruiterOrBusiness =
       user.role === "recruiter" || user.role === "business";
@@ -321,53 +273,63 @@ export default function Jobs() {
                     <Search className="h-5 w-5" />
                     {isJobSeeker ? "Available Jobs" : "All Jobs"}
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {paginatedJobs.map((job) => {
-                      const jobMetadata = {
-                        id: job.id,
-                        slug: job.slug,
-                        title: job.data.title,
-                        company: job.data.company.name,
-                        location: job.data.location.remote
-                          ? "Remote"
-                          : `${job.data.location.city}, ${job.data.location.state}`,
-                        salary:
-                          job.data.salaryMin && job.data.salaryMax
-                            ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
+                  {isLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div key={index} className="animate-pulse">
+                          <div className="bg-gray-200 rounded-lg h-48"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-12">
+                      <p className="text-red-600 mb-4">{error}</p>
+                      <Button onClick={fetchJobs}>Try Again</Button>
+                    </div>
+                  ) : jobs.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 mb-4">No jobs found matching your criteria.</p>
+                      <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {jobs.map((job) => {
+                        const jobMetadata = {
+                          id: job.id,
+                          title: job.title,
+                          company: job.company,
+                          location: job.location,
+                          salary: job.salaryMin && job.salaryMax
+                            ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
                             : undefined,
-                        employmentType: job.data.employmentType,
-                        experienceLevel: job.data.experienceLevel,
-                        status: job.status,
-                        privacy: job.privacy,
-                        createdAt: job.createdAt,
-                        updatedAt: job.updatedAt,
-                        expiresAt: job.expiresAt,
-                        views: job.views,
-                        applications: job.applications,
-                        summary: job.data.summary,
-                        userId: job.userId,
-                        companyId: job.companyId,
-                      };
+                          employmentType: job.employmentType,
+                          experienceLevel: job.experienceLevel,
+                          postedDate: job.postedDate,
+                          isRemote: job.isRemote,
+                        };
 
-                      return (
-                        <JobCard
-                          key={job.id}
-                          job={jobMetadata}
-                          onTrack={handleTrackJob}
-                          onUntrack={handleUntrackJob}
-                        />
-                      );
-                    })}
-                  </div>
+                        return (
+                          <JobCard
+                            key={job.id}
+                            job={jobMetadata}
+                            onTrack={handleTrackJob}
+                            onUntrack={handleUntrackJob}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Pagination */}
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredJobs.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={handleItemsPerPageChange}
-                  />
+                  {!isLoading && !error && jobs.length > 0 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={totalJobs}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -463,33 +425,21 @@ export default function Jobs() {
                 Featured Opportunities
               </h2>
               <div className="grid md:grid-cols-2 gap-6">
-                {getPublicJobs()
+                {jobs
                   .slice(0, 2)
                   .map((job) => {
                     const jobMetadata = {
                       id: job.id,
-                      slug: job.slug,
-                      title: job.data.title,
-                      company: job.data.company.name,
-                      location: job.data.location.remote
-                        ? "Remote"
-                        : `${job.data.location.city}, ${job.data.location.state}`,
-                      salary:
-                        job.data.salaryMin && job.data.salaryMax
-                          ? `$${(job.data.salaryMin / 1000).toFixed(0)}k - $${(job.data.salaryMax / 1000).toFixed(0)}k`
-                          : undefined,
-                      employmentType: job.data.employmentType,
-                      experienceLevel: job.data.experienceLevel,
-                      status: job.status,
-                      privacy: job.privacy,
-                      createdAt: job.createdAt,
-                      updatedAt: job.updatedAt,
-                      expiresAt: job.expiresAt,
-                      views: job.views,
-                      applications: job.applications,
-                      summary: job.data.summary,
-                      userId: job.userId,
-                      companyId: job.companyId,
+                      title: job.title,
+                      company: job.company,
+                      location: job.location,
+                      salary: job.salaryMin && job.salaryMax
+                        ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
+                        : undefined,
+                      employmentType: job.employmentType,
+                      experienceLevel: job.experienceLevel,
+                      postedDate: job.postedDate,
+                      isRemote: job.isRemote,
                     };
 
                     return <JobCard key={job.id} job={jobMetadata} />;

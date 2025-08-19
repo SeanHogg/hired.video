@@ -59,15 +59,7 @@ import ResumeCard from "@/components/ResumeCard";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
-import {
-  MOCK_RESUME_METADATA,
-  getResumesByUserId,
-  generateResumeId,
-  getAllResumesForUser,
-  isResumeTrackedByUser,
-  addTrackedResume,
-  removeTrackedResume,
-} from "@/data/mockResumes";
+import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type {

@@ -6,11 +6,10 @@ import {
   CreditCard,
   Users,
 } from "lucide-react";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -91,9 +90,18 @@ export default function ShoppingCart() {
             <div className="text-center py-8">
               <ShoppingCartIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Your cart is empty</h3>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-6">
                 Add a premium plan to get started
               </p>
+              <Button
+                onClick={() => {
+                  closeCart();
+                  navigate("/pricing");
+                }}
+                className="w-full"
+              >
+                View Pricing Plans
+              </Button>
             </div>
           ) : (
             <>

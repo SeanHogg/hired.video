@@ -1,49 +1,30 @@
 import {
   Building2,
   Video,
-  Sparkles,
   ArrowRight,
-  Star,
   Users,
-  Clock,
   TrendingUp,
-  CheckCircle2,
   Play,
-  Target,
-  Zap,
-  BarChart3,
   Plus,
   Search,
-  Filter,
-  X,
   Eye,
-  Briefcase,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
-import type { SearchFilters } from "@/components/SearchBar";
-import SearchBar from "@/components/SearchBar";
+import SearchBar, { type SearchFilters } from "@/components/SearchBar";
 import Sidebar from "@/components/Sidebar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  getAllCompaniesForUser,
-  addTrackedCompany,
-  removeTrackedCompany,
-  getPublicCompanies,
-  getCompaniesByFilters,
-} from "@/data/mockCompanies";
+import { companyService, type CompanyFilters, type Company } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { CompanyWithOwnership } from "@/types/company";
@@ -58,131 +39,79 @@ export default function Companies() {
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-
-  // Get filtered companies data
-  const getFilteredCompanies = () => {
-    return getCompaniesByFilters({
-      search: searchFilters.search || "",
-      industry: searchFilters.industry ? [searchFilters.industry] : undefined,
-      size: searchFilters.size ? [searchFilters.size] : undefined,
-      location: searchFilters.location,
-    });
-  };
-
-  const filteredCompanies = getFilteredCompanies();
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalCompanies, setTotalCompanies] = useState<number>(0);
 
   // Pagination logic
   const {
     currentPage,
     itemsPerPage,
-    totalPages,
-    startIndex,
-    endIndex,
+    totalPages: _totalPages,
+    startIndex: _startIndex,
+    endIndex: _endIndex,
     setCurrentPage,
     handleItemsPerPageChange,
     handleTotalItemsChange,
-  } = usePagination(filteredCompanies.length, 9);
+  } = usePagination(totalCompanies, 9);
 
-  // Update pagination when filtered companies change
-  useEffect(() => {
-    handleTotalItemsChange(filteredCompanies.length);
-  }, [filteredCompanies.length, handleTotalItemsChange]);
+  // Fetch companies data
+  const fetchCompanies = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-  // Get paginated companies
-  const paginatedCompanies = filteredCompanies.slice(startIndex, endIndex);
-
-  // Get companies based on user role and authentication
-  const getCompaniesForUser = () => {
-    if (!user) {
-      return getPublicCompanies().map((company) => ({
-        ...company,
-        onboardingProgress: 100, // Public companies are fully set up
-      }));
-    }
-
-    const { owned, tracked } = getAllCompaniesForUser(user.id);
-    const ownedWithOwnership: CompanyWithOwnership[] = owned.map((company) => {
-      const completedTasks = company.onboardingTasks.filter(
-        (task) => task.completed,
-      ).length;
-      const totalTasks = company.onboardingTasks.length;
-      const onboardingProgress = Math.round(
-        (completedTasks / totalTasks) * 100,
-      );
-
-      return {
-        id: company.id,
-        slug: company.slug,
-        name: company.data.name,
-        logo: company.data.logo,
-        tagline: company.data.tagline,
-        industry: company.data.industry,
-        size: company.data.size,
-        location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
-        status: company.status,
-        visibility: company.visibility,
-        createdAt: company.createdAt,
-        updatedAt: company.updatedAt,
-        views: company.views,
-        followers: company.followers,
-        jobCount: company.jobCount,
-        activeJobCount: company.activeJobCount,
-        userId: company.userId,
-        teamMembers: company.teamMembers,
-        onboardingProgress,
-        ownership: "owned" as const,
+      const filters: CompanyFilters = {
+        search: searchFilters.search || undefined,
+        industry: searchFilters.industry || undefined,
+        size: searchFilters.size || undefined,
+        location: searchFilters.location || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
       };
-    });
 
-    const trackedWithOwnership: CompanyWithOwnership[] = tracked.map(
-      (company) => {
-        const completedTasks = company.onboardingTasks.filter(
-          (task) => task.completed,
-        ).length;
-        const totalTasks = company.onboardingTasks.length;
-        const onboardingProgress = Math.round(
-          (completedTasks / totalTasks) * 100,
-        );
+      const result = await companyService.getPublicCompanies(filters);
+      setCompanies(result.items);
+      setTotalCompanies(result.total);
+      handleTotalItemsChange(result.total);
+    } catch (err) {
+      console.error("Failed to fetch companies:", err);
+      setError("Failed to load companies. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchFilters, currentPage, itemsPerPage]);
 
-        return {
-          id: company.id,
-          slug: company.slug,
-          name: company.data.name,
-          logo: company.data.logo,
-          tagline: company.data.tagline,
-          industry: company.data.industry,
-          size: company.data.size,
-          location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
-          status: company.status,
-          visibility: company.visibility,
-          createdAt: company.createdAt,
-          updatedAt: company.updatedAt,
-          views: company.views,
-          followers: company.followers,
-          jobCount: company.jobCount,
-          activeJobCount: company.activeJobCount,
-          userId: company.userId,
-          teamMembers: company.teamMembers,
-          onboardingProgress,
-          ownership: "tracked" as const,
-        };
-      },
-    );
+  // Fetch companies when filters or page changes
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
 
-    return { owned: ownedWithOwnership, tracked: trackedWithOwnership };
-  };
+  // Note: User-specific company management (owned/tracked) will be implemented
+  // when the backend API supports user company associations
 
-  const handleTrackCompany = (companyId: string) => {
+  const handleFollowCompany = async (companyId: string) => {
     if (user) {
-      addTrackedCompany(companyId, user.id);
-      // In a real app, you'd trigger a re-render here
+      try {
+        await companyService.followCompany(companyId);
+        // Refresh companies to show updated follow status
+        await fetchCompanies();
+      } catch (error) {
+        console.error("Failed to follow company:", error);
+      }
     }
   };
 
-  const handleUntrackCompany = (companyId: string) => {
+  const handleUnfollowCompany = async (companyId: string) => {
     if (user) {
-      removeTrackedCompany(companyId, user.id);
-      // In a real app, you'd trigger a re-render here
+      try {
+        await companyService.unfollowCompany(companyId);
+        // Refresh companies to show updated follow status
+        await fetchCompanies();
+      } catch (error) {
+        console.error("Failed to unfollow company:", error);
+      }
     }
   };
 
@@ -196,6 +125,16 @@ export default function Companies() {
 
   const handleClearFilters = () => {
     setSearchFilters({});
+  };
+
+  // Get user-specific company data (owned and tracked companies)
+  const getCompaniesForUser = () => {
+    // TODO: Replace with actual API calls when backend supports user company associations
+    // For now, return empty arrays as placeholder
+    return {
+      owned: [] as CompanyWithOwnership[],
+      tracked: [] as CompanyWithOwnership[]
+    };
   };
 
   // If user is authenticated, show the actual companies page
@@ -316,49 +255,66 @@ export default function Companies() {
                       <Search className="h-5 w-5" />
                       {isJobSeeker ? "Discover Companies" : "Explore Companies"}
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {paginatedCompanies.map((company) => {
-                        const companyMetadata = {
-                          id: company.id,
-                          slug: company.slug,
-                          name: company.data.name,
-                          logo: company.data.logo,
-                          tagline: company.data.tagline,
-                          industry: company.data.industry,
-                          size: company.data.size,
-                          location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
-                          status: company.status,
-                          visibility: company.visibility,
-                          createdAt: company.createdAt,
-                          updatedAt: company.updatedAt,
-                          views: company.views,
-                          followers: company.followers,
-                          jobCount: company.jobCount,
-                          activeJobCount: company.activeJobCount,
-                          userId: company.userId,
-                          teamMembers: company.teamMembers,
-                          onboardingProgress: 100, // Public companies are complete
-                        };
+                    {isLoading ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <div key={index} className="animate-pulse">
+                            <div className="bg-gray-200 rounded-lg h-48"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : error ? (
+                      <div className="text-center py-12">
+                        <p className="text-red-600 mb-4">{error}</p>
+                        <Button onClick={fetchCompanies}>Try Again</Button>
+                      </div>
+                    ) : companies.length === 0 ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600 mb-4">No companies found matching your criteria.</p>
+                        <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {companies.map((company) => {
+                          const companyMetadata = {
+                            id: company.id,
+                            name: company.name,
+                            logo: company.logo,
+                            description: company.description,
+                            industry: company.industry,
+                            size: company.size,
+                            location: company.location,
+                            website: company.website,
+                            founded: company.founded,
+                            followersCount: company.followersCount,
+                            jobsCount: company.jobsCount,
+                            isPublic: company.isPublic,
+                            createdAt: company.createdAt,
+                            updatedAt: company.updatedAt,
+                          };
 
-                        return (
-                          <CompanyCard
-                            key={company.id}
-                            company={companyMetadata}
-                            onTrack={handleTrackCompany}
-                            onUntrack={handleUntrackCompany}
-                          />
-                        );
-                      })}
-                    </div>
+                          return (
+                            <CompanyCard
+                              key={company.id}
+                              company={companyMetadata}
+                              onFollow={handleFollowCompany}
+                              onUnfollow={handleUnfollowCompany}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Pagination */}
-                    <Pagination
-                      currentPage={currentPage}
-                      totalItems={filteredCompanies.length}
-                      itemsPerPage={itemsPerPage}
-                      onPageChange={setCurrentPage}
-                      onItemsPerPageChange={handleItemsPerPageChange}
-                    />
+                    {!isLoading && !error && companies.length > 0 && (
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalCompanies}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={handleItemsPerPageChange}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -478,7 +434,7 @@ export default function Companies() {
                 Featured Companies
               </h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {getPublicCompanies()
+                {companies
                   .slice(0, 3)
                   .map((company) => {
                     const companyMetadata = {

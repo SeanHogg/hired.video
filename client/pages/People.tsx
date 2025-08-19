@@ -38,22 +38,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  getAllPeopleForUser,
-  addTrackedPerson,
-  removeTrackedPerson,
-  getPublicUsers,
-  getUsersByFilters,
-  getConnectionStatus,
-  sendConnectionRequest,
-  acceptConnectionRequest,
-  rejectConnectionRequest,
-  getPendingConnectionRequests,
-} from "@/data/mockPeople";
+import { userService, type UserFilters, type PublicUser } from "@/lib/services/user-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import type { UserWithOwnership, UserProfile } from "@/types/people";
+import type { UserWithOwnership, UserProfile, UserMetadata } from "@/types/people";
 import { ConnectionStatus } from "@/types/people";
+
 
 // Type for the people data structure
 type PeopleData =
@@ -77,22 +67,10 @@ export default function People() {
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-
-  // Get filtered people data
-  const getFilteredPeople = () => {
-    const searchQuery = searchFilters.search || "";
-    return getUsersByFilters({
-      search: searchQuery,
-      role: searchFilters.role ? [searchFilters.role] : undefined,
-      location: searchFilters.location,
-      skills: searchFilters.skills
-        ? searchFilters.skills.split(",").map((s) => s.trim())
-        : undefined,
-      openToWork: searchFilters.openToWork,
-    }).filter((person) => person.id !== user?.id);
-  };
-
-  const filteredPeople = getFilteredPeople();
+  const [people, setPeople] = useState<PublicUser[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalPeople, setTotalPeople] = useState<number>(0);
 
   // Pagination logic
   const {
@@ -104,29 +82,56 @@ export default function People() {
     setCurrentPage,
     handleItemsPerPageChange,
     handleTotalItemsChange,
-  } = usePagination(filteredPeople.length, 9);
+  } = usePagination(totalPeople, 9);
 
-  // Update pagination when filtered people change
+  // Fetch people data
+  const fetchPeople = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const filters: UserFilters = {
+        search: searchFilters.search || undefined,
+        role: searchFilters.role || undefined,
+        location: searchFilters.location || undefined,
+        skills: searchFilters.skills
+          ? searchFilters.skills.split(",").map((s) => s.trim())
+          : undefined,
+        openToWork: searchFilters.openToWork || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      const result = await userService.getPublicUsers(filters);
+      // Filter out current user if authenticated
+      const filteredPeople = result.items.filter(person => person.id !== user?.id);
+
+      setPeople(filteredPeople);
+      setTotalPeople(result.total - (user ? 1 : 0)); // Subtract 1 if current user was in results
+      handleTotalItemsChange(result.total - (user ? 1 : 0));
+    } catch (err) {
+      console.error("Failed to fetch people:", err);
+      setError("Failed to load people. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch people when filters or page changes
   useEffect(() => {
-    handleTotalItemsChange(filteredPeople.length);
-  }, [filteredPeople.length, handleTotalItemsChange]);
-
-  // Get paginated people
-  const paginatedPeople = filteredPeople.slice(startIndex, endIndex);
+    fetchPeople();
+  }, [searchFilters, currentPage, itemsPerPage]);
 
   // Get people based on user role and authentication
   const getPeopleForUser = () => {
     if (!user) {
-      return getPublicUsers().map((person) => ({
+      return people.map((person) => ({
         ...person,
-        fullName: `${person.data.firstName} ${person.data.lastName}`,
-        location: person.data.location.remote
-          ? "Remote"
-          : `${person.data.location.city}, ${person.data.location.state}`,
-        experienceLevel: getExperienceLevel(person),
-        currentPosition: getCurrentPosition(person),
-        currentCompany: person.data.experience.find((exp) => exp.isCurrent)
-          ?.company,
+        fullName: person.fullName || '',
+        location: person.location || '',
+        experienceLevel: 'Entry Level', // TODO: Calculate from API data when available
+        currentPosition: person.currentRole || '',
+        currentCompany: person.currentCompany || '',
       }));
     }
 
@@ -134,59 +139,60 @@ export default function People() {
     const trackedWithOwnership: UserWithOwnership[] = tracked.map((person) => ({
       id: person.id,
       slug: person.slug,
-      firstName: person.data.firstName,
-      lastName: person.data.lastName,
-      fullName: `${person.data.firstName} ${person.data.lastName}`,
-      avatar: person.data.avatar,
-      headline: person.data.headline,
-      location: person.data.location.remote
-        ? "Remote"
-        : `${person.data.location.city}, ${person.data.location.state}`,
+      firstName: person.fullName?.split(' ')[0] || '',
+      lastName: person.fullName?.split(' ').slice(1).join(' ') || '',
+      fullName: person.fullName || '',
+      avatar: person.avatar,
+      headline: person.headline,
+      location: person.location || '',
       role: person.role,
-      visibility: person.visibility,
-      status: person.status,
-      companyId: person.companyId,
-      companyName: getCompanyNameByUser(person),
+      visibility: 'public', // Default for tracked users
+      status: 'active', // Default status
+      companyId: '', // Not available in UserMetadataDTO
+      companyName: person.currentCompany || '',
       createdAt: person.createdAt,
       updatedAt: person.updatedAt,
-      lastActiveAt: person.lastActiveAt,
-      profileViews: person.profileViews,
-      connectionCount: person.connectionCount,
-      followerCount: person.followerCount,
-      isVerified: person.isVerified,
-      isPremium: person.isPremium,
-      openToWork: person.data.openToWork,
+      lastActiveAt: new Date(), // Default to now
+      profileViews: person.profileViews || 0,
+      connectionCount: 0, // Not available in UserMetadataDTO
+      followerCount: 0, // Not available in UserMetadataDTO
+      isVerified: person.isVerified || false,
+      isPremium: person.isPremium || false,
+      openToWork: person.openToWork || false,
       experienceLevel: getExperienceLevel(person),
       currentPosition: getCurrentPosition(person),
-      currentCompany: person.data.experience.find((exp) => exp.isCurrent)
-        ?.company,
+      currentCompany: person.currentCompany || '',
       ownership: "tracked" as const,
     }));
 
     return { tracked: trackedWithOwnership };
   };
 
-  // Helper functions
-  const getExperienceLevel = (person: UserProfile): string => {
-    const totalYears = person.data.experience.reduce((total: number, exp) => {
-      const start = new Date(exp.startDate);
-      const end = exp.endDate ? new Date(exp.endDate) : new Date();
-      const years =
-        (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
-      return total + years;
-    }, 0);
-
-    if (totalYears < 2) return "Entry Level";
-    if (totalYears < 5) return "Mid Level";
-    if (totalYears < 10) return "Senior Level";
-    return "Executive Level";
+  // Get user-specific people data (tracked people)
+  const getAllPeopleForUser = (userId: string) => {
+    // TODO: Replace with actual API calls when backend supports user people associations
+    // For now, return empty arrays as placeholder
+    return {
+      tracked: [] as PublicUser[]
+    };
   };
 
-  const getCurrentPosition = (person: UserProfile): string | undefined => {
-    const currentExp = person.data.experience.find((exp) => exp.isCurrent);
-    return currentExp
-      ? `${currentExp.title} at ${currentExp.company}`
-      : undefined;
+  // Helper functions
+  const getExperienceLevel = (person: any): string => {
+    // TODO: Calculate experience level from API data when detailed experience is available
+    // For now, return a default based on role or use a simple heuristic
+    if (person.currentRole?.toLowerCase().includes('senior')) return "Senior Level";
+    if (person.currentRole?.toLowerCase().includes('lead') || person.currentRole?.toLowerCase().includes('manager')) return "Senior Level";
+    if (person.currentRole?.toLowerCase().includes('junior')) return "Entry Level";
+    return "Mid Level"; // Default fallback
+  };
+
+  const getCurrentPosition = (person: any): string | undefined => {
+    // Use the currentRole and currentCompany from UserMetadataDTO
+    if (person.currentRole && person.currentCompany) {
+      return `${person.currentRole} at ${person.currentCompany}`;
+    }
+    return person.currentRole || undefined;
   };
 
   const getCompanyNameByUser = (person: UserProfile): string | undefined => {
@@ -212,42 +218,47 @@ export default function People() {
     }
   };
 
-  const handleConnect = (personId: string) => {
+
+
+  const handleConnect = async (personId: string) => {
     if (user) {
-      sendConnectionRequest(
-        user.id,
-        personId,
-        "I'd love to connect and expand my professional network!",
-      );
-      // In a real app, you'd trigger a re-render here
+      try {
+        await userService.sendConnectionRequest({ toUserId: personId });
+        // Refresh people to show updated connection status
+        await fetchPeople();
+      } catch (error) {
+        console.error("Failed to send connection request:", error);
+      }
+    }
+  };
+
+  const handleAcceptConnection = async (connectionId: string) => {
+    if (user) {
+      try {
+        await userService.acceptConnectionRequest(connectionId);
+        // Refresh people to show updated connection status
+        await fetchPeople();
+      } catch (error) {
+        console.error("Failed to accept connection request:", error);
+      }
+    }
+  };
+
+  const handleRejectConnection = async (connectionId: string) => {
+    if (user) {
+      try {
+        await userService.rejectConnectionRequest(connectionId);
+        // Refresh people to show updated connection status
+        await fetchPeople();
+      } catch (error) {
+        console.error("Failed to reject connection request:", error);
+      }
     }
   };
 
   const handleMessage = (personId: string) => {
     // Navigate to messaging or open message modal
     console.log("Message person:", personId);
-  };
-
-  const handleAcceptConnection = (personId: string) => {
-    if (user) {
-      const requests = getPendingConnectionRequests(user.id);
-      const request = requests.find((req) => req.fromUserId === personId);
-      if (request) {
-        acceptConnectionRequest(request.id);
-        // In a real app, you'd trigger a re-render here
-      }
-    }
-  };
-
-  const handleRejectConnection = (personId: string) => {
-    if (user) {
-      const requests = getPendingConnectionRequests(user.id);
-      const request = requests.find((req) => req.fromUserId === personId);
-      if (request) {
-        rejectConnectionRequest(request.id);
-        // In a real app, you'd trigger a re-render here
-      }
-    }
   };
 
   const handleSearch = (query: string) => {
@@ -362,68 +373,68 @@ export default function People() {
                     <Search className="h-5 w-5" />
                     Discover Professionals
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {paginatedPeople.map((person) => {
-                      const personMetadata = {
-                        id: person.id,
-                        slug: person.slug,
-                        firstName: person.data.firstName,
-                        lastName: person.data.lastName,
-                        fullName: `${person.data.firstName} ${person.data.lastName}`,
-                        avatar: person.data.avatar,
-                        headline: person.data.headline,
-                        location: person.data.location.remote
-                          ? "Remote"
-                          : `${person.data.location.city}, ${person.data.location.state}`,
-                        role: person.role,
-                        visibility: person.visibility,
-                        status: person.status,
-                        companyId: person.companyId,
-                        companyName: getCompanyNameByUser(person),
-                        createdAt: person.createdAt,
-                        updatedAt: person.updatedAt,
-                        lastActiveAt: person.lastActiveAt,
-                        profileViews: person.profileViews,
-                        connectionCount: person.connectionCount,
-                        followerCount: person.followerCount,
-                        isVerified: person.isVerified,
-                        isPremium: person.isPremium,
-                        openToWork: person.data.openToWork,
-                        experienceLevel: getExperienceLevel(person),
-                        currentPosition: getCurrentPosition(person),
-                        currentCompany: person.data.experience.find(
-                          (exp) => exp.isCurrent,
-                        )?.company,
-                      };
+                  {isLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div key={index} className="animate-pulse">
+                          <div className="bg-gray-200 rounded-lg h-48"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-12">
+                      <p className="text-red-600 mb-4">{error}</p>
+                      <Button onClick={fetchPeople}>Try Again</Button>
+                    </div>
+                  ) : people.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 mb-4">No people found matching your criteria.</p>
+                      <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {people.map((person) => {
+                        const personMetadata = {
+                          id: person.id,
+                          firstName: person.firstName,
+                          lastName: person.lastName,
+                          fullName: `${person.firstName} ${person.lastName}`,
+                          avatar: person.profilePicture,
+                          bio: person.bio,
+                          location: person.location || "Location not specified",
+                          role: person.role,
+                          skills: person.skills,
+                          openToWork: person.openToWork,
+                          slug: person.slug,
+                          createdAt: person.createdAt,
+                          updatedAt: person.updatedAt,
+                        };
 
-                      return (
-                        <PeopleCard
-                          key={person.id}
-                          person={personMetadata}
-                          connectionStatus={
-                            user
-                              ? getConnectionStatus(user.id, person.id)
-                              : "none"
-                          }
-                          onTrack={handleTrackPerson}
-                          onUntrack={handleUntrackPerson}
-                          onConnect={handleConnect}
-                          onMessage={handleMessage}
-                          onAcceptConnection={handleAcceptConnection}
-                          onRejectConnection={handleRejectConnection}
-                        />
-                      );
-                    })}
-                  </div>
+                        return (
+                          <PeopleCard
+                            key={person.id}
+                            person={personMetadata}
+                            connectionStatus="none" // TODO: Implement connection status checking
+                            onConnect={handleConnect}
+                            onMessage={handleMessage}
+                            onAcceptConnection={handleAcceptConnection}
+                            onRejectConnection={handleRejectConnection}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Pagination */}
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={filteredPeople.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={handleItemsPerPageChange}
-                  />
+                  {!isLoading && !error && people.length > 0 && (
+                    <Pagination
+                      currentPage={currentPage}
+                      totalItems={totalPeople}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={setCurrentPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
+                  )}
                 </div>
 
                 {/* Empty State */}
@@ -543,39 +554,35 @@ export default function People() {
                 Meet Our Community
               </h2>
               <div className="grid md:grid-cols-3 gap-6">
-                {getPublicUsers()
+                {people
                   .slice(0, 3)
                   .map((person) => {
                     const personMetadata = {
-                      id: person.id,
-                      slug: person.slug,
-                      firstName: person.data.firstName,
-                      lastName: person.data.lastName,
-                      fullName: `${person.data.firstName} ${person.data.lastName}`,
-                      avatar: person.data.avatar,
-                      headline: person.data.headline,
-                      location: person.data.location.remote
-                        ? "Remote"
-                        : `${person.data.location.city}, ${person.data.location.state}`,
-                      role: person.role,
-                      visibility: person.visibility,
-                      status: person.status,
-                      companyId: person.companyId,
-                      companyName: getCompanyNameByUser(person),
-                      createdAt: person.createdAt,
-                      updatedAt: person.updatedAt,
-                      lastActiveAt: person.lastActiveAt,
-                      profileViews: person.profileViews,
-                      connectionCount: person.connectionCount,
-                      followerCount: person.followerCount,
-                      isVerified: person.isVerified,
-                      isPremium: person.isPremium,
-                      openToWork: person.data.openToWork,
+                      id: person.id || '',
+                      slug: person.slug || '',
+                      firstName: person.fullName?.split(' ')[0] || '',
+                      lastName: person.fullName?.split(' ').slice(1).join(' ') || '',
+                      fullName: person.fullName || '',
+                      avatar: person.avatar,
+                      headline: person.headline,
+                      location: person.location || '',
+                      role: person.role || 0,
+                      visibility: 'public' as const, // Default for public users
+                      status: 'active' as const, // Default status
+                      companyId: '', // Not available in PublicUser
+                      companyName: person.currentCompany || '',
+                      createdAt: person.createdAt || '',
+                      updatedAt: person.updatedAt || '',
+                      lastActiveAt: person.updatedAt || '', // Use updatedAt as fallback
+                      profileViews: person.profileViews || 0,
+                      connectionCount: 0, // Not available in PublicUser
+                      followerCount: 0, // Not available in PublicUser
+                      isVerified: person.isVerified || false,
+                      isPremium: person.isPremium || false,
+                      openToWork: person.openToWork || false,
                       experienceLevel: getExperienceLevel(person),
                       currentPosition: getCurrentPosition(person),
-                      currentCompany: person.data.experience.find(
-                        (exp) => exp.isCurrent,
-                      )?.company,
+                      currentCompany: person.currentCompany || '',
                     };
 
                     return (
@@ -623,11 +630,4 @@ export default function People() {
   );
 }
 
-function getCompanyNameByUser(person: any): string | undefined {
-  const companyMap: { [key: string]: string } = {
-    "techcorp-inc": "TechCorp Inc.",
-    "growth-dynamics": "Growth Dynamics",
-    "cloudscale-solutions": "CloudScale Solutions",
-  };
-  return person.companyId ? companyMap[person.companyId] : undefined;
-}
+

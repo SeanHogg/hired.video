@@ -1,5 +1,5 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,12 +38,12 @@ export default function ResumeUpload({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const allowedTypes = [
+  const allowedTypes = useMemo(() => [
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
-  ];
+  ], []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

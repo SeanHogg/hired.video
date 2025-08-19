@@ -67,7 +67,7 @@ export default function HeroCarousel({
       type: "upload",
       title: "Upload Your Resume",
       description:
-        "Drop your resume here and let our AI create a stunning video presentation that stands out from the crowd.",
+        "",
       badge: "AI-Powered Resume Videos",
     },
     {
@@ -153,8 +153,8 @@ export default function HeroCarousel({
   const currentSlideData = slides[currentSlide];
 
   return (
-    <section className="relative pt-20 pb-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
-      <div className="max-w-7xl mx-auto relative">
+    <section className="relative pt-12 pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
+      <div className="max-w-7xl mx-auto relative min-h-[400px] flex items-center">
         {/* Navigation Arrows */}
         <button
           onClick={prevSlide}
@@ -171,114 +171,118 @@ export default function HeroCarousel({
         </button>
 
         {/* Slide Content */}
-        <div className="text-center max-w-4xl mx-auto">
+        <div className="text-center max-w-4xl mx-auto w-full">
           <Badge
             variant="secondary"
-            className="mb-4 px-4 py-2 text-sm font-medium bg-brand-purple-light text-brand-purple-dark"
+            className="mb-3 px-3 py-1 text-xs font-medium bg-brand-purple-light text-brand-purple-dark"
           >
-            <Sparkles className="w-4 h-4 mr-2" />
+            <Sparkles className="w-3 h-3 mr-1" />
             {currentSlideData.badge}
           </Badge>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 leading-tight">
             {currentSlideData.title}
           </h1>
 
-          <p className="text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">
+          <p className="text-base text-muted-foreground mb-4 max-w-2xl mx-auto line-clamp-2">
             {currentSlideData.description}
           </p>
 
           {/* Slide-specific content */}
-          {currentSlideData.type === "main" && currentSlideData.stats && (
-            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground mb-6">
-              {currentSlideData.stats.map((stat, index) => (
-                <div key={index} className="flex items-center gap-1">
-                  <stat.icon className="w-4 h-4" />
-                  <span>{stat.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {currentSlideData.type === "upload" && (
-            <div className="max-w-md mx-auto mb-6">
-              <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
-                <CardContent className="pt-6">
-                  <div
-                    className={cn(
-                      "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-                      dragActive
-                        ? "border-primary bg-primary/10"
-                        : "border-muted-foreground/30 hover:border-primary/50",
-                    )}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                  >
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-base font-medium mb-2">
-                      Drop your resume here
-                    </p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      PDF, DOC, or DOCX files
-                    </p>
-                    <Button size="sm" variant="outline" className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Browse Files
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {currentSlideData.type === "features" &&
-            currentSlideData.features && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 max-w-2xl mx-auto">
-                {currentSlideData.features.map((feature, index) => (
-                  <div
-                    key={index}
-                    className="flex flex-col items-center p-4 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
-                  >
-                    <feature.icon className="w-6 h-6 mb-2 text-brand-purple" />
-                    <span className="text-sm font-medium">{feature.label}</span>
+          <div className="min-h-[80px] flex items-center justify-center mb-4">
+            {currentSlideData.type === "main" && currentSlideData.stats && (
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                {currentSlideData.stats.map((stat, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <stat.icon className="w-3 h-3" />
+                    <span>{stat.label}</span>
                   </div>
                 ))}
               </div>
             )}
 
-          {/* Action Buttons */}
-          {currentSlideData.type === "upload" ? (
-            <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8 py-3">
-              Generate AI Video
-            </Button>
-          ) : (
-            currentSlideData.actions && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                {currentSlideData.actions.map((action, index) => (
-                  <Button
-                    key={index}
-                    size={action.size}
-                    variant={action.variant}
-                    className="text-lg px-8 py-3"
-                  >
-                    {action.label}
-                  </Button>
-                ))}
+            {currentSlideData.type === "upload" && (
+              <div className="max-w-sm mx-auto">
+                <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+                  <CardContent className="pt-4">
+                    <div
+                      className={cn(
+                        "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                        dragActive
+                          ? "border-primary bg-primary/10"
+                          : "border-muted-foreground/30 hover:border-primary/50",
+                      )}
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                    >
+                      <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm font-medium mb-1">
+                        Drop your resume here
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        PDF, DOC, or DOCX files
+                      </p>
+                      <Button size="sm" variant="outline" className="gap-1 text-xs">
+                        <Plus className="h-3 w-3" />
+                        Browse Files
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            )
-          )}
+            )}
+
+            {currentSlideData.type === "features" &&
+              currentSlideData.features && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-xl mx-auto">
+                  {currentSlideData.features.map((feature, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col items-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
+                    >
+                      <feature.icon className="w-5 h-5 mb-1 text-brand-purple" />
+                      <span className="text-xs font-medium text-center">{feature.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="min-h-[50px] flex items-center justify-center">
+            {currentSlideData.type === "upload" ? (
+              <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2">
+                Generate AI Video
+              </Button>
+            ) : (
+              currentSlideData.actions && (
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {currentSlideData.actions.map((action, index) => (
+                    <Button
+                      key={index}
+                      size="sm"
+                      variant={action.variant}
+                      className="text-sm px-6 py-2"
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
         </div>
 
         {/* Slide Indicators */}
-        <div className="flex justify-center mt-8 gap-2">
+        <div className="flex justify-center mt-6 gap-2">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
               className={cn(
-                "w-3 h-3 rounded-full transition-colors",
+                "w-2 h-2 rounded-full transition-colors",
                 index === currentSlide
                   ? "bg-brand-purple"
                   : "bg-white/30 hover:bg-white/50",

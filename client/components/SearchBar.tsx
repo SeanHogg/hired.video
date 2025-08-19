@@ -1,7 +1,6 @@
 import {
   Search,
   Filter,
-  X,
   ChevronDown,
   SlidersHorizontal,
   MapPin,
@@ -132,7 +131,7 @@ export default function SearchBar({
     onSearch?.(query);
   };
 
-  const handleFilterChange = (key: string, value: any) => {
+  const handleFilterChange = (key: string, value: string | number | boolean | undefined) => {
     const newFilters = { ...filters, [key]: value };
     onFilterChange?.(newFilters);
   };

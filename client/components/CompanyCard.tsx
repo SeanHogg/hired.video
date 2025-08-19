@@ -31,8 +31,8 @@ import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 interface CompanyCardProps {
   company: CompanyMetadata | CompanyWithOwnership;
   showOwnership?: boolean;
-  onTrack?: (companyId: string) => void;
-  onUntrack?: (companyId: string) => void;
+  onTrack?: (_companyId: string) => void;
+  onUntrack?: (_companyId: string) => void;
 }
 
 export default function CompanyCard({

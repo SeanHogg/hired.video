@@ -1,62 +1,67 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { logger } from "./logger";
+import { authService, type UserProfile, type LoginRequest, type RegisterRequest } from "./services/auth-service";
 
 export type UserRole = "job_seeker" | "recruiter" | "business";
 
 export interface User {
   id: string;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  name: string; // Computed from firstName + lastName
   role?: UserRole;
   onboardingComplete: boolean;
   subscription?: "free" | "pro" | "enterprise";
   avatar?: string;
+  profilePicture?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  linkedIn?: string;
+  github?: string;
+  phone?: string;
+  skills?: string[];
+  openToWork?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, name: string) => Promise<boolean>;
-  logout: () => void;
-  updateUserRole: (role: UserRole) => void;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<boolean>;
+  signup: (email: string, password: string, firstName: string, lastName: string, role?: UserRole) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateUserRole: (role: UserRole) => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   completeOnboarding: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users
-const mockUsers: Array<User & { password: string }> = [
-  {
-    id: "u1a2b3c4-d5e6-7890-abcd-ef1234567890",
-    email: "john.seeker@example.com",
-    password: "password123",
-    name: "John Seeker",
-    role: "job_seeker",
-    onboardingComplete: true,
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
-  },
-  {
-    id: "u2b3c4d5-e6f7-8901-bcde-f23456789012",
-    email: "sarah.recruiter@example.com",
-    password: "password123",
-    name: "Sarah Recruiter",
-    role: "recruiter",
-    onboardingComplete: true,
-    avatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-  },
-  {
-    id: "u3c4d5e6-f7g8-9012-cdef-345678901234",
-    email: "michael.business@example.com",
-    password: "password123",
-    name: "Michael Business",
-    role: "business",
-    onboardingComplete: true,
-    avatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
-  },
-];
+// Helper function to convert UserProfile to User
+function userProfileToUser(profile: UserProfile): User {
+  return {
+    id: profile.id,
+    email: profile.email,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    name: `${profile.firstName} ${profile.lastName}`,
+    role: profile.role as UserRole,
+    onboardingComplete: true, // Assume completed if profile exists
+    avatar: profile.profilePicture,
+    profilePicture: profile.profilePicture,
+    bio: profile.bio,
+    location: profile.location,
+    website: profile.website,
+    linkedIn: profile.linkedIn,
+    github: profile.github,
+    phone: profile.phone,
+    skills: profile.skills,
+    openToWork: profile.openToWork,
+  };
+}
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -65,69 +70,130 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser || null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Only check localStorage if no initial user is provided (for testing)
-    if (initialUser === undefined) {
-      const savedUser = localStorage.getItem("user");
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
+    // Check for stored user and token on mount
+    const initializeAuth = async () => {
+      try {
+        logger.info("AuthProvider: initializing auth");
+        if (authService.isAuthenticated()) {
+          logger.info("AuthProvider: authenticated; checking stored user");
+          const storedUser = authService.getStoredUser();
+          if (storedUser) {
+            logger.info("AuthProvider: found stored user; setting from storage (no /me fetch)");
+            setUser(userProfileToUser(storedUser));
+          } else {
+            // Do not call /users/me globally; defer to /profile page
+            logger.info("AuthProvider: no stored user; deferring /Users/me fetch until /profile");
+          }
+        } else {
+          logger.info("AuthProvider: not authenticated; skipping user fetch");
+        }
+      } catch (error) {
+        console.error("Failed to initialize auth:", error);
+        logger.error("AuthProvider: initialization failed", error as any);
+        // Clear invalid auth data
+        await authService.logout();
+      } finally {
+        setIsLoading(false);
       }
+    };
+
+    // Only initialize if no initial user is provided (for testing)
+    if (initialUser === undefined) {
+      initializeAuth();
+    } else {
+      setIsLoading(false);
     }
   }, [initialUser]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const mockUser = mockUsers.find(
-      (u) => u.email === email && u.password === password,
-    );
-    if (mockUser) {
-      const { password: _, ...userWithoutPassword } = mockUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem("user", JSON.stringify(userWithoutPassword));
+  const login = async (email: string, password: string, rememberMe = false): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      await authService.login({ email, password, rememberMe });
+      const profile = authService.getStoredUser();
+      if (profile) setUser(userProfileToUser(profile));
       return true;
+    } catch (error) {
+      console.error("Login failed:", error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
   };
 
   const signup = async (
     email: string,
     password: string,
-    name: string,
+    firstName: string,
+    lastName: string,
+    role: UserRole = "job_seeker"
   ): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Check if user already exists
-    if (mockUsers.find((u) => u.email === email)) {
+    try {
+      setIsLoading(true);
+      await authService.register({
+        email,
+        password,
+        confirmPassword: password,
+        firstName,
+        lastName,
+        role,
+      });
+      const profile = authService.getStoredUser();
+      if (profile) setUser(userProfileToUser(profile));
+      return true;
+    } catch (error) {
+      console.error("Signup failed:", error);
       return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    // Create new user
-    const newUser: User = {
-      id: Date.now().toString(),
-      email,
-      name,
-      onboardingComplete: false,
-    };
-
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
-    return true;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
+  const logout = async (): Promise<void> => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+    }
   };
 
-  const updateUserRole = (role: UserRole) => {
+  const updateUserRole = async (role: UserRole): Promise<void> => {
     if (user) {
-      const updatedUser = { ...user, role };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      try {
+        const updatedProfile = await authService.updateProfile({ role });
+        setUser(userProfileToUser(updatedProfile));
+      } catch (error) {
+        console.error("Failed to update user role:", error);
+        throw error;
+      }
+    }
+  };
+
+  const updateProfile = async (updates: Partial<UserProfile>): Promise<void> => {
+    if (user) {
+      try {
+        const updatedProfile = await authService.updateProfile(updates);
+        setUser(userProfileToUser(updatedProfile));
+      } catch (error) {
+        console.error("Failed to update profile:", error);
+        throw error;
+      }
+    }
+  };
+
+  const refreshUser = async (): Promise<void> => {
+    if (authService.isAuthenticated()) {
+      try {
+        const profile = await authService.getCurrentUser();
+        setUser(userProfileToUser(profile));
+      } catch (error) {
+        console.error("Failed to refresh user:", error);
+        throw error;
+      }
     }
   };
 
@@ -135,7 +201,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     if (user) {
       const updatedUser = { ...user, onboardingComplete: true };
       setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
     }
   };
 
@@ -145,8 +210,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     signup,
     logout,
     updateUserRole,
+    updateProfile,
     completeOnboarding,
     isAuthenticated: !!user,
+    isLoading,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

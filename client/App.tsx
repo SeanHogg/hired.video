@@ -52,6 +52,12 @@ import JobUploadPage from "./pages/JobUploadPage";
 import JobCreatePage from "./pages/JobCreatePage";
 import JobEditPage from "./pages/JobEditPage";
 import PeopleDetail from "./pages/PeopleDetail";
+import AccountManagement from "./pages/AccountManagement";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import ConfirmEmail from "./pages/ConfirmEmail";
+import SignupSuccess from "./pages/SignupSuccess";
+import EmbeddedResume from "./pages/EmbeddedResume";
 
 // Create a client with production-ready configuration
 const queryClient = new QueryClient({
@@ -127,6 +133,10 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/signup-success" element={<SignupSuccess />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/confirm-email" element={<ConfirmEmail />} />
                   <Route
                     path="/persona-selection"
                     element={<PersonaSelection />}
@@ -181,6 +191,7 @@ const App = () => (
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
+                  <Route path="/account" element={<AccountManagement />} />
 
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/help" element={<Help />} />
@@ -192,6 +203,12 @@ const App = () => (
                     element={<TermsOfService />}
                   />
                   <Route path="/cookies" element={<CookiePolicy />} />
+
+                  {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}
+                  <Route path="/embedded-resume/:identifier" element={<EmbeddedResume />} />
+                  <Route path="/embedded/resume/:identifier" element={<EmbeddedResume />} />
+                  <Route path="/embedded/resumes/:identifier" element={<EmbeddedResume />} />
+
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

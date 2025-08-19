@@ -25,8 +25,9 @@ import {
   Github,
   X,
   Send,
+  Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
@@ -52,21 +53,11 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  getUserById,
-  addTrackedPerson,
-  removeTrackedPerson,
-  isPersonTrackedByUser,
-  getConnectionStatus,
-  sendConnectionRequest,
-  acceptConnectionRequest,
-  rejectConnectionRequest,
-  getPendingConnectionRequests,
-} from "@/data/mockPeople";
-import { getResumesByUserId } from "@/data/mockResumes";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { userService, type UserProfile } from "@/lib/services/user-service";
+import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateFakePersonData } from "@/lib/fakeData";
 
 export default function PeopleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -92,23 +83,113 @@ export default function PeopleDetail() {
   const [connectionMessage, setConnectionMessage] = useState("");
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
 
-  const rawPerson = id ? getUserById(id) : null;
-  const person = rawPerson
-    ? isAuthenticated
-      ? rawPerson
-      : generateFakePersonData(rawPerson)
-    : null;
-  const isTracked =
-    user && rawPerson ? isPersonTrackedByUser(rawPerson.id, user.id) : false;
-  const connectionStatus =
-    user && rawPerson ? getConnectionStatus(user.id, rawPerson.id) : "none";
-  const isOwnProfile = user && rawPerson && rawPerson.id === user.id;
+  // API state management
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if person has an active public resume
-  const personResumes = rawPerson ? getResumesByUserId(rawPerson.id) : [];
-  const hasActivePublicResume = personResumes.some(
-    (resume) => resume.privacy === "public" && resume.isActive,
-  );
+  // Load user profile from API
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!id) {
+        setError("User ID is required");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Try to determine if the ID is a UUID or a slug
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        let profile: UserProfile;
+        if (isUUID) {
+          // Use getUserById for UUIDs
+          profile = await userService.getUserById(id);
+        } else {
+          // Try getUserBySlug for non-UUID strings, fallback to getUserById
+          try {
+            profile = await userService.getUserBySlug(id);
+          } catch (slugError) {
+            // If slug lookup fails, try as ID (API might accept both)
+            profile = await userService.getUserById(id);
+          }
+        }
+
+        setUserProfile(profile);
+      } catch (err) {
+        console.error("Failed to load user profile:", err);
+        setError(err instanceof Error ? err.message : "Failed to load user profile");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [id]);
+
+  // For backward compatibility with existing code, create a person object
+  // that matches the expected structure from mock data
+  const person = userProfile ? {
+    id: userProfile.id,
+    slug: userProfile.slug || `${userProfile.firstName}-${userProfile.lastName}`.toLowerCase().replace(/\s+/g, '-'),
+    data: {
+      firstName: userProfile.firstName,
+      lastName: userProfile.lastName,
+      avatar: userProfile.profilePicture,
+      headline: `${userProfile.role} | ${userProfile.location || 'Remote'}`,
+      summary: userProfile.bio || `${userProfile.firstName} ${userProfile.lastName} is a ${userProfile.role} professional.`,
+      location: {
+        city: userProfile.location?.split(',')[0]?.trim() || '',
+        state: userProfile.location?.split(',')[1]?.trim() || '',
+        country: 'USA',
+        remote: true,
+      },
+      contact: {
+        email: userProfile.email,
+        website: userProfile.website,
+        linkedin: userProfile.linkedIn,
+        github: userProfile.github,
+      },
+      experience: [], // TODO: Add experience data when available from API
+      education: [], // TODO: Add education data when available from API
+      skills: userProfile.skills?.map(skill => ({
+        name: skill,
+        level: 'Intermediate' as const,
+        endorsed: false,
+      })) || [],
+      projects: [], // TODO: Add projects data when available from API
+      openToWork: userProfile.openToWork || false,
+      openToOpportunities: ['full-time'],
+    },
+    createdAt: userProfile.createdAt,
+    updatedAt: userProfile.updatedAt,
+  } : null;
+
+  // For now, use mock data for tracking and connections until API is available
+  const isTracked = false; // TODO: Implement with real API
+  const connectionStatus = "none"; // TODO: Implement with real API
+  const isOwnProfile = user && userProfile && userProfile.id === user.id;
+
+  // Check if person has an active public resume via API (simplified: any public resumes exist?)
+  const [hasActivePublicResume, setHasActivePublicResume] = useState(false);
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      if (!userProfile?.id) { setHasActivePublicResume(false); return; }
+      try {
+        const list = await resumeService.getPublicResumes(1, 1);
+        if (!isMounted) return;
+        setHasActivePublicResume((list.items ?? []).some(r => (r.userId === userProfile.id) && r.isPublic));
+      } catch {
+        if (isMounted) setHasActivePublicResume(false);
+      }
+    };
+    load();
+    return () => { isMounted = false; };
+  }, [userProfile?.id]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -118,65 +199,54 @@ export default function PeopleDetail() {
   };
 
   const handleTrackPerson = () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !userProfile) {
       return;
     }
-
-    if (user && rawPerson) {
-      if (isTracked) {
-        removeTrackedPerson(rawPerson.id, user.id);
-      } else {
-        addTrackedPerson(rawPerson.id, user.id);
-      }
-      // In a real app, you'd trigger a re-render here
-    }
+    // TODO: Implement with real API
+    console.log("Track person:", userProfile.id);
   };
 
-  const handleSendConnectionRequest = () => {
-    if (!isAuthenticated) {
+  const handleSendConnectionRequest = async () => {
+    if (!isAuthenticated || !userProfile) {
       return;
     }
 
-    if (user && rawPerson) {
-      sendConnectionRequest(user.id, rawPerson.id, connectionMessage);
+    try {
+      await userService.sendConnectionRequest({
+        toUserId: userProfile.id,
+        message: connectionMessage,
+      });
       setShowConnectionDialog(false);
       setConnectionMessage("");
-      // In a real app, you'd trigger a re-render here
+      // TODO: Update connection status in state
+    } catch (error) {
+      console.error("Failed to send connection request:", error);
     }
   };
 
-  const handleAcceptConnection = () => {
-    if (!isAuthenticated) {
+  const handleAcceptConnection = async () => {
+    if (!isAuthenticated || !userProfile) {
       return;
     }
-
-    if (user && rawPerson) {
-      const requests = getPendingConnectionRequests(user.id);
-      const request = requests.find((req) => req.fromUserId === rawPerson.id);
-      if (request) {
-        acceptConnectionRequest(request.id);
-        // In a real app, you'd trigger a re-render here
-      }
-    }
+    // TODO: Implement with real API
+    console.log("Accept connection from:", userProfile.id);
   };
 
-  const handleRejectConnection = () => {
-    if (user && person) {
-      const requests = getPendingConnectionRequests(user.id);
-      const request = requests.find((req) => req.fromUserId === person.id);
-      if (request) {
-        rejectConnectionRequest(request.id);
-        // In a real app, you'd trigger a re-render here
-      }
+  const handleRejectConnection = async () => {
+    if (!isAuthenticated || !userProfile) {
+      return;
     }
+    // TODO: Implement with real API
+    console.log("Reject connection from:", userProfile.id);
   };
 
   const handleMessage = () => {
     // Navigate to messaging or open message modal
-    console.log("Message person:", person?.id);
+    console.log("Message person:", userProfile?.id);
   };
 
-  if (!person) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar
@@ -192,6 +262,40 @@ export default function PeopleDetail() {
           />
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <h1 className="text-2xl font-bold mb-4">Loading Profile...</h1>
+              <p className="text-muted-foreground">
+                Please wait while we fetch the user profile.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !person) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16 p-6">
+            <div className="max-w-4xl mx-auto text-center">
+              <Alert className="mb-6">
+                <AlertDescription>
+                  {error || "The profile you're looking for doesn't exist or has been"}
+                </AlertDescription>
+              </Alert>
               <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
               <p className="text-muted-foreground mb-6">
                 The profile you're looking for doesn't exist or has been

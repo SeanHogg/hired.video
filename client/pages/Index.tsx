@@ -16,10 +16,19 @@ import {
   Building2,
   Grid,
   List,
+  Plus,
+  Star,
+  Users,
+  BarChart3,
+  Target,
+  Zap,
+  CheckCircle2,
+  ArrowRight,
+  Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import ActionsModal from "@/components/ActionsModal";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
@@ -38,19 +47,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import VideoCard from "@/components/VideoCard";
 import PeopleCard from "@/components/PeopleCard";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
-import { MOCK_COMPANIES } from "@/data/mockCompanies";
-import { getPublicJobs } from "@/data/mockJobs";
-import { MOCK_USERS } from "@/data/mockPeople";
-import { MOCK_RESUME_IDS, MOCK_RESUME_METADATA } from "@/data/mockResumes";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+// Removed legacy companyService usage - unified search only
+// import { companyService, type CompanyFilters, type Company } from "@/lib/services/company-service";
+import { dashboardService, type DashboardStats, type HomepageContent } from "@/lib/services/dashboard-service";
+import { searchService, type SearchResponse, type SearchFilters } from "@/lib/services/search-service";
+import { jobService } from "@/lib/services/job-service";
+import { userService } from "@/lib/services/user-service";
+import { resumeService } from "@/lib/services/resume-service";
+import type { CompanyWithOwnership } from "@/types/company";
 
 export default function Index() {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
@@ -67,8 +89,8 @@ export default function Index() {
     toggleSidebar,
   } = useSidebar();
 
-  // Mock user state - in real app this would come from auth context
-  const [currentUser] = useState(null);
+  // Company-specific state for interactive features
+  // Legacy company state removed; unified search provides companies
 
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
@@ -78,6 +100,34 @@ export default function Index() {
     isOpen: false,
     item: null,
   });
+
+  // New state for real API data - now with individual loading states
+  const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
+
+  // Load dashboard data on component mount - now with progressive loading
+  useEffect(() => {
+    const loadContent = async () => {
+      try {
+        setIsLoadingContent(true);
+        setContentError(null);
+        // Call unified search once to get all content types
+        const content = await searchService.searchPublicContent({
+          page: 1,
+          limit: 16, // Get enough items to distribute across all categories
+        });
+        setSearchResults(content);
+      } catch (error) {
+        console.error('Failed to load homepage content:', error);
+        setContentError('Failed to load content');
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
+
+    loadContent();
+  }, []);
 
   // Action handlers
   const handleOpenActions = (item: any) => {
@@ -116,113 +166,187 @@ export default function Index() {
     console.log("Track candidate:", item.id);
   };
 
-  // Get real data from mock sources
-  const realJobs = getPublicJobs().slice(0, 4);
-  const realCompanies = MOCK_COMPANIES.slice(0, 4);
-  const realPeople = MOCK_USERS.slice(0, 4);
+  // Interactive company functions
+  // Removed fetchCompanies; companies come from unified search
 
-  // Convert to unified content items
-  const contentItems = [
-    // People
-    ...realPeople.map((person) => ({
-      id: person.id,
-      name: `${person.data.firstName} ${person.data.lastName}`,
-      title: person.data.headline,
-      summary: person.data.summary,
-      avatar: person.data.avatar,
-      views: Math.floor(Math.random() * 500) + 50,
-      type: "people" as const,
-      contentType: "profile" as const,
-      profession: person.data.headline.split(" | ")[0] || person.data.headline,
-      company: person.data.experience[0]?.company || "Independent",
-      createdAt: person.createdAt,
-      location: `${person.data.location.city}, ${person.data.location.state}`,
-      role: person.role,
-      isVerified: person.isVerified,
-      isPremium: person.isPremium,
-    })),
-    // Companies
-    ...realCompanies.map((company) => ({
-      id: company.id,
-      name: company.data.name,
-      title: company.data.tagline,
-      summary: company.data.description,
-      logo: company.data.logo,
-      views: company.views,
-      type: "companies" as const,
-      contentType: "profile" as const,
-      profession: company.data.industry,
-      company: company.data.name,
-      createdAt: company.createdAt,
-      location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
-      size: company.data.size,
-      activeJobCount: company.activeJobCount,
-      followers: company.followers,
-    })),
-    // Resumes
-    {
-      id: MOCK_RESUME_IDS.SEAN_HOGG_MASTER,
-      name: "Sean Hogg",
-      title: "CTO and Technology Leader",
-      summary:
-        "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
-      views: 45,
-      type: "resume" as const,
-      contentType: "text" as const,
-      profession: "Technology Leader",
-      company: "HireFractionalTalent.com",
-      createdAt: "2024-01-15",
-      ownerId: "1",
-    },
-    {
-      id: MOCK_RESUME_IDS.SARAH_CHEN_RESUME,
-      name: "Sarah Chen",
-      title: "Senior Software Engineer",
-      summary:
-        "Passionate software engineer with 8 years of experience building scalable web applications. Expertise in React, Node.js, and cloud technologies.",
-      views: 67,
-      type: "resume" as const,
-      contentType: "text" as const,
-      profession: "Software Engineer",
-      company: "TechCorp Inc",
-      createdAt: "2024-01-10",
-      ownerId: "4",
-    },
-    {
-      id: MOCK_RESUME_IDS.MICHAEL_RODRIGUEZ,
-      name: "Michael Rodriguez",
-      title: "Senior Marketing Manager",
-      summary:
-        "Results-driven marketing professional with 7 years of experience in digital marketing, brand management, and growth strategy.",
-      views: 2,
-      type: "resume" as const,
-      contentType: "text" as const,
-      profession: "Marketing Manager",
-      company: "GrowthCo",
-      createdAt: "2024-01-28",
-      ownerId: "5",
-    },
-    // Jobs
-    ...realJobs.map((job) => ({
-      id: job.id,
-      title: job.data.title,
-      name: job.data.title,
-      summary: job.data.summary,
-      views: job.views,
-      type: "job_listing" as const,
-      contentType: "job" as const,
-      profession: job.data.title,
-      company: job.data.company.name,
-      createdAt: job.createdAt,
-      location: job.data.location.remote
-        ? "Remote"
-        : `${job.data.location.city}, ${job.data.location.state}`,
-      employmentType: job.data.employmentType,
-      salaryMin: job.data.salaryMin,
-      salaryMax: job.data.salaryMax,
-      jobData: job,
-    })),
-  ];
+  const handleFollowCompany = async (companyId: string) => {
+    if (user) {
+      try {
+        await companyService.followCompany(companyId);
+        await fetchCompanies(); // Refresh companies
+      } catch (error) {
+        console.error("Failed to follow company:", error);
+      }
+    }
+  };
+
+  const handleUnfollowCompany = async (companyId: string) => {
+    if (user) {
+      try {
+        await companyService.unfollowCompany(companyId);
+        await fetchCompanies(); // Refresh companies
+      } catch (error) {
+        console.error("Failed to unfollow company:", error);
+      }
+    }
+  };
+
+  const handleTrackCompany = async (companyId: string) => {
+    console.log("Track company:", companyId);
+    // This could be implemented to track companies for non-follow scenarios
+  };
+
+  const handleUntrackCompany = async (companyId: string) => {
+    console.log("Untrack company:", companyId);
+    // This could be implemented to untrack companies
+  };
+
+  // Get companies based on user role and authentication
+  const getCompaniesForUser = () => {
+    if (!user || !searchResults) {
+      return { owned: [], tracked: [] };
+    }
+    // TODO: Implement real company ownership logic with API
+    return { owned: [], tracked: [] };
+  };
+
+  // Convert unified search results to content items
+  const contentItems = searchResults ? searchResults.items.map((item) => {
+    switch (item.type) {
+      case 'people':
+        return {
+          id: item.id,
+          name: item.name || item.title,
+          title: item.headline || item.summary || "Professional",
+          summary: item.headline || item.summary || "Professional",
+          avatar: item.avatar,
+          views: item.views || 0,
+          type: "people" as const,
+          contentType: "profile" as const,
+          profession: item.headline?.split(" | ")[0] || item.summary || "Professional",
+          company: "Independent", // TODO: Get from user profile
+          createdAt: item.createdAt || new Date().toISOString(),
+          location: item.location,
+          role: "job_seeker" as const, // TODO: Get actual role
+          isVerified: false, // TODO: Get from user profile
+          isPremium: false, // TODO: Get from user profile
+        };
+      case 'company':
+        return {
+          id: item.id,
+          name: item.name || item.title,
+          title: item.description || item.summary || "Company",
+          summary: item.description || item.summary || "Company",
+          logo: item.logo,
+          views: item.views || 0,
+          type: "companies" as const,
+          contentType: "profile" as const,
+          profession: item.industry || "Technology",
+          company: item.name || item.title,
+          createdAt: item.createdAt || new Date().toISOString(),
+          location: item.location,
+          size: "Unknown", // TODO: Get from company profile
+          activeJobCount: 0, // TODO: Get from company profile
+          followers: 0, // TODO: Get from company profile
+        };
+      case 'resume':
+        return {
+          id: item.id,
+          name: item.title || item.name || "Untitled Resume",
+          title: item.title || item.name || "Untitled Resume",
+          summary: item.summary || item.description || "No summary available",
+          views: item.views || 0,
+          type: "resume" as const,
+          contentType: "text" as const,
+          profession: item.skills?.[0] || "Professional",
+          company: "Independent", // TODO: Get from resume data
+          createdAt: item.createdAt || new Date().toISOString(),
+          ownerId: item.id, // TODO: Get actual owner ID
+        };
+      case 'job':
+        return {
+          id: item.id,
+          title: item.title,
+          name: item.title,
+          summary: `${item.title} at ${item.company || "Unknown Company"}`,
+          views: item.views || 0,
+          type: "job_listing" as const,
+          contentType: "job" as const,
+          profession: item.title,
+          company: item.company || "Unknown Company",
+          createdAt: item.postedDate || item.createdAt || new Date().toISOString(),
+          location: item.location,
+          employmentType: item.employmentType || "Full-time",
+          salaryMin: 0, // TODO: Get from job data
+          salaryMax: 0, // TODO: Get from job data
+          jobData: {
+            id: item.id,
+            title: item.title,
+            company: item.company || "Unknown Company",
+            location: item.location || "Unknown Location",
+            employmentType: item.employmentType || "Full-time",
+            postedDate: item.postedDate || item.createdAt || new Date().toISOString(),
+            views: item.views || 0,
+          },
+        };
+      default:
+        return null;
+    }
+  }).filter(Boolean) : [];
+
+  // Helper function to render content section with loading states
+  const renderContentSection = (title: string, items: any[], itemType: string, isLoading: boolean, error: string | null) => {
+    if (isLoading) {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          {renderSkeletonLoader(4, "h-40")}
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          {renderSectionError(error)}
+        </div>
+      );
+    }
+
+    if (!items || items.length === 0) {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <p className="text-muted-foreground text-center py-8">No {itemType} found</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {items.slice(0, 4).map((item) => {
+            // Render appropriate card based on item type
+            if (itemType === 'jobs') {
+              return <JobCard key={item.id} job={item} />;
+            } else if (itemType === 'companies') {
+              return <CompanyCard key={item.id} company={item} />;
+            } else if (itemType === 'people') {
+              return <PeopleCard key={item.id} person={item} />;
+            } else if (itemType === 'resumes') {
+              return <ResumeCard key={item.id} resume={item} />;
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Fetch companies when filters change or when companies category is selected
+  // Removed legacy companies fetch effect
 
   const categories = [
     { id: "all", label: "All", icon: TrendingUp },
@@ -257,7 +381,7 @@ export default function Index() {
       selectedCategory === "all" ||
       (selectedCategory === "job_description" && item.type === "job_listing") ||
       (selectedCategory === "people" && item.type === "resume") ||
-      (selectedCategory === "companies" && false) || // No company data in current content
+      (selectedCategory === "companies" && item.type === "companies") || // Fixed company filtering
       item.type === selectedCategory;
     const matchesSearch =
       searchQuery === "" ||
@@ -293,15 +417,35 @@ export default function Index() {
   // Get paginated items
   const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
-  const totalViews = allContentItems.reduce(
-    (sum, item) => sum + (item.views || 0),
-    0,
-  );
+      // Calculate total views from search results
+    const totalViews = searchResults ? searchResults.items.reduce(
+      (sum, item) => sum + (item.views || 0),
+      0,
+    ) : 0;
   const formatTotalViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
     return count.toString();
   };
+
+  // Helper function to render skeleton loaders
+  const renderSkeletonLoader = (count: number, className: string = "h-32") => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className={`${className} bg-muted animate-pulse rounded-lg`} />
+      ))}
+    </div>
+  );
+
+  // Helper function to render error state for a section
+  const renderSectionError = (message: string) => (
+    <div className="text-center py-8">
+      <p className="text-muted-foreground">{message}</p>
+      <Button variant="outline" size="sm" className="mt-2" onClick={() => window.location.reload()}>
+        Retry
+      </Button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -322,6 +466,9 @@ export default function Index() {
           totalViews={formatTotalViews(totalViews)}
           totalItems={contentItems.length}
         />
+
+
+
 
         {/* Search and Filters */}
         <section className="py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
@@ -355,6 +502,47 @@ export default function Index() {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Content Sections with Progressive Loading */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto space-y-12">
+            {/* Recent Jobs Section */}
+            {renderContentSection(
+              "Recent Jobs",
+              searchResults?.items.filter(item => item.type === 'job') || [],
+              'jobs',
+              isLoadingContent,
+              contentError
+            )}
+
+            {/* Featured Companies Section */}
+            {renderContentSection(
+              "Featured Companies", 
+              searchResults?.items.filter(item => item.type === 'company') || [],
+              'companies',
+              isLoadingContent,
+              contentError
+            )}
+
+            {/* Top People Section */}
+            {renderContentSection(
+              "Top People",
+              searchResults?.items.filter(item => item.type === 'people') || [],
+              'people',
+              isLoadingContent,
+              contentError
+            )}
+
+            {/* Latest Resumes Section */}
+            {renderContentSection(
+              "Latest Resumes",
+              searchResults?.items.filter(item => item.type === 'resume') || [],
+              'resumes',
+              isLoadingContent,
+              contentError
+            )}
           </div>
         </section>
 
@@ -415,29 +603,24 @@ export default function Index() {
                       if (item.type === "job_listing" && "jobData" in item) {
                         const jobMetadata = {
                           id: item.jobData.id,
-                          slug: item.jobData.slug,
-                          title: item.jobData.data.title,
-                          company: item.jobData.data.company.name,
-                          location: item.jobData.data.location.remote
-                            ? "Remote"
-                            : `${item.jobData.data.location.city}, ${item.jobData.data.location.state}`,
-                          salary:
-                            item.jobData.data.salaryMin &&
-                            item.jobData.data.salaryMax
-                              ? `$${(item.jobData.data.salaryMin / 1000).toFixed(0)}k - $${(item.jobData.data.salaryMax / 1000).toFixed(0)}k`
-                              : undefined,
-                          employmentType: item.jobData.data.employmentType,
-                          experienceLevel: item.jobData.data.experienceLevel,
-                          status: item.jobData.status,
-                          privacy: item.jobData.privacy,
-                          createdAt: item.jobData.createdAt,
-                          updatedAt: item.jobData.updatedAt,
-                          expiresAt: item.jobData.expiresAt,
-                          views: item.jobData.views,
-                          applications: item.jobData.applications,
-                          summary: item.jobData.data.summary,
-                          userId: item.jobData.userId,
-                          companyId: item.jobData.companyId,
+                          slug: item.id, // Use item id as slug fallback
+                          title: item.jobData.title,
+                          company: item.jobData.company,
+                          location: item.jobData.location,
+                          salary: undefined, // TODO: Add salary to job API
+                          employmentType: item.jobData.employmentType,
+                          experienceLevel: "Mid-level", // TODO: Add to job API
+                          status: "active" as const,
+                          privacy: "public" as const,
+                          createdAt: item.jobData.postedDate,
+                          updatedAt: item.jobData.postedDate,
+                          expiresAt: undefined, // TODO: Add to job API
+                          views: item.jobData.views || 0,
+                          applications: 0, // TODO: Add to job API
+                          summary: `${item.jobData.title} at ${item.jobData.company}`,
+                          userId: "unknown", // TODO: Add to job API
+                          companyId: "unknown", // TODO: Add to job API
+                          ownership: "tracked" as const,
                         };
 
                         return <JobCard key={item.id} job={jobMetadata} />;
@@ -477,30 +660,29 @@ export default function Index() {
                           />
                         );
                       } else if (item.type === "companies") {
+                        const companyName = item.name || item.title || "Company";
                         const companyData = {
                           id: item.id,
-                          slug: `${item.name.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
-                          name: item.name,
-                          logo: item.logo,
-                          tagline: item.title,
-                          industry: item.profession,
-                          size: item.size,
-                          location: item.location,
+                          slug: `${companyName.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
+                          name: companyName,
+                          logo: item.logo || "",
+                          tagline: item.tagline || item.summary || "",
+                          industry: item.industry || "Technology",
+                          size: item.size || "Unknown",
+                          location: item.location || "Unknown location",
                           status: "active" as const,
                           visibility: "public" as const,
                           createdAt: item.createdAt || new Date().toISOString(),
                           updatedAt: item.createdAt || new Date().toISOString(),
-                          views: item.views,
-                          followers: item.followers,
-                          jobCount: item.activeJobCount,
-                          activeJobCount: item.activeJobCount,
+                          views: item.views || 0,
+                          followers: 0,
+                          jobCount: 0,
+                          activeJobCount: 0,
                           userId: "system",
                           teamMembers: [],
                           onboardingProgress: 100,
                         };
-                        return (
-                          <CompanyCard key={item.id} company={companyData} />
-                        );
+                        return <CompanyCard key={item.id} company={companyData} />;
                       } else if (item.type === "resume") {
                         return (
                           <ResumeCard
@@ -639,7 +821,11 @@ export default function Index() {
         isOpen={actionsModal.isOpen}
         onClose={handleCloseActions}
         item={actionsModal.item}
-        user={currentUser}
+        user={user ? {
+          ...user,
+          isAuthenticated,
+          role: (user.role === "business" ? "recruiter" : user.role || "job_seeker") as "job_seeker" | "recruiter" | "business"
+        } : null}
         onView={() => actionsModal.item && handleView(actionsModal.item)}
         onShare={() => actionsModal.item && handleShare(actionsModal.item)}
         onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}

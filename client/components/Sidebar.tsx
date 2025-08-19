@@ -1,27 +1,20 @@
 import {
   Home,
   Video,
-  Upload,
-  User,
   Briefcase,
-  Search,
   TrendingUp,
-  Calendar,
   Settings,
   HelpCircle,
-  Star,
-  Clock,
-  Eye,
   FileText,
-  X,
   Building2,
   Users,
   Wrench,
   CheckSquare,
   Send,
   LogOut,
+  UserCog,
+  X,
 } from "lucide-react";
-import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -45,16 +39,30 @@ export default function Sidebar({
   const location = useLocation();
 
   const navigation = [
-    { name: "Home", href: "/", icon: Home },
-    { name: "Dashboard", href: "/dashboard", icon: TrendingUp },
-    { name: "Resumes", href: "/resumes", icon: FileText },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Companies", href: "/companies", icon: Building2 },
-    { name: "People", href: "/people", icon: Users },
-    { name: "Tools", href: "/tools", icon: Wrench },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare },
-    { name: "Outreach", href: "/outreach", icon: Send },
+    { name: "Home", href: "/", icon: Home, exactMatch: true },
+    { name: "Dashboard", href: "/dashboard", icon: TrendingUp, exactMatch: false },
+    { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
+    { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
+    { name: "Companies", href: "/companies", icon: Building2, exactMatch: false },
+    { name: "People", href: "/people", icon: Users, exactMatch: false },
+    { name: "Tools", href: "/tools", icon: Wrench, exactMatch: false },
+    { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
+    { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
+    { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
   ];
+
+  // Helper function to determine if a menu item is active
+  const isMenuItemActive = (item: { href: string; exactMatch: boolean }) => {
+    if (item.exactMatch) {
+      return location.pathname === item.href;
+    }
+    // For non-exact matches, check if current path starts with the menu item path
+    // But make sure we don't match "/" for everything
+    if (item.href === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname.startsWith(item.href);
+  };
 
   const categories = [
     { name: "Software Engineering", count: 156 },
@@ -80,7 +88,9 @@ export default function Sidebar({
         className={cn(
           "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out",
           collapsed ? "w-16 overflow-hidden" : "w-80 overflow-y-auto",
+          // Mobile: hidden by default, show when isOpen
           isOpen ? "translate-x-0" : "-translate-x-full",
+          // Desktop: always visible, ignore isOpen state
           "lg:translate-x-0 lg:fixed lg:z-auto",
         )}
       >
@@ -126,7 +136,7 @@ export default function Sidebar({
                     className={cn(
                       "flex items-center text-sm font-medium rounded-md transition-colors",
                       collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
-                      location.pathname === item.href
+                      isMenuItemActive(item)
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted",
                     )}
@@ -183,6 +193,13 @@ export default function Sidebar({
           <div className="border-t border-border p-4 space-y-2">
             {isAuthenticated && user ? (
               <>
+                {/* Account Switcher */}
+                {!collapsed && (
+                  <div className="mb-3">
+                    <AccountSwitcher className="w-full" />
+                  </div>
+                )}
+
                 {/* User Profile Section */}
                 <Link
                   to="/profile"
@@ -221,7 +238,7 @@ export default function Sidebar({
                   className={cn(
                     "flex items-center text-sm rounded-md transition-colors",
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    location.pathname === "/settings"
+                    isMenuItemActive({ href: "/settings", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
@@ -256,7 +273,7 @@ export default function Sidebar({
                   className={cn(
                     "flex items-center text-sm rounded-md transition-colors",
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    location.pathname === "/settings"
+                    isMenuItemActive({ href: "/settings", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
@@ -271,7 +288,7 @@ export default function Sidebar({
                   className={cn(
                     "flex items-center text-sm rounded-md transition-colors",
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
-                    location.pathname === "/help"
+                    isMenuItemActive({ href: "/help", exactMatch: false })
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}

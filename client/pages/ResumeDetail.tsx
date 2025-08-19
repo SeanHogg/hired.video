@@ -40,10 +40,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { getResumeById } from "@/data/mockResumes";
+import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateFakeResumeData } from "@/lib/fakeData";
 import type { Resume } from "@/types/resume";
 import { ResumeData } from "@/types/resume";
 
@@ -155,20 +154,13 @@ export default function ResumeDetail() {
 
   useEffect(() => {
     const loadResume = async () => {
+      if (!id) return;
+
       setLoading(true);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const foundResume = getResumeById(id);
-        if (!foundResume) {
-          throw new Error("Resume not found");
-        }
-
+        const foundResume = await resumeService.getResumeById(id);
         setRawResume(foundResume);
-        setResume(
-          isAuthenticated ? foundResume : generateFakeResumeData(foundResume),
-        );
+        setResume(foundResume);
       } catch (error) {
         console.error("Failed to load resume:", error);
       } finally {
@@ -176,10 +168,8 @@ export default function ResumeDetail() {
       }
     };
 
-    if (id) {
-      loadResume();
-    }
-  }, [id, user, isAuthenticated]);
+    loadResume();
+  }, [id]);
 
   const handleUpdateResume = (updateData: any) => {
     if (resume) {
@@ -297,7 +287,7 @@ export default function ResumeDetail() {
           {!isAuthenticated && (
             <AuthOverlay
               contentType="resume"
-              title={resume?.data.Basics.Name}
+              title={resume?.metaResume?.basics?.name}
             />
           )}
           {/* Header with Video */}
@@ -372,30 +362,30 @@ export default function ResumeDetail() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
                     <Avatar className="w-20 h-20 border-4 border-white/30">
-                      <AvatarImage src={resume.data.Basics.Image} />
+                      <AvatarImage src={resume.metaResume?.basics?.image} />
                       <AvatarFallback className="text-2xl bg-white/20">
-                        {resume.data.Basics.Name.split(" ")
+                        {resume.metaResume?.basics?.name?.split(" ")
                           .map((n) => n[0])
-                          .join("")}
+                          .join("") || "??"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <h1 className="text-4xl font-bold">
-                        {resume.data.Basics.Name}
+                        {resume.metaResume?.basics?.name || "Untitled Resume"}
                       </h1>
                       <p className="text-xl opacity-90">
-                        {resume.data.Basics.Label}
+                        {resume.metaResume?.basics?.label || ""}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    {resume.data.Basics.Email && (
+                    {resume.metaResume?.basics?.email && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open(`mailto:${resume.data.Basics.Email}`)
+                          window.open(`mailto:${resume.metaResume.basics.email}`)
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -403,12 +393,12 @@ export default function ResumeDetail() {
                         Email
                       </Button>
                     )}
-                    {resume.data.Basics.Phone && (
+                    {resume.metaResume?.basics?.phone && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open(`tel:${resume.data.Basics.Phone}`)
+                          window.open(`tel:${resume.metaResume.basics.phone}`)
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -416,12 +406,12 @@ export default function ResumeDetail() {
                         Call
                       </Button>
                     )}
-                    {resume.data.Basics.Url && (
+                    {resume.metaResume?.basics?.url && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open(resume.data.Basics.Url, "_blank")
+                          window.open(resume.metaResume.basics.url, "_blank")
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -440,7 +430,7 @@ export default function ResumeDetail() {
                   </div>
 
                   <p className="text-lg leading-relaxed opacity-95">
-                    {resume.data.Basics.Summary}
+                    {resume.metaResume?.basics?.summary}
                   </p>
                 </div>
 
@@ -464,7 +454,7 @@ export default function ResumeDetail() {
                           <DialogContent className="max-w-4xl">
                             <DialogHeader>
                               <DialogTitle>
-                                Video Resume - {resume.data.Basics.Name}
+                                Video Resume - {resume.metaResume?.basics?.name}
                               </DialogTitle>
                             </DialogHeader>
                             <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
@@ -494,7 +484,7 @@ export default function ResumeDetail() {
           {/* Content */}
           <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
             {/* Work Experience Timeline */}
-            {resume.data.Work.length > 0 && (
+            {resume.metaResume?.work && resume.metaResume.work.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -506,21 +496,21 @@ export default function ResumeDetail() {
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Work.sort(
+                      {resume.metaResume.work.sort(
                         (a, b) =>
-                          new Date(b.StartDate).getTime() -
-                          new Date(a.StartDate).getTime(),
+                          new Date(b.startDate || '').getTime() -
+                          new Date(a.startDate || '').getTime(),
                       ).map((work, index) => (
                         <TimelineItem
                           key={index}
-                          title={work.Position}
-                          subtitle={work.Name}
-                          startDate={work.StartDate}
-                          endDate={work.EndDate || "Present"}
-                          description={work.Summary}
-                          highlights={work.Highlights}
+                          title={work.position || ''}
+                          subtitle={work.name || ''}
+                          startDate={work.startDate || ''}
+                          endDate={work.endDate || "Present"}
+                          description={work.summary || ''}
+                          highlights={work.highlights}
                           icon={Building}
-                          isLast={index === resume.data.Work.length - 1}
+                          isLast={index === resume.metaResume!.work!.length - 1}
                         />
                       ))}
                     </div>
@@ -530,7 +520,7 @@ export default function ResumeDetail() {
             )}
 
             {/* Education Timeline */}
-            {resume.data.Education.length > 0 && (
+            {resume.metaResume?.education && resume.metaResume.education.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -542,22 +532,22 @@ export default function ResumeDetail() {
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Education.sort(
+                      {resume.metaResume.education.sort(
                         (a, b) =>
-                          new Date(b.StartDate).getTime() -
-                          new Date(a.StartDate).getTime(),
+                          new Date(b.startDate || '').getTime() -
+                          new Date(a.startDate || '').getTime(),
                       ).map((edu, index) => (
                         <TimelineItem
                           key={index}
-                          title={`${edu.StudyType} in ${edu.Area}`}
-                          subtitle={edu.Institution}
-                          startDate={edu.StartDate}
-                          endDate={edu.EndDate}
+                          title={`${edu.studyType || ''} in ${edu.area || ''}`}
+                          subtitle={edu.institution || ''}
+                          startDate={edu.startDate || ''}
+                          endDate={edu.endDate || ''}
                           description={
-                            edu.Score ? `GPA: ${edu.Score}` : undefined
+                            edu.score ? `GPA: ${edu.score}` : undefined
                           }
                           icon={GraduationCap}
-                          isLast={index === resume.data.Education.length - 1}
+                          isLast={index === resume.metaResume!.education!.length - 1}
                         />
                       ))}
                     </div>
@@ -567,7 +557,7 @@ export default function ResumeDetail() {
             )}
 
             {/* Volunteer Experience Timeline */}
-            {resume.data.Volunteer.length > 0 && (
+            {resume.metaResume?.volunteer && resume.metaResume.volunteer.length > 0 && (
               <section>
                 <div className="flex items-center gap-3 mb-8">
                   <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -579,21 +569,21 @@ export default function ResumeDetail() {
                 <Card>
                   <CardContent className="p-6">
                     <div className="space-y-4">
-                      {resume.data.Volunteer.sort(
+                      {resume.metaResume.volunteer.sort(
                         (a, b) =>
-                          new Date(b.StartDate).getTime() -
-                          new Date(a.StartDate).getTime(),
+                          new Date(b.startDate || '').getTime() -
+                          new Date(a.startDate || '').getTime(),
                       ).map((volunteer, index) => (
                         <TimelineItem
                           key={index}
-                          title={volunteer.Position}
-                          subtitle={volunteer.Organization}
-                          startDate={volunteer.StartDate}
-                          endDate={volunteer.EndDate || "Present"}
-                          description={volunteer.Summary}
-                          highlights={volunteer.Highlights || undefined}
+                          title={volunteer.position || ''}
+                          subtitle={volunteer.organization || ''}
+                          startDate={volunteer.startDate || ''}
+                          endDate={volunteer.endDate || "Present"}
+                          description={volunteer.summary || ''}
+                          highlights={volunteer.highlights || undefined}
                           icon={Heart}
-                          isLast={index === resume.data.Volunteer.length - 1}
+                          isLast={index === resume.metaResume!.volunteer!.length - 1}
                         />
                       ))}
                     </div>

@@ -258,7 +258,7 @@ export default function Navigation({
                 ) : (
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="capitalize">
-                      {user?.subscription || "Pro"} Plan
+                      {(user?.subscription ?? "free")} Plan
                     </Badge>
                   </div>
                 )}

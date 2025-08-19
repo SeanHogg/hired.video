@@ -25,7 +25,7 @@ import {
   Linkedin,
   Twitter,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
@@ -44,16 +44,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import {
-  getCompanyById,
-  addTrackedCompany,
-  removeTrackedCompany,
-  isCompanyTrackedByUser,
-  updateOnboardingTask,
-} from "@/data/mockCompanies";
+import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateFakeCompanyData } from "@/lib/fakeData";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -77,19 +70,33 @@ export default function CompanyDetail() {
     onboarding: true,
   });
 
-  const rawCompany = id ? getCompanyById(id) : null;
-  const company = rawCompany
-    ? isAuthenticated
-      ? rawCompany
-      : generateFakeCompanyData(rawCompany)
-    : null;
-  const isOwner =
-    user &&
-    rawCompany &&
-    (rawCompany.userId === user.id ||
-      rawCompany.teamMembers?.includes(user.id));
-  const isTracked =
-    user && rawCompany ? isCompanyTrackedByUser(rawCompany.id, user.id) : false;
+  const [company, setCompany] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isTracked, setIsTracked] = useState(false);
+
+  // Fetch company data
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!id) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const companyData = await companyService.getCompanyById(id);
+        setCompany(companyData);
+      } catch (err) {
+        console.error("Failed to fetch company:", err);
+        setError("Failed to load company. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, [id]);
+
+  const isOwner = user && company && company.userId === user.id;
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -98,29 +105,69 @@ export default function CompanyDetail() {
     }));
   };
 
-  const handleTrackCompany = () => {
-    if (!isAuthenticated) {
+  const handleTrackCompany = async () => {
+    if (!isAuthenticated || !company) {
       return;
     }
 
-    if (user && rawCompany) {
+    try {
       if (isTracked) {
-        removeTrackedCompany(rawCompany.id, user.id);
+        await companyService.unfollowCompany(company.id);
+        setIsTracked(false);
       } else {
-        addTrackedCompany(rawCompany.id, user.id);
+        await companyService.followCompany(company.id);
+        setIsTracked(true);
       }
-      // In a real app, you'd trigger a re-render here
+    } catch (err) {
+      console.error("Failed to update company tracking:", err);
     }
   };
 
   const handleOnboardingTaskToggle = (taskId: string, completed: boolean) => {
-    if (rawCompany && isOwner) {
-      updateOnboardingTask(rawCompany.id, taskId, completed);
-      // In a real app, you'd trigger a re-render here
-    }
+    // TODO: Implement onboarding task API when available
+    console.log("Onboarding task toggle:", taskId, completed);
   };
 
-  if (!company) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16">
+            <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
+              <div className="max-w-7xl mx-auto">
+                <div className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+                  <div className="h-64 bg-gray-200 rounded mb-6"></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="h-32 bg-gray-200 rounded"></div>
+                      <div className="h-32 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="h-48 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !company) {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar

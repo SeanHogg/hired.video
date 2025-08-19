@@ -17,6 +17,10 @@ import {
   type ChatMessage,
 } from "@/lib/services/ai-service";
 import { cn } from "@/lib/utils";
+  import Markdown from "@/components/Markdown";
+  import { useAuth } from "@/lib/auth";
+  import { Button as UiButton } from "@/components/ui/button";
+  import { Link } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -116,6 +120,9 @@ export default function AIChatPanel() {
     handleSendMessage(suggestion);
   };
 
+  const { user, isAuthenticated } = useAuth();
+  const isPro = user?.subscription === "pro" || user?.subscription === "enterprise";
+
   if (!isAIChatOpen) return null;
 
   return (
@@ -173,7 +180,11 @@ export default function AIChatPanel() {
                       </span>
                     </div>
                   )}
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  {message.sender === "ai" ? (
+                    <Markdown>{message.content}</Markdown>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                  )}
                   <div className="text-xs opacity-70 mt-1">
                     {message.timestamp.toLocaleTimeString([], {
                       hour: "2-digit",
@@ -219,7 +230,8 @@ export default function AIChatPanel() {
                     variant="outline"
                     size="sm"
                     className="h-auto p-2 text-left justify-start"
-                    onClick={() => handleQuickSuggestion(suggestion.text)}
+                    onClick={() => (isPro ? handleQuickSuggestion(suggestion.text) : undefined)}
+                    disabled={!isPro}
                   >
                     <Icon className="h-3 w-3 mr-2" />
                     <span className="text-xs">{suggestion.text}</span>
@@ -232,26 +244,44 @@ export default function AIChatPanel() {
 
         {/* Input */}
         <div className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Ask me anything about HR..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  handleSendMessage(inputValue);
-                }
-              }}
-              className="flex-1"
-            />
-            <Button
-              onClick={() => handleSendMessage(inputValue)}
-              disabled={!inputValue.trim() || isTyping}
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          {isPro ? (
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ask me anything about HR..."
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    handleSendMessage(inputValue);
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                onClick={() => handleSendMessage(inputValue)}
+                disabled={!inputValue.trim() || isTyping}
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm text-muted-foreground">
+                {isAuthenticated ? "Upgrade to Pro to use the AI Assistant." : "Sign in to upgrade to Pro and use the AI Assistant."}
+              </div>
+              <div className="flex gap-2">
+                {!isAuthenticated && (
+                  <UiButton asChild variant="outline" size="sm">
+                    <Link to="/login">Sign In</Link>
+                  </UiButton>
+                )}
+                <UiButton asChild size="sm">
+                  <Link to="/pricing">View Plans</Link>
+                </UiButton>
+              </div>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground mt-2 text-center">
             {isAIConfigured
               ? "Powered by OpenRouter AI"

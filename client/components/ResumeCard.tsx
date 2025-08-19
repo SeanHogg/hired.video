@@ -1,7 +1,6 @@
 import {
   Eye,
   Calendar,
-  User,
   FileText,
   Star,
   Globe,

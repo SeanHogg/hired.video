@@ -10,9 +10,12 @@ import type {
 } from "@shared/api";
 import {
   validateApiResponse,
-  createApiError,
   ApiResponseSchema,
   ApiErrorResponseSchema,
+  // Raw validation helper to normalize nulls
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error exported util exists
+  nullToUndefined,
 } from "@shared/api";
 import type { AppError } from "./errors";
 import {
@@ -23,7 +26,7 @@ import {
   NotFoundError,
   normalizeError,
 } from "./errors";
-import { logger, logApiCall } from "./logger";
+import { logApiCall } from "./logger";
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -78,8 +81,9 @@ export class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || "/api";
-    this.timeout = config.timeout || 10000;
+    // Use environment variable or default to localhost backend
+    this.baseUrl = config.baseUrl || import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {
       "Content-Type": "application/json",
@@ -167,13 +171,27 @@ export class ApiClient {
     );
 
     try {
+      // Prepare headers
+      const headers = { ...this.defaultHeaders, ...config.headers };
+
+      // Prepare body
+      let body: string | FormData | undefined;
+      if (config.body) {
+        if (config.body instanceof FormData) {
+          // For FormData, don't set Content-Type (let browser set it with boundary)
+          delete headers["Content-Type"];
+          body = config.body;
+        } else {
+          // For regular objects, stringify as JSON
+          body = JSON.stringify(config.body);
+        }
+      }
+
       const response = await fetch(url, {
         method: config.method || "GET",
-        headers: {
-          ...this.defaultHeaders,
-          ...config.headers,
-        },
-        body: config.body ? JSON.stringify(config.body) : undefined,
+        headers,
+        body,
+        credentials: "include",
         signal: controller.signal,
       });
 
@@ -361,6 +379,40 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<ApiSuccessResponse<T>> {
     return this.request(endpoint, { method: "GET" }, schema);
+  }
+
+  // Raw GET for endpoints that do not use the common { success, data } envelope
+  async getRaw<T>(endpoint: string, schema?: z.ZodSchema<T>): Promise<{ data: T }>{
+    const url = this.createUrl(endpoint);
+    const response = await this.executeRequest(url, { method: "GET" });
+
+    let responseData: unknown;
+    try {
+      responseData = await response.json();
+    } catch (error) {
+      throw new NetworkError(
+        "Invalid JSON response",
+        error instanceof Error ? error : undefined,
+      );
+    }
+
+    if (!response.ok) {
+      this.handleErrorResponse(response.status, responseData);
+    }
+
+    if (schema) {
+      // @ts-expect-error util imported from shared
+      const preprocessed = nullToUndefined ? nullToUndefined(responseData) : responseData;
+      const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
+      if (!validation.success) {
+        throw new ValidationError(
+          `Invalid response data: ${validation.error.issues.map(i => i.message).join(", ")}`,
+        );
+      }
+      return { data: validation.data };
+    }
+
+    return { data: responseData as T };
   }
 
   async post<T>(

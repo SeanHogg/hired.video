@@ -13,8 +13,15 @@ import {
   EyeOff,
   Save,
   RefreshCw,
+  ArrowRight,
+  Sparkles,
+  Lock,
+  Zap,
+  Target,
+  Sliders,
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -64,10 +71,10 @@ export default function Settings() {
     indexable: true,
   });
 
-  // If user is not authenticated, redirect or show login prompt
+  // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -80,20 +87,201 @@ export default function Settings() {
             sidebarCollapsed={sidebarCollapsed}
           />
 
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="text-center py-16">
-                <SettingsIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
-                <p className="text-muted-foreground mb-6">
-                  Please sign in to access your settings and preferences.
+          <div className="pt-16">
+            <div className="max-w-6xl mx-auto px-4 py-16">
+              {/* Hero Section */}
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center space-x-2 mb-6">
+                  <div className="relative">
+                    <SettingsIcon className="h-12 w-12 text-primary" />
+                    <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                  </div>
+                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                    Smart Settings
+                  </span>
+                </div>
+                <h1 className="text-5xl font-bold mb-6">
+                  Customize Your Experience
+                </h1>
+                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                  Take control of your profile, privacy, notifications, and preferences
+                  with our comprehensive settings dashboard. Personalize every aspect
+                  of your experience to match your workflow.
                 </p>
-                <Button asChild>
-                  <a href="/login">Sign In</a>
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link to="/signup">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
+                      Start Customizing
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="text-lg px-8"
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Features Grid */}
+              <div className="grid md:grid-cols-3 gap-8 mb-16">
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <User className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>Profile Management</CardTitle>
+                    <CardDescription>
+                      Customize your profile, update personal information, and
+                      manage your professional presence across the platform.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                  <CardHeader>
+                    <Shield className="h-10 w-10 text-brand-blue mb-4" />
+                    <CardTitle>Privacy & Security</CardTitle>
+                    <CardDescription>
+                      Control your privacy settings, manage data visibility, and
+                      configure security preferences for maximum protection.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <Bell className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>Smart Notifications</CardTitle>
+                    <CardDescription>
+                      Fine-tune your notification preferences to stay informed
+                      about what matters most without overwhelming your inbox.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              {/* Benefits Section */}
+              <div className="bg-white/50 rounded-2xl p-8 mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Why Our Settings Matter
+                </h2>
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-brand-purple/10 p-3 rounded-lg">
+                      <Sliders className="h-6 w-6 text-brand-purple" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Granular Control</h3>
+                      <p className="text-muted-foreground">
+                        Fine-tune every aspect of your experience with detailed
+                        settings and customization options.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-brand-blue/10 p-3 rounded-lg">
+                      <Lock className="h-6 w-6 text-brand-blue" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Privacy First</h3>
+                      <p className="text-muted-foreground">
+                        Your data is yours. Control what's shared, with whom,
+                        and how your information is used.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-brand-purple/10 p-3 rounded-lg">
+                      <Zap className="h-6 w-6 text-brand-purple" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Instant Updates</h3>
+                      <p className="text-muted-foreground">
+                        Changes take effect immediately, so you can see and feel
+                        the difference right away.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-brand-blue/10 p-3 rounded-lg">
+                      <Target className="h-6 w-6 text-brand-blue" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Smart Defaults</h3>
+                      <p className="text-muted-foreground">
+                        Intelligent default settings that learn from your behavior
+                        and adapt to your preferences over time.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Settings Categories Preview */}
+              <div className="mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Comprehensive Settings Categories
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="text-center p-6">
+                    <User className="h-8 w-8 text-brand-purple mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Profile</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Personal info, bio, and professional details
+                    </p>
+                  </Card>
+                  <Card className="text-center p-6">
+                    <Bell className="h-8 w-8 text-brand-blue mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Notifications</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Email, push, and in-app notification preferences
+                    </p>
+                  </Card>
+                  <Card className="text-center p-6">
+                    <Shield className="h-8 w-8 text-brand-purple mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Privacy</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Data visibility and sharing controls
+                    </p>
+                  </Card>
+                  <Card className="text-center p-6">
+                    <Palette className="h-8 w-8 text-brand-blue mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Appearance</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Theme, layout, and display preferences
+                    </p>
+                  </Card>
+                </div>
+              </div>
+
+              {/* CTA Section */}
+              <div className="text-center">
+                <h2 className="text-3xl font-bold mb-6">
+                  Ready to Take Control?
+                </h2>
+                <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  Join thousands of users who have already customized their
+                  experience to match their unique needs and preferences.
+                </p>
+                <Link to="/signup">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                  >
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
+
           <Footer />
         </div>
       </div>

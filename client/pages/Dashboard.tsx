@@ -934,6 +934,42 @@ export default function Dashboard() {
               ))}
             </div>
 
+	            {/* Profile Stats (moved from Profile page) */}
+	            <div className="grid md:grid-cols-4 gap-4">
+	              <Card>
+	                <CardContent className="p-4 text-center">
+	                  <Eye className="h-8 w-8 mx-auto mb-2 text-primary" />
+	                  <div className="text-2xl font-bold">2,847</div>
+	                  <div className="text-sm text-muted-foreground">Profile Views</div>
+	                </CardContent>
+	              </Card>
+
+	              <Card>
+	                <CardContent className="p-4 text-center">
+	                  <Star className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+	                  <div className="text-2xl font-bold">4.9</div>
+	                  <div className="text-sm text-muted-foreground">Rating</div>
+	                </CardContent>
+	              </Card>
+
+	              <Card>
+	                <CardContent className="p-4 text-center">
+	                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-500" />
+	                  <div className="text-2xl font-bold">+12%</div>
+	                  <div className="text-sm text-muted-foreground">Growth</div>
+	                </CardContent>
+	              </Card>
+
+	              <Card>
+	                <CardContent className="p-4 text-center">
+	                  <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+	                  <div className="text-2xl font-bold">24h</div>
+	                  <div className="text-sm text-muted-foreground">Response Time</div>
+	                </CardContent>
+	              </Card>
+	            </div>
+
+
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Activity */}

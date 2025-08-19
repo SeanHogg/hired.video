@@ -1,5 +1,6 @@
 import { Edit, ArrowLeft, Building2 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -11,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getCompanyById } from "@/data/mockCompanies";
+import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -26,7 +27,30 @@ export default function CompanyEditPage() {
   } = useSidebar();
   const { user } = useAuth();
 
-  const company = id ? getCompanyById(id) : null;
+  const [company, setCompany] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch company data
+  useEffect(() => {
+    const fetchCompany = async () => {
+      if (!id) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const companyData = await companyService.getCompanyById(id);
+        setCompany(companyData);
+      } catch (err) {
+        console.error("Failed to fetch company:", err);
+        setError("Failed to load company. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, [id]);
 
   return (
     <div className="min-h-screen bg-background">

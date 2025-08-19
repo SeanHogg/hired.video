@@ -6,7 +6,7 @@ import Navigation from "@/components/Navigation";
 import ResumeViewer from "@/components/ResumeViewer";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import { getResumeById } from "@/data/mockResumes";
+import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { Resume, UpdateResumeRequest } from "@/types/resume";

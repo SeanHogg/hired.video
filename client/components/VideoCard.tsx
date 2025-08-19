@@ -54,8 +54,17 @@ export default function VideoCard({
       <CardContent className="p-0">
         {/* Video Thumbnail Section */}
         <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
-          {/* Thumbnail placeholder with gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20" />
+          {/* Thumbnail image */}
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={title}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            /* Thumbnail placeholder with gradient */
+            <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20" />
+          )}
 
           {/* Play button overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">

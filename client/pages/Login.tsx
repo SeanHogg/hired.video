@@ -166,7 +166,7 @@ export default function Login() {
                   <Button
                     variant="outline"
                     onClick={() =>
-                      handleDemoLogin("john.seeker@example.com", "password123")
+                      handleDemoLogin("john.seeker@example.com", "Password123!")
                     }
                     disabled={isLoading}
                     className="text-left justify-start"
@@ -178,7 +178,7 @@ export default function Login() {
                     onClick={() =>
                       handleDemoLogin(
                         "sarah.recruiter@example.com",
-                        "password123",
+                        "Password123!",
                       )
                     }
                     disabled={isLoading}
@@ -191,7 +191,7 @@ export default function Login() {
                     onClick={() =>
                       handleDemoLogin(
                         "michael.business@example.com",
-                        "password123",
+                        "Password123!",
                       )
                     }
                     disabled={isLoading}
@@ -201,7 +201,16 @@ export default function Login() {
                   </Button>
                 </div>
 
-                <div className="text-center">
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    <Link
+                      to="/forgot-password"
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Forgot your password?
+                    </Link>
+                  </p>
+
                   <p className="text-sm text-muted-foreground">
                     Don't have an account?{" "}
                     <Link

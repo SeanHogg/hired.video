@@ -27,7 +27,7 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -50,7 +50,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useSidebar } from "@/hooks/use-sidebar";
+import type { UserRole } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 
@@ -67,7 +69,114 @@ export default function Pricing() {
 
   // Pricing state
   const [isAnnual, setIsAnnual] = useState(false);
+  // Persona state
+  const [persona, setPersona] = useState<UserRole>("job_seeker");
+
+  const personaCopy: Record<
+    UserRole,
+    {
+      label: string;
+      freeDescription: string;
+      premiumDescription: string;
+      freeFeatures: string[];
+      premiumFeatures: string[];
+      unitLabel: string; // e.g., per seat / month
+      userCountLabel: string; // label for the user count selector
+    }
+  > = {
+    job_seeker: {
+      label: "Job Seeker",
+      freeDescription:
+        "Get started with tools to build and share your video resume.",
+      premiumDescription:
+        "Unlock advanced branding, analytics, and AI to land roles faster.",
+      freeFeatures: [
+        "Create video resumes",
+        "Basic resume analytics",
+        "AI assistance (10/mo)",
+        "Apply to jobs",
+        "Profile hosting",
+        "Community access",
+      ],
+      premiumFeatures: [
+        "Advanced video templates",
+        "Unlimited AI assistance",
+        "Interview practice & feedback",
+        "Resume optimization",
+        "Priority job matching",
+        "Salary insights",
+      ],
+      unitLabel: "per month",
+      userCountLabel: "",
+    },
+    recruiter: {
+      label: "Recruiter",
+      freeDescription:
+        "Essential ATS and CRM to start sourcing and tracking candidates.",
+      premiumDescription:
+        "Scale your recruiting with automation, outreach, and analytics.",
+      freeFeatures: [
+        "Applicant Tracking System (ATS)",
+        "Unlimited job postings",
+        "Recruiting CRM",
+        "Basic interview scheduling",
+        "Up to 2 team members",
+        "AI assistance (10/mo)",
+      ],
+      premiumFeatures: [
+        "Exclusive job boards + bidding",
+        "Advanced pipeline & automation",
+
+        "Smart outreach campaigns",
+
+        "AI message personalization",
+        "Performance dashboards",
+        "Unlimited seats",
+      ],
+      unitLabel: "per seat / month",
+      userCountLabel: "Seats",
+    },
+    business: {
+      label: "Business",
+      freeDescription:
+        "Core HR tools to start hiring and organizing candidates.",
+      premiumDescription:
+        "All-in-one HR suite with engagement and advanced analytics.",
+      freeFeatures: [
+        "ATS + Job postings",
+        "Recruiting & Sales CRM",
+        "1 admin user",
+        "Up to 2 employees",
+        "Basic scheduling",
+        "AI assistance (10/mo)",
+      ],
+      premiumFeatures: [
+        "Employee community (Engage/Inform/Inspire)",
+        "Hiring & Onboarding (Offers)",
+        "Performance management",
+        "Calendar & notifications",
+        "Advanced analytics & API",
+        "Unlimited users",
+      ],
+      unitLabel: "per user / month",
+      userCountLabel: "Users",
+    },
+  };
+
   const [selectedUsers, setSelectedUsers] = useState(1);
+  // Default persona from logged-in user if available
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        if (u?.role === "job_seeker" || u?.role === "recruiter" || u?.role === "business") {
+          setPersona(u.role as UserRole);
+        }
+      } catch (_) {}
+    }
+  }, []);
+
 
   const basePrice = 9.95; // per user per month
   const calculatePrice = (users: number, annual: boolean) => {
@@ -146,10 +255,46 @@ export default function Pricing() {
                 className={isAnnual ? "font-semibold" : ""}
               >
                 Annual
-                <Badge variant="secondary" className="ml-2">
-                  Save 20%
-                </Badge>
+                <Badge variant="secondary" className="ml-2">Save 20%</Badge>
               </Label>
+
+              {/* Personas Segmented Control under hero */}
+              <div className="text-center mb-10">
+                <div className="flex items-center justify-center mb-2">
+                  <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue">
+                    <div className="bg-background rounded-full p-1">
+                      <ToggleGroup
+                        type="single"
+                        value={persona}
+                        onValueChange={(v) => v && setPersona(v as UserRole)}
+                        className="gap-1"
+                      >
+                        <ToggleGroupItem
+                          value="job_seeker"
+                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                        >
+                          <Users className="h-4 w-4 mr-2" /> Job Seeker
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="recruiter"
+                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                        >
+                          <Briefcase className="h-4 w-4 mr-2" /> Recruiter
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="business"
+                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                        >
+                          <Building2 className="h-4 w-4 mr-2" /> Business
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">Plans tailored for {personaCopy[persona].label}</p>
+              </div>
+
+
             </div>
 
             {/* Pricing Cards */}
@@ -160,63 +305,27 @@ export default function Pricing() {
                   <CardTitle className="text-2xl">Free</CardTitle>
                   <div className="mt-4">
                     <span className="text-5xl font-bold">$0.00</span>
+
+
                   </div>
                   <CardDescription className="text-lg mt-4">
-                    Essential HR platform features including ATS, social
-                    recruiting, and CRM — perfect for growing teams.
+                    {personaCopy[persona].freeDescription}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
                     <h4 className="font-semibold text-lg">What's included:</h4>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
+                      {personaCopy[persona].freeFeatures.map((feat) => (
+                        <div key={feat} className="flex items-center gap-3">
+                          <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Check className="h-3 w-3 text-green-600" />
+                          </div>
+                          <span className="text-sm">{feat}</span>
                         </div>
-                        <span className="text-sm">
-                          Applicant Tracking System (ATS)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">Unlimited Jobs Postings</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">Recruiting & Sales CRM</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">Up to 2 Employees</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">
-                          AI Assistance (10 requests/month)
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">1 Admin User</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </div>
-                        <span className="text-sm">Login / Sign-Up</span>
-                      </div>
+                      ))}
                     </div>
+
                   </div>
 
                   <div className="pt-4">
@@ -245,66 +354,18 @@ export default function Pricing() {
                 <CardHeader className="text-center pb-8">
                   <CardTitle className="text-2xl">Premium</CardTitle>
 
-                  {/* User Selection */}
+                  {/* Pricing Summary & (Conditional) User Selection */}
                   <div className="mt-4 space-y-4">
-                    <div className="flex items-center justify-center gap-4">
-                      <Label htmlFor="user-select">Number of users:</Label>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() =>
-                            setSelectedUsers(Math.max(1, selectedUsers - 1))
-                          }
-                          disabled={selectedUsers <= 1}
-                          className="h-8 w-8"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Select
-                          value={selectedUsers.toString()}
-                          onValueChange={(value) =>
-                            setSelectedUsers(parseInt(value))
-                          }
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: 20 }, (_, i) => i + 1).map(
-                              (num) => (
-                                <SelectItem key={num} value={num.toString()}>
-                                  {num}
-                                </SelectItem>
-                              ),
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() =>
-                            setSelectedUsers(Math.min(20, selectedUsers + 1))
-                          }
-                          disabled={selectedUsers >= 20}
-                          className="h-8 w-8"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
+                    {/* Price summary always visible */}
                     <div className="text-center">
                       <span className="text-5xl font-bold">
                         $
                         {isAnnual
-                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(
-                              2,
-                            )
+                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(2)
                           : calculatePrice(selectedUsers, false).toFixed(2)}
                       </span>
                       <span className="text-lg text-muted-foreground ml-2">
-                        / {isAnnual ? "month (billed annually)" : "month"}
+                        / {personaCopy[persona].unitLabel}{isAnnual ? " (billed annually)" : ""}
                       </span>
                       {isAnnual && (
                         <div className="text-sm text-green-600 mt-2">
@@ -317,79 +378,72 @@ export default function Pricing() {
                         </div>
                       )}
                     </div>
+
+                    {/* Seats selector only for recruiter/business */}
+                    {persona !== "job_seeker" && (
+                      <div className="flex items-center justify-center gap-4">
+                        <Label htmlFor="user-select">
+                          {personaCopy[persona].userCountLabel || "Number of users"}:
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              setSelectedUsers(Math.max(1, selectedUsers - 1))
+                            }
+                            disabled={selectedUsers <= 1}
+                            className="h-8 w-8"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <Select
+                            value={selectedUsers.toString()}
+                            onValueChange={(value) => setSelectedUsers(parseInt(value))}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                                <SelectItem key={num} value={num.toString()}>
+                                  {num}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              setSelectedUsers(Math.min(20, selectedUsers + 1))
+                            }
+                            disabled={selectedUsers >= 20}
+                            className="h-8 w-8"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <CardDescription className="text-lg mt-4">
-                    All FREE features plus advanced tools for growing teams
+                    {personaCopy[persona].premiumDescription}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-lg">
-                      All FREE features plus:
-                    </h4>
+                    <h4 className="font-semibold text-lg">All FREE features plus:</h4>
                     <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Check className="h-3 w-3 text-primary" />
+                      {personaCopy[persona].premiumFeatures.map((feat) => (
+                        <div key={feat} className="flex items-start gap-3">
+                          <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Check className="h-3 w-3 text-primary" />
+                          </div>
+                          <span className="text-sm">{feat}</span>
                         </div>
-                        <div>
-                          <span className="text-sm font-medium">
-                            Employee Community
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            (Engage, Inform, Inspire)
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Check className="h-3 w-3 text-primary" />
-                        </div>
-                        <span className="text-sm">
-                          Post & Bid on Exclusive Job Postings
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Check className="h-3 w-3 text-primary" />
-                        </div>
-                        <span className="text-sm">
-                          Unlimited Applicants & Contacts
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Check className="h-3 w-3 text-primary" />
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium">
-                            Hiring & Onboarding
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            (Offers)
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Check className="h-3 w-3 text-primary" />
-                        </div>
-                        <span className="text-sm">Performance Management</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Zap className="h-3 w-3 text-primary" />
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium">
-                            Unlimited AI Assistance
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            AI-powered resume optimization & job matching
-                          </p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
@@ -430,6 +484,13 @@ export default function Pricing() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Compare Features
               </h2>
+	              <div className="text-center mb-6">
+	                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm">
+	                  <span className="text-muted-foreground">Viewing features for</span>
+	                  <span className="font-medium">{personaCopy[persona].label}</span>
+	                </div>
+	              </div>
+
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -472,10 +533,10 @@ export default function Pricing() {
                           Job Postings
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
+                          {persona === "job_seeker" ? "—" : "Unlimited"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited + Exclusive
+                          {persona === "recruiter" ? "Unlimited + Exclusive" : persona === "business" ? "Unlimited" : "—"}
                         </td>
                       </tr>
                       <tr>
@@ -484,10 +545,10 @@ export default function Pricing() {
                           Team Size
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Up to 2
+                          {persona === "job_seeker" ? "1" : persona === "recruiter" ? "Up to 2" : "Up to 2"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
+                          {persona === "job_seeker" ? "1" : "Unlimited"}
                         </td>
                       </tr>
                       <tr>
@@ -496,10 +557,10 @@ export default function Pricing() {
                           Admin Users
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          1
+                          {persona === "job_seeker" ? "1" : "1"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
+                          {persona === "job_seeker" ? "1" : "Unlimited"}
                         </td>
                       </tr>
                       <tr>
@@ -658,10 +719,10 @@ export default function Pricing() {
                           Recruiting & Sales CRM
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <Check className="h-5 w-5 text-green-600 mx-auto" />}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <Check className="h-5 w-5 text-green-600 mx-auto" />}
                         </td>
                       </tr>
                       <tr>
@@ -670,10 +731,10 @@ export default function Pricing() {
                           Hiring & Onboarding
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "business" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
                       <tr>
@@ -716,10 +777,10 @@ export default function Pricing() {
                           Smart Outreach Campaigns
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          {persona === "recruiter" ? <span className="text-muted-foreground">Basic</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
                       <tr>
@@ -752,10 +813,10 @@ export default function Pricing() {
                           Employee Community
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          {persona === "business" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "business" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
 
@@ -798,10 +859,10 @@ export default function Pricing() {
                           Hiring Success Metrics
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          {persona === "business" || persona === "recruiter" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "business" || persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
                       <tr>
@@ -810,10 +871,10 @@ export default function Pricing() {
                           Time-to-hire Analytics
                         </td>
                         <td className="text-center p-4">
-                          <span className="text-muted-foreground">—</span>
+                          {persona === "business" || persona === "recruiter" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="text-center p-4">
-                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          {persona === "business" || persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
 

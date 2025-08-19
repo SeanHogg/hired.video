@@ -22,7 +22,7 @@ import {
   CheckCircle,
   ArrowLeft,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
@@ -39,15 +39,98 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  getJobById,
-  addTrackedJob,
-  removeTrackedJob,
-  isJobTrackedByUser,
-} from "@/data/mockJobs";
+import { jobService } from "@/lib/services/job-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateFakeJobData } from "@/lib/fakeData";
+
+type UIJobRequirement = { skill: string; level: string; required: boolean };
+type UIJobBenefit = { type: string; description: string };
+type UIJobCompany = { name: string; logo?: string; description?: string; industry?: string; size?: string; website?: string };
+type UIJobLocation = { city?: string; state?: string; remote: boolean };
+type UIJobData = {
+  title: string;
+  description: string;
+  company: UIJobCompany;
+  location: UIJobLocation;
+  videoUrl?: string;
+  contactEmail?: string;
+  applicationDeadline?: string;
+  responsibilities: string[];
+  requirements: UIJobRequirement[];
+  qualifications: string[];
+  benefits: UIJobBenefit[];
+  employmentType?: string;
+  experienceLevel?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+};
+type UIJob = {
+  id: string;
+  status: "active" | "paused" | "closed" | "draft";
+  createdAt: string;
+  updatedAt?: string;
+  expiresAt?: string;
+  views: number;
+  applications: number;
+  userId?: string;
+  data: UIJobData;
+};
+
+function mapApiJobToUI(apiJob: any): UIJob {
+  // If server returns envelope { success, data }, unwrap
+  const j = apiJob && apiJob.data && apiJob.success !== undefined ? apiJob.data : apiJob;
+  // Some jobs store serialized JSON in jobSerialized
+  let parsed: any = {};
+  try {
+    if (typeof j.jobSerialized === "string" && j.jobSerialized.trim().length > 0) {
+      parsed = JSON.parse(j.jobSerialized);
+    }
+  } catch {
+    parsed = {};
+  }
+  return {
+    id: (j.id || j.Id || "").toString(),
+    status: ((j.status || j.Status) as UIJob["status"]) || "active",
+    createdAt: j.createdAt || j.creationDateTime || j.postedDate || new Date().toISOString(),
+    updatedAt: j.updatedAt || j.updateDateTime || j.creationDateTime || new Date().toISOString(),
+    expiresAt: j.expiryDate || j.expirationDate,
+    views: j.viewCount ?? 0,
+    applications: j.applicationCount ?? 0,
+    userId: j.createdBy || j.userId,
+    data: {
+      title: j.title || parsed.title || "",
+      description: j.description || parsed.description || "",
+      company: {
+        name: (j.company && j.company.name) || j.company || parsed.company || "Unknown Company",
+        logo: j.companyLogo || (j.company && j.company.logoUrl) || "",
+        website: j.companyWebsite,
+        description: j.companyDescription,
+        industry: (Array.isArray(j.industry) ? j.industry[0] : j.industry) || undefined,
+        size: j.size,
+      },
+      location: {
+        remote: j.isRemote ?? false,
+        city: j.city || (j.address && j.address.city) || undefined,
+        state: j.state || (j.address && j.address.stateProvince) || undefined,
+      },
+      responsibilities: Array.isArray(j.responsibilities) ? j.responsibilities : (Array.isArray(parsed.responsibilities) ? parsed.responsibilities : []),
+      requirements: Array.isArray(j.requirements)
+        ? j.requirements.map((r: string) => ({ skill: r, level: "Intermediate", required: true }))
+        : [],
+      qualifications: Array.isArray(j.qualifications) ? j.qualifications : [],
+      benefits: Array.isArray(j.benefits)
+        ? j.benefits.map((b: any) => ({ type: b.type || "Benefit", description: b.description || "" }))
+        : [],
+      employmentType: (Array.isArray(j.employmentType) ? j.employmentType[0] : j.employmentType) || undefined,
+      experienceLevel: j.experienceLevel,
+      salaryMin: j.salaryMin,
+      salaryMax: j.salaryMax,
+      videoUrl: j.videoUrl,
+      contactEmail: j.contactEmail,
+      applicationDeadline: j.applicationDeadline,
+    },
+  };
+}
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -70,15 +153,36 @@ export default function JobDetail() {
     benefits: false,
   });
 
-  const rawJob = id ? getJobById(id) : null;
-  const job = rawJob
-    ? isAuthenticated
-      ? rawJob
-      : generateFakeJobData(rawJob)
-    : null;
-  const isOwner = user && rawJob && rawJob.userId === user.id;
-  const isTracked =
-    user && rawJob ? isJobTrackedByUser(rawJob.id, user.id) : false;
+  const [job, setJob] = useState<UIJob | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isTracked, setIsTracked] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const run = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        setError(null);
+        const apiJob = await jobService.getJobById(id);
+        if (!isMounted) return;
+        setJob(mapApiJobToUI(apiJob as any));
+      } catch (e) {
+        if (!isMounted) return;
+        setError("Failed to load job");
+        setJob(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const isOwner = user && job && job.userId === user.id;
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -88,19 +192,34 @@ export default function JobDetail() {
   };
 
   const handleTrackJob = () => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    if (user && rawJob) {
-      if (isTracked) {
-        removeTrackedJob(rawJob.id, user.id);
-      } else {
-        addTrackedJob(rawJob.id, user.id);
-      }
-      // In a real app, you'd trigger a re-render here
-    }
+    if (!isAuthenticated) return;
+    setIsTracked((prev) => !prev);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+          <div className="pt-16 p-6">
+            <div className="max-w-4xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Loading job...</CardTitle>
+                  <CardDescription>Please wait</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-40 bg-muted animate-pulse rounded" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
 
   if (!job) {
     return (
