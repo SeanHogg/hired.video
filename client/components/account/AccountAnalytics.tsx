@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   BarChart3,
   Users,
@@ -9,20 +9,26 @@ import {
   Calendar,
   Download,
   Eye,
-  MessageSquare
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+  MessageSquare,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AnalyticsData {
   totalUsers: number;
@@ -55,14 +61,21 @@ interface AnalyticsData {
 interface AccountAnalyticsProps {
   data?: AnalyticsData;
   loading?: boolean;
-  onExport?: (format: 'csv' | 'pdf') => void;
+  onExport?: (format: "csv" | "pdf") => void;
   onLoadAnalytics?: () => Promise<AnalyticsData>;
 }
 
-export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalytics }: AccountAnalyticsProps) {
-  const [timeRange, setTimeRange] = useState('30d');
-  const [selectedTab, setSelectedTab] = useState('overview');
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+export function AccountAnalytics({
+  data,
+  loading = false,
+  onExport,
+  onLoadAnalytics,
+}: AccountAnalyticsProps) {
+  const [timeRange, setTimeRange] = useState("30d");
+  const [selectedTab, setSelectedTab] = useState("overview");
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(
+    null,
+  );
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Load analytics data on mount
@@ -74,7 +87,7 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           const apiData = await onLoadAnalytics();
           setAnalyticsData(apiData);
         } catch (error) {
-          console.error('Failed to load analytics:', error);
+          console.error("Failed to load analytics:", error);
           // Fall back to mock data on error
         } finally {
           setLoadingAnalytics(false);
@@ -86,35 +99,41 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
   }, [onLoadAnalytics, data]);
 
   // Use real data if available, otherwise fall back to mock data
-  const mockData: AnalyticsData = analyticsData || data || {
-    totalUsers: 156,
-    activeUsers: 89,
-    totalJobs: 45,
-    totalResumes: 234,
-    totalApplications: 1247,
-    userGrowth: 12.5,
-    jobGrowth: 8.3,
-    applicationGrowth: 15.7,
-    topPerformingJobs: [
-      { id: '1', title: 'Senior Software Engineer', applications: 89, views: 456 },
-      { id: '2', title: 'Product Manager', applications: 67, views: 234 },
-      { id: '3', title: 'UX Designer', applications: 45, views: 189 },
-      { id: '4', title: 'Data Scientist', applications: 34, views: 167 },
-    ],
-    userActivity: [
-      { date: '2024-01-01', activeUsers: 45, newUsers: 5 },
-      { date: '2024-01-02', activeUsers: 52, newUsers: 8 },
-      { date: '2024-01-03', activeUsers: 48, newUsers: 3 },
-      { date: '2024-01-04', activeUsers: 61, newUsers: 12 },
-      { date: '2024-01-05', activeUsers: 58, newUsers: 7 },
-    ],
-    departmentStats: [
-      { department: 'Engineering', users: 45, jobs: 12, applications: 234 },
-      { department: 'Product', users: 23, jobs: 8, applications: 156 },
-      { department: 'Design', users: 18, jobs: 6, applications: 89 },
-      { department: 'Marketing', users: 15, jobs: 4, applications: 67 },
-    ],
-  };
+  const mockData: AnalyticsData = analyticsData ||
+    data || {
+      totalUsers: 156,
+      activeUsers: 89,
+      totalJobs: 45,
+      totalResumes: 234,
+      totalApplications: 1247,
+      userGrowth: 12.5,
+      jobGrowth: 8.3,
+      applicationGrowth: 15.7,
+      topPerformingJobs: [
+        {
+          id: "1",
+          title: "Senior Software Engineer",
+          applications: 89,
+          views: 456,
+        },
+        { id: "2", title: "Product Manager", applications: 67, views: 234 },
+        { id: "3", title: "UX Designer", applications: 45, views: 189 },
+        { id: "4", title: "Data Scientist", applications: 34, views: 167 },
+      ],
+      userActivity: [
+        { date: "2024-01-01", activeUsers: 45, newUsers: 5 },
+        { date: "2024-01-02", activeUsers: 52, newUsers: 8 },
+        { date: "2024-01-03", activeUsers: 48, newUsers: 3 },
+        { date: "2024-01-04", activeUsers: 61, newUsers: 12 },
+        { date: "2024-01-05", activeUsers: 58, newUsers: 7 },
+      ],
+      departmentStats: [
+        { department: "Engineering", users: 45, jobs: 12, applications: 234 },
+        { department: "Product", users: 23, jobs: 8, applications: 156 },
+        { department: "Design", users: 18, jobs: 6, applications: 89 },
+        { department: "Marketing", users: 15, jobs: 4, applications: 67 },
+      ],
+    };
 
   const formatNumber = (num: number) => {
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
@@ -124,8 +143,14 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
   const formatGrowth = (growth: number) => {
     const isPositive = growth > 0;
     return (
-      <div className={`flex items-center gap-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-        {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+      <div
+        className={`flex items-center gap-1 ${isPositive ? "text-green-600" : "text-red-600"}`}
+      >
+        {isPositive ? (
+          <TrendingUp className="h-4 w-4" />
+        ) : (
+          <TrendingDown className="h-4 w-4" />
+        )}
         <span className="text-sm font-medium">{Math.abs(growth)}%</span>
       </div>
     );
@@ -168,7 +193,7 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
             </SelectContent>
           </Select>
           {onExport && (
-            <Button variant="outline" onClick={() => onExport('csv')}>
+            <Button variant="outline" onClick={() => onExport("csv")}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -182,8 +207,12 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Users</p>
-                <p className="text-2xl font-bold">{formatNumber(mockData.totalUsers)}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Users
+                </p>
+                <p className="text-2xl font-bold">
+                  {formatNumber(mockData.totalUsers)}
+                </p>
               </div>
               <div className="flex flex-col items-end">
                 <Users className="h-8 w-8 text-blue-600" />
@@ -191,7 +220,10 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
               </div>
             </div>
             <div className="mt-4">
-              <Progress value={(mockData.activeUsers / mockData.totalUsers) * 100} className="h-2" />
+              <Progress
+                value={(mockData.activeUsers / mockData.totalUsers) * 100}
+                className="h-2"
+              />
               <p className="text-xs text-muted-foreground mt-2">
                 {mockData.activeUsers} active users
               </p>
@@ -203,8 +235,12 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Jobs</p>
-                <p className="text-2xl font-bold">{formatNumber(mockData.totalJobs)}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Jobs
+                </p>
+                <p className="text-2xl font-bold">
+                  {formatNumber(mockData.totalJobs)}
+                </p>
               </div>
               <div className="flex flex-col items-end">
                 <Briefcase className="h-8 w-8 text-green-600" />
@@ -218,8 +254,12 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Resumes</p>
-                <p className="text-2xl font-bold">{formatNumber(mockData.totalResumes)}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Resumes
+                </p>
+                <p className="text-2xl font-bold">
+                  {formatNumber(mockData.totalResumes)}
+                </p>
               </div>
               <div className="flex flex-col items-end">
                 <FileText className="h-8 w-8 text-purple-600" />
@@ -233,8 +273,12 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Applications</p>
-                <p className="text-2xl font-bold">{formatNumber(mockData.totalApplications)}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Applications
+                </p>
+                <p className="text-2xl font-bold">
+                  {formatNumber(mockData.totalApplications)}
+                </p>
               </div>
               <div className="flex flex-col items-end">
                 <MessageSquare className="h-8 w-8 text-orange-600" />
@@ -266,7 +310,9 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
                   <div className="text-center">
                     <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>Chart visualization would go here</p>
-                    <p className="text-sm">Integration with charting library needed</p>
+                    <p className="text-sm">
+                      Integration with charting library needed
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -282,7 +328,9 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
                   <div className="text-center">
                     <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
                     <p>Chart visualization would go here</p>
-                    <p className="text-sm">Integration with charting library needed</p>
+                    <p className="text-sm">
+                      Integration with charting library needed
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -294,12 +342,17 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <Card>
             <CardHeader>
               <CardTitle>Top Performing Jobs</CardTitle>
-              <CardDescription>Jobs with the most applications and views</CardDescription>
+              <CardDescription>
+                Jobs with the most applications and views
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {mockData.topPerformingJobs.map((job, index) => (
-                  <div key={job.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <Badge variant="secondary">#{index + 1}</Badge>
                       <div>
@@ -318,9 +371,13 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium">
-                        {((job.applications / job.views) * 100).toFixed(1)}% conversion
+                        {((job.applications / job.views) * 100).toFixed(1)}%
+                        conversion
                       </p>
-                      <Progress value={(job.applications / job.views) * 100} className="w-20 h-2 mt-1" />
+                      <Progress
+                        value={(job.applications / job.views) * 100}
+                        className="w-20 h-2 mt-1"
+                      />
                     </div>
                   </div>
                 ))}
@@ -338,11 +395,16 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
             <CardContent>
               <div className="space-y-4">
                 {mockData.userActivity.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <Calendar className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">{new Date(day.date).toLocaleDateString()}</p>
+                        <p className="font-medium">
+                          {new Date(day.date).toLocaleDateString()}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           {day.activeUsers} active • {day.newUsers} new
                         </p>
@@ -363,12 +425,17 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
           <Card>
             <CardHeader>
               <CardTitle>Department Statistics</CardTitle>
-              <CardDescription>Performance metrics by department</CardDescription>
+              <CardDescription>
+                Performance metrics by department
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {mockData.departmentStats.map((dept, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
                     <div>
                       <p className="font-medium">{dept.department}</p>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
@@ -388,7 +455,8 @@ export function AccountAnalytics({ data, loading = false, onExport, onLoadAnalyt
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium">
-                        {(dept.applications / dept.jobs).toFixed(1)} avg applications/job
+                        {(dept.applications / dept.jobs).toFixed(1)} avg
+                        applications/job
                       </p>
                     </div>
                   </div>

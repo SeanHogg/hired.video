@@ -92,45 +92,64 @@ export default function Outreach() {
   const { isAuthenticated, user } = useAuth();
 
   // State management
-  const [activeTab, setActiveTab] = useState<"dashboard" | "templates" | "campaigns" | "tracking" | "contacts">("dashboard");
+  const [activeTab, setActiveTab] = useState<
+    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts"
+  >("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);
   const [emailCampaigns, setEmailCampaigns] = useState<EmailCampaignDTO[]>([]);
-  const [communicationTracking, setCommunicationTracking] = useState<CommunicationTrackingDTO[]>([]);
-  const [externalContacts, setExternalContacts] = useState<ExternalContactDTO[]>([]);
-  const [communicationStats, setCommunicationStats] = useState<CommunicationStats | null>(null);
+  const [communicationTracking, setCommunicationTracking] = useState<
+    CommunicationTrackingDTO[]
+  >([]);
+  const [externalContacts, setExternalContacts] = useState<
+    ExternalContactDTO[]
+  >([]);
+  const [communicationStats, setCommunicationStats] =
+    useState<CommunicationStats | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, no-unused-vars
-  const [_teamMembers, setTeamMembers] = useState<{ id: string; userProfile?: { id: string; firstName: string; lastName: string; role?: string } }[]>([]);
+  const [_teamMembers, setTeamMembers] = useState<
+    {
+      id: string;
+      userProfile?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        role?: string;
+      };
+    }[]
+  >([]);
 
   // Dialog states
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showContactDialog, setShowContactDialog] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplateDTO | null>(null);
-  const [editingContact, setEditingContact] = useState<ExternalContactDTO | null>(null);
+  const [editingTemplate, setEditingTemplate] =
+    useState<EmailTemplateDTO | null>(null);
+  const [editingContact, setEditingContact] =
+    useState<ExternalContactDTO | null>(null);
 
   // Form states
   const [templateForm, setTemplateForm] = useState<CreateEmailTemplateRequest>({
-    name: '',
-    description: '',
-    subject: '',
-    body: '',
+    name: "",
+    description: "",
+    subject: "",
+    body: "",
     category: EmailTemplateCategory.General,
     targetRole: EmailTemplateTargetRole.All,
   });
 
   const [contactForm, setContactForm] = useState<CreateExternalContactRequest>({
-    email: '',
-    firstName: '',
-    lastName: '',
-    jobTitle: '',
-    companyName: '',
-    phone: '',
-    linkedInUrl: '',
-    location: '',
-    notes: '',
+    email: "",
+    firstName: "",
+    lastName: "",
+    jobTitle: "",
+    companyName: "",
+    phone: "",
+    linkedInUrl: "",
+    location: "",
+    notes: "",
   });
 
   // Load data on component mount
@@ -165,8 +184,10 @@ export default function Outreach() {
         setCommunicationStats(statsData);
         setTeamMembers(teamData);
       } catch (err) {
-        console.error('Failed to load outreach data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load outreach data');
+        console.error("Failed to load outreach data:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load outreach data",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -178,12 +199,15 @@ export default function Outreach() {
   // Template management functions
   const handleCreateTemplate = async () => {
     try {
-      const newTemplate = await communicationService.createEmailTemplate(templateForm);
-      setEmailTemplates(prev => [...prev, newTemplate]);
+      const newTemplate =
+        await communicationService.createEmailTemplate(templateForm);
+      setEmailTemplates((prev) => [...prev, newTemplate]);
       setShowTemplateDialog(false);
       resetTemplateForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create template');
+      setError(
+        err instanceof Error ? err.message : "Failed to create template",
+      );
     }
   };
 
@@ -195,30 +219,36 @@ export default function Outreach() {
         ...templateForm,
         id: editingTemplate.id,
       });
-      setEmailTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
+      setEmailTemplates((prev) =>
+        prev.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t)),
+      );
       setShowTemplateDialog(false);
       resetTemplateForm();
       setEditingTemplate(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update template');
+      setError(
+        err instanceof Error ? err.message : "Failed to update template",
+      );
     }
   };
 
   const handleDeleteTemplate = async (templateId: string) => {
     try {
       await communicationService.deleteEmailTemplate(templateId);
-      setEmailTemplates(prev => prev.filter(t => t.id !== templateId));
+      setEmailTemplates((prev) => prev.filter((t) => t.id !== templateId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template');
+      setError(
+        err instanceof Error ? err.message : "Failed to delete template",
+      );
     }
   };
 
   const resetTemplateForm = () => {
     setTemplateForm({
-      name: '',
-      description: '',
-      subject: '',
-      body: '',
+      name: "",
+      description: "",
+      subject: "",
+      body: "",
       category: EmailTemplateCategory.General,
       targetRole: EmailTemplateTargetRole.All,
     });
@@ -227,12 +257,13 @@ export default function Outreach() {
   // Contact management functions
   const handleCreateContact = async () => {
     try {
-      const newContact = await communicationService.createExternalContact(contactForm);
-      setExternalContacts(prev => [...prev, newContact]);
+      const newContact =
+        await communicationService.createExternalContact(contactForm);
+      setExternalContacts((prev) => [...prev, newContact]);
       setShowContactDialog(false);
       resetContactForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create contact');
+      setError(err instanceof Error ? err.message : "Failed to create contact");
     }
   };
 
@@ -244,35 +275,37 @@ export default function Outreach() {
         ...contactForm,
         id: editingContact.id,
       });
-      setExternalContacts(prev => prev.map(c => c.id === updatedContact.id ? updatedContact : c));
+      setExternalContacts((prev) =>
+        prev.map((c) => (c.id === updatedContact.id ? updatedContact : c)),
+      );
       setShowContactDialog(false);
       resetContactForm();
       setEditingContact(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update contact');
+      setError(err instanceof Error ? err.message : "Failed to update contact");
     }
   };
 
   const handleDeleteContact = async (contactId: string) => {
     try {
       await communicationService.deleteExternalContact(contactId);
-      setExternalContacts(prev => prev.filter(c => c.id !== contactId));
+      setExternalContacts((prev) => prev.filter((c) => c.id !== contactId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete contact');
+      setError(err instanceof Error ? err.message : "Failed to delete contact");
     }
   };
 
   const resetContactForm = () => {
     setContactForm({
-      email: '',
-      firstName: '',
-      lastName: '',
-      jobTitle: '',
-      companyName: '',
-      phone: '',
-      linkedInUrl: '',
-      location: '',
-      notes: '',
+      email: "",
+      firstName: "",
+      lastName: "",
+      jobTitle: "",
+      companyName: "",
+      phone: "",
+      linkedInUrl: "",
+      location: "",
+      notes: "",
     });
   };
 
@@ -598,7 +631,19 @@ export default function Outreach() {
             {!isLoading && !error && (
               <>
                 {/* Tabs Navigation */}
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "dashboard" | "templates" | "campaigns" | "tracking" | "contacts")}>
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(value) =>
+                    setActiveTab(
+                      value as
+                        | "dashboard"
+                        | "templates"
+                        | "campaigns"
+                        | "tracking"
+                        | "contacts",
+                    )
+                  }
+                >
                   <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="templates">Templates</TabsTrigger>
@@ -637,7 +682,9 @@ export default function Outreach() {
                         </CardHeader>
                         <CardContent>
                           <div className="text-2xl font-bold">
-                            {communicationStats?.responseRate ? `${Math.round(communicationStats.responseRate * 100)}%` : '0%'}
+                            {communicationStats?.responseRate
+                              ? `${Math.round(communicationStats.responseRate * 100)}%`
+                              : "0%"}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Average response rate
@@ -726,14 +773,20 @@ export default function Outreach() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                           {communicationTracking.slice(0, 3).map((tracking) => (
-                            <div key={tracking.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                            <div
+                              key={tracking.id}
+                              className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
+                            >
                               <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
                               <div className="flex-1">
                                 <p className="text-sm font-medium">
-                                  {tracking.subject || 'Communication'}
+                                  {tracking.subject || "Communication"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {tracking.externalName || tracking.targetUser?.firstName + ' ' + tracking.targetUser?.lastName}
+                                  {tracking.externalName ||
+                                    tracking.targetUser?.firstName +
+                                      " " +
+                                      tracking.targetUser?.lastName}
                                 </p>
                               </div>
                             </div>
@@ -764,8 +817,12 @@ export default function Outreach() {
                           <CardHeader>
                             <div className="flex items-start justify-between">
                               <div>
-                                <CardTitle className="text-lg">{template.name}</CardTitle>
-                                <CardDescription>{template.description}</CardDescription>
+                                <CardTitle className="text-lg">
+                                  {template.name}
+                                </CardTitle>
+                                <CardDescription>
+                                  {template.description}
+                                </CardDescription>
                               </div>
                               <div className="flex gap-2">
                                 <Button
@@ -775,7 +832,7 @@ export default function Outreach() {
                                     setEditingTemplate(template);
                                     setTemplateForm({
                                       name: template.name,
-                                      description: template.description || '',
+                                      description: template.description || "",
                                       subject: template.subject,
                                       body: template.body,
                                       category: template.category,
@@ -790,7 +847,9 @@ export default function Outreach() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDeleteTemplate(template.id)}
+                                    onClick={() =>
+                                      handleDeleteTemplate(template.id)
+                                    }
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -818,7 +877,9 @@ export default function Outreach() {
                     {emailTemplates.length === 0 && (
                       <div className="text-center py-12">
                         <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No templates yet</h3>
+                        <h3 className="text-lg font-medium mb-2">
+                          No templates yet
+                        </h3>
                         <p className="text-muted-foreground mb-4">
                           Create your first email template to get started
                         </p>
@@ -847,9 +908,17 @@ export default function Outreach() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <CardTitle>{campaign.name}</CardTitle>
-                                <CardDescription>{campaign.description}</CardDescription>
+                                <CardDescription>
+                                  {campaign.description}
+                                </CardDescription>
                               </div>
-                              <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"}>
+                              <Badge
+                                variant={
+                                  campaign.status === EmailCampaignStatus.Sent
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
                                 {EmailCampaignStatus[campaign.status]}
                               </Badge>
                             </div>
@@ -857,20 +926,30 @@ export default function Outreach() {
                           <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
-                                <p className="text-muted-foreground">Recipients</p>
-                                <p className="font-medium">{campaign.totalRecipients}</p>
+                                <p className="text-muted-foreground">
+                                  Recipients
+                                </p>
+                                <p className="font-medium">
+                                  {campaign.totalRecipients}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Sent</p>
-                                <p className="font-medium">{campaign.emailsSent}</p>
+                                <p className="font-medium">
+                                  {campaign.emailsSent}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Opened</p>
-                                <p className="font-medium">{campaign.emailsOpened}</p>
+                                <p className="font-medium">
+                                  {campaign.emailsOpened}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-muted-foreground">Replies</p>
-                                <p className="font-medium">{campaign.repliesReceived}</p>
+                                <p className="font-medium">
+                                  {campaign.repliesReceived}
+                                </p>
                               </div>
                             </div>
                           </CardContent>
@@ -881,7 +960,9 @@ export default function Outreach() {
                     {emailCampaigns.length === 0 && (
                       <div className="text-center py-12">
                         <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
+                        <h3 className="text-lg font-medium mb-2">
+                          No campaigns yet
+                        </h3>
                         <p className="text-muted-foreground mb-4">
                           Create your first email campaign to start outreach
                         </p>
@@ -895,7 +976,9 @@ export default function Outreach() {
 
                   {/* Tracking Tab */}
                   <TabsContent value="tracking" className="space-y-6">
-                    <h2 className="text-2xl font-bold">Communication Tracking</h2>
+                    <h2 className="text-2xl font-bold">
+                      Communication Tracking
+                    </h2>
 
                     <Table>
                       <TableHeader>
@@ -912,21 +995,36 @@ export default function Outreach() {
                           <TableRow key={tracking.id}>
                             <TableCell>
                               {tracking.externalName ||
-                               (tracking.targetUser ? `${tracking.targetUser.firstName} ${tracking.targetUser.lastName}` : 'Unknown')}
+                                (tracking.targetUser
+                                  ? `${tracking.targetUser.firstName} ${tracking.targetUser.lastName}`
+                                  : "Unknown")}
                             </TableCell>
-                            <TableCell>{tracking.subject || 'No subject'}</TableCell>
+                            <TableCell>
+                              {tracking.subject || "No subject"}
+                            </TableCell>
                             <TableCell>
                               <Badge variant="outline">
                                 {CommunicationChannel[tracking.channel]}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={tracking.status === CommunicationTrackingStatus.Replied ? "default" : "secondary"}>
+                              <Badge
+                                variant={
+                                  tracking.status ===
+                                  CommunicationTrackingStatus.Replied
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
                                 {CommunicationTrackingStatus[tracking.status]}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {tracking.creationDateTime ? new Date(tracking.creationDateTime).toLocaleDateString() : 'Unknown'}
+                              {tracking.creationDateTime
+                                ? new Date(
+                                    tracking.creationDateTime,
+                                  ).toLocaleDateString()
+                                : "Unknown"}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -936,7 +1034,9 @@ export default function Outreach() {
                     {communicationTracking.length === 0 && (
                       <div className="text-center py-12">
                         <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No communications tracked</h3>
+                        <h3 className="text-lg font-medium mb-2">
+                          No communications tracked
+                        </h3>
                         <p className="text-muted-foreground">
                           Start sending messages to see tracking data here
                         </p>
@@ -963,8 +1063,12 @@ export default function Outreach() {
                                 <CardTitle className="text-lg">
                                   {contact.firstName} {contact.lastName}
                                 </CardTitle>
-                                <CardDescription>{contact.jobTitle}</CardDescription>
-                                <CardDescription>{contact.companyName}</CardDescription>
+                                <CardDescription>
+                                  {contact.jobTitle}
+                                </CardDescription>
+                                <CardDescription>
+                                  {contact.companyName}
+                                </CardDescription>
                               </div>
                               <div className="flex gap-2">
                                 <Button
@@ -974,14 +1078,14 @@ export default function Outreach() {
                                     setEditingContact(contact);
                                     setContactForm({
                                       email: contact.email,
-                                      firstName: contact.firstName || '',
-                                      lastName: contact.lastName || '',
-                                      jobTitle: contact.jobTitle || '',
-                                      companyName: contact.companyName || '',
-                                      phone: contact.phone || '',
-                                      linkedInUrl: contact.linkedInUrl || '',
-                                      location: contact.location || '',
-                                      notes: contact.notes || '',
+                                      firstName: contact.firstName || "",
+                                      lastName: contact.lastName || "",
+                                      jobTitle: contact.jobTitle || "",
+                                      companyName: contact.companyName || "",
+                                      phone: contact.phone || "",
+                                      linkedInUrl: contact.linkedInUrl || "",
+                                      location: contact.location || "",
+                                      notes: contact.notes || "",
                                     });
                                     setShowContactDialog(true);
                                   }}
@@ -991,7 +1095,9 @@ export default function Outreach() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleDeleteContact(contact.id)}
+                                  onClick={() =>
+                                    handleDeleteContact(contact.id)
+                                  }
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1000,9 +1106,19 @@ export default function Outreach() {
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-2 text-sm">
-                              <p className="text-muted-foreground">{contact.email}</p>
-                              {contact.phone && <p className="text-muted-foreground">{contact.phone}</p>}
-                              {contact.location && <p className="text-muted-foreground">{contact.location}</p>}
+                              <p className="text-muted-foreground">
+                                {contact.email}
+                              </p>
+                              {contact.phone && (
+                                <p className="text-muted-foreground">
+                                  {contact.phone}
+                                </p>
+                              )}
+                              {contact.location && (
+                                <p className="text-muted-foreground">
+                                  {contact.location}
+                                </p>
+                              )}
                               {contact.linkedInUrl && (
                                 <a
                                   href={contact.linkedInUrl}
@@ -1022,7 +1138,9 @@ export default function Outreach() {
                     {externalContacts.length === 0 && (
                       <div className="text-center py-12">
                         <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No contacts yet</h3>
+                        <h3 className="text-lg font-medium mb-2">
+                          No contacts yet
+                        </h3>
                         <p className="text-muted-foreground mb-4">
                           Add external contacts to manage your outreach
                         </p>
@@ -1046,7 +1164,9 @@ export default function Outreach() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingTemplate ? 'Edit Email Template' : 'Create Email Template'}
+              {editingTemplate
+                ? "Edit Email Template"
+                : "Create Email Template"}
             </DialogTitle>
             <DialogDescription>
               Create reusable email templates for your outreach campaigns
@@ -1059,7 +1179,9 @@ export default function Outreach() {
               <Input
                 id="template-name"
                 value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, name: e.target.value })
+                }
                 placeholder="e.g., Job Application Follow-up"
               />
             </div>
@@ -1069,7 +1191,12 @@ export default function Outreach() {
               <Input
                 id="template-description"
                 value={templateForm.description}
-                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({
+                    ...templateForm,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Brief description of when to use this template"
               />
             </div>
@@ -1079,7 +1206,12 @@ export default function Outreach() {
                 <Label htmlFor="template-category">Category</Label>
                 <Select
                   value={templateForm.category.toString()}
-                  onValueChange={(value) => setTemplateForm({ ...templateForm, category: parseInt(value) as EmailTemplateCategory })}
+                  onValueChange={(value) =>
+                    setTemplateForm({
+                      ...templateForm,
+                      category: parseInt(value) as EmailTemplateCategory,
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1100,7 +1232,12 @@ export default function Outreach() {
                 <Label htmlFor="template-target-role">Target Role</Label>
                 <Select
                   value={templateForm.targetRole.toString()}
-                  onValueChange={(value) => setTemplateForm({ ...templateForm, targetRole: parseInt(value) as EmailTemplateTargetRole })}
+                  onValueChange={(value) =>
+                    setTemplateForm({
+                      ...templateForm,
+                      targetRole: parseInt(value) as EmailTemplateTargetRole,
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1123,7 +1260,9 @@ export default function Outreach() {
               <Input
                 id="template-subject"
                 value={templateForm.subject}
-                onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, subject: e.target.value })
+                }
                 placeholder="e.g., Following up on our conversation about {{position}}"
               />
             </div>
@@ -1133,7 +1272,9 @@ export default function Outreach() {
               <Textarea
                 id="template-body"
                 value={templateForm.body}
-                onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
+                onChange={(e) =>
+                  setTemplateForm({ ...templateForm, body: e.target.value })
+                }
                 placeholder="Write your email template here. Use {{variable}} for personalization."
                 rows={8}
               />
@@ -1141,15 +1282,22 @@ export default function Outreach() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowTemplateDialog(false);
-              setEditingTemplate(null);
-              resetTemplateForm();
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTemplateDialog(false);
+                setEditingTemplate(null);
+                resetTemplateForm();
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}>
-              {editingTemplate ? 'Update Template' : 'Create Template'}
+            <Button
+              onClick={
+                editingTemplate ? handleUpdateTemplate : handleCreateTemplate
+              }
+            >
+              {editingTemplate ? "Update Template" : "Create Template"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1160,7 +1308,7 @@ export default function Outreach() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingContact ? 'Edit Contact' : 'Add External Contact'}
+              {editingContact ? "Edit Contact" : "Add External Contact"}
             </DialogTitle>
             <DialogDescription>
               Add contacts for your outreach campaigns
@@ -1174,7 +1322,12 @@ export default function Outreach() {
                 <Input
                   id="contact-first-name"
                   value={contactForm.firstName}
-                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({
+                      ...contactForm,
+                      firstName: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div>
@@ -1182,7 +1335,9 @@ export default function Outreach() {
                 <Input
                   id="contact-last-name"
                   value={contactForm.lastName}
-                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({ ...contactForm, lastName: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -1193,7 +1348,9 @@ export default function Outreach() {
                 id="contact-email"
                 type="email"
                 value={contactForm.email}
-                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                onChange={(e) =>
+                  setContactForm({ ...contactForm, email: e.target.value })
+                }
                 required
               />
             </div>
@@ -1204,7 +1361,9 @@ export default function Outreach() {
                 <Input
                   id="contact-job-title"
                   value={contactForm.jobTitle}
-                  onChange={(e) => setContactForm({ ...contactForm, jobTitle: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({ ...contactForm, jobTitle: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -1212,7 +1371,12 @@ export default function Outreach() {
                 <Input
                   id="contact-company"
                   value={contactForm.companyName}
-                  onChange={(e) => setContactForm({ ...contactForm, companyName: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({
+                      ...contactForm,
+                      companyName: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1223,7 +1387,9 @@ export default function Outreach() {
                 <Input
                   id="contact-phone"
                   value={contactForm.phone}
-                  onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({ ...contactForm, phone: e.target.value })
+                  }
                 />
               </div>
               <div>
@@ -1231,7 +1397,9 @@ export default function Outreach() {
                 <Input
                   id="contact-location"
                   value={contactForm.location}
-                  onChange={(e) => setContactForm({ ...contactForm, location: e.target.value })}
+                  onChange={(e) =>
+                    setContactForm({ ...contactForm, location: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -1241,7 +1409,12 @@ export default function Outreach() {
               <Input
                 id="contact-linkedin"
                 value={contactForm.linkedInUrl}
-                onChange={(e) => setContactForm({ ...contactForm, linkedInUrl: e.target.value })}
+                onChange={(e) =>
+                  setContactForm({
+                    ...contactForm,
+                    linkedInUrl: e.target.value,
+                  })
+                }
                 placeholder="https://linkedin.com/in/username"
               />
             </div>
@@ -1251,7 +1424,9 @@ export default function Outreach() {
               <Textarea
                 id="contact-notes"
                 value={contactForm.notes}
-                onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
+                onChange={(e) =>
+                  setContactForm({ ...contactForm, notes: e.target.value })
+                }
                 placeholder="Any additional notes about this contact"
                 rows={3}
               />
@@ -1259,15 +1434,22 @@ export default function Outreach() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowContactDialog(false);
-              setEditingContact(null);
-              resetContactForm();
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowContactDialog(false);
+                setEditingContact(null);
+                resetContactForm();
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={editingContact ? handleUpdateContact : handleCreateContact}>
-              {editingContact ? 'Update Contact' : 'Add Contact'}
+            <Button
+              onClick={
+                editingContact ? handleUpdateContact : handleCreateContact
+              }
+            >
+              {editingContact ? "Update Contact" : "Add Contact"}
             </Button>
           </DialogFooter>
         </DialogContent>

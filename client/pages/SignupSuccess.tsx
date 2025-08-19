@@ -1,17 +1,23 @@
-import { Mail, CheckCircle, ArrowLeft, RefreshCw } from 'lucide-react';
-import { useSearchParams, Link } from 'react-router-dom';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSidebar } from '@/hooks/use-sidebar';
+import { Mail, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { useSearchParams, Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
-  const email = searchParams.get('email') || 'your email address';
-  const firstName = searchParams.get('firstName') || '';
+  const email = searchParams.get("email") || "your email address";
+  const firstName = searchParams.get("firstName") || "";
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -33,7 +39,7 @@ export default function SignupSuccess() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16">
           <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
             <Card className="w-full max-w-md">
@@ -42,7 +48,7 @@ export default function SignupSuccess() {
                   <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
                 <CardTitle className="text-2xl">
-                  Welcome{firstName ? ` ${firstName}` : ''}!
+                  Welcome{firstName ? ` ${firstName}` : ""}!
                 </CardTitle>
                 <CardDescription>
                   Your account has been created successfully
@@ -79,10 +85,10 @@ export default function SignupSuccess() {
                     <p className="text-sm text-gray-600 mb-3">
                       Didn't receive the email?
                     </p>
-                    
+
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => window.location.reload()}
                         className="flex-1"
@@ -90,34 +96,30 @@ export default function SignupSuccess() {
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Resend Email
                       </Button>
-                      
-                      <Button 
-                        variant="outline" 
+
+                      <Button
+                        variant="outline"
                         size="sm"
                         asChild
                         className="flex-1"
                       >
-                        <Link to="/signup">
-                          Try Different Email
-                        </Link>
+                        <Link to="/signup">Try Different Email</Link>
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="text-center pt-4 border-t">
                     <p className="text-sm text-gray-600 mb-2">
                       Already confirmed your email?
                     </p>
                     <Button asChild className="w-full">
-                      <Link to="/login">
-                        Sign In to Your Account
-                      </Link>
+                      <Link to="/login">Sign In to Your Account</Link>
                     </Button>
                   </div>
-                  
+
                   <div className="text-center">
-                    <Link 
-                      to="/" 
+                    <Link
+                      to="/"
                       className="text-sm text-gray-600 hover:text-gray-500 inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
@@ -128,8 +130,9 @@ export default function SignupSuccess() {
 
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-600 text-center">
-                    <strong>Having trouble?</strong> Contact our support team for assistance.
-                    The confirmation link will expire in 24 hours.
+                    <strong>Having trouble?</strong> Contact our support team
+                    for assistance. The confirmation link will expire in 24
+                    hours.
                   </p>
                 </div>
               </CardContent>

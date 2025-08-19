@@ -104,9 +104,10 @@ export default function Settings() {
                   Customize Your Experience
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Take control of your profile, privacy, notifications, and preferences
-                  with our comprehensive settings dashboard. Personalize every aspect
-                  of your experience to match your workflow.
+                  Take control of your profile, privacy, notifications, and
+                  preferences with our comprehensive settings dashboard.
+                  Personalize every aspect of your experience to match your
+                  workflow.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -215,8 +216,8 @@ export default function Settings() {
                     <div>
                       <h3 className="font-semibold mb-2">Smart Defaults</h3>
                       <p className="text-muted-foreground">
-                        Intelligent default settings that learn from your behavior
-                        and adapt to your preferences over time.
+                        Intelligent default settings that learn from your
+                        behavior and adapt to your preferences over time.
                       </p>
                     </div>
                   </div>

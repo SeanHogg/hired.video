@@ -85,8 +85,8 @@ export default function PlaceholderPage({
                   </div>
 
                   <p className="text-sm text-muted-foreground mt-6">
-                    This page is ready to be built! Continue prompting to add the
-                    content you need.
+                    This page is ready to be built! Continue prompting to add
+                    the content you need.
                   </p>
                 </CardContent>
               </Card>

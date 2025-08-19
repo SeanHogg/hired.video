@@ -13,85 +13,140 @@ import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 // ============================================================================
 
 // Schema for the actual ResumeInformationEntity structure returned by the API
-export const ResumeSchema = z.object({
-  id: nullableString(),
-  userId: nullableString(),
-  name: nullableString(),
-  slug: nullableString(),
-  description: nullableString(),
-  isPrimaryDefault: nullableBoolean(),
-  sentimentScore: nullableNumber(),
-  isWatched: nullableBoolean(),
-  privacy_ShowResume: nullableNumber(),
-  privacy_ShowContactDetails: nullableNumber(),
-  industry: nullableNumber(),
-  employmentType: z.array(z.number()).nullable().transform(val => val === null ? undefined : val).optional(),
-  paySchedule: nullableNumber(),
-  minimumSalary: nullableNumber(),
-  resumeType: nullableNumber(),
-  resumeSerialized: nullableString(),
-  createdAt: nullableString(),
-  updatedAt: nullableString(),
-  views: nullableNumber(),
-  metaResume: z.object({
+export const ResumeSchema = z
+  .object({
     id: nullableString(),
-    basics: z.object({
-      id: nullableString(),
-      name: nullableString(),
-      label: nullableString(),
-      image: nullableString(),
-      email: nullableString(),
-      phone: nullableString(),
-      url: nullableString(),
-      summary: nullableString(),
-      location: z.object({
-        address: nullableString(),
-        city: nullableString(),
-        region: nullableString(),
-        postalCode: nullableString(),
-        countryCode: nullableString(),
-      }).nullable().optional(),
-    }).nullable().optional(),
-    work: z.array(z.object({
-      id: nullableString(),
-      name: nullableString(),
-      position: nullableString(),
-      summary: nullableString(),
-      startDate: nullableString(),
-      endDate: nullableString(),
-      highlights: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
-      url: nullableString(),
-    })).nullable().transform(val => val === null ? undefined : val).optional(),
-    education: z.array(z.object({
-      id: nullableString(),
-      institution: nullableString(),
-      area: nullableString(),
-      studyType: nullableString(),
-      startDate: nullableString(),
-      endDate: nullableString(),
-      score: nullableString(),
-      courses: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
-      url: nullableString(),
-    })).nullable().transform(val => val === null ? undefined : val).optional(),
-    volunteer: z.array(z.object({
-      id: nullableString(),
-      organization: nullableString(),
-      position: nullableString(),
-      summary: nullableString(),
-      startDate: nullableString(),
-      endDate: nullableString(),
-      highlights: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
-      url: nullableString(),
-    })).nullable().transform(val => val === null ? undefined : val).optional(),
-    skills: z.array(z.object({
-      id: nullableString(),
-      name: nullableString(),
-      level: nullableString(),
-      keywords: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
-    })).nullable().transform(val => val === null ? undefined : val).optional(),
-    // Add other sections as needed
-  }).nullable().optional(),
-}).passthrough();
+    userId: nullableString(),
+    name: nullableString(),
+    slug: nullableString(),
+    description: nullableString(),
+    isPrimaryDefault: nullableBoolean(),
+    sentimentScore: nullableNumber(),
+    isWatched: nullableBoolean(),
+    privacy_ShowResume: nullableNumber(),
+    privacy_ShowContactDetails: nullableNumber(),
+    industry: nullableNumber(),
+    employmentType: z
+      .array(z.number())
+      .nullable()
+      .transform((val) => (val === null ? undefined : val))
+      .optional(),
+    paySchedule: nullableNumber(),
+    minimumSalary: nullableNumber(),
+    resumeType: nullableNumber(),
+    resumeSerialized: nullableString(),
+    createdAt: nullableString(),
+    updatedAt: nullableString(),
+    views: nullableNumber(),
+    metaResume: z
+      .object({
+        id: nullableString(),
+        basics: z
+          .object({
+            id: nullableString(),
+            name: nullableString(),
+            label: nullableString(),
+            image: nullableString(),
+            email: nullableString(),
+            phone: nullableString(),
+            url: nullableString(),
+            summary: nullableString(),
+            location: z
+              .object({
+                address: nullableString(),
+                city: nullableString(),
+                region: nullableString(),
+                postalCode: nullableString(),
+                countryCode: nullableString(),
+              })
+              .nullable()
+              .optional(),
+          })
+          .nullable()
+          .optional(),
+        work: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              position: nullableString(),
+              summary: nullableString(),
+              startDate: nullableString(),
+              endDate: nullableString(),
+              highlights: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              url: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        education: z
+          .array(
+            z.object({
+              id: nullableString(),
+              institution: nullableString(),
+              area: nullableString(),
+              studyType: nullableString(),
+              startDate: nullableString(),
+              endDate: nullableString(),
+              score: nullableString(),
+              courses: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              url: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        volunteer: z
+          .array(
+            z.object({
+              id: nullableString(),
+              organization: nullableString(),
+              position: nullableString(),
+              summary: nullableString(),
+              startDate: nullableString(),
+              endDate: nullableString(),
+              highlights: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              url: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        skills: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              level: nullableString(),
+              keywords: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        // Add other sections as needed
+      })
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
 
 export const ResumeSummarySchema = z.object({
   // Backend properties (PascalCase)
@@ -149,35 +204,51 @@ export const CreateResumeSchema = z.object({
   linkedIn: z.string().optional(),
   github: z.string().optional(),
   summary: z.string().optional(),
-  experience: z.array(z.object({
-    company: z.string(),
-    position: z.string(),
-    startDate: z.string(),
-    endDate: z.string().optional(),
-    description: z.string().optional(),
-    current: z.boolean().optional(),
-  })).optional(),
-  education: z.array(z.object({
-    institution: z.string(),
-    degree: z.string(),
-    field: z.string().optional(),
-    startDate: z.string(),
-    endDate: z.string().optional(),
-    gpa: z.string().optional(),
-  })).optional(),
+  experience: z
+    .array(
+      z.object({
+        company: z.string(),
+        position: z.string(),
+        startDate: z.string(),
+        endDate: z.string().optional(),
+        description: z.string().optional(),
+        current: z.boolean().optional(),
+      }),
+    )
+    .optional(),
+  education: z
+    .array(
+      z.object({
+        institution: z.string(),
+        degree: z.string(),
+        field: z.string().optional(),
+        startDate: z.string(),
+        endDate: z.string().optional(),
+        gpa: z.string().optional(),
+      }),
+    )
+    .optional(),
   skills: z.array(z.string()).optional(),
-  certifications: z.array(z.object({
-    name: z.string(),
-    issuer: z.string(),
-    date: z.string(),
-    expiryDate: z.string().optional(),
-  })).optional(),
-  projects: z.array(z.object({
-    name: z.string(),
-    description: z.string(),
-    technologies: z.array(z.string()).optional(),
-    url: z.string().optional(),
-  })).optional(),
+  certifications: z
+    .array(
+      z.object({
+        name: z.string(),
+        issuer: z.string(),
+        date: z.string(),
+        expiryDate: z.string().optional(),
+      }),
+    )
+    .optional(),
+  projects: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        technologies: z.array(z.string()).optional(),
+        url: z.string().optional(),
+      }),
+    )
+    .optional(),
   isPublic: z.boolean().optional(),
   templateId: z.string().optional(),
 });
@@ -225,16 +296,26 @@ export class ResumeService {
 
     const response = await apiClient.get<any>(
       `/Resume/public?${params.toString()}`,
-      PaginatedResumesSchema
+      PaginatedResumesSchema,
     );
 
     const dto = response.data as any;
     const rawItems = (dto.items || dto.Items || []) as unknown[];
-    const total = (dto.total ?? dto.Total ?? (Array.isArray(rawItems) ? rawItems.length : 0)) as number;
+    const total = (dto.total ??
+      dto.Total ??
+      (Array.isArray(rawItems) ? rawItems.length : 0)) as number;
     const pageNum = (dto.page ?? dto.Page ?? 1) as number;
-    const limitNum = (dto.limit ?? dto.Limit ?? (Array.isArray(rawItems) ? rawItems.length : 0)) as number;
-    const hasNext = (dto.hasNext ?? dto.hasNextPage ?? dto.HasNextPage ?? (pageNum * limitNum < total)) as boolean;
-    const hasPrev = (dto.hasPrev ?? dto.hasPreviousPage ?? dto.HasPreviousPage ?? (pageNum > 1)) as boolean;
+    const limitNum = (dto.limit ??
+      dto.Limit ??
+      (Array.isArray(rawItems) ? rawItems.length : 0)) as number;
+    const hasNext = (dto.hasNext ??
+      dto.hasNextPage ??
+      dto.HasNextPage ??
+      pageNum * limitNum < total) as boolean;
+    const hasPrev = (dto.hasPrev ??
+      dto.hasPreviousPage ??
+      dto.HasPreviousPage ??
+      pageNum > 1) as boolean;
 
     // Normalize the resume items to have consistent property names
     const items = rawItems.map((item: any) => ({
@@ -243,7 +324,8 @@ export class ResumeService {
       templateName: item.TemplateName || item.templateName,
       isPublic: item.IsPublic ?? item.isPublic,
       isOwner: item.IsOwner ?? item.isOwner,
-      creationDateTimeFormatted: item.CreationDateTimeFormatted || item.creationDateTimeFormatted,
+      creationDateTimeFormatted:
+        item.CreationDateTimeFormatted || item.creationDateTimeFormatted,
       sentimentScore: item.SentimentScore ?? item.sentimentScore,
       userId: item.UserId || item.userId,
       name: item.Name || item.name,
@@ -258,8 +340,14 @@ export class ResumeService {
       // Computed properties for backward compatibility
       title: item.Name || item.name || item.title,
       summary: item.Description || item.description || item.summary,
-      createdAt: item.CreationDateTimeFormatted || item.creationDateTimeFormatted || item.createdAt,
-      updatedAt: item.CreationDateTimeFormatted || item.creationDateTimeFormatted || item.updatedAt,
+      createdAt:
+        item.CreationDateTimeFormatted ||
+        item.creationDateTimeFormatted ||
+        item.createdAt,
+      updatedAt:
+        item.CreationDateTimeFormatted ||
+        item.creationDateTimeFormatted ||
+        item.updatedAt,
     })) as ResumeSummary[];
 
     return {
@@ -278,9 +366,9 @@ export class ResumeService {
   async getUserResumes(): Promise<ResumeSummary[]> {
     const response = await apiClient.get<ResumeSummary[]>(
       "/Resume/GetResumesOwnedbyAuthUser",
-      z.array(ResumeSummarySchema)
+      z.array(ResumeSummarySchema),
     );
-    
+
     return response.data;
   }
 
@@ -296,7 +384,11 @@ export class ResumeService {
    * Create new resume
    */
   async createResume(resumeData: CreateResume): Promise<Resume> {
-    const response = await apiClient.post<Resume>("/Resume/Save", resumeData, ResumeSchema);
+    const response = await apiClient.post<Resume>(
+      "/Resume/Save",
+      resumeData,
+      ResumeSchema,
+    );
     return response.data;
   }
 
@@ -315,7 +407,7 @@ export class ResumeService {
         body: formData,
         headers: {}, // Remove Content-Type to let browser set it for FormData
       },
-      ResumeSchema
+      ResumeSchema,
     );
 
     return response.data;
@@ -324,8 +416,15 @@ export class ResumeService {
   /**
    * Update existing resume
    */
-  async updateResume(id: string, updates: Partial<CreateResume>): Promise<Resume> {
-    const response = await apiClient.put<Resume>(`/Resume/${id}`, updates, ResumeSchema);
+  async updateResume(
+    id: string,
+    updates: Partial<CreateResume>,
+  ): Promise<Resume> {
+    const response = await apiClient.put<Resume>(
+      `/Resume/${id}`,
+      updates,
+      ResumeSchema,
+    );
     return response.data;
   }
 
@@ -340,7 +439,11 @@ export class ResumeService {
    * Clone resume
    */
   async cloneResume(id: string): Promise<Resume> {
-    const response = await apiClient.post<Resume>(`/Resume/${id}/clone`, {}, ResumeSchema);
+    const response = await apiClient.post<Resume>(
+      `/Resume/${id}/clone`,
+      {},
+      ResumeSchema,
+    );
     return response.data;
   }
 
@@ -350,7 +453,7 @@ export class ResumeService {
   async exportResume(id: string, format = "pdf"): Promise<Blob> {
     const response = await apiClient.request<Blob>(
       `/Resume/${id}/export?format=${format}`,
-      { method: "GET" }
+      { method: "GET" },
     );
 
     // Return the blob directly for download
@@ -378,25 +481,27 @@ export class ResumeService {
     const response = await apiClient.post<{ summary: string }>(
       `/Resume/Summarize`,
       { resumeId: id },
-      z.object({ summary: z.string() })
+      z.object({ summary: z.string() }),
     );
-    
+
     return response.data.summary;
   }
 
   /**
    * Get resume sentiment analysis
    */
-  async getResumeSentiment(id: string): Promise<{ sentiment: string; score: number }> {
+  async getResumeSentiment(
+    id: string,
+  ): Promise<{ sentiment: string; score: number }> {
     const response = await apiClient.post<{ sentiment: string; score: number }>(
       `/Resume/SentimentPrediction`,
       { resumeId: id },
       z.object({
         sentiment: z.string(),
         score: z.number(),
-      })
+      }),
     );
-    
+
     return response.data;
   }
 
@@ -407,9 +512,9 @@ export class ResumeService {
     const response = await apiClient.post<Partial<CreateResume>>(
       `/Resume/Parse`,
       { content },
-      CreateResumeSchema.partial()
+      CreateResumeSchema.partial(),
     );
-    
+
     return response.data;
   }
 }

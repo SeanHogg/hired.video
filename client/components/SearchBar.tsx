@@ -131,7 +131,10 @@ export default function SearchBar({
     onSearch?.(query);
   };
 
-  const handleFilterChange = (key: string, value: string | number | boolean | undefined) => {
+  const handleFilterChange = (
+    key: string,
+    value: string | number | boolean | undefined,
+  ) => {
     const newFilters = { ...filters, [key]: value };
     onFilterChange?.(newFilters);
   };

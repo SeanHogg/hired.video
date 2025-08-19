@@ -45,7 +45,14 @@ import { useAuth } from "@/lib/auth";
 
 type UIJobRequirement = { skill: string; level: string; required: boolean };
 type UIJobBenefit = { type: string; description: string };
-type UIJobCompany = { name: string; logo?: string; description?: string; industry?: string; size?: string; website?: string };
+type UIJobCompany = {
+  name: string;
+  logo?: string;
+  description?: string;
+  industry?: string;
+  size?: string;
+  website?: string;
+};
 type UIJobLocation = { city?: string; state?: string; remote: boolean };
 type UIJobData = {
   title: string;
@@ -78,11 +85,17 @@ type UIJob = {
 
 function mapApiJobToUI(apiJob: any): UIJob {
   // If server returns envelope { success, data }, unwrap
-  const j = apiJob && apiJob.data && apiJob.success !== undefined ? apiJob.data : apiJob;
+  const j =
+    apiJob && apiJob.data && apiJob.success !== undefined
+      ? apiJob.data
+      : apiJob;
   // Some jobs store serialized JSON in jobSerialized
   let parsed: any = {};
   try {
-    if (typeof j.jobSerialized === "string" && j.jobSerialized.trim().length > 0) {
+    if (
+      typeof j.jobSerialized === "string" &&
+      j.jobSerialized.trim().length > 0
+    ) {
       parsed = JSON.parse(j.jobSerialized);
     }
   } catch {
@@ -91,8 +104,16 @@ function mapApiJobToUI(apiJob: any): UIJob {
   return {
     id: (j.id || j.Id || "").toString(),
     status: ((j.status || j.Status) as UIJob["status"]) || "active",
-    createdAt: j.createdAt || j.creationDateTime || j.postedDate || new Date().toISOString(),
-    updatedAt: j.updatedAt || j.updateDateTime || j.creationDateTime || new Date().toISOString(),
+    createdAt:
+      j.createdAt ||
+      j.creationDateTime ||
+      j.postedDate ||
+      new Date().toISOString(),
+    updatedAt:
+      j.updatedAt ||
+      j.updateDateTime ||
+      j.creationDateTime ||
+      new Date().toISOString(),
     expiresAt: j.expiryDate || j.expirationDate,
     views: j.viewCount ?? 0,
     applications: j.applicationCount ?? 0,
@@ -101,11 +122,16 @@ function mapApiJobToUI(apiJob: any): UIJob {
       title: j.title || parsed.title || "",
       description: j.description || parsed.description || "",
       company: {
-        name: (j.company && j.company.name) || j.company || parsed.company || "Unknown Company",
+        name:
+          (j.company && j.company.name) ||
+          j.company ||
+          parsed.company ||
+          "Unknown Company",
         logo: j.companyLogo || (j.company && j.company.logoUrl) || "",
         website: j.companyWebsite,
         description: j.companyDescription,
-        industry: (Array.isArray(j.industry) ? j.industry[0] : j.industry) || undefined,
+        industry:
+          (Array.isArray(j.industry) ? j.industry[0] : j.industry) || undefined,
         size: j.size,
       },
       location: {
@@ -113,15 +139,29 @@ function mapApiJobToUI(apiJob: any): UIJob {
         city: j.city || (j.address && j.address.city) || undefined,
         state: j.state || (j.address && j.address.stateProvince) || undefined,
       },
-      responsibilities: Array.isArray(j.responsibilities) ? j.responsibilities : (Array.isArray(parsed.responsibilities) ? parsed.responsibilities : []),
+      responsibilities: Array.isArray(j.responsibilities)
+        ? j.responsibilities
+        : Array.isArray(parsed.responsibilities)
+          ? parsed.responsibilities
+          : [],
       requirements: Array.isArray(j.requirements)
-        ? j.requirements.map((r: string) => ({ skill: r, level: "Intermediate", required: true }))
+        ? j.requirements.map((r: string) => ({
+            skill: r,
+            level: "Intermediate",
+            required: true,
+          }))
         : [],
       qualifications: Array.isArray(j.qualifications) ? j.qualifications : [],
       benefits: Array.isArray(j.benefits)
-        ? j.benefits.map((b: any) => ({ type: b.type || "Benefit", description: b.description || "" }))
+        ? j.benefits.map((b: any) => ({
+            type: b.type || "Benefit",
+            description: b.description || "",
+          }))
         : [],
-      employmentType: (Array.isArray(j.employmentType) ? j.employmentType[0] : j.employmentType) || undefined,
+      employmentType:
+        (Array.isArray(j.employmentType)
+          ? j.employmentType[0]
+          : j.employmentType) || undefined,
       experienceLevel: j.experienceLevel,
       salaryMin: j.salaryMin,
       salaryMax: j.salaryMax,
@@ -199,9 +239,17 @@ export default function JobDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          collapsed={sidebarCollapsed}
+        />
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto">
               <Card>

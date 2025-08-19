@@ -3,11 +3,11 @@
  * Integrates with the backend TaskController and ProductivityService
  */
 
-import { apiClient } from '@/lib/api-client';
-import { 
-  TaskDTO, 
-  CreateTaskRequest, 
-  UpdateTaskRequest, 
+import { apiClient } from "@/lib/api-client";
+import {
+  TaskDTO,
+  CreateTaskRequest,
+  UpdateTaskRequest,
   TaskAssignmentRequest,
   TaskListResponse,
   TaskFilters,
@@ -15,54 +15,61 @@ import {
   UserCompanyRoleAssociation,
   TaskType,
   ProductivityItemStatus,
-  MyVideoResumeRoles
-} from '@/types/task';
-import { UserProfile } from './user-service';
+  MyVideoResumeRoles,
+} from "@/types/task";
+import { UserProfile } from "./user-service";
 
 export class TaskService {
-  private readonly baseUrl = '/api/task';
+  private readonly baseUrl = "/api/task";
 
   /**
    * Get all tasks for the current user
    */
-  async getTasks(filters?: TaskFilters, sort?: TaskSortOptions): Promise<TaskDTO[]> {
+  async getTasks(
+    filters?: TaskFilters,
+    sort?: TaskSortOptions,
+  ): Promise<TaskDTO[]> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filters) {
         if (filters.status?.length) {
-          filters.status.forEach(status => params.append('status', status.toString()));
+          filters.status.forEach((status) =>
+            params.append("status", status.toString()),
+          );
         }
         if (filters.taskType?.length) {
-          filters.taskType.forEach(type => params.append('taskType', type.toString()));
+          filters.taskType.forEach((type) =>
+            params.append("taskType", type.toString()),
+          );
         }
         if (filters.assignedToUserId) {
-          params.append('assignedToUserId', filters.assignedToUserId);
+          params.append("assignedToUserId", filters.assignedToUserId);
         }
         if (filters.createdByUserId) {
-          params.append('createdByUserId', filters.createdByUserId);
+          params.append("createdByUserId", filters.createdByUserId);
         }
         if (filters.startDate) {
-          params.append('startDate', filters.startDate);
+          params.append("startDate", filters.startDate);
         }
         if (filters.endDate) {
-          params.append('endDate', filters.endDate);
+          params.append("endDate", filters.endDate);
         }
       }
 
       if (sort) {
-        params.append('sortField', sort.field);
-        params.append('sortDirection', sort.direction);
+        params.append("sortField", sort.field);
+        params.append("sortDirection", sort.direction);
       }
 
       const queryString = params.toString();
       const url = queryString ? `${this.baseUrl}?${queryString}` : this.baseUrl;
-      
+
       const response = await apiClient.get<TaskDTO[]>(url);
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch tasks:', error);
-      throw new Error('Failed to fetch tasks');
+      console.error("Failed to fetch tasks:", error);
+      throw new Error("Failed to fetch tasks");
     }
   }
 
@@ -71,7 +78,9 @@ export class TaskService {
    */
   async getTaskById(taskId: string): Promise<TaskDTO> {
     try {
-      const response = await apiClient.get<TaskDTO>(`${this.baseUrl}/${taskId}`);
+      const response = await apiClient.get<TaskDTO>(
+        `${this.baseUrl}/${taskId}`,
+      );
       return response.data;
     } catch (error) {
       console.error(`Failed to fetch task ${taskId}:`, error);
@@ -97,11 +106,14 @@ export class TaskService {
         assignedToUserId: request.assignedToUserId,
       };
 
-      const response = await apiClient.post<{ result: TaskDTO }>(`${this.baseUrl}/save`, taskDto);
+      const response = await apiClient.post<{ result: TaskDTO }>(
+        `${this.baseUrl}/save`,
+        taskDto,
+      );
       return response.data.result;
     } catch (error) {
-      console.error('Failed to create task:', error);
-      throw new Error('Failed to create task');
+      console.error("Failed to create task:", error);
+      throw new Error("Failed to create task");
     }
   }
 
@@ -125,7 +137,10 @@ export class TaskService {
         updateDateTime: new Date().toISOString(),
       };
 
-      const response = await apiClient.post<{ result: TaskDTO }>(`${this.baseUrl}/save`, taskDto);
+      const response = await apiClient.post<{ result: TaskDTO }>(
+        `${this.baseUrl}/save`,
+        taskDto,
+      );
       return response.data.result;
     } catch (error) {
       console.error(`Failed to update task ${request.id}:`, error);
@@ -151,7 +166,7 @@ export class TaskService {
   async assignTask(request: TaskAssignmentRequest): Promise<TaskDTO> {
     try {
       const task = await this.getTaskById(request.taskId);
-      
+
       const updateRequest: UpdateTaskRequest = {
         id: task.id!,
         text: task.text,
@@ -177,11 +192,12 @@ export class TaskService {
    */
   async getAssignableUsers(): Promise<UserCompanyRoleAssociation[]> {
     try {
-      const response = await apiClient.get<UserCompanyRoleAssociation[]>('/api/account/users');
+      const response =
+        await apiClient.get<UserCompanyRoleAssociation[]>("/api/account/users");
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch assignable users:', error);
-      throw new Error('Failed to fetch assignable users');
+      console.error("Failed to fetch assignable users:", error);
+      throw new Error("Failed to fetch assignable users");
     }
   }
 
@@ -196,8 +212,8 @@ export class TaskService {
 
       // Common onboarding tasks
       tasks.push({
-        text: 'Complete your profile',
-        description: 'Add your personal information, skills, and preferences',
+        text: "Complete your profile",
+        description: "Add your personal information, skills, and preferences",
         start: now.toISOString(),
         end: tomorrow.toISOString(),
         taskType: TaskType.OnboardingProfile,
@@ -208,64 +224,67 @@ export class TaskService {
       if (roles.includes(MyVideoResumeRoles.JobSeeker)) {
         tasks.push(
           {
-            text: 'Polish your resume',
-            description: 'Upload or build your resume using our resume builder',
+            text: "Polish your resume",
+            description: "Upload or build your resume using our resume builder",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.Resume,
             status: ProductivityItemStatus.ToDo,
           },
           {
-            text: 'Prepare for interviews',
-            description: 'Review common questions and prepare your stories',
+            text: "Prepare for interviews",
+            description: "Review common questions and prepare your stories",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.Interview,
             status: ProductivityItemStatus.ToDo,
-          }
+          },
         );
       }
 
       if (roles.includes(MyVideoResumeRoles.Recruiter)) {
         tasks.push(
           {
-            text: 'Set your recruiter preferences',
-            description: 'Define industries, roles, and locations you recruit for',
+            text: "Set your recruiter preferences",
+            description:
+              "Define industries, roles, and locations you recruit for",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.RecruiterPreferences,
             status: ProductivityItemStatus.ToDo,
           },
           {
-            text: 'Add your first candidate pipeline',
-            description: 'Create a Kanban board for an open role',
+            text: "Add your first candidate pipeline",
+            description: "Create a Kanban board for an open role",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.Recruiter,
             status: ProductivityItemStatus.ToDo,
-          }
+          },
         );
       }
 
-      if (roles.includes(MyVideoResumeRoles.Employer) || 
-          roles.includes(MyVideoResumeRoles.EmployerManager)) {
+      if (
+        roles.includes(MyVideoResumeRoles.Employer) ||
+        roles.includes(MyVideoResumeRoles.EmployerManager)
+      ) {
         tasks.push(
           {
-            text: 'Complete company profile',
-            description: 'Add company information, culture, and benefits',
+            text: "Complete company profile",
+            description: "Add company information, culture, and benefits",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.Company,
             status: ProductivityItemStatus.ToDo,
           },
           {
-            text: 'Post your first job',
-            description: 'Create and publish your first job posting',
+            text: "Post your first job",
+            description: "Create and publish your first job posting",
             start: now.toISOString(),
             end: tomorrow.toISOString(),
             taskType: TaskType.Job,
             status: ProductivityItemStatus.ToDo,
-          }
+          },
         );
       }
 
@@ -278,8 +297,8 @@ export class TaskService {
 
       return createdTasks;
     } catch (error) {
-      console.error('Failed to create onboarding tasks:', error);
-      throw new Error('Failed to create onboarding tasks');
+      console.error("Failed to create onboarding tasks:", error);
+      throw new Error("Failed to create onboarding tasks");
     }
   }
 
@@ -304,7 +323,7 @@ export class TaskService {
   async completeTask(taskId: string): Promise<TaskDTO> {
     try {
       const task = await this.getTaskById(taskId);
-      
+
       const updateRequest: UpdateTaskRequest = {
         id: task.id!,
         text: task.text,

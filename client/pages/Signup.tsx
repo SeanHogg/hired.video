@@ -1,4 +1,13 @@
-import { Eye, EyeOff, User, Mail, Lock, Users, Briefcase, Building2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  User,
+  Mail,
+  Lock,
+  Users,
+  Briefcase,
+  Building2,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
@@ -63,7 +72,9 @@ export default function Signup() {
       const success = await signup(email, password, firstName, lastName, role);
       if (success) {
         // Redirect to success page with email confirmation instructions
-        navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`);
+        navigate(
+          `/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`,
+        );
       } else {
         setError(
           "Account with this email already exists. Please sign in instead.",
@@ -161,14 +172,27 @@ export default function Signup() {
                     <Label>Registering as</Label>
                     <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue inline-block">
                       <div className="bg-background rounded-full p-1">
-                        <ToggleGroup type="single" value={role} onValueChange={(v) => v && setRole(v as UserRole)}>
-                          <ToggleGroupItem value="job_seeker" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                        <ToggleGroup
+                          type="single"
+                          value={role}
+                          onValueChange={(v) => v && setRole(v as UserRole)}
+                        >
+                          <ToggleGroupItem
+                            value="job_seeker"
+                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                          >
                             <Users className="h-4 w-4 mr-2" /> Job Seeker
                           </ToggleGroupItem>
-                          <ToggleGroupItem value="recruiter" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                          <ToggleGroupItem
+                            value="recruiter"
+                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                          >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
-                          <ToggleGroupItem value="business" className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white">
+                          <ToggleGroupItem
+                            value="business"
+                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                          >
                             <Building2 className="h-4 w-4 mr-2" /> Business
                           </ToggleGroupItem>
                         </ToggleGroup>

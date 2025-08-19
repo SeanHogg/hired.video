@@ -49,7 +49,7 @@ export class FeatureFlagService {
   async getFeatureFlags(): Promise<FeatureFlagsResponse> {
     const response = await apiClient.get<FeatureFlagsResponse>(
       "/FeatureFlag",
-      FeatureFlagsResponseSchema
+      FeatureFlagsResponseSchema,
     );
 
     // Update cache
@@ -85,17 +85,17 @@ export class FeatureFlagService {
     try {
       const flags = await this.getFeatureFlags();
       const result: Record<string, boolean> = {};
-      
-      flagKeys.forEach(key => {
+
+      flagKeys.forEach((key) => {
         result[key] = flags.userFlags[key] || false;
       });
 
       return result;
     } catch (error) {
-      console.warn('Failed to fetch feature flags:', error);
+      console.warn("Failed to fetch feature flags:", error);
       // Return cached values or false
       const result: Record<string, boolean> = {};
-      flagKeys.forEach(key => {
+      flagKeys.forEach((key) => {
         result[key] = this.flagsCache.get(key) || false;
       });
       return result;
@@ -119,7 +119,7 @@ export class FeatureFlagService {
     try {
       await this.getFeatureFlags();
     } catch (error) {
-      console.warn('Failed to preload feature flags:', error);
+      console.warn("Failed to preload feature flags:", error);
     }
   }
 
@@ -154,7 +154,7 @@ export class FeatureFlagService {
 // REACT HOOK FOR FEATURE FLAGS
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * React hook for using feature flags
@@ -192,7 +192,7 @@ export function useFeatureFlag(flagKey: string): {
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error'));
+          setError(err instanceof Error ? err : new Error("Unknown error"));
           setIsLoading(false);
         }
       }
@@ -235,7 +235,7 @@ export function useFeatureFlags(flagKeys: string[]): {
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error'));
+          setError(err instanceof Error ? err : new Error("Unknown error"));
           setIsLoading(false);
         }
       }
@@ -246,7 +246,7 @@ export function useFeatureFlags(flagKeys: string[]): {
     return () => {
       mounted = false;
     };
-  }, [flagKeys.join(',')]);
+  }, [flagKeys.join(",")]);
 
   return { flags, isLoading, error };
 }

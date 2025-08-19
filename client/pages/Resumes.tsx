@@ -130,41 +130,41 @@ export default function Resumes() {
       // TODO: Implement tracked resumes functionality when API supports it
       const tracked: any[] = [];
 
-    const ownedWithOwnership: ResumeWithOwnership[] = owned.map((resume) => ({
-      id: resume.id,
-      slug: resume.slug,
-      name: resume.name,
-      privacy: (resume as any).privacy || "private",
-      isMaster: (resume as any).isMaster || false,
-      isActive: (resume as any).isActive || true,
-      parentId: (resume as any).parentId || null,
-      createdAt: resume.createdAt,
-      updatedAt: resume.updatedAt,
-      views: (resume as any).views || 0,
-      summary: (resume as any).data?.Basics?.Summary || "",
-      title: (resume as any).data?.Basics?.Label || resume.name || "",
-      userId: resume.userId,
-      ownership: "owned" as const,
-    }));
-
-    const trackedWithOwnership: ResumeWithOwnership[] = tracked.map(
-      (resume) => ({
+      const ownedWithOwnership: ResumeWithOwnership[] = owned.map((resume) => ({
         id: resume.id,
         slug: resume.slug,
         name: resume.name,
-        privacy: resume.privacy,
-        isMaster: resume.isMaster,
-        isActive: resume.isActive,
-        parentId: resume.parentId,
+        privacy: (resume as any).privacy || "private",
+        isMaster: (resume as any).isMaster || false,
+        isActive: (resume as any).isActive || true,
+        parentId: (resume as any).parentId || null,
         createdAt: resume.createdAt,
         updatedAt: resume.updatedAt,
-        views: resume.views,
-        summary: resume.data.Basics.Summary,
-        title: resume.data.Basics.Label,
+        views: (resume as any).views || 0,
+        summary: (resume as any).data?.Basics?.Summary || "",
+        title: (resume as any).data?.Basics?.Label || resume.name || "",
         userId: resume.userId,
-        ownership: "tracked" as const,
-      }),
-    );
+        ownership: "owned" as const,
+      }));
+
+      const trackedWithOwnership: ResumeWithOwnership[] = tracked.map(
+        (resume) => ({
+          id: resume.id,
+          slug: resume.slug,
+          name: resume.name,
+          privacy: resume.privacy,
+          isMaster: resume.isMaster,
+          isActive: resume.isActive,
+          parentId: resume.parentId,
+          createdAt: resume.createdAt,
+          updatedAt: resume.updatedAt,
+          views: resume.views,
+          summary: resume.data.Basics.Summary,
+          title: resume.data.Basics.Label,
+          userId: resume.userId,
+          ownership: "tracked" as const,
+        }),
+      );
 
       return [...ownedWithOwnership, ...trackedWithOwnership];
     } catch (error) {

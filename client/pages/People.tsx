@@ -38,12 +38,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { userService, type UserFilters, type PublicUser } from "@/lib/services/user-service";
+import {
+  userService,
+  type UserFilters,
+  type PublicUser,
+} from "@/lib/services/user-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import type { UserWithOwnership, UserProfile, UserMetadata } from "@/types/people";
+import type {
+  UserWithOwnership,
+  UserProfile,
+  UserMetadata,
+} from "@/types/people";
 import { ConnectionStatus } from "@/types/people";
-
 
 // Type for the people data structure
 type PeopleData =
@@ -104,7 +111,9 @@ export default function People() {
 
       const result = await userService.getPublicUsers(filters);
       // Filter out current user if authenticated
-      const filteredPeople = result.items.filter(person => person.id !== user?.id);
+      const filteredPeople = result.items.filter(
+        (person) => person.id !== user?.id,
+      );
 
       setPeople(filteredPeople);
       setTotalPeople(result.total - (user ? 1 : 0)); // Subtract 1 if current user was in results
@@ -127,11 +136,11 @@ export default function People() {
     if (!user) {
       return people.map((person) => ({
         ...person,
-        fullName: person.fullName || '',
-        location: person.location || '',
-        experienceLevel: 'Entry Level', // TODO: Calculate from API data when available
-        currentPosition: person.currentRole || '',
-        currentCompany: person.currentCompany || '',
+        fullName: person.fullName || "",
+        location: person.location || "",
+        experienceLevel: "Entry Level", // TODO: Calculate from API data when available
+        currentPosition: person.currentRole || "",
+        currentCompany: person.currentCompany || "",
       }));
     }
 
@@ -139,17 +148,18 @@ export default function People() {
     const trackedWithOwnership: UserWithOwnership[] = tracked.map((person) => ({
       id: person.id,
       slug: person.slug,
-      firstName: person.fullName?.split(' ')[0] || '',
-      lastName: person.fullName?.split(' ').slice(1).join(' ') || '',
-      fullName: person.fullName || '',
+      firstName: person.fullName?.split(" ")[0] || "",
+      lastName: person.fullName?.split(" ").slice(1).join(" ") || "",
+      fullName: person.fullName || "",
       avatar: person.avatar,
       headline: person.headline,
-      location: person.location || '',
-      role: typeof person.role === 'number' ? person.role.toString() : person.role,
-      visibility: 'public', // Default for tracked users
-      status: 'active', // Default status
-      companyId: '', // Not available in UserMetadataDTO
-      companyName: person.currentCompany || '',
+      location: person.location || "",
+      role:
+        typeof person.role === "number" ? person.role.toString() : person.role,
+      visibility: "public", // Default for tracked users
+      status: "active", // Default status
+      companyId: "", // Not available in UserMetadataDTO
+      companyName: person.currentCompany || "",
       createdAt: person.createdAt,
       updatedAt: person.updatedAt,
       lastActiveAt: new Date().toISOString(), // Default to now
@@ -161,7 +171,7 @@ export default function People() {
       openToWork: person.openToWork || false,
       experienceLevel: getExperienceLevel(person),
       currentPosition: getCurrentPosition(person),
-      currentCompany: person.currentCompany || '',
+      currentCompany: person.currentCompany || "",
       ownership: "tracked" as const,
     }));
 
@@ -173,7 +183,7 @@ export default function People() {
     // TODO: Replace with actual API calls when backend supports user people associations
     // For now, return empty arrays as placeholder
     return {
-      tracked: [] as PublicUser[]
+      tracked: [] as PublicUser[],
     };
   };
 
@@ -210,9 +220,15 @@ export default function People() {
   const getExperienceLevel = (person: any): string => {
     // TODO: Calculate experience level from API data when detailed experience is available
     // For now, return a default based on role or use a simple heuristic
-    if (person.currentRole?.toLowerCase().includes('senior')) return "Senior Level";
-    if (person.currentRole?.toLowerCase().includes('lead') || person.currentRole?.toLowerCase().includes('manager')) return "Senior Level";
-    if (person.currentRole?.toLowerCase().includes('junior')) return "Entry Level";
+    if (person.currentRole?.toLowerCase().includes("senior"))
+      return "Senior Level";
+    if (
+      person.currentRole?.toLowerCase().includes("lead") ||
+      person.currentRole?.toLowerCase().includes("manager")
+    )
+      return "Senior Level";
+    if (person.currentRole?.toLowerCase().includes("junior"))
+      return "Entry Level";
     return "Mid Level"; // Default fallback
   };
 
@@ -246,8 +262,6 @@ export default function People() {
       // In a real app, you'd trigger a re-render here
     }
   };
-
-
 
   const handleConnect = async (personId: string) => {
     if (user) {
@@ -417,8 +431,12 @@ export default function People() {
                     </div>
                   ) : people.length === 0 ? (
                     <div className="text-center py-12">
-                      <p className="text-gray-600 mb-4">No people found matching your criteria.</p>
-                      <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                      <p className="text-gray-600 mb-4">
+                        No people found matching your criteria.
+                      </p>
+                      <Button onClick={() => setSearchFilters({})}>
+                        Clear Filters
+                      </Button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -426,14 +444,28 @@ export default function People() {
                         const personMetadata = {
                           id: person.id,
                           slug: person.slug,
-                          firstName: (person as any).firstName || person.fullName?.split(' ')[0] || '',
-                          lastName: (person as any).lastName || person.fullName?.split(' ').slice(1).join(' ') || '',
-                          fullName: person.fullName || `${(person as any).firstName || ''} ${(person as any).lastName || ''}`.trim(),
-                          avatar: (person as any).profilePicture || person.avatar || '',
-                          headline: person.headline || '',
-                          bio: (person as any).bio || person.headline || '',
+                          firstName:
+                            (person as any).firstName ||
+                            person.fullName?.split(" ")[0] ||
+                            "",
+                          lastName:
+                            (person as any).lastName ||
+                            person.fullName?.split(" ").slice(1).join(" ") ||
+                            "",
+                          fullName:
+                            person.fullName ||
+                            `${(person as any).firstName || ""} ${(person as any).lastName || ""}`.trim(),
+                          avatar:
+                            (person as any).profilePicture ||
+                            person.avatar ||
+                            "",
+                          headline: person.headline || "",
+                          bio: (person as any).bio || person.headline || "",
                           location: person.location || "Location not specified",
-                          role: typeof person.role === 'number' ? person.role.toString() : person.role,
+                          role:
+                            typeof person.role === "number"
+                              ? person.role.toString()
+                              : person.role,
                           skills: person.skills,
                           openToWork: person.openToWork,
                           visibility: "public" as const,
@@ -597,42 +629,42 @@ export default function People() {
                 Meet Our Community
               </h2>
               <div className="grid md:grid-cols-3 gap-6">
-                {people
-                  .slice(0, 3)
-                  .map((person) => {
-                    const personMetadata = {
-                      id: person.id || '',
-                      slug: person.slug || '',
-                      firstName: person.fullName?.split(' ')[0] || '',
-                      lastName: person.fullName?.split(' ').slice(1).join(' ') || '',
-                      fullName: person.fullName || '',
-                      avatar: person.avatar,
-                      headline: person.headline,
-                      location: person.location || '',
-                      role: typeof person.role === 'number' ? person.role.toString() : (person.role || "0"),
-                      visibility: 'public' as const, // Default for public users
-                      status: 'active' as const, // Default status
-                      companyId: '', // Not available in PublicUser
-                      companyName: person.currentCompany || '',
-                      createdAt: person.createdAt || '',
-                      updatedAt: person.updatedAt || '',
-                      lastActiveAt: person.updatedAt || '', // Use updatedAt as fallback
-                      profileViews: person.profileViews || 0,
-                      connectionCount: 0, // Not available in PublicUser
-                      followerCount: 0, // Not available in PublicUser
-                      isVerified: person.isVerified || false,
-                      isPremium: person.isPremium || false,
-                      openToWork: person.openToWork || false,
-                      experienceLevel: getExperienceLevel(person),
-                      currentPosition: getCurrentPosition(person),
-                      currentCompany: person.currentCompany || '',
-                      ownership: "tracked" as const,
-                    };
+                {people.slice(0, 3).map((person) => {
+                  const personMetadata = {
+                    id: person.id || "",
+                    slug: person.slug || "",
+                    firstName: person.fullName?.split(" ")[0] || "",
+                    lastName:
+                      person.fullName?.split(" ").slice(1).join(" ") || "",
+                    fullName: person.fullName || "",
+                    avatar: person.avatar,
+                    headline: person.headline,
+                    location: person.location || "",
+                    role:
+                      typeof person.role === "number"
+                        ? person.role.toString()
+                        : person.role || "0",
+                    visibility: "public" as const, // Default for public users
+                    status: "active" as const, // Default status
+                    companyId: "", // Not available in PublicUser
+                    companyName: person.currentCompany || "",
+                    createdAt: person.createdAt || "",
+                    updatedAt: person.updatedAt || "",
+                    lastActiveAt: person.updatedAt || "", // Use updatedAt as fallback
+                    profileViews: person.profileViews || 0,
+                    connectionCount: 0, // Not available in PublicUser
+                    followerCount: 0, // Not available in PublicUser
+                    isVerified: person.isVerified || false,
+                    isPremium: person.isPremium || false,
+                    openToWork: person.openToWork || false,
+                    experienceLevel: getExperienceLevel(person),
+                    currentPosition: getCurrentPosition(person),
+                    currentCompany: person.currentCompany || "",
+                    ownership: "tracked" as const,
+                  };
 
-                    return (
-                      <PeopleCard key={person.id} person={personMetadata} />
-                    );
-                  })}
+                  return <PeopleCard key={person.id} person={personMetadata} />;
+                })}
               </div>
               <div className="text-center mt-8">
                 <Link to="/signup">
@@ -673,5 +705,3 @@ export default function People() {
     </div>
   );
 }
-
-

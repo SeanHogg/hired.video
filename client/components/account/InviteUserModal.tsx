@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { UserPlus, Mail, User, MessageSquare } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import React, { useState } from "react";
+import { UserPlus, Mail, User, MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -11,21 +11,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  MyVideoResumeRole, 
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  MyVideoResumeRole,
   InviteUserRequest,
   getRoleDisplayName,
-  getAvailableRolesForInvite
-} from '@/types/account';
+  getAvailableRolesForInvite,
+} from "@/types/account";
 
 interface InviteUserModalProps {
   open: boolean;
@@ -34,17 +34,17 @@ interface InviteUserModalProps {
   currentUserRoles: MyVideoResumeRole[];
 }
 
-export function InviteUserModal({ 
-  open, 
-  onOpenChange, 
-  onInvite, 
-  currentUserRoles 
+export function InviteUserModal({
+  open,
+  onOpenChange,
+  onInvite,
+  currentUserRoles,
 }: InviteUserModalProps) {
   const [formData, setFormData] = useState({
-    email: '',
-    firstName: '',
-    lastName: '',
-    message: ''
+    email: "",
+    firstName: "",
+    lastName: "",
+    message: "",
   });
   const [selectedRoles, setSelectedRoles] = useState<MyVideoResumeRole[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,21 +56,21 @@ export function InviteUserModal({
     const newErrors: Record<string, string> = {};
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+      newErrors.firstName = "First name is required";
     }
 
     if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+      newErrors.lastName = "Last name is required";
     }
 
     if (selectedRoles.length === 0) {
-      newErrors.roles = 'Please select at least one role';
+      newErrors.roles = "Please select at least one role";
     }
 
     setErrors(newErrors);
@@ -79,7 +79,7 @@ export function InviteUserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -91,11 +91,11 @@ export function InviteUserModal({
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         roles: selectedRoles,
-        message: formData.message.trim() || undefined
+        message: formData.message.trim() || undefined,
       });
-      
+
       // Reset form
-      setFormData({ email: '', firstName: '', lastName: '', message: '' });
+      setFormData({ email: "", firstName: "", lastName: "", message: "" });
       setSelectedRoles([]);
       setErrors({});
     } catch (error) {
@@ -106,31 +106,29 @@ export function InviteUserModal({
   };
 
   const handleRoleToggle = (role: MyVideoResumeRole) => {
-    setSelectedRoles(prev => 
-      prev.includes(role) 
-        ? prev.filter(r => r !== role)
-        : [...prev, role]
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
     // Clear role error when user selects a role
     if (errors.roles) {
-      setErrors(prev => ({ ...prev, roles: '' }));
+      setErrors((prev) => ({ ...prev, roles: "" }));
     }
   };
 
   const getRoleDescription = (role: MyVideoResumeRole): string => {
     switch (role) {
       case MyVideoResumeRole.AccountAdmin:
-        return 'Can manage users, settings, and account configuration';
+        return "Can manage users, settings, and account configuration";
       case MyVideoResumeRole.Recruiter:
-        return 'Can post jobs, manage candidates, and access recruitment tools';
+        return "Can post jobs, manage candidates, and access recruitment tools";
       case MyVideoResumeRole.Employer:
-        return 'Can post jobs and manage hiring processes';
+        return "Can post jobs and manage hiring processes";
       case MyVideoResumeRole.EmployerManager:
-        return 'Can manage team members and oversee hiring processes';
+        return "Can manage team members and oversee hiring processes";
       case MyVideoResumeRole.EmployerEmployee:
-        return 'Basic access to company features and job postings';
+        return "Basic access to company features and job postings";
       default:
-        return 'Standard user access';
+        return "Standard user access";
     }
   };
 
@@ -143,7 +141,8 @@ export function InviteUserModal({
             Invite Team Member
           </DialogTitle>
           <DialogDescription>
-            Send an invitation to join your account with specific roles and permissions.
+            Send an invitation to join your account with specific roles and
+            permissions.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,12 +162,19 @@ export function InviteUserModal({
                   <Input
                     id="firstName"
                     value={formData.firstName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
                     placeholder="John"
-                    className={errors.firstName ? 'border-red-500' : ''}
+                    className={errors.firstName ? "border-red-500" : ""}
                   />
                   {errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1">{errors.firstName}</p>
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.firstName}
+                    </p>
                   )}
                 </div>
                 <div>
@@ -176,25 +182,34 @@ export function InviteUserModal({
                   <Input
                     id="lastName"
                     value={formData.lastName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
                     placeholder="Doe"
-                    className={errors.lastName ? 'border-red-500' : ''}
+                    className={errors.lastName ? "border-red-500" : ""}
                   />
                   {errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.lastName}
+                    </p>
                   )}
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, email: e.target.value }))
+                  }
                   placeholder="john.doe@company.com"
-                  className={errors.email ? 'border-red-500' : ''}
+                  className={errors.email ? "border-red-500" : ""}
                 />
                 {errors.email && (
                   <p className="text-sm text-red-500 mt-1">{errors.email}</p>
@@ -208,7 +223,8 @@ export function InviteUserModal({
             <CardHeader>
               <CardTitle className="text-lg">Role Assignment *</CardTitle>
               <CardDescription>
-                Select the roles this user will have in your account. You can assign multiple roles.
+                Select the roles this user will have in your account. You can
+                assign multiple roles.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -236,10 +252,12 @@ export function InviteUserModal({
                   </div>
                 ))}
               </div>
-              
+
               {selectedRoles.length > 0 && (
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-900 mb-2">Selected Roles:</p>
+                  <p className="text-sm font-medium text-blue-900 mb-2">
+                    Selected Roles:
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {selectedRoles.map((role) => (
                       <Badge key={role} variant="secondary">
@@ -249,7 +267,7 @@ export function InviteUserModal({
                   </div>
                 </div>
               )}
-              
+
               {errors.roles && (
                 <p className="text-sm text-red-500 mt-2">{errors.roles}</p>
               )}
@@ -267,7 +285,9 @@ export function InviteUserModal({
             <CardContent>
               <Textarea
                 value={formData.message}
-                onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, message: e.target.value }))
+                }
                 placeholder="Add a personal message to the invitation email..."
                 rows={3}
               />
@@ -276,16 +296,16 @@ export function InviteUserModal({
         </form>
 
         <DialogFooter>
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             onClick={handleSubmit}
             disabled={loading}
             className="flex items-center gap-2"
@@ -295,7 +315,7 @@ export function InviteUserModal({
             ) : (
               <Mail className="h-4 w-4" />
             )}
-            {loading ? 'Sending...' : 'Send Invitation'}
+            {loading ? "Sending..." : "Send Invitation"}
           </Button>
         </DialogFooter>
       </DialogContent>

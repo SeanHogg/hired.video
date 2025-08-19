@@ -67,9 +67,16 @@ function mapServerRole(role: string | number | undefined): string {
   if (typeof role === "string") {
     // Normalize known variants
     const r = role.toLowerCase();
-    if (r === "jobseeker" || r === "job_seeker" || r === "jobseeker" || r === "jobseeker") return "job_seeker";
+    if (
+      r === "jobseeker" ||
+      r === "job_seeker" ||
+      r === "jobseeker" ||
+      r === "jobseeker"
+    )
+      return "job_seeker";
     if (r === "recruiter") return "recruiter";
-    if (r === "business" || r === "employer" || r === "company") return "business";
+    if (r === "business" || r === "employer" || r === "company")
+      return "business";
     // If it's numeric-like string ("0"), map below
     const num = Number(r);
     if (!Number.isNaN(num)) return mapServerRole(num);
@@ -77,13 +84,16 @@ function mapServerRole(role: string | number | undefined): string {
   }
   // Numeric enum mapping fallback
   switch (role) {
-    case 0: return "job_seeker";
-    case 1: return "recruiter";
-    case 2: return "business";
-    default: return "job_seeker";
+    case 0:
+      return "job_seeker";
+    case 1:
+      return "recruiter";
+    case 2:
+      return "business";
+    default:
+      return "job_seeker";
   }
 }
-
 
 // ============================================================================
 // TYPES
@@ -131,7 +141,7 @@ export class AuthService {
     const response = await apiClient.post<LoginResponse>(
       "/Auth/login",
       credentials,
-      LoginResponseSchema // shared + optional refreshToken
+      LoginResponseSchema, // shared + optional refreshToken
     );
 
     // Store authentication data then fetch full profile to normalize user fields
@@ -155,10 +165,11 @@ export class AuthService {
         .toLowerCase()
         .replace(/[^a-z0-9]/g, "");
       if (fromNames && fromNames.length >= 3) return fromNames.slice(0, 32);
-      const fromEmail = (userData as any).email
-        ?.split("@")[0]
-        ?.toLowerCase()
-        ?.replace(/[^a-z0-9]/g, "") || "";
+      const fromEmail =
+        (userData as any).email
+          ?.split("@")[0]
+          ?.toLowerCase()
+          ?.replace(/[^a-z0-9]/g, "") || "";
       if (fromEmail && fromEmail.length >= 3) return fromEmail.slice(0, 32);
       return `user${Date.now()}`;
     };
@@ -168,7 +179,7 @@ export class AuthService {
     const response = await apiClient.post<LoginResponse>(
       "/Auth/register",
       payload,
-      LoginResponseSchema
+      LoginResponseSchema,
     );
 
     // Store authentication data then fetch full profile to normalize user fields
@@ -205,7 +216,7 @@ export class AuthService {
     logger.info("authService.getCurrentUser: GET /Users/me");
     const response = await apiClient.get<UserProfileDTO>(
       "/Users/me",
-      UserProfileDTOSchema
+      UserProfileDTOSchema,
     );
     logger.info("authService.getCurrentUser: response received");
 
@@ -252,15 +263,18 @@ export class AuthService {
     // Optional mappings if present in updates cast: phone/currentRole/currentCompany/headline
     const anyUpdates = updates as any;
     if (anyUpdates.phone !== undefined) payload.phone = anyUpdates.phone;
-    if (anyUpdates.currentRole !== undefined) payload.currentRole = anyUpdates.currentRole;
-    if (anyUpdates.currentCompany !== undefined) payload.currentCompany = anyUpdates.currentCompany;
-    if (anyUpdates.headline !== undefined) payload.headline = anyUpdates.headline;
+    if (anyUpdates.currentRole !== undefined)
+      payload.currentRole = anyUpdates.currentRole;
+    if (anyUpdates.currentCompany !== undefined)
+      payload.currentCompany = anyUpdates.currentCompany;
+    if (anyUpdates.headline !== undefined)
+      payload.headline = anyUpdates.headline;
 
     logger.info("authService.updateProfile: PUT /Users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(
       "/Users/me",
       payload,
-      UserProfileDTOSchema
+      UserProfileDTOSchema,
     );
     logger.info("authService.updateProfile: response received");
 
@@ -306,7 +320,7 @@ export class AuthService {
     const response = await apiClient.post<LoginResponse>(
       "/Auth/refresh",
       { refreshToken },
-      LoginResponseSchema
+      LoginResponseSchema,
     );
 
     // Store new authentication data
@@ -324,7 +338,7 @@ export class AuthService {
 
     // Check if token is expired (basic check)
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split(".")[1]));
       const currentTime = Date.now() / 1000;
       return payload.exp > currentTime;
     } catch {

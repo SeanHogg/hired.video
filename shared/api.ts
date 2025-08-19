@@ -105,7 +105,9 @@ export const LoginResponseSchema = z.object({
   }),
   token: z.string(),
   // Accept any RFC3339/ISO8601-like string that Date.parse can read (some backends send >3 fractional seconds)
-  expiresAt: z.string().refine((s) => !Number.isNaN(Date.parse(s)), "Invalid datetime"),
+  expiresAt: z
+    .string()
+    .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid datetime"),
 });
 
 export const SignupRequestSchema = z.object({
@@ -277,7 +279,7 @@ function nullToUndefined(obj: any): any {
   if (Array.isArray(obj)) {
     return obj.map(nullToUndefined);
   }
-  if (typeof obj === 'object' && obj !== null) {
+  if (typeof obj === "object" && obj !== null) {
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = nullToUndefined(value);
@@ -290,17 +292,32 @@ function nullToUndefined(obj: any): any {
 /**
  * Helper to create a nullable string schema that converts null to undefined
  */
-export const nullableString = () => z.string().nullable().transform(val => val === null ? undefined : val).optional();
+export const nullableString = () =>
+  z
+    .string()
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional();
 
 /**
  * Helper to create a nullable number schema that converts null to undefined
  */
-export const nullableNumber = () => z.number().nullable().transform(val => val === null ? undefined : val).optional();
+export const nullableNumber = () =>
+  z
+    .number()
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional();
 
 /**
  * Helper to create a nullable boolean schema that converts null to undefined
  */
-export const nullableBoolean = () => z.boolean().nullable().transform(val => val === null ? undefined : val).optional();
+export const nullableBoolean = () =>
+  z
+    .boolean()
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional();
 
 /**
  * Validates API response data against a schema

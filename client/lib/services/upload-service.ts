@@ -10,9 +10,8 @@ export async function uploadAvatar(file: File): Promise<string> {
 
   const response = await apiClient.post<UploadAvatarResponse>(
     "/Users/me/avatar",
-    formData
+    formData,
   );
 
   return (response.data as any).avatarUrl || (response.data as any).url || "";
 }
-

@@ -170,13 +170,16 @@ export default function Pricing() {
     if (stored) {
       try {
         const u = JSON.parse(stored);
-        if (u?.role === "job_seeker" || u?.role === "recruiter" || u?.role === "business") {
+        if (
+          u?.role === "job_seeker" ||
+          u?.role === "recruiter" ||
+          u?.role === "business"
+        ) {
           setPersona(u.role as UserRole);
         }
       } catch (_) {}
     }
   }, []);
-
 
   const basePrice = 9.95; // per user per month
   const calculatePrice = (users: number, annual: boolean) => {
@@ -255,7 +258,9 @@ export default function Pricing() {
                 className={isAnnual ? "font-semibold" : ""}
               >
                 Annual
-                <Badge variant="secondary" className="ml-2">Save 20%</Badge>
+                <Badge variant="secondary" className="ml-2">
+                  Save 20%
+                </Badge>
               </Label>
 
               {/* Personas Segmented Control under hero */}
@@ -291,10 +296,10 @@ export default function Pricing() {
                     </div>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">Plans tailored for {personaCopy[persona].label}</p>
+                <p className="text-sm text-muted-foreground">
+                  Plans tailored for {personaCopy[persona].label}
+                </p>
               </div>
-
-
             </div>
 
             {/* Pricing Cards */}
@@ -305,8 +310,6 @@ export default function Pricing() {
                   <CardTitle className="text-2xl">Free</CardTitle>
                   <div className="mt-4">
                     <span className="text-5xl font-bold">$0.00</span>
-
-
                   </div>
                   <CardDescription className="text-lg mt-4">
                     {personaCopy[persona].freeDescription}
@@ -325,7 +328,6 @@ export default function Pricing() {
                         </div>
                       ))}
                     </div>
-
                   </div>
 
                   <div className="pt-4">
@@ -361,11 +363,14 @@ export default function Pricing() {
                       <span className="text-5xl font-bold">
                         $
                         {isAnnual
-                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(2)
+                          ? (calculatePrice(selectedUsers, true) / 12).toFixed(
+                              2,
+                            )
                           : calculatePrice(selectedUsers, false).toFixed(2)}
                       </span>
                       <span className="text-lg text-muted-foreground ml-2">
-                        / {personaCopy[persona].unitLabel}{isAnnual ? " (billed annually)" : ""}
+                        / {personaCopy[persona].unitLabel}
+                        {isAnnual ? " (billed annually)" : ""}
                       </span>
                       {isAnnual && (
                         <div className="text-sm text-green-600 mt-2">
@@ -383,7 +388,9 @@ export default function Pricing() {
                     {persona !== "job_seeker" && (
                       <div className="flex items-center justify-center gap-4">
                         <Label htmlFor="user-select">
-                          {personaCopy[persona].userCountLabel || "Number of users"}:
+                          {personaCopy[persona].userCountLabel ||
+                            "Number of users"}
+                          :
                         </Label>
                         <div className="flex items-center gap-2">
                           <Button
@@ -399,17 +406,21 @@ export default function Pricing() {
                           </Button>
                           <Select
                             value={selectedUsers.toString()}
-                            onValueChange={(value) => setSelectedUsers(parseInt(value))}
+                            onValueChange={(value) =>
+                              setSelectedUsers(parseInt(value))
+                            }
                           >
                             <SelectTrigger className="w-20">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
-                                <SelectItem key={num} value={num.toString()}>
-                                  {num}
-                                </SelectItem>
-                              ))}
+                              {Array.from({ length: 20 }, (_, i) => i + 1).map(
+                                (num) => (
+                                  <SelectItem key={num} value={num.toString()}>
+                                    {num}
+                                  </SelectItem>
+                                ),
+                              )}
                             </SelectContent>
                           </Select>
                           <Button
@@ -434,7 +445,9 @@ export default function Pricing() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-lg">All FREE features plus:</h4>
+                    <h4 className="font-semibold text-lg">
+                      All FREE features plus:
+                    </h4>
                     <div className="space-y-3">
                       {personaCopy[persona].premiumFeatures.map((feat) => (
                         <div key={feat} className="flex items-start gap-3">
@@ -484,12 +497,16 @@ export default function Pricing() {
               <h2 className="text-3xl font-bold text-center mb-12">
                 Compare Features
               </h2>
-	              <div className="text-center mb-6">
-	                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm">
-	                  <span className="text-muted-foreground">Viewing features for</span>
-	                  <span className="font-medium">{personaCopy[persona].label}</span>
-	                </div>
-	              </div>
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm">
+                  <span className="text-muted-foreground">
+                    Viewing features for
+                  </span>
+                  <span className="font-medium">
+                    {personaCopy[persona].label}
+                  </span>
+                </div>
+              </div>
 
               <Card className="overflow-hidden">
                 <div className="overflow-x-auto">
@@ -536,7 +553,11 @@ export default function Pricing() {
                           {persona === "job_seeker" ? "—" : "Unlimited"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "recruiter" ? "Unlimited + Exclusive" : persona === "business" ? "Unlimited" : "—"}
+                          {persona === "recruiter"
+                            ? "Unlimited + Exclusive"
+                            : persona === "business"
+                              ? "Unlimited"
+                              : "—"}
                         </td>
                       </tr>
                       <tr>
@@ -545,7 +566,11 @@ export default function Pricing() {
                           Team Size
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker" ? "1" : persona === "recruiter" ? "Up to 2" : "Up to 2"}
+                          {persona === "job_seeker"
+                            ? "1"
+                            : persona === "recruiter"
+                              ? "Up to 2"
+                              : "Up to 2"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           {persona === "job_seeker" ? "1" : "Unlimited"}
@@ -719,10 +744,18 @@ export default function Pricing() {
                           Recruiting & Sales CRM
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <Check className="h-5 w-5 text-green-600 mx-auto" />}
+                          {persona === "job_seeker" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <Check className="h-5 w-5 text-green-600 mx-auto" />}
+                          {persona === "job_seeker" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -731,10 +764,18 @@ export default function Pricing() {
                           Hiring & Onboarding
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
+                          {persona === "job_seeker" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -777,10 +818,18 @@ export default function Pricing() {
                           Smart Outreach Campaigns
                         </td>
                         <td className="text-center p-4">
-                          {persona === "recruiter" ? <span className="text-muted-foreground">Basic</span> : <span className="text-muted-foreground">—</span>}
+                          {persona === "recruiter" ? (
+                            <span className="text-muted-foreground">Basic</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
+                          {persona === "recruiter" ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -813,10 +862,18 @@ export default function Pricing() {
                           Employee Community
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
 
@@ -859,10 +916,18 @@ export default function Pricing() {
                           Hiring Success Metrics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" || persona === "recruiter" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" || persona === "recruiter" ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -871,10 +936,18 @@ export default function Pricing() {
                           Time-to-hire Analytics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? <span className="text-muted-foreground">—</span> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" || persona === "recruiter" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? <Check className="h-5 w-5 text-green-600 mx-auto" /> : <span className="text-muted-foreground">—</span>}
+                          {persona === "business" || persona === "recruiter" ? (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
 

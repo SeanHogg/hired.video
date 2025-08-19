@@ -40,10 +40,20 @@ export default function Sidebar({
 
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },
-    { name: "Dashboard", href: "/dashboard", icon: TrendingUp, exactMatch: false },
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: TrendingUp,
+      exactMatch: false,
+    },
     { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
     { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
-    { name: "Companies", href: "/companies", icon: Building2, exactMatch: false },
+    {
+      name: "Companies",
+      href: "/companies",
+      icon: Building2,
+      exactMatch: false,
+    },
     { name: "People", href: "/people", icon: Users, exactMatch: false },
     { name: "Tools", href: "/tools", icon: Wrench, exactMatch: false },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },

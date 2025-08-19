@@ -63,7 +63,7 @@ export enum InviteStatus {
   Rejected = 2,
   Resent = 3,
   Expired = 4,
-  Owner = 5
+  Owner = 5,
 }
 
 export enum MyVideoResumeRole {
@@ -75,19 +75,19 @@ export enum MyVideoResumeRole {
   EmployerEmployee = 22,
   EmployerExecutive = 23,
   JobSeeker = 30,
-  Recruiter = 40
+  Recruiter = 40,
 }
 
 export enum AccountUsageType {
   Individual = 0,
   Business = 1,
-  Employee = 2
+  Employee = 2,
 }
 
 export enum ProfileStatus {
   NoStatus = 0,
   OpenToWork = 1,
-  Hiring = 2
+  Hiring = 2,
 }
 
 // Request/Response DTOs
@@ -157,71 +157,72 @@ export interface RoleEditFormData {
 export const getRoleDisplayName = (role: MyVideoResumeRole): string => {
   switch (role) {
     case MyVideoResumeRole.Admin:
-      return 'Admin';
+      return "Admin";
     case MyVideoResumeRole.AccountOwner:
-      return 'Account Owner';
+      return "Account Owner";
     case MyVideoResumeRole.AccountAdmin:
-      return 'Account Admin';
+      return "Account Admin";
     case MyVideoResumeRole.Employer:
-      return 'Employer';
+      return "Employer";
     case MyVideoResumeRole.EmployerManager:
-      return 'Employer Manager';
+      return "Employer Manager";
     case MyVideoResumeRole.EmployerEmployee:
-      return 'Employer Employee';
+      return "Employer Employee";
     case MyVideoResumeRole.EmployerExecutive:
-      return 'Employer Executive';
+      return "Employer Executive";
     case MyVideoResumeRole.JobSeeker:
-      return 'Job Seeker';
+      return "Job Seeker";
     case MyVideoResumeRole.Recruiter:
-      return 'Recruiter';
+      return "Recruiter";
     default:
-      return 'Unknown';
+      return "Unknown";
   }
 };
 
 export const getInviteStatusDisplayName = (status: InviteStatus): string => {
   switch (status) {
     case InviteStatus.Invited:
-      return 'Invited';
+      return "Invited";
     case InviteStatus.Accepted:
-      return 'Accepted';
+      return "Accepted";
     case InviteStatus.Rejected:
-      return 'Rejected';
+      return "Rejected";
     case InviteStatus.Resent:
-      return 'Resent';
+      return "Resent";
     case InviteStatus.Expired:
-      return 'Expired';
+      return "Expired";
     case InviteStatus.Owner:
-      return 'Owner';
+      return "Owner";
     default:
-      return 'Unknown';
+      return "Unknown";
   }
 };
 
 export const getInviteStatusColor = (status: InviteStatus): string => {
   switch (status) {
     case InviteStatus.Invited:
-      return 'text-yellow-600 bg-yellow-50';
+      return "text-yellow-600 bg-yellow-50";
     case InviteStatus.Accepted:
-      return 'text-green-600 bg-green-50';
+      return "text-green-600 bg-green-50";
     case InviteStatus.Rejected:
-      return 'text-red-600 bg-red-50';
+      return "text-red-600 bg-red-50";
     case InviteStatus.Resent:
-      return 'text-blue-600 bg-blue-50';
+      return "text-blue-600 bg-blue-50";
     case InviteStatus.Expired:
-      return 'text-gray-600 bg-gray-50';
+      return "text-gray-600 bg-gray-50";
     case InviteStatus.Owner:
-      return 'text-purple-600 bg-purple-50';
+      return "text-purple-600 bg-purple-50";
     default:
-      return 'text-gray-600 bg-gray-50';
+      return "text-gray-600 bg-gray-50";
   }
 };
 
 export const canManageUsers = (userRoles: MyVideoResumeRole[]): boolean => {
-  return userRoles.some(role => 
-    role === MyVideoResumeRole.AccountOwner || 
-    role === MyVideoResumeRole.AccountAdmin ||
-    role === MyVideoResumeRole.Admin
+  return userRoles.some(
+    (role) =>
+      role === MyVideoResumeRole.AccountOwner ||
+      role === MyVideoResumeRole.AccountAdmin ||
+      role === MyVideoResumeRole.Admin,
   );
 };
 
@@ -229,42 +230,48 @@ export const canInviteUsers = (userRoles: MyVideoResumeRole[]): boolean => {
   return canManageUsers(userRoles);
 };
 
-export const canEditRoles = (userRoles: MyVideoResumeRole[], targetUserRoles: MyVideoResumeRole[]): boolean => {
+export const canEditRoles = (
+  userRoles: MyVideoResumeRole[],
+  targetUserRoles: MyVideoResumeRole[],
+): boolean => {
   // Account owners can edit anyone except other owners
   if (userRoles.includes(MyVideoResumeRole.AccountOwner)) {
     return !targetUserRoles.includes(MyVideoResumeRole.AccountOwner);
   }
-  
+
   // Account admins can edit non-admin roles
   if (userRoles.includes(MyVideoResumeRole.AccountAdmin)) {
-    return !targetUserRoles.some(role => 
-      role === MyVideoResumeRole.AccountOwner || 
-      role === MyVideoResumeRole.AccountAdmin ||
-      role === MyVideoResumeRole.Admin
+    return !targetUserRoles.some(
+      (role) =>
+        role === MyVideoResumeRole.AccountOwner ||
+        role === MyVideoResumeRole.AccountAdmin ||
+        role === MyVideoResumeRole.Admin,
     );
   }
-  
+
   return false;
 };
 
-export const getAvailableRolesForInvite = (userRoles: MyVideoResumeRole[]): MyVideoResumeRole[] => {
+export const getAvailableRolesForInvite = (
+  userRoles: MyVideoResumeRole[],
+): MyVideoResumeRole[] => {
   if (userRoles.includes(MyVideoResumeRole.AccountOwner)) {
     return [
       MyVideoResumeRole.AccountAdmin,
       MyVideoResumeRole.Recruiter,
       MyVideoResumeRole.Employer,
       MyVideoResumeRole.EmployerManager,
-      MyVideoResumeRole.EmployerEmployee
+      MyVideoResumeRole.EmployerEmployee,
     ];
   }
-  
+
   if (userRoles.includes(MyVideoResumeRole.AccountAdmin)) {
     return [
       MyVideoResumeRole.Recruiter,
       MyVideoResumeRole.Employer,
-      MyVideoResumeRole.EmployerEmployee
+      MyVideoResumeRole.EmployerEmployee,
     ];
   }
-  
+
   return [];
 };

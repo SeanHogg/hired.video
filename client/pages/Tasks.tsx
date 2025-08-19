@@ -71,7 +71,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { taskService } from "@/lib/services/task-service";
 import {
   TaskDTO,
@@ -83,7 +90,7 @@ import {
   TaskType,
   ProductivityItemStatus,
   CreateTaskRequest,
-  UpdateTaskRequest
+  UpdateTaskRequest,
 } from "@/types/task";
 
 // Use the TaskUIState interface from types/task.ts
@@ -116,7 +123,9 @@ export default function Tasks() {
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
-  const [currentView, setCurrentView] = useState<"calendar" | "table" | "kanban">("table");
+  const [currentView, setCurrentView] = useState<
+    "calendar" | "table" | "kanban"
+  >("table");
   const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
@@ -148,11 +157,11 @@ export default function Tasks() {
       if (isGuid(selectedTask.id)) {
         await taskService.deleteTask(selectedTask.id);
       }
-      setTasks(prev => prev.filter(t => t.id !== selectedTask.id));
+      setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
       setTaskPanelOpen(false);
     } catch (e) {
       console.error("Delete failed", e);
-      setError(e instanceof Error ? e.message : 'Failed to delete task');
+      setError(e instanceof Error ? e.message : "Failed to delete task");
     }
   };
 
@@ -160,7 +169,11 @@ export default function Tasks() {
     <Sheet open={taskPanelOpen} onOpenChange={setTaskPanelOpen}>
       <SheetContent side="right" className="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{isEditing ? (editTask?.title || "Edit Task") : (selectedTask?.title || "Task Details")}</SheetTitle>
+          <SheetTitle>
+            {isEditing
+              ? editTask?.title || "Edit Task"
+              : selectedTask?.title || "Task Details"}
+          </SheetTitle>
           {!isEditing && selectedTask?.description && (
             <SheetDescription>{selectedTask.description}</SheetDescription>
           )}
@@ -169,11 +182,15 @@ export default function Tasks() {
           <div className="mt-4 space-y-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Type</span>
-              <Badge className={taskTypeColors[selectedTask.type]}>{selectedTask.type}</Badge>
+              <Badge className={taskTypeColors[selectedTask.type]}>
+                {selectedTask.type}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Priority</span>
-              <Badge className={priorityColors[selectedTask.priority]}>{selectedTask.priority}</Badge>
+              <Badge className={priorityColors[selectedTask.priority]}>
+                {selectedTask.priority}
+              </Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Status</span>
@@ -181,7 +198,11 @@ export default function Tasks() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Start</span>
-              <span>{selectedTask.startDate ? new Date(selectedTask.startDate).toLocaleDateString() : "-"}</span>
+              <span>
+                {selectedTask.startDate
+                  ? new Date(selectedTask.startDate).toLocaleDateString()
+                  : "-"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Due</span>
@@ -190,13 +211,19 @@ export default function Tasks() {
             {selectedTask.assignedTo && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Assigned To</span>
-                <span>{selectedTask.assignedTo.firstName} {selectedTask.assignedTo.lastName}</span>
+                <span>
+                  {selectedTask.assignedTo.firstName}{" "}
+                  {selectedTask.assignedTo.lastName}
+                </span>
               </div>
             )}
             {selectedTask.createdBy && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Created By</span>
-                <span>{selectedTask.createdBy.firstName} {selectedTask.createdBy.lastName}</span>
+                <span>
+                  {selectedTask.createdBy.firstName}{" "}
+                  {selectedTask.createdBy.lastName}
+                </span>
               </div>
             )}
           </div>
@@ -206,15 +233,32 @@ export default function Tasks() {
           <div className="mt-4 space-y-3 text-sm">
             <div>
               <Label htmlFor="edit-title">Title</Label>
-              <Input id="edit-title" value={editTask.title} onChange={(e) => setEditTask({ ...editTask, title: e.target.value })} />
+              <Input
+                id="edit-title"
+                value={editTask.title}
+                onChange={(e) =>
+                  setEditTask({ ...editTask, title: e.target.value })
+                }
+              />
             </div>
             <div>
               <Label htmlFor="edit-description">Description</Label>
-              <Textarea id="edit-description" value={editTask.description || ""} onChange={(e) => setEditTask({ ...editTask, description: e.target.value })} />
+              <Textarea
+                id="edit-description"
+                value={editTask.description || ""}
+                onChange={(e) =>
+                  setEditTask({ ...editTask, description: e.target.value })
+                }
+              />
             </div>
             <div>
               <Label htmlFor="edit-type">Type</Label>
-              <Select value={editTask.type} onValueChange={(v) => setEditTask({ ...editTask, type: v as Task["type"] })}>
+              <Select
+                value={editTask.type}
+                onValueChange={(v) =>
+                  setEditTask({ ...editTask, type: v as Task["type"] })
+                }
+              >
                 <SelectTrigger id="edit-type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -229,72 +273,123 @@ export default function Tasks() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="edit-start">Start Date</Label>
-                <Input id="edit-start" type="date" value={editTask.startDate || ""} onChange={(e) => setEditTask({ ...editTask, startDate: e.target.value })} />
+                <Input
+                  id="edit-start"
+                  type="date"
+                  value={editTask.startDate || ""}
+                  onChange={(e) =>
+                    setEditTask({ ...editTask, startDate: e.target.value })
+                  }
+                />
               </div>
               <div>
                 <Label htmlFor="edit-due">Due Date</Label>
-                <Input id="edit-due" type="date" value={editTask.dueDate} onChange={(e) => setEditTask({ ...editTask, dueDate: e.target.value })} />
+                <Input
+                  id="edit-due"
+                  type="date"
+                  value={editTask.dueDate}
+                  onChange={(e) =>
+                    setEditTask({ ...editTask, dueDate: e.target.value })
+                  }
+                />
               </div>
             </div>
 
             {/* Task Assignment - only show for business/recruiter roles */}
-            {(user?.role === 'business' || user?.role === 'recruiter') && assignableUsers.length > 0 && (
-              <div>
-                <Label htmlFor="edit-assigned">Assign To</Label>
-                <Select
-                  value={editTask.assignedTo?.id || ''}
-                  onValueChange={(userId) => {
-                    const assignedUser = assignableUsers.find(u => u.userProfile?.id === userId);
-                    setEditTask({
-                      ...editTask,
-                      assignedTo: assignedUser?.userProfile || undefined
-                    });
-                  }}
-                >
-                  <SelectTrigger id="edit-assigned">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
-                    {assignableUsers.map((association) => (
-                      <SelectItem key={association.id} value={association.userProfile?.id || ''}>
-                        {association.userProfile?.firstName} {association.userProfile?.lastName}
-                        {association.userProfile?.role && ` (${association.userProfile.role})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {(user?.role === "business" || user?.role === "recruiter") &&
+              assignableUsers.length > 0 && (
+                <div>
+                  <Label htmlFor="edit-assigned">Assign To</Label>
+                  <Select
+                    value={editTask.assignedTo?.id || ""}
+                    onValueChange={(userId) => {
+                      const assignedUser = assignableUsers.find(
+                        (u) => u.userProfile?.id === userId,
+                      );
+                      setEditTask({
+                        ...editTask,
+                        assignedTo: assignedUser?.userProfile || undefined,
+                      });
+                    }}
+                  >
+                    <SelectTrigger id="edit-assigned">
+                      <SelectValue placeholder="Select assignee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Unassigned</SelectItem>
+                      {assignableUsers.map((association) => (
+                        <SelectItem
+                          key={association.id}
+                          value={association.userProfile?.id || ""}
+                        >
+                          {association.userProfile?.firstName}{" "}
+                          {association.userProfile?.lastName}
+                          {association.userProfile?.role &&
+                            ` (${association.userProfile.role})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
           </div>
         )}
 
         <SheetFooter className="mt-6">
           <div className="flex w-full justify-between gap-2">
             {!isEditing ? (
-              <Button variant="secondary" onClick={() => { setIsEditing(true); setEditTask(selectedTask ? { ...selectedTask } : null); }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsEditing(true);
+                  setEditTask(selectedTask ? { ...selectedTask } : null);
+                }}
+              >
                 Edit
               </Button>
             ) : (
               <div className="flex gap-2 ml-auto">
-                <Button variant="outline" onClick={() => { setTaskPanelOpen(false); setIsEditing(false); setEditTask(selectedTask ? { ...selectedTask } : null); }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTaskPanelOpen(false);
+                    setIsEditing(false);
+                    setEditTask(selectedTask ? { ...selectedTask } : null);
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button onClick={async () => {
-                  if (!editTask) return;
-                  // Local update
-                  setTasks(prev => {
-                    const exists = prev.some(t => t.id === editTask.id);
-                    const updated = exists ? prev.map(t => t.id === editTask.id ? { ...editTask, updatedAt: new Date().toISOString() } : t)
-                                           : [{ ...editTask, updatedAt: new Date().toISOString() }, ...prev];
-                    return updated;
-                  });
-                  // Remote save
-                  await saveTaskToApi({ ...editTask });
-                  setSelectedTask(editTask);
-                  setIsEditing(false);
-                  setTaskPanelOpen(false);
-                }}>
+                <Button
+                  onClick={async () => {
+                    if (!editTask) return;
+                    // Local update
+                    setTasks((prev) => {
+                      const exists = prev.some((t) => t.id === editTask.id);
+                      const updated = exists
+                        ? prev.map((t) =>
+                            t.id === editTask.id
+                              ? {
+                                  ...editTask,
+                                  updatedAt: new Date().toISOString(),
+                                }
+                              : t,
+                          )
+                        : [
+                            {
+                              ...editTask,
+                              updatedAt: new Date().toISOString(),
+                            },
+                            ...prev,
+                          ];
+                      return updated;
+                    });
+                    // Remote save
+                    await saveTaskToApi({ ...editTask });
+                    setSelectedTask(editTask);
+                    setIsEditing(false);
+                    setTaskPanelOpen(false);
+                  }}
+                >
                   Save
                 </Button>
               </div>
@@ -319,21 +414,24 @@ export default function Tasks() {
 
         const [tasksData, usersData] = await Promise.all([
           taskService.getTasks(),
-          taskService.getAssignableUsers().catch(() => []) // Don't fail if users can't be loaded
+          taskService.getAssignableUsers().catch(() => []), // Don't fail if users can't be loaded
         ]);
 
         // Convert backend DTOs to UI format
         const uiTasks: Task[] = tasksData.map((dto: TaskDTO): Task => {
           const start = dto.start ? new Date(dto.start) : null;
           const end = dto.end ? new Date(dto.end) : null;
-          const ymd = (d: Date | null) => (d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : undefined);
+          const ymd = (d: Date | null) =>
+            d
+              ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+              : undefined;
 
           return {
-            id: dto.id || '',
-            title: dto.text || '',
+            id: dto.id || "",
+            title: dto.text || "",
             description: dto.description,
             type: mapBackendTaskTypeToUI(dto.taskType),
-            priority: 'medium', // Default priority since backend doesn't have this
+            priority: "medium", // Default priority since backend doesn't have this
             status: mapBackendStatusToUI(dto.status),
             startDate: ymd(start),
             dueDate: ymd(end || start) || ymd(new Date()),
@@ -347,8 +445,8 @@ export default function Tasks() {
         setTasks(uiTasks);
         setAssignableUsers(usersData);
       } catch (err) {
-        console.error('Failed to load tasks:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load tasks');
+        console.error("Failed to load tasks:", err);
+        setError(err instanceof Error ? err.message : "Failed to load tasks");
       } finally {
         setIsLoading(false);
       }
@@ -356,7 +454,6 @@ export default function Tasks() {
 
     loadTasks();
   }, [isAuthenticated, user]);
-
 
   // Filter tasks based on selected filters
   const filteredTasks = tasks
@@ -421,22 +518,25 @@ export default function Tasks() {
     return days;
   };
 
-	  // Get month grid (6 weeks x 7 days) for month view
-	  const getMonthGrid = () => {
-	    const firstOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-	    const start = new Date(firstOfMonth);
-	    // move to Sunday on or before the 1st
-	    start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
+  // Get month grid (6 weeks x 7 days) for month view
+  const getMonthGrid = () => {
+    const firstOfMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+    const start = new Date(firstOfMonth);
+    // move to Sunday on or before the 1st
+    start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
 
-	    const grid: Date[] = [];
-	    for (let i = 0; i < 42; i++) {
-	      const day = new Date(start);
-	      day.setDate(start.getDate() + i);
-	      grid.push(day);
-	    }
-	    return grid;
-	  };
-
+    const grid: Date[] = [];
+    for (let i = 0; i < 42; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      grid.push(day);
+    }
+    return grid;
+  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -504,7 +604,10 @@ export default function Tasks() {
     );
   }
 
-  const isGuid = (value: string) => /^(\{)?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(\})?$/.test(value);
+  const isGuid = (value: string) =>
+    /^(\{)?[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(\})?$/.test(
+      value,
+    );
 
   const mapTaskTypeToBackend = (type: Task["type"]): string => {
     switch (type) {
@@ -565,7 +668,10 @@ export default function Tasks() {
   const fromBackendDto = (dto: any): Task => {
     const start = dto.start ? new Date(dto.start) : null;
     const end = dto.end ? new Date(dto.end) : null;
-    const ymd = (d: Date | null) => (d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}` : undefined);
+    const ymd = (d: Date | null) =>
+      d
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        : undefined;
     return {
       id: dto.id,
       title: dto.text,
@@ -575,12 +681,14 @@ export default function Tasks() {
       status: backendStatusToUi(String(dto.status)),
       startDate: ymd(start || end),
       dueDate: ymd(end || start) || ymd(new Date()),
-      createdAt: dto.creationDateTime ? new Date(dto.creationDateTime).toISOString() : new Date().toISOString(),
-      updatedAt: dto.updateDateTime ? new Date(dto.updateDateTime).toISOString() : undefined,
+      createdAt: dto.creationDateTime
+        ? new Date(dto.creationDateTime).toISOString()
+        : new Date().toISOString(),
+      updatedAt: dto.updateDateTime
+        ? new Date(dto.updateDateTime).toISOString()
+        : undefined,
     };
   };
-
-
 
   const toBackendDto = (task: Task) => {
     const start = task.startDate || task.dueDate;
@@ -601,7 +709,9 @@ export default function Tasks() {
       const request: CreateTaskRequest | UpdateTaskRequest = {
         text: task.title,
         description: task.description,
-        start: task.startDate ? new Date(task.startDate).toISOString() : new Date().toISOString(),
+        start: task.startDate
+          ? new Date(task.startDate).toISOString()
+          : new Date().toISOString(),
         end: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
         taskType: mapUITaskTypeToBackend(task.type),
         status: mapUIStatusToBackend(task.status),
@@ -620,20 +730,24 @@ export default function Tasks() {
         const createdTask = await taskService.createTask(request);
 
         // Update the task in state with the new ID
-        setTasks(prev => prev.map(t =>
-          t.id === task.id ? { ...task, id: createdTask.id || task.id } : t
-        ));
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? { ...task, id: createdTask.id || task.id } : t,
+          ),
+        );
       }
     } catch (e) {
       console.error("Failed to save task", e);
-      setError(e instanceof Error ? e.message : 'Failed to save task');
+      setError(e instanceof Error ? e.message : "Failed to save task");
     }
   };
 
   const updateTaskStatus = (taskId: string, newStatus: Task["status"]) => {
     setTasks((prev) => {
       const updated = prev.map((task) =>
-        task.id === taskId ? { ...task, status: newStatus, updatedAt: new Date().toISOString() } : task,
+        task.id === taskId
+          ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
+          : task,
       );
       const task = updated.find((t) => t.id === taskId);
       if (task) {
@@ -642,7 +756,6 @@ export default function Tasks() {
       return updated;
     });
   };
-
 
   // Drag and drop helpers for Kanban view
   const onDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
@@ -665,7 +778,8 @@ export default function Tasks() {
           ? {
               ...t,
               status: column,
-              startDate: column === "in_progress" && !t.startDate ? now : t.startDate,
+              startDate:
+                column === "in_progress" && !t.startDate ? now : t.startDate,
               updatedAt: new Date().toISOString(),
             }
           : t,
@@ -714,32 +828,34 @@ export default function Tasks() {
                 </p>
               </div>
 
-
               <div className="flex items-center gap-3">
                 <Badge variant="secondary" className="capitalize">
                   {user.role?.replace("_", " ")}
                 </Badge>
-                <Button className="gap-2" onClick={() => {
-                  const today = new Date();
-                  const y = today.getFullYear();
-                  const m = String(today.getMonth() + 1).padStart(2, "0");
-                  const d = String(today.getDate()).padStart(2, "0");
-                  const newTask: Task = {
-                    id: `temp-${Date.now()}`,
-                    title: "",
-                    description: "",
-                    type: "onboarding",
-                    priority: "medium",
-                    status: "todo",
-                    startDate: `${y}-${m}-${d}`,
-                    dueDate: `${y}-${m}-${d}`,
-                    createdAt: today.toISOString(),
-                  };
-                  setSelectedTask(newTask);
-                  setEditTask({ ...newTask });
-                  setIsEditing(true);
-                  setTaskPanelOpen(true);
-                }}>
+                <Button
+                  className="gap-2"
+                  onClick={() => {
+                    const today = new Date();
+                    const y = today.getFullYear();
+                    const m = String(today.getMonth() + 1).padStart(2, "0");
+                    const d = String(today.getDate()).padStart(2, "0");
+                    const newTask: Task = {
+                      id: `temp-${Date.now()}`,
+                      title: "",
+                      description: "",
+                      type: "onboarding",
+                      priority: "medium",
+                      status: "todo",
+                      startDate: `${y}-${m}-${d}`,
+                      dueDate: `${y}-${m}-${d}`,
+                      createdAt: today.toISOString(),
+                    };
+                    setSelectedTask(newTask);
+                    setEditTask({ ...newTask });
+                    setIsEditing(true);
+                    setTaskPanelOpen(true);
+                  }}
+                >
                   <Plus className="h-4 w-4" />
                   Add Task
                 </Button>
@@ -767,62 +883,60 @@ export default function Tasks() {
             {/* Quick Stats */}
             {!isLoading && !error && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Total Tasks
-                  </CardTitle>
-                  <CheckSquare className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{tasks.length}</div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Total Tasks
+                    </CardTitle>
+                    <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{tasks.length}</div>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    To Do
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {tasks.filter((t) => t.status === "todo").length}
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      To Do
+                    </CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === "todo").length}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    In Progress
-                  </CardTitle>
-                  <Zap className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {tasks.filter((t) => t.status === "in_progress").length}
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      In Progress
+                    </CardTitle>
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === "in_progress").length}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Completed
-                  </CardTitle>
-                  <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {tasks.filter((t) => t.status === "completed").length}
-                  </div>
-
-                </CardContent>
-              </Card>
-
-            </div>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Completed
+                    </CardTitle>
+                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === "completed").length}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
 
             {/* View Toggle and Filters */}
@@ -907,7 +1021,11 @@ export default function Tasks() {
                     </TableHeader>
                     <TableBody>
                       {filteredTasks.map((task) => (
-                        <TableRow key={task.id} className="cursor-pointer" onClick={() => openTaskPanel(task)}>
+                        <TableRow
+                          key={task.id}
+                          className="cursor-pointer"
+                          onClick={() => openTaskPanel(task)}
+                        >
                           <TableCell>
                             <div>
                               <div className="font-medium">{task.title}</div>
@@ -945,7 +1063,6 @@ export default function Tasks() {
                                 updateTaskStatus(
                                   task.id,
 
-
                                   value as Task["status"],
                                 )
                               }
@@ -966,13 +1083,25 @@ export default function Tasks() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setIsEditing(true); setTaskPanelOpen(true); }}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTask(task);
+                                  setIsEditing(true);
+                                  setTaskPanelOpen(true);
+                                }}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteTask(task.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1101,17 +1230,23 @@ export default function Tasks() {
                         ),
                       )}
                       {getMonthGrid().map((day, index) => {
-                        const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                        const isCurrentMonth =
+                          day.getMonth() === currentDate.getMonth();
                         const dayTasks = getTasksForDate(day);
-                        const isToday = day.toDateString() === new Date().toDateString();
+                        const isToday =
+                          day.toDateString() === new Date().toDateString();
                         return (
                           <div
                             key={index}
                             className={`min-h-28 p-2 border rounded-lg ${
-                              isToday ? "bg-primary/5 border-primary/20" : "border-border"
+                              isToday
+                                ? "bg-primary/5 border-primary/20"
+                                : "border-border"
                             } ${isCurrentMonth ? "" : "opacity-50"}`}
                           >
-                            <div className={`text-sm font-medium mb-2 ${isToday ? "text-primary" : "text-foreground"}`}>
+                            <div
+                              className={`text-sm font-medium mb-2 ${isToday ? "text-primary" : "text-foreground"}`}
+                            >
                               {day.getDate()}
                             </div>
                             <div className="space-y-1">
@@ -1150,70 +1285,134 @@ export default function Tasks() {
               <Card>
                 <CardHeader>
                   <CardTitle>Kanban View</CardTitle>
-                  <CardDescription>Drag tasks between columns to update status</CardDescription>
+                  <CardDescription>
+                    Drag tasks between columns to update status
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* To Do Column */}
-                    <div className="rounded-lg border p-3 bg-muted/30" onDragOver={onDragOver} onDrop={(e) => onDropOnColumn(e, "todo")}>
+                    <div
+                      className="rounded-lg border p-3 bg-muted/30"
+                      onDragOver={onDragOver}
+                      onDrop={(e) => onDropOnColumn(e, "todo")}
+                    >
                       <div className="font-semibold mb-2">To Do</div>
                       <div className="space-y-2 min-h-24">
-                        {tasks.filter((t) => t.status === "todo").map((t) => (
-                          <div key={t.id} className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => onDragStart(e, t.id)} onClick={() => openTaskPanel(t)} role="button" tabIndex={0}>
-                            <div className="text-sm font-medium">{t.title}</div>
-                            {t.description && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {t.description.length > 60 ? `${t.description.substring(0, 60)}...` : t.description}
+                        {tasks
+                          .filter((t) => t.status === "todo")
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              draggable
+                              onDragStart={(e) => onDragStart(e, t.id)}
+                              onClick={() => openTaskPanel(t)}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <div className="text-sm font-medium">
+                                {t.title}
                               </div>
-                            )}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Badge className={taskTypeColors[t.type]}>{t.type}</Badge>
-                              <Badge className={priorityColors[t.priority]}>{t.priority}</Badge>
+                              {t.description && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {t.description.length > 60
+                                    ? `${t.description.substring(0, 60)}...`
+                                    : t.description}
+                                </div>
+                              )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge className={taskTypeColors[t.type]}>
+                                  {t.type}
+                                </Badge>
+                                <Badge className={priorityColors[t.priority]}>
+                                  {t.priority}
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
 
                     {/* In Progress Column */}
-                    <div className="rounded-lg border p-3 bg-muted/30" onDragOver={onDragOver} onDrop={(e) => onDropOnColumn(e, "in_progress")}>
+                    <div
+                      className="rounded-lg border p-3 bg-muted/30"
+                      onDragOver={onDragOver}
+                      onDrop={(e) => onDropOnColumn(e, "in_progress")}
+                    >
                       <div className="font-semibold mb-2">In Progress</div>
                       <div className="space-y-2 min-h-24">
-                        {tasks.filter((t) => t.status === "in_progress").map((t) => (
-                          <div key={t.id} className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => onDragStart(e, t.id)} onClick={() => openTaskPanel(t)}>
-                            <div className="text-sm font-medium">{t.title}</div>
-                            {t.description && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {t.description.length > 60 ? `${t.description.substring(0, 60)}...` : t.description}
+                        {tasks
+                          .filter((t) => t.status === "in_progress")
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              draggable
+                              onDragStart={(e) => onDragStart(e, t.id)}
+                              onClick={() => openTaskPanel(t)}
+                            >
+                              <div className="text-sm font-medium">
+                                {t.title}
                               </div>
-                            )}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Badge className={taskTypeColors[t.type]}>{t.type}</Badge>
-                              <Badge className={priorityColors[t.priority]}>{t.priority}</Badge>
+                              {t.description && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {t.description.length > 60
+                                    ? `${t.description.substring(0, 60)}...`
+                                    : t.description}
+                                </div>
+                              )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge className={taskTypeColors[t.type]}>
+                                  {t.type}
+                                </Badge>
+                                <Badge className={priorityColors[t.priority]}>
+                                  {t.priority}
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
 
                     {/* Completed Column */}
-                    <div className="rounded-lg border p-3 bg-muted/30" onDragOver={onDragOver} onDrop={(e) => onDropOnColumn(e, "completed")}>
+                    <div
+                      className="rounded-lg border p-3 bg-muted/30"
+                      onDragOver={onDragOver}
+                      onDrop={(e) => onDropOnColumn(e, "completed")}
+                    >
                       <div className="font-semibold mb-2">Completed</div>
                       <div className="space-y-2 min-h-24">
-                        {tasks.filter((t) => t.status === "completed").map((t) => (
-                          <div key={t.id} className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing" draggable onDragStart={(e) => onDragStart(e, t.id)} onClick={() => openTaskPanel(t)}>
-                            <div className="text-sm font-medium">{t.title}</div>
-                            {t.description && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {t.description.length > 60 ? `${t.description.substring(0, 60)}...` : t.description}
+                        {tasks
+                          .filter((t) => t.status === "completed")
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              draggable
+                              onDragStart={(e) => onDragStart(e, t.id)}
+                              onClick={() => openTaskPanel(t)}
+                            >
+                              <div className="text-sm font-medium">
+                                {t.title}
                               </div>
-                            )}
-                            <div className="mt-2 flex items-center gap-2">
-                              <Badge className={taskTypeColors[t.type]}>{t.type}</Badge>
-                              <Badge className={priorityColors[t.priority]}>{t.priority}</Badge>
+                              {t.description && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {t.description.length > 60
+                                    ? `${t.description.substring(0, 60)}...`
+                                    : t.description}
+                                </div>
+                              )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge className={taskTypeColors[t.type]}>
+                                  {t.type}
+                                </Badge>
+                                <Badge className={priorityColors[t.priority]}>
+                                  {t.priority}
+                                </Badge>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
                   </div>
@@ -1222,8 +1421,6 @@ export default function Tasks() {
             )}
 
             {renderTaskSheet()}
-
-
           </div>
         </div>
         <Footer />

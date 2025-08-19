@@ -80,7 +80,9 @@ export default function Profile() {
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
     if (isAuthenticated) {
-      refreshUser().catch((e) => console.warn("Profile: refreshUser failed", e));
+      refreshUser().catch((e) =>
+        console.warn("Profile: refreshUser failed", e),
+      );
     }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,7 +150,9 @@ export default function Profile() {
       // Immediately switch to read-only on successful update
       setIsEditing(false);
       // Refresh in background; don't block UI transition
-      refreshUser().catch((e) => console.warn("refreshUser failed after save", e));
+      refreshUser().catch((e) =>
+        console.warn("refreshUser failed after save", e),
+      );
     } catch (err) {
       console.error("Failed to save profile:", err);
     } finally {
@@ -183,7 +187,7 @@ export default function Profile() {
       const response = await fetch("/api/account", {
         method: "DELETE",
         headers: {
-          "Authorization": `Bearer ${localStorage.getItem("auth_token")}`,
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           "Content-Type": "application/json",
         },
       });
@@ -296,7 +300,9 @@ export default function Profile() {
                         <Button
                           size="icon"
                           className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full"
-                          onClick={() => document.getElementById("avatarInput")?.click()}
+                          onClick={() =>
+                            document.getElementById("avatarInput")?.click()
+                          }
                           disabled={saving}
                         >
                           <Camera className="h-4 w-4" />
@@ -543,8 +549,6 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-
-
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -561,34 +565,62 @@ export default function Profile() {
                     if (role === "job_seeker") {
                       return (
                         <>
-                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Button
+                            variant="outline"
+                            className="h-auto p-4 flex flex-col gap-2"
+                            asChild
+                          >
                             <Link to="/resumes">
                               <FileText className="h-6 w-6" />
                               <span className="font-medium">Update Resume</span>
-                              <span className="text-xs text-muted-foreground">Upload or edit your resume</span>
+                              <span className="text-xs text-muted-foreground">
+                                Upload or edit your resume
+                              </span>
                             </Link>
                           </Button>
 
-                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Button
+                            variant="outline"
+                            className="h-auto p-4 flex flex-col gap-2"
+                            asChild
+                          >
                             <Link to="/jobs">
                               <Briefcase className="h-6 w-6" />
-                              <span className="font-medium">Job Applications</span>
-                              <span className="text-xs text-muted-foreground">Track your applications</span>
+                              <span className="font-medium">
+                                Job Applications
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Track your applications
+                              </span>
                             </Link>
                           </Button>
 
-                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                          <Button
+                            variant="outline"
+                            className="h-auto p-4 flex flex-col gap-2"
+                            asChild
+                          >
                             <Link to="/settings">
                               <Settings className="h-6 w-6" />
-                              <span className="font-medium">Account Settings</span>
-                              <span className="text-xs text-muted-foreground">Privacy & preferences</span>
+                              <span className="font-medium">
+                                Account Settings
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Privacy & preferences
+                              </span>
                             </Link>
                           </Button>
 
-                          <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" onClick={() => setShareOpen(true)}>
+                          <Button
+                            variant="outline"
+                            className="h-auto p-4 flex flex-col gap-2"
+                            onClick={() => setShareOpen(true)}
+                          >
                             <Share className="h-6 w-6" />
                             <span className="font-medium">Share Profile</span>
-                            <span className="text-xs text-muted-foreground">Get your profile link</span>
+                            <span className="text-xs text-muted-foreground">
+                              Get your profile link
+                            </span>
                           </Button>
                         </>
                       );
@@ -597,34 +629,61 @@ export default function Profile() {
                     // recruiter/business
                     return (
                       <>
-                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                        <Button
+                          variant="outline"
+                          className="h-auto p-4 flex flex-col gap-2"
+                          asChild
+                        >
                           <Link to="/jobs/new">
                             <Briefcase className="h-6 w-6" />
                             <span className="font-medium">Post a Job</span>
-                            <span className="text-xs text-muted-foreground">Create a new job listing</span>
+                            <span className="text-xs text-muted-foreground">
+                              Create a new job listing
+                            </span>
                           </Link>
                         </Button>
 
-                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                        <Button
+                          variant="outline"
+                          className="h-auto p-4 flex flex-col gap-2"
+                          asChild
+                        >
                           <Link to="/candidates">
                             <Eye className="h-6 w-6" />
-                            <span className="font-medium">Browse Candidates</span>
-                            <span className="text-xs text-muted-foreground">Search profiles & resumes</span>
+                            <span className="font-medium">
+                              Browse Candidates
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Search profiles & resumes
+                            </span>
                           </Link>
                         </Button>
 
-                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2" asChild>
+                        <Button
+                          variant="outline"
+                          className="h-auto p-4 flex flex-col gap-2"
+                          asChild
+                        >
                           <Link to="/settings">
                             <Settings className="h-6 w-6" />
-                            <span className="font-medium">Account Settings</span>
-                            <span className="text-xs text-muted-foreground">Team & preferences</span>
+                            <span className="font-medium">
+                              Account Settings
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Team & preferences
+                            </span>
                           </Link>
                         </Button>
 
-                        <Button variant="outline" className="h-auto p-4 flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          className="h-auto p-4 flex flex-col gap-2"
+                        >
                           <Share className="h-6 w-6" />
                           <span className="font-medium">Share Company</span>
-                          <span className="text-xs text-muted-foreground">Invite or share your page</span>
+                          <span className="text-xs text-muted-foreground">
+                            Invite or share your page
+                          </span>
                         </Button>
                       </>
                     );
@@ -641,12 +700,15 @@ export default function Profile() {
                   Delete Account
                 </CardTitle>
                 <CardDescription>
-                  Permanently delete your account and all associated data. This action cannot be undone.
+                  Permanently delete your account and all associated data. This
+                  action cannot be undone.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                  <h4 className="font-medium text-destructive mb-2">Before you delete your account:</h4>
+                  <h4 className="font-medium text-destructive mb-2">
+                    Before you delete your account:
+                  </h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Download your resume and any important documents</li>
                     <li>• This action is permanent and cannot be reversed</li>
@@ -655,7 +717,10 @@ export default function Profile() {
                   </ul>
                 </div>
 
-                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <Dialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button variant="destructive" className="w-full">
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -664,9 +729,13 @@ export default function Profile() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle className="text-destructive">Delete Account</DialogTitle>
+                      <DialogTitle className="text-destructive">
+                        Delete Account
+                      </DialogTitle>
                       <DialogDescription>
-                        This action is permanent and cannot be undone. Your account and all associated data will be permanently deleted.
+                        This action is permanent and cannot be undone. Your
+                        account and all associated data will be permanently
+                        deleted.
                       </DialogDescription>
                     </DialogHeader>
 
@@ -677,7 +746,9 @@ export default function Profile() {
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1">
                           <li>• Your profile will be permanently removed</li>
-                          <li>• All your resumes and documents will be deleted</li>
+                          <li>
+                            • All your resumes and documents will be deleted
+                          </li>
                           <li>• You will lose access to all your data</li>
                           <li>• This action cannot be reversed</li>
                         </ul>
@@ -728,7 +799,6 @@ export default function Profile() {
               title="Share Options"
               message="Please share by using an option below."
             />
-
           </div>
         </div>
         <Footer />

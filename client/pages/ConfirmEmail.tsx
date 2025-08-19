@@ -1,20 +1,29 @@
-import { CheckCircle, XCircle, Mail, ArrowLeft, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSidebar } from '@/hooks/use-sidebar';
+import { CheckCircle, XCircle, Mail, ArrowLeft, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams, Link } from "react-router-dom";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useSidebar } from "@/hooks/use-sidebar";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export default function ConfirmEmail() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'invalid'>('loading');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<
+    "loading" | "success" | "error" | "invalid"
+  >("loading");
+  const [message, setMessage] = useState("");
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -23,14 +32,16 @@ export default function ConfirmEmail() {
     toggleSidebar,
   } = useSidebar();
 
-  const userId = searchParams.get('userId');
-  const code = searchParams.get('code');
+  const userId = searchParams.get("userId");
+  const code = searchParams.get("code");
 
   useEffect(() => {
     const confirmEmail = async () => {
       if (!userId || !code) {
-        setStatus('invalid');
-        setMessage('Invalid confirmation link. Please check your email for the correct link.');
+        setStatus("invalid");
+        setMessage(
+          "Invalid confirmation link. Please check your email for the correct link.",
+        );
         return;
       }
 
@@ -38,29 +49,42 @@ export default function ConfirmEmail() {
         const response = await fetch(
           `${API_BASE_URL}/Account/ConfirmEmail?userId=${encodeURIComponent(userId)}&code=${encodeURIComponent(code)}`,
           {
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
-          }
+          },
         );
 
         if (response.ok) {
           const responseText = await response.text();
-          if (response.url.includes('info=Your registration has been confirmed') || responseText.includes('confirmed')) {
-            setStatus('success');
-            setMessage('Your email has been successfully confirmed! You can now sign in to your account.');
+          if (
+            response.url.includes(
+              "info=Your registration has been confirmed",
+            ) ||
+            responseText.includes("confirmed")
+          ) {
+            setStatus("success");
+            setMessage(
+              "Your email has been successfully confirmed! You can now sign in to your account.",
+            );
           } else {
-            setStatus('error');
-            setMessage('Email confirmation failed. The link may have expired or been used already.');
+            setStatus("error");
+            setMessage(
+              "Email confirmation failed. The link may have expired or been used already.",
+            );
           }
         } else {
-          setStatus('error');
-          setMessage('Email confirmation failed. The link may have expired or been used already.');
+          setStatus("error");
+          setMessage(
+            "Email confirmation failed. The link may have expired or been used already.",
+          );
         }
       } catch (err) {
-        setStatus('error');
-        setMessage('Network error. Please check your connection and try again.');
+        setStatus("error");
+        setMessage(
+          "Network error. Please check your connection and try again.",
+        );
       }
     };
 
@@ -68,12 +92,13 @@ export default function ConfirmEmail() {
   }, [userId, code]);
 
   const handleResendConfirmation = async () => {
-    window.location.href = '/signup?message=Please sign up again to receive a new confirmation email';
+    window.location.href =
+      "/signup?message=Please sign up again to receive a new confirmation email";
   };
 
   const renderContent = () => {
     switch (status) {
-      case 'loading':
+      case "loading":
         return (
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
@@ -88,7 +113,7 @@ export default function ConfirmEmail() {
           </Card>
         );
 
-      case 'success':
+      case "success":
         return (
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
@@ -103,21 +128,17 @@ export default function ConfirmEmail() {
             <CardContent className="space-y-4">
               <Alert>
                 <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {message}
-                </AlertDescription>
+                <AlertDescription>{message}</AlertDescription>
               </Alert>
 
               <div className="space-y-3">
                 <Button asChild className="w-full">
-                  <Link to="/login">
-                    Sign In to Your Account
-                  </Link>
+                  <Link to="/login">Sign In to Your Account</Link>
                 </Button>
-                
+
                 <div className="text-center">
-                  <Link 
-                    to="/" 
+                  <Link
+                    to="/"
                     className="text-sm text-gray-600 hover:text-gray-500"
                   >
                     Return to Home
@@ -128,7 +149,7 @@ export default function ConfirmEmail() {
           </Card>
         );
 
-      case 'error':
+      case "error":
         return (
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
@@ -143,30 +164,28 @@ export default function ConfirmEmail() {
             <CardContent className="space-y-4">
               <Alert variant="destructive">
                 <XCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {message}
-                </AlertDescription>
+                <AlertDescription>{message}</AlertDescription>
               </Alert>
 
               <div className="space-y-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={handleResendConfirmation}
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Get New Confirmation Email
                 </Button>
-                
+
                 <div className="text-center space-y-2">
-                  <Link 
-                    to="/login" 
+                  <Link
+                    to="/login"
                     className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                   >
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     Back to Sign In
                   </Link>
-                  
+
                   <p className="text-xs text-gray-500">
                     Need help? Contact our support team
                   </p>
@@ -176,7 +195,7 @@ export default function ConfirmEmail() {
           </Card>
         );
 
-      case 'invalid':
+      case "invalid":
         return (
           <Card className="w-full max-w-md">
             <CardHeader className="text-center">
@@ -191,24 +210,22 @@ export default function ConfirmEmail() {
             <CardContent className="space-y-4">
               <Alert>
                 <Mail className="h-4 w-4" />
-                <AlertDescription>
-                  {message}
-                </AlertDescription>
+                <AlertDescription>{message}</AlertDescription>
               </Alert>
 
               <div className="space-y-3">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={handleResendConfirmation}
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Get New Confirmation Email
                 </Button>
-                
+
                 <div className="text-center">
-                  <Link 
-                    to="/signup" 
+                  <Link
+                    to="/signup"
                     className="text-sm text-blue-600 hover:text-blue-500"
                   >
                     Create New Account
@@ -237,13 +254,13 @@ export default function ConfirmEmail() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        
+
         <div className="pt-16">
           <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
             {renderContent()}
           </div>
         </div>
-        
+
         <Footer />
       </div>
     </div>

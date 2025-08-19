@@ -24,7 +24,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { companyService, type CompanyFilters, type Company } from "@/lib/services/company-service";
+import {
+  companyService,
+  type CompanyFilters,
+  type Company,
+} from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { CompanyWithOwnership } from "@/types/company";
@@ -155,7 +159,7 @@ export default function Companies() {
     // For now, return empty arrays as placeholder
     return {
       owned: [] as CompanyWithOwnership[],
-      tracked: [] as CompanyWithOwnership[]
+      tracked: [] as CompanyWithOwnership[],
     };
   };
 
@@ -292,8 +296,12 @@ export default function Companies() {
                       </div>
                     ) : companies.length === 0 ? (
                       <div className="text-center py-12">
-                        <p className="text-gray-600 mb-4">No companies found matching your criteria.</p>
-                        <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                        <p className="text-gray-600 mb-4">
+                          No companies found matching your criteria.
+                        </p>
+                        <Button onClick={() => setSearchFilters({})}>
+                          Clear Filters
+                        </Button>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -310,7 +318,8 @@ export default function Companies() {
                             location: company.location || "",
                             website: (company as any).website || "",
                             founded: (company as any).founded || "",
-                            followersCount: (company as any).followersCount || 0,
+                            followersCount:
+                              (company as any).followersCount || 0,
                             jobsCount: (company as any).jobCount || 0,
                             isPublic: (company as any).isPublic || true,
                             status: (company.status as any) || "active",
@@ -322,7 +331,8 @@ export default function Companies() {
                             views: (company as any).views || 0,
                             followers: (company as any).followers || 0,
                             jobCount: (company as any).jobCount || 0,
-                            activeJobCount: (company as any).activeJobCount || 0,
+                            activeJobCount:
+                              (company as any).activeJobCount || 0,
                             userId: (company as any).userId || "",
                             ownership: "tracked" as const,
                           };
@@ -468,36 +478,34 @@ export default function Companies() {
                 Featured Companies
               </h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {companies
-                  .slice(0, 3)
-                  .map((company) => {
-                    const companyMetadata = {
-                      id: company.id || "",
-                      slug: company.slug || "",
-                      name: (company as any).name || "",
-                      logo: (company as any).logo || "",
-                      tagline: company.tagline || "",
-                      industry: company.industry || "",
-                      size: company.size || "",
-                      location: company.location || "",
-                      status: (company.status as any) || "active",
-                      visibility: (company.visibility as any) || "public",
-                      createdAt: company.createdAt || "",
-                      updatedAt: company.updatedAt || "",
-                      views: (company as any).views || 0,
-                      followers: (company as any).followers || 0,
-                      jobCount: (company as any).jobCount || 0,
-                      activeJobCount: (company as any).activeJobCount || 0,
-                      userId: (company as any).userId || "",
-                      teamMembers: (company as any).teamMembers || [],
-                      onboardingProgress: company.onboardingProgress || 100,
-                      ownership: "tracked" as const,
-                    };
+                {companies.slice(0, 3).map((company) => {
+                  const companyMetadata = {
+                    id: company.id || "",
+                    slug: company.slug || "",
+                    name: (company as any).name || "",
+                    logo: (company as any).logo || "",
+                    tagline: company.tagline || "",
+                    industry: company.industry || "",
+                    size: company.size || "",
+                    location: company.location || "",
+                    status: (company.status as any) || "active",
+                    visibility: (company.visibility as any) || "public",
+                    createdAt: company.createdAt || "",
+                    updatedAt: company.updatedAt || "",
+                    views: (company as any).views || 0,
+                    followers: (company as any).followers || 0,
+                    jobCount: (company as any).jobCount || 0,
+                    activeJobCount: (company as any).activeJobCount || 0,
+                    userId: (company as any).userId || "",
+                    teamMembers: (company as any).teamMembers || [],
+                    onboardingProgress: company.onboardingProgress || 100,
+                    ownership: "tracked" as const,
+                  };
 
-                    return (
-                      <CompanyCard key={company.id} company={companyMetadata} />
-                    );
-                  })}
+                  return (
+                    <CompanyCard key={company.id} company={companyMetadata} />
+                  );
+                })}
               </div>
               <div className="text-center mt-8">
                 <Link to="/signup">

@@ -18,7 +18,13 @@ interface ShareModalProps {
   message?: string;
 }
 
-export default function ShareModal({ open, onOpenChange, shareUrl, title = "Share Options", message = "Please share by using an option below." }: ShareModalProps) {
+export default function ShareModal({
+  open,
+  onOpenChange,
+  shareUrl,
+  title = "Share Options",
+  message = "Please share by using an option below.",
+}: ShareModalProps) {
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async () => {
@@ -32,16 +38,39 @@ export default function ShareModal({ open, onOpenChange, shareUrl, title = "Shar
   };
 
   const encodedUrl = encodeURIComponent(shareUrl);
-  const defaultText = encodeURIComponent("Check out my profile on MyVideoResume!");
+  const defaultText = encodeURIComponent(
+    "Check out my profile on MyVideoResume!",
+  );
 
   const links = [
-    { label: "Share on Twitter", href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${defaultText}` },
-    { label: "Share on Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` },
-    { label: "Share on LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` },
-    { label: "Share by Email", href: `mailto:?subject=${encodeURIComponent("MyVideoResume Profile")}&body=${defaultText}%20${encodedUrl}` },
-    { label: "Share on WhatsApp", href: `https://wa.me/?text=${defaultText}%20${encodedUrl}` },
-    { label: "Share on Telegram", href: `https://t.me/share/url?url=${encodedUrl}&text=${defaultText}` },
-    { label: "Share on Reddit", href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${defaultText}` },
+    {
+      label: "Share on Twitter",
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${defaultText}`,
+    },
+    {
+      label: "Share on Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    },
+    {
+      label: "Share on LinkedIn",
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+    },
+    {
+      label: "Share by Email",
+      href: `mailto:?subject=${encodeURIComponent("MyVideoResume Profile")}&body=${defaultText}%20${encodedUrl}`,
+    },
+    {
+      label: "Share on WhatsApp",
+      href: `https://wa.me/?text=${defaultText}%20${encodedUrl}`,
+    },
+    {
+      label: "Share on Telegram",
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${defaultText}`,
+    },
+    {
+      label: "Share on Reddit",
+      href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${defaultText}`,
+    },
   ];
 
   return (
@@ -63,7 +92,9 @@ export default function ShareModal({ open, onOpenChange, shareUrl, title = "Shar
         <div className="grid sm:grid-cols-2 gap-2 mt-2">
           {links.map((item) => (
             <Button key={item.label} variant="outline" asChild>
-              <a href={item.href} target="_blank" rel="noopener noreferrer">{item.label}</a>
+              <a href={item.href} target="_blank" rel="noopener noreferrer">
+                {item.label}
+              </a>
             </Button>
           ))}
         </div>
@@ -71,4 +102,3 @@ export default function ShareModal({ open, onOpenChange, shareUrl, title = "Shar
     </Dialog>
   );
 }
-

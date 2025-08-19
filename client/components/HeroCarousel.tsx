@@ -66,8 +66,7 @@ export default function HeroCarousel({
       id: 2,
       type: "upload",
       title: "Upload Your Resume",
-      description:
-        "",
+      description: "",
       badge: "AI-Powered Resume Videos",
     },
     {
@@ -224,7 +223,11 @@ export default function HeroCarousel({
                       <p className="text-xs text-muted-foreground mb-3">
                         PDF, DOC, or DOCX files
                       </p>
-                      <Button size="sm" variant="outline" className="gap-1 text-xs">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                      >
                         <Plus className="h-3 w-3" />
                         Browse Files
                       </Button>
@@ -243,7 +246,9 @@ export default function HeroCarousel({
                       className="flex flex-col items-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
                     >
                       <feature.icon className="w-5 h-5 mb-1 text-brand-purple" />
-                      <span className="text-xs font-medium text-center">{feature.label}</span>
+                      <span className="text-xs font-medium text-center">
+                        {feature.label}
+                      </span>
                     </div>
                   ))}
                 </div>

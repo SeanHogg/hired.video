@@ -1,22 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Building2, 
-  Globe, 
-  MapPin, 
-  Phone, 
+import React, { useState, useEffect } from "react";
+import {
+  Settings,
+  Building2,
+  Globe,
+  MapPin,
+  Phone,
   Mail,
   Save,
-  AlertCircle
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+  AlertCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 interface AccountSettingsData {
   companyName: string;
@@ -47,26 +53,31 @@ interface AccountSettingsProps {
   onLoadSettings?: () => Promise<any>;
 }
 
-export function AccountSettings({ onSave, initialData, loading = false, onLoadSettings }: AccountSettingsProps) {
+export function AccountSettings({
+  onSave,
+  initialData,
+  loading = false,
+  onLoadSettings,
+}: AccountSettingsProps) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [settings, setSettings] = useState<AccountSettingsData>({
-    companyName: initialData?.companyName || '',
-    companyDescription: initialData?.companyDescription || '',
-    website: initialData?.website || '',
-    industry: initialData?.industry || '',
-    companySize: initialData?.companySize || '',
-    address: initialData?.address || '',
-    city: initialData?.city || '',
-    state: initialData?.state || '',
-    zipCode: initialData?.zipCode || '',
-    country: initialData?.country || '',
-    phone: initialData?.phone || '',
-    email: initialData?.email || '',
-    timezone: initialData?.timezone || 'UTC',
-    currency: initialData?.currency || 'USD',
-    language: initialData?.language || 'en',
+    companyName: initialData?.companyName || "",
+    companyDescription: initialData?.companyDescription || "",
+    website: initialData?.website || "",
+    industry: initialData?.industry || "",
+    companySize: initialData?.companySize || "",
+    address: initialData?.address || "",
+    city: initialData?.city || "",
+    state: initialData?.state || "",
+    zipCode: initialData?.zipCode || "",
+    country: initialData?.country || "",
+    phone: initialData?.phone || "",
+    email: initialData?.email || "",
+    timezone: initialData?.timezone || "UTC",
+    currency: initialData?.currency || "USD",
+    language: initialData?.language || "en",
     emailNotifications: initialData?.emailNotifications ?? true,
     marketingEmails: initialData?.marketingEmails ?? false,
     weeklyReports: initialData?.weeklyReports ?? true,
@@ -80,10 +91,10 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
         setLoadingSettings(true);
         try {
           const data = await onLoadSettings();
-          setSettings(prev => ({
+          setSettings((prev) => ({
             ...prev,
-            companyName: data.companyName || '',
-            email: data.email || '',
+            companyName: data.companyName || "",
+            email: data.email || "",
             // Map other fields from API response
           }));
         } catch (error) {
@@ -101,8 +112,11 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
     loadSettings();
   }, [onLoadSettings, initialData, toast]);
 
-  const handleInputChange = (field: keyof AccountSettingsData, value: string | boolean) => {
-    setSettings(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof AccountSettingsData,
+    value: string | boolean,
+  ) => {
+    setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
@@ -149,7 +163,8 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          These settings apply to your entire organization and affect all team members.
+          These settings apply to your entire organization and affect all team
+          members.
         </AlertDescription>
       </Alert>
 
@@ -171,7 +186,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="companyName"
                 value={settings.companyName}
-                onChange={(e) => handleInputChange('companyName', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("companyName", e.target.value)
+                }
                 placeholder="Enter company name"
               />
             </div>
@@ -180,7 +197,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="industry"
                 value={settings.industry}
-                onChange={(e) => handleInputChange('industry', e.target.value)}
+                onChange={(e) => handleInputChange("industry", e.target.value)}
                 placeholder="e.g., Technology, Healthcare"
               />
             </div>
@@ -191,7 +208,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             <Textarea
               id="companyDescription"
               value={settings.companyDescription}
-              onChange={(e) => handleInputChange('companyDescription', e.target.value)}
+              onChange={(e) =>
+                handleInputChange("companyDescription", e.target.value)
+              }
               placeholder="Brief description of your company"
               rows={3}
             />
@@ -205,7 +224,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
                 <Input
                   id="website"
                   value={settings.website}
-                  onChange={(e) => handleInputChange('website', e.target.value)}
+                  onChange={(e) => handleInputChange("website", e.target.value)}
                   placeholder="https://company.com"
                   className="pl-10"
                 />
@@ -216,7 +235,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="companySize"
                 value={settings.companySize}
-                onChange={(e) => handleInputChange('companySize', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("companySize", e.target.value)
+                }
                 placeholder="e.g., 1-10, 11-50, 51-200"
               />
             </div>
@@ -245,7 +266,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
                   id="email"
                   type="email"
                   value={settings.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
                   placeholder="contact@company.com"
                   className="pl-10"
                 />
@@ -258,7 +279,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
                 <Input
                   id="phone"
                   value={settings.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
                   placeholder="+1 (555) 123-4567"
                   className="pl-10"
                 />
@@ -271,7 +292,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             <Input
               id="address"
               value={settings.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
+              onChange={(e) => handleInputChange("address", e.target.value)}
               placeholder="Street address"
             />
           </div>
@@ -282,7 +303,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="city"
                 value={settings.city}
-                onChange={(e) => handleInputChange('city', e.target.value)}
+                onChange={(e) => handleInputChange("city", e.target.value)}
                 placeholder="City"
               />
             </div>
@@ -291,7 +312,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="state"
                 value={settings.state}
-                onChange={(e) => handleInputChange('state', e.target.value)}
+                onChange={(e) => handleInputChange("state", e.target.value)}
                 placeholder="State"
               />
             </div>
@@ -300,7 +321,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="zipCode"
                 value={settings.zipCode}
-                onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                onChange={(e) => handleInputChange("zipCode", e.target.value)}
                 placeholder="12345"
               />
             </div>
@@ -311,7 +332,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             <Input
               id="country"
               value={settings.country}
-              onChange={(e) => handleInputChange('country', e.target.value)}
+              onChange={(e) => handleInputChange("country", e.target.value)}
               placeholder="United States"
             />
           </div>
@@ -322,9 +343,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
-          <CardDescription>
-            Regional and language preferences
-          </CardDescription>
+          <CardDescription>Regional and language preferences</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -333,7 +352,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="timezone"
                 value={settings.timezone}
-                onChange={(e) => handleInputChange('timezone', e.target.value)}
+                onChange={(e) => handleInputChange("timezone", e.target.value)}
                 placeholder="UTC"
               />
             </div>
@@ -342,7 +361,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="currency"
                 value={settings.currency}
-                onChange={(e) => handleInputChange('currency', e.target.value)}
+                onChange={(e) => handleInputChange("currency", e.target.value)}
                 placeholder="USD"
               />
             </div>
@@ -351,7 +370,7 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
               <Input
                 id="language"
                 value={settings.language}
-                onChange={(e) => handleInputChange('language', e.target.value)}
+                onChange={(e) => handleInputChange("language", e.target.value)}
                 placeholder="English"
               />
             </div>
@@ -377,7 +396,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             </div>
             <Switch
               checked={settings.emailNotifications}
-              onCheckedChange={(checked) => handleInputChange('emailNotifications', checked)}
+              onCheckedChange={(checked) =>
+                handleInputChange("emailNotifications", checked)
+              }
             />
           </div>
 
@@ -390,7 +411,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             </div>
             <Switch
               checked={settings.marketingEmails}
-              onCheckedChange={(checked) => handleInputChange('marketingEmails', checked)}
+              onCheckedChange={(checked) =>
+                handleInputChange("marketingEmails", checked)
+              }
             />
           </div>
 
@@ -403,7 +426,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             </div>
             <Switch
               checked={settings.weeklyReports}
-              onCheckedChange={(checked) => handleInputChange('weeklyReports', checked)}
+              onCheckedChange={(checked) =>
+                handleInputChange("weeklyReports", checked)
+              }
             />
           </div>
 
@@ -416,7 +441,9 @@ export function AccountSettings({ onSave, initialData, loading = false, onLoadSe
             </div>
             <Switch
               checked={settings.securityAlerts}
-              onCheckedChange={(checked) => handleInputChange('securityAlerts', checked)}
+              onCheckedChange={(checked) =>
+                handleInputChange("securityAlerts", checked)
+              }
             />
           </div>
         </CardContent>

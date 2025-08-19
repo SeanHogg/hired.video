@@ -1,24 +1,25 @@
 // Account & Organization Management Service
 // Handles API calls for user invitations, role management, and account switching
 
-import { 
-  AccountUser, 
-  AccountUsersResponse, 
-  InviteUserRequest, 
-  InviteUserResponse, 
+import {
+  AccountUser,
+  AccountUsersResponse,
+  InviteUserRequest,
+  InviteUserResponse,
   UpdateUserRolesRequest,
   AccountSwitchContext,
   AccountOption,
-  MyVideoResumeRole
-} from '@/types/account';
+  MyVideoResumeRole,
+} from "@/types/account";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 class AccountService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem("authToken");
     return {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
@@ -29,23 +30,25 @@ class AccountService {
   async getAccountUsers(): Promise<AccountUser[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/users`, {
-        method: 'GET',
+        method: "GET",
         headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch account users: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch account users: ${response.statusText}`,
+        );
       }
 
       const data: AccountUsersResponse = await response.json();
-      
+
       if (data.errorMessage) {
         throw new Error(data.errorMessage);
       }
 
       return data.result || [];
     } catch (error) {
-      console.error('Error fetching account users:', error);
+      console.error("Error fetching account users:", error);
       throw error;
     }
   }
@@ -56,7 +59,7 @@ class AccountService {
   async inviteUser(request: InviteUserRequest): Promise<InviteUserResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/invite`, {
-        method: 'POST',
+        method: "POST",
         headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       });
@@ -68,7 +71,7 @@ class AccountService {
       const data: InviteUserResponse = await response.json();
       return data;
     } catch (error) {
-      console.error('Error inviting user:', error);
+      console.error("Error inviting user:", error);
       throw error;
     }
   }
@@ -79,7 +82,7 @@ class AccountService {
   async updateUserRoles(request: UpdateUserRolesRequest): Promise<void> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/roles`, {
-        method: 'PUT',
+        method: "PUT",
         headers: this.getAuthHeaders(),
         body: JSON.stringify(request),
       });
@@ -88,7 +91,7 @@ class AccountService {
         throw new Error(`Failed to update user roles: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error updating user roles:', error);
+      console.error("Error updating user roles:", error);
       throw error;
     }
   }
@@ -98,16 +101,19 @@ class AccountService {
    */
   async removeUser(userId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/users/${userId}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/account/users/${userId}`,
+        {
+          method: "DELETE",
+          headers: this.getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to remove user: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error removing user:', error);
+      console.error("Error removing user:", error);
       throw error;
     }
   }
@@ -117,17 +123,20 @@ class AccountService {
    */
   async resendInvitation(userId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/invite/resend`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ userId }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/account/invite/resend`,
+        {
+          method: "POST",
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ userId }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to resend invitation: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error resending invitation:', error);
+      console.error("Error resending invitation:", error);
       throw error;
     }
   }
@@ -138,12 +147,14 @@ class AccountService {
   async getAvailableAccounts(): Promise<AccountOption[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/available`, {
-        method: 'GET',
+        method: "GET",
         headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch available accounts: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch available accounts: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
@@ -159,10 +170,10 @@ class AccountService {
         logoUrl: account.logoUrl,
         memberCount: account.memberCount,
         isActive: account.isActive,
-        joinedDate: new Date(account.joinedDate)
+        joinedDate: new Date(account.joinedDate),
       }));
     } catch (error) {
-      console.error('Error fetching available accounts:', error);
+      console.error("Error fetching available accounts:", error);
       // Return empty array if API not implemented yet
       return [];
     }
@@ -174,7 +185,7 @@ class AccountService {
   async switchAccount(accountId: string): Promise<any> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/switch`, {
-        method: 'POST',
+        method: "POST",
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ accountId }),
       });
@@ -187,11 +198,11 @@ class AccountService {
       const switchResult = data.result;
 
       // Update local storage with new account context
-      localStorage.setItem('currentAccountId', accountId);
+      localStorage.setItem("currentAccountId", accountId);
 
       return switchResult;
     } catch (error) {
-      console.error('Error switching account:', error);
+      console.error("Error switching account:", error);
       throw error;
     }
   }
@@ -200,11 +211,11 @@ class AccountService {
    * Get current account context
    */
   getCurrentAccountContext(): AccountSwitchContext {
-    const currentAccountId = localStorage.getItem('currentAccountId');
+    const currentAccountId = localStorage.getItem("currentAccountId");
     // This will be populated by getAvailableAccounts()
     return {
       currentAccountId: currentAccountId || undefined,
-      availableAccounts: []
+      availableAccounts: [],
     };
   }
 
@@ -213,17 +224,20 @@ class AccountService {
    */
   async acceptInvitation(inviteId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/invite/accept`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ inviteId }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/account/invite/accept`,
+        {
+          method: "POST",
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ inviteId }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to accept invitation: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error accepting invitation:', error);
+      console.error("Error accepting invitation:", error);
       throw error;
     }
   }
@@ -233,17 +247,20 @@ class AccountService {
    */
   async rejectInvitation(inviteId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/invite/reject`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ inviteId }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/account/invite/reject`,
+        {
+          method: "POST",
+          headers: this.getAuthHeaders(),
+          body: JSON.stringify({ inviteId }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to reject invitation: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('Error rejecting invitation:', error);
+      console.error("Error rejecting invitation:", error);
       throw error;
     }
   }
@@ -253,24 +270,27 @@ class AccountService {
    */
   async getPendingInvitations(): Promise<AccountUser[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/invitations/pending`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/account/invitations/pending`,
+        {
+          method: "GET",
+          headers: this.getAuthHeaders(),
+        },
+      );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch pending invitations: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch pending invitations: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
       return data.result || [];
     } catch (error) {
-      console.error('Error fetching pending invitations:', error);
+      console.error("Error fetching pending invitations:", error);
       return [];
     }
   }
-
-
 
   /**
    * Get account settings
@@ -278,18 +298,20 @@ class AccountService {
   async getAccountSettings(): Promise<any> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/settings`, {
-        method: 'GET',
+        method: "GET",
         headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch account settings: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch account settings: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
       return data.result || data;
     } catch (error) {
-      console.error('Error fetching account settings:', error);
+      console.error("Error fetching account settings:", error);
       throw error;
     }
   }
@@ -300,19 +322,21 @@ class AccountService {
   async updateAccountSettings(settings: any): Promise<any> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/settings`, {
-        method: 'POST',
+        method: "POST",
         headers: this.getAuthHeaders(),
         body: JSON.stringify(settings),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update account settings: ${response.statusText}`);
+        throw new Error(
+          `Failed to update account settings: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
       return data.result || data;
     } catch (error) {
-      console.error('Error updating account settings:', error);
+      console.error("Error updating account settings:", error);
       throw error;
     }
   }
@@ -323,18 +347,20 @@ class AccountService {
   async getAccountAnalytics(): Promise<any> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/account/analytics`, {
-        method: 'GET',
+        method: "GET",
         headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch account analytics: ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch account analytics: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
       return data.result || data;
     } catch (error) {
-      console.error('Error fetching account analytics:', error);
+      console.error("Error fetching account analytics:", error);
       throw error;
     }
   }

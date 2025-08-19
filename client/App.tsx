@@ -205,9 +205,18 @@ const App = () => (
                   <Route path="/cookies" element={<CookiePolicy />} />
 
                   {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}
-                  <Route path="/embedded-resume/:identifier" element={<EmbeddedResume />} />
-                  <Route path="/embedded/resume/:identifier" element={<EmbeddedResume />} />
-                  <Route path="/embedded/resumes/:identifier" element={<EmbeddedResume />} />
+                  <Route
+                    path="/embedded-resume/:identifier"
+                    element={<EmbeddedResume />}
+                  />
+                  <Route
+                    path="/embedded/resume/:identifier"
+                    element={<EmbeddedResume />}
+                  />
+                  <Route
+                    path="/embedded/resumes/:identifier"
+                    element={<EmbeddedResume />}
+                  />
 
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

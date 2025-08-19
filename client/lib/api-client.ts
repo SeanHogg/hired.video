@@ -80,7 +80,10 @@ export class ApiClient {
 
   constructor(config: ApiClientConfig = {}) {
     // Use environment variable or default to localhost backend
-    this.baseUrl = config.baseUrl || import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    this.baseUrl =
+      config.baseUrl ||
+      import.meta.env.VITE_API_URL ||
+      "http://localhost:5000/api";
     this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {
@@ -385,7 +388,10 @@ export class ApiClient {
   }
 
   // Raw GET for endpoints that do not use the common { success, data } envelope
-  async getRaw<T>(endpoint: string, schema?: z.ZodSchema<T>): Promise<{ data: T }>{
+  async getRaw<T>(
+    endpoint: string,
+    schema?: z.ZodSchema<T>,
+  ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
     const response = await this.executeRequest(url, { method: "GET" });
 
@@ -404,11 +410,13 @@ export class ApiClient {
     }
 
     if (schema) {
-      const preprocessed = nullToUndefined ? nullToUndefined(responseData) : responseData;
+      const preprocessed = nullToUndefined
+        ? nullToUndefined(responseData)
+        : responseData;
       const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
       if (!validation.success) {
         throw new ValidationError(
-          `Invalid response data: ${validation.error.issues.map(i => i.message).join(", ")}`,
+          `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
         );
       }
       return { data: validation.data };

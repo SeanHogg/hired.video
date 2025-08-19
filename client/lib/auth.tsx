@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
-import { authService, type UserProfile, type LoginRequest, type RegisterRequest } from "./services/auth-service";
+import {
+  authService,
+  type UserProfile,
+  type LoginRequest,
+  type RegisterRequest,
+} from "./services/auth-service";
 
 export type UserRole = "job_seeker" | "recruiter" | "business";
 
@@ -27,8 +32,18 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<boolean>;
-  signup: (email: string, password: string, firstName: string, lastName: string, role?: UserRole) => Promise<boolean>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean,
+  ) => Promise<boolean>;
+  signup: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    role?: UserRole,
+  ) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
@@ -81,11 +96,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           logger.info("AuthProvider: authenticated; checking stored user");
           const storedUser = authService.getStoredUser();
           if (storedUser) {
-            logger.info("AuthProvider: found stored user; setting from storage (no /me fetch)");
+            logger.info(
+              "AuthProvider: found stored user; setting from storage (no /me fetch)",
+            );
             setUser(userProfileToUser(storedUser));
           } else {
             // Do not call /users/me globally; defer to /profile page
-            logger.info("AuthProvider: no stored user; deferring /Users/me fetch until /profile");
+            logger.info(
+              "AuthProvider: no stored user; deferring /Users/me fetch until /profile",
+            );
           }
         } else {
           logger.info("AuthProvider: not authenticated; skipping user fetch");
@@ -108,7 +127,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   }, [initialUser]);
 
-  const login = async (email: string, password: string, rememberMe = false): Promise<boolean> => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = false,
+  ): Promise<boolean> => {
     try {
       setIsLoading(true);
       await authService.login({ email, password, rememberMe });
@@ -128,7 +151,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     password: string,
     firstName: string,
     lastName: string,
-    role: UserRole = "job_seeker"
+    role: UserRole = "job_seeker",
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -173,7 +196,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
-  const updateProfile = async (updates: Partial<UserProfile>): Promise<void> => {
+  const updateProfile = async (
+    updates: Partial<UserProfile>,
+  ): Promise<void> => {
     if (user) {
       try {
         const updatedProfile = await authService.updateProfile(updates);

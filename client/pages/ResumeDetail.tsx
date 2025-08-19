@@ -362,16 +362,20 @@ export default function ResumeDetail() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
                     <Avatar className="w-20 h-20 border-4 border-white/30">
-                      <AvatarImage src={(resume as any).metaResume?.basics?.image} />
+                      <AvatarImage
+                        src={(resume as any).metaResume?.basics?.image}
+                      />
                       <AvatarFallback className="text-2xl bg-white/20">
-                        {(resume as any).metaResume?.basics?.name?.split(" ")
+                        {(resume as any).metaResume?.basics?.name
+                          ?.split(" ")
                           .map((n: string) => n[0])
                           .join("") || "??"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <h1 className="text-4xl font-bold">
-                        {(resume as any).metaResume?.basics?.name || "Untitled Resume"}
+                        {(resume as any).metaResume?.basics?.name ||
+                          "Untitled Resume"}
                       </h1>
                       <p className="text-xl opacity-90">
                         {(resume as any).metaResume?.basics?.label || ""}
@@ -385,7 +389,9 @@ export default function ResumeDetail() {
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open(`mailto:${(resume as any).metaResume.basics.email}`)
+                          window.open(
+                            `mailto:${(resume as any).metaResume.basics.email}`,
+                          )
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -398,7 +404,9 @@ export default function ResumeDetail() {
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open(`tel:${(resume as any).metaResume.basics.phone}`)
+                          window.open(
+                            `tel:${(resume as any).metaResume.basics.phone}`,
+                          )
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -411,7 +419,10 @@ export default function ResumeDetail() {
                         variant="secondary"
                         size="sm"
                         onClick={() =>
-                          window.open((resume as any).metaResume.basics.url, "_blank")
+                          window.open(
+                            (resume as any).metaResume.basics.url,
+                            "_blank",
+                          )
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
                       >
@@ -454,7 +465,8 @@ export default function ResumeDetail() {
                           <DialogContent className="max-w-4xl">
                             <DialogHeader>
                               <DialogTitle>
-                                Video Resume - {(resume as any).metaResume?.basics?.name}
+                                Video Resume -{" "}
+                                {(resume as any).metaResume?.basics?.name}
                               </DialogTitle>
                             </DialogHeader>
                             <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
@@ -484,113 +496,133 @@ export default function ResumeDetail() {
           {/* Content */}
           <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
             {/* Work Experience Timeline */}
-            {(resume as any).metaResume?.work && (resume as any).metaResume.work.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Building className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Work Experience</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {(resume as any).metaResume.work.sort(
-                        (a, b) =>
-                          new Date(b.startDate || '').getTime() -
-                          new Date(a.startDate || '').getTime(),
-                      ).map((work, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={work.position || ''}
-                          subtitle={work.name || ''}
-                          startDate={work.startDate || ''}
-                          endDate={work.endDate || "Present"}
-                          description={work.summary || ''}
-                          highlights={work.highlights}
-                          icon={Building}
-                          isLast={index === (resume as any).metaResume!.work!.length - 1}
-                        />
-                      ))}
+            {(resume as any).metaResume?.work &&
+              (resume as any).metaResume.work.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <Building className="w-5 h-5 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
+                    <h2 className="text-3xl font-bold">Work Experience</h2>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        {(resume as any).metaResume.work
+                          .sort(
+                            (a, b) =>
+                              new Date(b.startDate || "").getTime() -
+                              new Date(a.startDate || "").getTime(),
+                          )
+                          .map((work, index) => (
+                            <TimelineItem
+                              key={index}
+                              title={work.position || ""}
+                              subtitle={work.name || ""}
+                              startDate={work.startDate || ""}
+                              endDate={work.endDate || "Present"}
+                              description={work.summary || ""}
+                              highlights={work.highlights}
+                              icon={Building}
+                              isLast={
+                                index ===
+                                (resume as any).metaResume!.work!.length - 1
+                              }
+                            />
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </section>
+              )}
 
             {/* Education Timeline */}
-            {(resume as any).metaResume?.education && (resume as any).metaResume.education.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <GraduationCap className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Education</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {(resume as any).metaResume.education.sort(
-                        (a, b) =>
-                          new Date(b.startDate || '').getTime() -
-                          new Date(a.startDate || '').getTime(),
-                      ).map((edu, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={`${edu.studyType || ''} in ${edu.area || ''}`}
-                          subtitle={edu.institution || ''}
-                          startDate={edu.startDate || ''}
-                          endDate={edu.endDate || ''}
-                          description={
-                            edu.score ? `GPA: ${edu.score}` : undefined
-                          }
-                          icon={GraduationCap}
-                          isLast={index === (resume as any).metaResume!.education!.length - 1}
-                        />
-                      ))}
+            {(resume as any).metaResume?.education &&
+              (resume as any).metaResume.education.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <GraduationCap className="w-5 h-5 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
+                    <h2 className="text-3xl font-bold">Education</h2>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        {(resume as any).metaResume.education
+                          .sort(
+                            (a, b) =>
+                              new Date(b.startDate || "").getTime() -
+                              new Date(a.startDate || "").getTime(),
+                          )
+                          .map((edu, index) => (
+                            <TimelineItem
+                              key={index}
+                              title={`${edu.studyType || ""} in ${edu.area || ""}`}
+                              subtitle={edu.institution || ""}
+                              startDate={edu.startDate || ""}
+                              endDate={edu.endDate || ""}
+                              description={
+                                edu.score ? `GPA: ${edu.score}` : undefined
+                              }
+                              icon={GraduationCap}
+                              isLast={
+                                index ===
+                                (resume as any).metaResume!.education!.length -
+                                  1
+                              }
+                            />
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </section>
+              )}
 
             {/* Volunteer Experience Timeline */}
-            {(resume as any).metaResume?.volunteer && (resume as any).metaResume.volunteer.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Volunteer Experience</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {(resume as any).metaResume.volunteer.sort(
-                        (a, b) =>
-                          new Date(b.startDate || '').getTime() -
-                          new Date(a.startDate || '').getTime(),
-                      ).map((volunteer, index) => (
-                        <TimelineItem
-                          key={index}
-                          title={volunteer.position || ''}
-                          subtitle={volunteer.organization || ''}
-                          startDate={volunteer.startDate || ''}
-                          endDate={volunteer.endDate || "Present"}
-                          description={volunteer.summary || ''}
-                          highlights={volunteer.highlights || undefined}
-                          icon={Heart}
-                          isLast={index === (resume as any).metaResume!.volunteer!.length - 1}
-                        />
-                      ))}
+            {(resume as any).metaResume?.volunteer &&
+              (resume as any).metaResume.volunteer.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <Heart className="w-5 h-5 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
+                    <h2 className="text-3xl font-bold">Volunteer Experience</h2>
+                  </div>
+
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        {(resume as any).metaResume.volunteer
+                          .sort(
+                            (a, b) =>
+                              new Date(b.startDate || "").getTime() -
+                              new Date(a.startDate || "").getTime(),
+                          )
+                          .map((volunteer, index) => (
+                            <TimelineItem
+                              key={index}
+                              title={volunteer.position || ""}
+                              subtitle={volunteer.organization || ""}
+                              startDate={volunteer.startDate || ""}
+                              endDate={volunteer.endDate || "Present"}
+                              description={volunteer.summary || ""}
+                              highlights={volunteer.highlights || undefined}
+                              icon={Heart}
+                              isLast={
+                                index ===
+                                (resume as any).metaResume!.volunteer!.length -
+                                  1
+                              }
+                            />
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </section>
+              )}
 
             {/* Resume Stats */}
             <Card>

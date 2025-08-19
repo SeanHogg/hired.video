@@ -3,7 +3,7 @@
  * Based on MyVideoResume.Abstractions.Communications namespace
  */
 
-import { UserProfile } from '@/lib/services/user-service';
+import { UserProfile } from "@/lib/services/user-service";
 
 // Backend enums - must match exactly
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -392,7 +392,8 @@ export interface CreateExternalContactRequest {
   preferredFrequency?: CommunicationFrequency;
 }
 
-export interface UpdateExternalContactRequest extends CreateExternalContactRequest {
+export interface UpdateExternalContactRequest
+  extends CreateExternalContactRequest {
   id: string;
 }
 

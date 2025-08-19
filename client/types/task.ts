@@ -3,7 +3,7 @@
  * Based on MyVideoResume.Abstractions.Productivity namespace
  */
 
-import { UserProfile } from '@/lib/services/user-service';
+import { UserProfile } from "@/lib/services/user-service";
 
 // Backend enums - must match exactly
 export enum TaskType {
@@ -148,9 +148,9 @@ export interface TaskUIState {
   id: string;
   title: string;
   description?: string;
-  type: 'onboarding' | 'interview' | 'recruiting' | 'sales' | 'general';
-  priority: 'low' | 'medium' | 'high';
-  status: 'todo' | 'in_progress' | 'completed';
+  type: "onboarding" | "interview" | "recruiting" | "sales" | "general";
+  priority: "low" | "medium" | "high";
+  status: "todo" | "in_progress" | "completed";
   startDate?: string;
   dueDate: string;
   createdAt: string;
@@ -160,63 +160,69 @@ export interface TaskUIState {
 }
 
 // Utility functions for type conversion
-export const mapBackendTaskTypeToUI = (taskType: TaskType): TaskUIState['type'] => {
+export const mapBackendTaskTypeToUI = (
+  taskType: TaskType,
+): TaskUIState["type"] => {
   switch (taskType) {
     case TaskType.Onboarding:
     case TaskType.OnboardingProfile:
     case TaskType.OnboardingProfileSettings:
     case TaskType.OnboardingPrivacy:
-      return 'onboarding';
+      return "onboarding";
     case TaskType.Interview:
-      return 'interview';
+      return "interview";
     case TaskType.Recruiter:
     case TaskType.Company:
-      return 'recruiting';
+      return "recruiting";
     case TaskType.General:
     default:
-      return 'general';
+      return "general";
   }
 };
 
-export const mapUITaskTypeToBackend = (type: TaskUIState['type']): TaskType => {
+export const mapUITaskTypeToBackend = (type: TaskUIState["type"]): TaskType => {
   switch (type) {
-    case 'onboarding':
+    case "onboarding":
       return TaskType.Onboarding;
-    case 'interview':
+    case "interview":
       return TaskType.Interview;
-    case 'recruiting':
+    case "recruiting":
       return TaskType.Recruiter;
-    case 'sales':
+    case "sales":
       return TaskType.Company;
-    case 'general':
+    case "general":
     default:
       return TaskType.General;
   }
 };
 
-export const mapBackendStatusToUI = (status: ProductivityItemStatus): TaskUIState['status'] => {
+export const mapBackendStatusToUI = (
+  status: ProductivityItemStatus,
+): TaskUIState["status"] => {
   switch (status) {
     case ProductivityItemStatus.ToDo:
     case ProductivityItemStatus.Open:
     case ProductivityItemStatus.Planning:
-      return 'todo';
+      return "todo";
     case ProductivityItemStatus.InProgress:
-      return 'in_progress';
+      return "in_progress";
     case ProductivityItemStatus.Completed:
     case ProductivityItemStatus.Closed:
-      return 'completed';
+      return "completed";
     default:
-      return 'todo';
+      return "todo";
   }
 };
 
-export const mapUIStatusToBackend = (status: TaskUIState['status']): ProductivityItemStatus => {
+export const mapUIStatusToBackend = (
+  status: TaskUIState["status"],
+): ProductivityItemStatus => {
   switch (status) {
-    case 'todo':
+    case "todo":
       return ProductivityItemStatus.ToDo;
-    case 'in_progress':
+    case "in_progress":
       return ProductivityItemStatus.InProgress;
-    case 'completed':
+    case "completed":
       return ProductivityItemStatus.Completed;
     default:
       return ProductivityItemStatus.ToDo;
@@ -234,6 +240,6 @@ export interface TaskFilters {
 }
 
 export interface TaskSortOptions {
-  field: 'start' | 'end' | 'creationDateTime' | 'updateDateTime' | 'text';
-  direction: 'asc' | 'desc';
+  field: "start" | "end" | "creationDateTime" | "updateDateTime" | "text";
+  direction: "asc" | "desc";
 }

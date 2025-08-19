@@ -39,12 +39,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { jobService, type JobFilters, type JobSummary } from "@/lib/services/job-service";
+import {
+  jobService,
+  type JobFilters,
+  type JobSummary,
+} from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
-
 
 export default function Jobs() {
   const {
@@ -58,9 +61,12 @@ export default function Jobs() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [jobsData, setJobsData] = useState<{ owned: JobWithOwnership[]; tracked: JobWithOwnership[] }>({
+  const [jobsData, setJobsData] = useState<{
+    owned: JobWithOwnership[];
+    tracked: JobWithOwnership[];
+  }>({
     owned: [],
-    tracked: []
+    tracked: [],
   });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
@@ -148,7 +154,10 @@ export default function Jobs() {
   };
 
   // Temporary stub until owned/tracked jobs are wired
-  const getJobsForUser = (): { owned: JobWithOwnership[]; tracked: JobWithOwnership[] } => {
+  const getJobsForUser = (): {
+    owned: JobWithOwnership[];
+    tracked: JobWithOwnership[];
+  } => {
     return { owned: [], tracked: [] };
   };
 
@@ -340,8 +349,12 @@ export default function Jobs() {
                     </div>
                   ) : jobs.length === 0 ? (
                     <div className="text-center py-12">
-                      <p className="text-gray-600 mb-4">No jobs found matching your criteria.</p>
-                      <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+                      <p className="text-gray-600 mb-4">
+                        No jobs found matching your criteria.
+                      </p>
+                      <Button onClick={() => setSearchFilters({})}>
+                        Clear Filters
+                      </Button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -354,11 +367,13 @@ export default function Jobs() {
                           companyId: (job as any).companyId || "",
                           location: job.location,
                           description: (job as any).description || "",
-                          salary: job.salaryMin && job.salaryMax
-                            ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
-                            : undefined,
+                          salary:
+                            job.salaryMin && job.salaryMax
+                              ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
+                              : undefined,
                           employmentType: job.employmentType,
-                          experienceLevel: (job as any).experienceLevel || "entry",
+                          experienceLevel:
+                            (job as any).experienceLevel || "entry",
                           postedDate: job.postedDate || "",
                           isRemote: job.isRemote || false,
                           status: "active" as const,
@@ -488,36 +503,35 @@ export default function Jobs() {
                 Featured Opportunities
               </h2>
               <div className="grid md:grid-cols-2 gap-6">
-                {jobs
-                  .slice(0, 2)
-                  .map((job) => {
-                    const jobMetadata = {
-                      id: job.id,
-                      slug: (job as any).slug || "",
-                      title: job.title,
-                      company: job.company,
-                      companyId: (job as any).companyId || "",
-                      location: job.location,
-                      description: (job as any).description || "",
-                      salary: job.salaryMin && job.salaryMax
+                {jobs.slice(0, 2).map((job) => {
+                  const jobMetadata = {
+                    id: job.id,
+                    slug: (job as any).slug || "",
+                    title: job.title,
+                    company: job.company,
+                    companyId: (job as any).companyId || "",
+                    location: job.location,
+                    description: (job as any).description || "",
+                    salary:
+                      job.salaryMin && job.salaryMax
                         ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
                         : undefined,
-                      employmentType: job.employmentType,
-                      experienceLevel: (job as any).experienceLevel || "entry",
-                      postedDate: job.postedDate || "",
-                      isRemote: job.isRemote || false,
-                      status: "active" as const,
-                      privacy: "public" as const,
-                      views: (job as any).views || 0,
-                      applications: (job as any).applications || 0,
-                      createdAt: (job as any).createdAt || "",
-                      updatedAt: (job as any).updatedAt || "",
-                      summary: (job as any).summary || "",
-                      userId: (job as any).userId || "",
-                    };
+                    employmentType: job.employmentType,
+                    experienceLevel: (job as any).experienceLevel || "entry",
+                    postedDate: job.postedDate || "",
+                    isRemote: job.isRemote || false,
+                    status: "active" as const,
+                    privacy: "public" as const,
+                    views: (job as any).views || 0,
+                    applications: (job as any).applications || 0,
+                    createdAt: (job as any).createdAt || "",
+                    updatedAt: (job as any).updatedAt || "",
+                    summary: (job as any).summary || "",
+                    userId: (job as any).userId || "",
+                  };
 
-                    return <JobCard key={job.id} job={jobMetadata} />;
-                  })}
+                  return <JobCard key={job.id} job={jobMetadata} />;
+                })}
               </div>
               <div className="text-center mt-8">
                 <Link to="/signup">

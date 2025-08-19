@@ -1,22 +1,34 @@
-import React from 'react';
-import { Bell, X, CheckCircle, AlertCircle, Info, AlertTriangle, Briefcase } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useSignalR } from '@/hooks/use-signalr';
-import { Notification } from '@/lib/services/signalr-service';
-import { formatDistanceToNow } from 'date-fns';
+import React from "react";
+import {
+  Bell,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  AlertTriangle,
+  Briefcase,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useSignalR } from "@/hooks/use-signalr";
+import { Notification } from "@/lib/services/signalr-service";
+import { formatDistanceToNow } from "date-fns";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
-    case 'success':
+    case "success":
       return <CheckCircle className="h-4 w-4 text-green-500" />;
-    case 'error':
+    case "error":
       return <AlertCircle className="h-4 w-4 text-red-500" />;
-    case 'warning':
+    case "warning":
       return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    case 'job_application':
+    case "job_application":
       return <Briefcase className="h-4 w-4 text-blue-500" />;
     default:
       return <Info className="h-4 w-4 text-blue-500" />;
@@ -24,16 +36,16 @@ const getNotificationIcon = (type: string) => {
 };
 
 const getNotificationBgColor = (type: string, isRead: boolean) => {
-  const opacity = isRead ? 'bg-opacity-50' : 'bg-opacity-100';
-  
+  const opacity = isRead ? "bg-opacity-50" : "bg-opacity-100";
+
   switch (type) {
-    case 'success':
+    case "success":
       return `bg-green-50 ${opacity}`;
-    case 'error':
+    case "error":
       return `bg-red-50 ${opacity}`;
-    case 'warning':
+    case "warning":
       return `bg-yellow-50 ${opacity}`;
-    case 'job_application':
+    case "job_application":
       return `bg-blue-50 ${opacity}`;
     default:
       return `bg-gray-50 ${opacity}`;
@@ -45,7 +57,10 @@ interface NotificationItemProps {
   onMarkAsRead: (id: string) => void;
 }
 
-const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMarkAsRead }) => {
+const NotificationItem: React.FC<NotificationItemProps> = ({
+  notification,
+  onMarkAsRead,
+}) => {
   const handleClick = () => {
     if (!notification.isRead) {
       onMarkAsRead(notification.id);
@@ -54,9 +69,10 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMar
 
   return (
     <div
-      className={`p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
-        getNotificationBgColor(notification.type, notification.isRead)
-      }`}
+      className={`p-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${getNotificationBgColor(
+        notification.type,
+        notification.isRead,
+      )}`}
       onClick={handleClick}
     >
       <div className="flex items-start space-x-3">
@@ -65,18 +81,24 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onMar
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <p className={`text-sm font-medium ${notification.isRead ? 'text-gray-600' : 'text-gray-900'}`}>
+            <p
+              className={`text-sm font-medium ${notification.isRead ? "text-gray-600" : "text-gray-900"}`}
+            >
               {notification.title}
             </p>
             {!notification.isRead && (
               <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
             )}
           </div>
-          <p className={`text-sm ${notification.isRead ? 'text-gray-500' : 'text-gray-700'} mt-1`}>
+          <p
+            className={`text-sm ${notification.isRead ? "text-gray-500" : "text-gray-700"} mt-1`}
+          >
             {notification.message}
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
+            {formatDistanceToNow(new Date(notification.timestamp), {
+              addSuffix: true,
+            })}
           </p>
         </div>
       </div>
@@ -92,9 +114,11 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected }) => {
   return (
     <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
       <div className="flex items-center space-x-2">
-        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+        <div
+          className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+        ></div>
         <span className="text-xs text-gray-600">
-          {isConnected ? 'Connected' : 'Disconnected'}
+          {isConnected ? "Connected" : "Disconnected"}
         </span>
       </div>
     </div>
@@ -102,14 +126,14 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected }) => {
 };
 
 const NotificationCenter: React.FC = () => {
-  const { 
-    notifications, 
-    isConnected, 
-    markNotificationAsRead, 
-    clearNotifications 
+  const {
+    notifications,
+    isConnected,
+    markNotificationAsRead,
+    clearNotifications,
   } = useSignalR();
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <Popover>
@@ -117,11 +141,11 @@ const NotificationCenter: React.FC = () => {
         <Button variant="ghost" size="sm" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
+            <Badge
+              variant="destructive"
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>
           )}
         </Button>
@@ -140,9 +164,9 @@ const NotificationCenter: React.FC = () => {
             </Button>
           )}
         </div>
-        
+
         <ConnectionStatus isConnected={isConnected} />
-        
+
         <ScrollArea className="h-96">
           {notifications.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
@@ -161,7 +185,7 @@ const NotificationCenter: React.FC = () => {
             </div>
           )}
         </ScrollArea>
-        
+
         {notifications.length > 0 && (
           <div className="p-3 border-t border-gray-200 bg-gray-50">
             <p className="text-xs text-gray-500 text-center">

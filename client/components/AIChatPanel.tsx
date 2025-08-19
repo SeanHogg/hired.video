@@ -17,10 +17,10 @@ import {
   type ChatMessage,
 } from "@/lib/services/ai-service";
 import { cn } from "@/lib/utils";
-  import Markdown from "@/components/Markdown";
-  import { useAuth } from "@/lib/auth";
-  import { Button as UiButton } from "@/components/ui/button";
-  import { Link } from "react-router-dom";
+import Markdown from "@/components/Markdown";
+import { useAuth } from "@/lib/auth";
+import { Button as UiButton } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 interface Message {
   id: string;
@@ -121,7 +121,8 @@ export default function AIChatPanel() {
   };
 
   const { user, isAuthenticated } = useAuth();
-  const isPro = user?.subscription === "pro" || user?.subscription === "enterprise";
+  const isPro =
+    user?.subscription === "pro" || user?.subscription === "enterprise";
 
   if (!isAIChatOpen) return null;
 
@@ -230,7 +231,9 @@ export default function AIChatPanel() {
                     variant="outline"
                     size="sm"
                     className="h-auto p-2 text-left justify-start"
-                    onClick={() => (isPro ? handleQuickSuggestion(suggestion.text) : undefined)}
+                    onClick={() =>
+                      isPro ? handleQuickSuggestion(suggestion.text) : undefined
+                    }
                     disabled={!isPro}
                   >
                     <Icon className="h-3 w-3 mr-2" />
@@ -268,7 +271,9 @@ export default function AIChatPanel() {
           ) : (
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm text-muted-foreground">
-                {isAuthenticated ? "Upgrade to Pro to use the AI Assistant." : "Sign in to upgrade to Pro and use the AI Assistant."}
+                {isAuthenticated
+                  ? "Upgrade to Pro to use the AI Assistant."
+                  : "Sign in to upgrade to Pro and use the AI Assistant."}
               </div>
               <div className="flex gap-2">
                 {!isAuthenticated && (

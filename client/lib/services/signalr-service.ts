@@ -1,10 +1,10 @@
-import * as signalR from '@microsoft/signalr';
+import * as signalR from "@microsoft/signalr";
 
 export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'job_application';
+  type: "info" | "success" | "warning" | "error" | "job_application";
   data?: any;
   timestamp: string;
   isRead: boolean;
@@ -13,13 +13,15 @@ export interface Notification {
 export interface UserStatusUpdate {
   userId: string;
   userName: string;
-  status: 'online' | 'away' | 'busy' | 'offline';
+  status: "online" | "away" | "busy" | "offline";
   timestamp: string;
 }
 
 export type NotificationHandler = (notification: Notification) => void;
 export type UserStatusHandler = (statusUpdate: UserStatusUpdate) => void;
-export type ConnectionStateHandler = (state: signalR.HubConnectionState) => void;
+export type ConnectionStateHandler = (
+  state: signalR.HubConnectionState,
+) => void;
 
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
@@ -32,15 +34,15 @@ class SignalRService {
   }
 
   private initializeConnection(): void {
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    
+    const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(`${apiBaseUrl}/api/hubs/notifications`, {
         accessTokenFactory: () => {
           // Get the auth token from localStorage
-          return localStorage.getItem('authToken') || '';
+          return localStorage.getItem("authToken") || "";
         },
-        withCredentials: true
+        withCredentials: true,
       })
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
@@ -49,7 +51,7 @@ class SignalRService {
           if (retryContext.previousRetryCount === 1) return 2000;
           if (retryContext.previousRetryCount === 2) return 10000;
           return 30000;
-        }
+        },
       })
       .configureLogging(signalR.LogLevel.Information)
       .build();
@@ -61,46 +63,55 @@ class SignalRService {
     if (!this.connection) return;
 
     // Handle incoming notifications
-    this.connection.on('ReceiveNotification', (notification: Notification) => {
-      console.log('Received notification:', notification);
-      this.notificationHandlers.forEach(handler => handler(notification));
+    this.connection.on("ReceiveNotification", (notification: Notification) => {
+      console.log("Received notification:", notification);
+      this.notificationHandlers.forEach((handler) => handler(notification));
     });
 
     // Handle user status changes
-    this.connection.on('UserStatusChanged', (statusUpdate: UserStatusUpdate) => {
-      console.log('User status changed:', statusUpdate);
-      this.userStatusHandlers.forEach(handler => handler(statusUpdate));
-    });
+    this.connection.on(
+      "UserStatusChanged",
+      (statusUpdate: UserStatusUpdate) => {
+        console.log("User status changed:", statusUpdate);
+        this.userStatusHandlers.forEach((handler) => handler(statusUpdate));
+      },
+    );
 
     // Handle broadcast messages
-    this.connection.on('BroadcastMessage', (data: any) => {
-      console.log('Broadcast message:', data);
+    this.connection.on("BroadcastMessage", (data: any) => {
+      console.log("Broadcast message:", data);
       const notification: Notification = {
         id: `broadcast_${Date.now()}`,
-        title: 'System Announcement',
+        title: "System Announcement",
         message: data.message,
-        type: 'info',
+        type: "info",
         data: data,
         timestamp: data.timestamp,
-        isRead: false
+        isRead: false,
       };
-      this.notificationHandlers.forEach(handler => handler(notification));
+      this.notificationHandlers.forEach((handler) => handler(notification));
     });
 
     // Handle connection state changes
     this.connection.onreconnecting(() => {
-      console.log('SignalR reconnecting...');
-      this.connectionStateHandlers.forEach(handler => handler(signalR.HubConnectionState.Reconnecting));
+      console.log("SignalR reconnecting...");
+      this.connectionStateHandlers.forEach((handler) =>
+        handler(signalR.HubConnectionState.Reconnecting),
+      );
     });
 
     this.connection.onreconnected(() => {
-      console.log('SignalR reconnected');
-      this.connectionStateHandlers.forEach(handler => handler(signalR.HubConnectionState.Connected));
+      console.log("SignalR reconnected");
+      this.connectionStateHandlers.forEach((handler) =>
+        handler(signalR.HubConnectionState.Connected),
+      );
     });
 
     this.connection.onclose(() => {
-      console.log('SignalR connection closed');
-      this.connectionStateHandlers.forEach(handler => handler(signalR.HubConnectionState.Disconnected));
+      console.log("SignalR connection closed");
+      this.connectionStateHandlers.forEach((handler) =>
+        handler(signalR.HubConnectionState.Disconnected),
+      );
     });
   }
 
@@ -112,22 +123,27 @@ class SignalRService {
     if (this.connection?.state === signalR.HubConnectionState.Disconnected) {
       try {
         await this.connection.start();
-        console.log('SignalR connection started');
-        this.connectionStateHandlers.forEach(handler => handler(signalR.HubConnectionState.Connected));
+        console.log("SignalR connection started");
+        this.connectionStateHandlers.forEach((handler) =>
+          handler(signalR.HubConnectionState.Connected),
+        );
       } catch (error) {
-        console.error('Error starting SignalR connection:', error);
+        console.error("Error starting SignalR connection:", error);
         throw error;
       }
     }
   }
 
   async stop(): Promise<void> {
-    if (this.connection && this.connection.state !== signalR.HubConnectionState.Disconnected) {
+    if (
+      this.connection &&
+      this.connection.state !== signalR.HubConnectionState.Disconnected
+    ) {
       try {
         await this.connection.stop();
-        console.log('SignalR connection stopped');
+        console.log("SignalR connection stopped");
       } catch (error) {
-        console.error('Error stopping SignalR connection:', error);
+        console.error("Error stopping SignalR connection:", error);
       }
     }
   }
@@ -135,7 +151,7 @@ class SignalRService {
   async joinGroup(groupName: string): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       try {
-        await this.connection.invoke('JoinGroup', groupName);
+        await this.connection.invoke("JoinGroup", groupName);
         console.log(`Joined group: ${groupName}`);
       } catch (error) {
         console.error(`Error joining group ${groupName}:`, error);
@@ -146,7 +162,7 @@ class SignalRService {
   async leaveGroup(groupName: string): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       try {
-        await this.connection.invoke('LeaveGroup', groupName);
+        await this.connection.invoke("LeaveGroup", groupName);
         console.log(`Left group: ${groupName}`);
       } catch (error) {
         console.error(`Error leaving group ${groupName}:`, error);
@@ -154,10 +170,12 @@ class SignalRService {
     }
   }
 
-  async updateStatus(status: 'online' | 'away' | 'busy' | 'offline'): Promise<void> {
+  async updateStatus(
+    status: "online" | "away" | "busy" | "offline",
+  ): Promise<void> {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
       try {
-        await this.connection.invoke('UpdateStatus', status);
+        await this.connection.invoke("UpdateStatus", status);
         console.log(`Status updated to: ${status}`);
       } catch (error) {
         console.error(`Error updating status to ${status}:`, error);

@@ -18,14 +18,24 @@ export const UserProfileSchema = z.object({
   firstName: nullableString(),
   lastName: nullableString(),
   // Backend may return numeric enum for role; accept string or number
-  role: z.union([z.string(), z.number()]).nullable().transform(val => val === null ? undefined : (typeof val === 'number' ? String(val) : val)).optional(),
+  role: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .transform((val) =>
+      val === null ? undefined : typeof val === "number" ? String(val) : val,
+    )
+    .optional(),
   profilePicture: nullableString(),
   bio: nullableString(),
   location: nullableString(),
   website: nullableString(),
   linkedIn: nullableString(),
   github: nullableString(),
-  skills: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
+  skills: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   openToWork: nullableBoolean(),
   slug: nullableString(),
   createdAt: nullableString(),
@@ -42,11 +52,19 @@ export const PublicUserSchema = z.object({
   location: nullableString(),
   currentRole: nullableString(),
   currentCompany: nullableString(),
-  role: z.union([z.string(), z.number()]).nullable().transform(val => val === null ? undefined : val).optional(),
+  role: z
+    .union([z.string(), z.number()])
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   isVerified: nullableBoolean(),
   isPremium: nullableBoolean(),
   openToWork: nullableBoolean(),
-  skills: z.array(z.string()).nullable().transform(val => val === null ? undefined : val).optional(),
+  skills: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   profileViews: nullableNumber(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
@@ -75,7 +93,11 @@ export const UserFiltersSchema = z.object({
 });
 
 export const PaginatedUsersSchema = z.object({
-  items: z.array(UserProfileSchema).nullable().transform(val => val === null ? undefined : val).optional(),
+  items: z
+    .array(UserProfileSchema)
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   total: nullableNumber(),
   page: nullableNumber(),
   limit: nullableNumber(),
@@ -85,7 +107,11 @@ export const PaginatedUsersSchema = z.object({
 
 // Matches API pagination shape for public users
 export const PaginatedPublicUsersSchema = z.object({
-  items: z.array(PublicUserSchema).nullable().transform(val => val === null ? undefined : val).optional(),
+  items: z
+    .array(PublicUserSchema)
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   total: nullableNumber(),
   page: nullableNumber(),
   limit: nullableNumber(),
@@ -126,7 +152,7 @@ export class UserService {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           if (Array.isArray(value)) {
-            value.forEach(v => params.append(key, v.toString()));
+            value.forEach((v) => params.append(key, v.toString()));
           } else {
             params.append(key, value.toString());
           }
@@ -134,8 +160,11 @@ export class UserService {
       });
     }
 
-    const endpoint = `/Users/public${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await apiClient.get<PaginatedPublicUsers>(endpoint, PaginatedPublicUsersSchema);
+    const endpoint = `/Users/public${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await apiClient.get<PaginatedPublicUsers>(
+      endpoint,
+      PaginatedPublicUsersSchema,
+    );
 
     return response.data;
   }
@@ -153,9 +182,12 @@ export class UserService {
     const normalized: UserProfile = {
       id: String(payload.id ?? ""),
       email: payload.email ?? undefined,
-      firstName: (payload.firstName ?? dataBlock.firstName) ?? undefined,
-      lastName: (payload.lastName ?? dataBlock.lastName) ?? undefined,
-      role: typeof payload.role === "number" ? String(payload.role) : (payload.role ?? undefined),
+      firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
+      lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
+      role:
+        typeof payload.role === "number"
+          ? String(payload.role)
+          : (payload.role ?? undefined),
       profilePicture: (payload.profilePicture ?? dataBlock.avatar) || undefined,
       bio: dataBlock.summary ?? undefined,
       location: dataBlock.location ?? undefined,
@@ -176,7 +208,10 @@ export class UserService {
    * Get user by slug/username
    */
   async getUserBySlug(slug: string): Promise<UserProfile> {
-    const response = await apiClient.get<UserProfile>(`/Users/slug/${slug}`, UserProfileSchema);
+    const response = await apiClient.get<UserProfile>(
+      `/Users/slug/${slug}`,
+      UserProfileSchema,
+    );
     return response.data;
   }
 
@@ -184,17 +219,22 @@ export class UserService {
    * Get current user profile
    */
   async getCurrentUser(): Promise<UserProfile> {
-    const response = await apiClient.get<UserProfile>("/Users/me", UserProfileSchema);
+    const response = await apiClient.get<UserProfile>(
+      "/Users/me",
+      UserProfileSchema,
+    );
     return response.data;
   }
-
-
 
   /**
    * Update current user profile
    */
   async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
-    const response = await apiClient.put<UserProfile>("/Users/me", updates, UserProfileSchema);
+    const response = await apiClient.put<UserProfile>(
+      "/Users/me",
+      updates,
+      UserProfileSchema,
+    );
     return response.data;
   }
 
@@ -212,11 +252,13 @@ export class UserService {
   /**
    * Send connection request
    */
-  async sendConnectionRequest(request: SendConnectionRequest): Promise<Connection> {
+  async sendConnectionRequest(
+    request: SendConnectionRequest,
+  ): Promise<Connection> {
     const response = await apiClient.post<Connection>(
       "/Users/connections",
       request,
-      ConnectionSchema
+      ConnectionSchema,
     );
     return response.data;
   }
@@ -227,7 +269,7 @@ export class UserService {
   async getMyConnections(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
       "/Users/me/connections",
-      z.array(ConnectionSchema)
+      z.array(ConnectionSchema),
     );
     return response.data;
   }
@@ -238,7 +280,7 @@ export class UserService {
   async getPendingConnectionRequests(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
       "/Users/me/connections/pending",
-      z.array(ConnectionSchema)
+      z.array(ConnectionSchema),
     );
     return response.data;
   }
@@ -263,7 +305,7 @@ export class UserService {
   async getUserConnections(userId: string): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
       `/Users/${userId}/connections`,
-      z.array(ConnectionSchema)
+      z.array(ConnectionSchema),
     );
     return response.data;
   }
@@ -271,11 +313,14 @@ export class UserService {
   /**
    * Check connection status between two users
    */
-  async getConnectionStatus(fromUserId: string, toUserId: string): Promise<Connection | null> {
+  async getConnectionStatus(
+    fromUserId: string,
+    toUserId: string,
+  ): Promise<Connection | null> {
     try {
       const response = await apiClient.get<Connection>(
         `/Users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
-        ConnectionSchema
+        ConnectionSchema,
       );
       return response.data;
     } catch (error) {
@@ -290,7 +335,7 @@ export class UserService {
   async getRecommendedConnections(): Promise<UserProfile[]> {
     const response = await apiClient.get<UserProfile[]>(
       "/Users/me/recommendations",
-      z.array(UserProfileSchema)
+      z.array(UserProfileSchema),
     );
     return response.data;
   }
@@ -306,7 +351,7 @@ export class UserService {
     try {
       const response = await apiClient.get<{ canMessage: boolean }>(
         `/Users/${userId}/can-message`,
-        z.object({ canMessage: z.boolean() })
+        z.object({ canMessage: z.boolean() }),
       );
       return response.data.canMessage;
     } catch (error) {
@@ -332,7 +377,7 @@ export class UserService {
         resumeCount: z.number(),
         connectionCount: z.number(),
         jobApplicationCount: z.number(),
-      })
+      }),
     );
     return response.data;
   }

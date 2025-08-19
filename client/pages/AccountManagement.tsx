@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Users,
   UserPlus,
@@ -17,25 +17,31 @@ import {
   BarChart3,
   Zap,
   Target,
-  Network
-} from 'lucide-react';
-import Footer from '@/components/Footer';
-import Navigation from '@/components/Navigation';
-import Sidebar from '@/components/Sidebar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+  Network,
+} from "lucide-react";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { useSidebar } from '@/hooks/use-sidebar';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/lib/auth';
-import { accountService } from '@/lib/services/account-service';
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
+import { accountService } from "@/lib/services/account-service";
 import {
   AccountUser,
   InviteStatus,
@@ -44,13 +50,13 @@ import {
   getInviteStatusDisplayName,
   getInviteStatusColor,
   canManageUsers,
-  canEditRoles
-} from '@/types/account';
-import { InviteUserModal } from '@/components/account/InviteUserModal';
-import { EditRolesModal } from '@/components/account/EditRolesModal';
-import { AccountSettings } from '@/components/account/AccountSettings';
-import { AccountAnalytics } from '@/components/account/AccountAnalytics';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+  canEditRoles,
+} from "@/types/account";
+import { InviteUserModal } from "@/components/account/InviteUserModal";
+import { EditRolesModal } from "@/components/account/EditRolesModal";
+import { AccountSettings } from "@/components/account/AccountSettings";
+import { AccountAnalytics } from "@/components/account/AccountAnalytics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AccountManagement() {
   const [users, setUsers] = useState<AccountUser[]>([]);
@@ -59,7 +65,7 @@ export default function AccountManagement() {
   const [selectedUser, setSelectedUser] = useState<AccountUser | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [editRolesModalOpen, setEditRolesModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState("users");
   const { toast } = useToast();
   const {
     sidebarOpen,
@@ -86,12 +92,13 @@ export default function AccountManagement() {
       const accountUsers = await accountService.getAccountUsers();
       setUsers(accountUsers);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load account users';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load account users";
       setError(errorMessage);
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -102,37 +109,42 @@ export default function AccountManagement() {
     try {
       await accountService.inviteUser(inviteData);
       toast({
-        title: 'Success',
-        description: 'User invitation sent successfully',
+        title: "Success",
+        description: "User invitation sent successfully",
       });
       setInviteModalOpen(false);
       loadAccountUsers(); // Refresh the list
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to invite user';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to invite user";
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
 
-  const handleUpdateRoles = async (userId: string, roles: MyVideoResumeRole[]) => {
+  const handleUpdateRoles = async (
+    userId: string,
+    roles: MyVideoResumeRole[],
+  ) => {
     try {
       await accountService.updateUserRoles({ userId, roles });
       toast({
-        title: 'Success',
-        description: 'User roles updated successfully',
+        title: "Success",
+        description: "User roles updated successfully",
       });
       setEditRolesModalOpen(false);
       setSelectedUser(null);
       loadAccountUsers(); // Refresh the list
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update user roles';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update user roles";
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -141,38 +153,42 @@ export default function AccountManagement() {
     try {
       await accountService.resendInvitation(userId);
       toast({
-        title: 'Success',
-        description: 'Invitation resent successfully',
+        title: "Success",
+        description: "Invitation resent successfully",
       });
       loadAccountUsers(); // Refresh the list
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to resend invitation';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to resend invitation";
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
 
   const handleRemoveUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to remove this user from the account?')) {
+    if (
+      !confirm("Are you sure you want to remove this user from the account?")
+    ) {
       return;
     }
 
     try {
       await accountService.removeUser(userId);
       toast({
-        title: 'Success',
-        description: 'User removed successfully',
+        title: "Success",
+        description: "User removed successfully",
       });
       loadAccountUsers(); // Refresh the list
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove user';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to remove user";
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -202,11 +218,11 @@ export default function AccountManagement() {
         description: "Account settings have been updated successfully.",
       });
     } catch (error) {
-      throw new Error('Failed to save settings');
+      throw new Error("Failed to save settings");
     }
   };
 
-  const handleExportAnalytics = (format: 'csv' | 'pdf') => {
+  const handleExportAnalytics = (format: "csv" | "pdf") => {
     // In a real app, this would generate and download the export
     toast({
       title: "Export started",
@@ -282,9 +298,10 @@ export default function AccountManagement() {
                   Manage Your Team and Organization
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Streamline your business operations with powerful account management tools.
-                  Invite team members, assign roles, track analytics, and manage permissions
-                  all from one centralized dashboard.
+                  Streamline your business operations with powerful account
+                  management tools. Invite team members, assign roles, track
+                  analytics, and manage permissions all from one centralized
+                  dashboard.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -326,8 +343,9 @@ export default function AccountManagement() {
                     <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
                     <CardTitle>Analytics Dashboard</CardTitle>
                     <CardDescription>
-                      Track team performance, user engagement, and organizational
-                      metrics with comprehensive analytics and reporting.
+                      Track team performance, user engagement, and
+                      organizational metrics with comprehensive analytics and
+                      reporting.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -338,7 +356,8 @@ export default function AccountManagement() {
                     <CardTitle>Security & Compliance</CardTitle>
                     <CardDescription>
                       Enterprise-grade security with role-based access control,
-                      audit logs, and compliance features for your peace of mind.
+                      audit logs, and compliance features for your peace of
+                      mind.
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -355,10 +374,12 @@ export default function AccountManagement() {
                       <Zap className="h-6 w-6 text-brand-purple" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Streamlined Operations</h3>
+                      <h3 className="font-semibold mb-2">
+                        Streamlined Operations
+                      </h3>
                       <p className="text-muted-foreground">
-                        Centralize all your team management tasks in one intuitive
-                        dashboard for maximum efficiency.
+                        Centralize all your team management tasks in one
+                        intuitive dashboard for maximum efficiency.
                       </p>
                     </div>
                   </div>
@@ -369,8 +390,8 @@ export default function AccountManagement() {
                     <div>
                       <h3 className="font-semibold mb-2">Role-Based Access</h3>
                       <p className="text-muted-foreground">
-                        Assign specific roles and permissions to ensure team members
-                        have access to exactly what they need.
+                        Assign specific roles and permissions to ensure team
+                        members have access to exactly what they need.
                       </p>
                     </div>
                   </div>
@@ -407,8 +428,8 @@ export default function AccountManagement() {
                   Ready to Transform Your Team Management?
                 </h2>
                 <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  Join thousands of organizations already using our platform
-                  to streamline their operations and boost productivity.
+                  Join thousands of organizations already using our platform to
+                  streamline their operations and boost productivity.
                 </p>
                 <Link to="/signup">
                   <Button
@@ -477,11 +498,18 @@ export default function AccountManagement() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Account Management</h1>
-                <p className="text-gray-600 mt-2">Manage your team members and account settings</p>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Account Management
+                </h1>
+                <p className="text-gray-600 mt-2">
+                  Manage your team members and account settings
+                </p>
               </div>
-              {canManage && activeTab === 'users' && (
-                <Button onClick={() => setInviteModalOpen(true)} className="flex items-center gap-2">
+              {canManage && activeTab === "users" && (
+                <Button
+                  onClick={() => setInviteModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
                   <UserPlus className="h-4 w-4" />
                   Invite User
                 </Button>
@@ -497,7 +525,6 @@ export default function AccountManagement() {
               </TabsList>
 
               <TabsContent value="users" className="space-y-6">
-
                 {/* Error State */}
                 {error && (
                   <Card className="border-red-200 bg-red-50">
@@ -510,112 +537,139 @@ export default function AccountManagement() {
                   </Card>
                 )}
 
-      {/* Users List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Team Members ({users.length})
-          </CardTitle>
-          <CardDescription>
-            Manage your account users, their roles, and permissions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {users.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No team members found</p>
-              {canManage && (
-                <Button 
-                  variant="outline" 
-                  className="mt-4"
-                  onClick={() => setInviteModalOpen(true)}
-                >
-                  Invite your first team member
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {users.map((user) => (
-                <div 
-                  key={user.id} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar>
-                      <AvatarImage src={user.userProfile?.avatarUrl} />
-                      <AvatarFallback>
-                        {user.userProfile?.firstName?.[0]}{user.userProfile?.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">
-                          {user.userProfile?.firstName} {user.userProfile?.lastName}
-                        </h3>
-                        <Badge 
-                          variant="secondary" 
-                          className={getInviteStatusColor(user.inviteStatus)}
-                        >
-                          {getStatusIcon(user.inviteStatus)}
-                          <span className="ml-1">{getInviteStatusDisplayName(user.inviteStatus)}</span>
-                        </Badge>
+                {/* Users List */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Team Members ({users.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Manage your account users, their roles, and permissions
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {users.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No team members found</p>
+                        {canManage && (
+                          <Button
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => setInviteModalOpen(true)}
+                          >
+                            Invite your first team member
+                          </Button>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-600">{user.userProfile?.email}</p>
-                      <div className="flex gap-1 mt-1">
-                        {user.rolesAssigned?.map((role) => (
-                          <Badge key={role} variant="outline" className="text-xs">
-                            {getRoleDisplayName(role)}
-                          </Badge>
+                    ) : (
+                      <div className="space-y-4">
+                        {users.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                          >
+                            <div className="flex items-center gap-4">
+                              <Avatar>
+                                <AvatarImage
+                                  src={user.userProfile?.avatarUrl}
+                                />
+                                <AvatarFallback>
+                                  {user.userProfile?.firstName?.[0]}
+                                  {user.userProfile?.lastName?.[0]}
+                                </AvatarFallback>
+                              </Avatar>
+
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-medium">
+                                    {user.userProfile?.firstName}{" "}
+                                    {user.userProfile?.lastName}
+                                  </h3>
+                                  <Badge
+                                    variant="secondary"
+                                    className={getInviteStatusColor(
+                                      user.inviteStatus,
+                                    )}
+                                  >
+                                    {getStatusIcon(user.inviteStatus)}
+                                    <span className="ml-1">
+                                      {getInviteStatusDisplayName(
+                                        user.inviteStatus,
+                                      )}
+                                    </span>
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {user.userProfile?.email}
+                                </p>
+                                <div className="flex gap-1 mt-1">
+                                  {user.rolesAssigned?.map((role) => (
+                                    <Badge
+                                      key={role}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {getRoleDisplayName(role)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {canManage &&
+                              user.inviteStatus !== InviteStatus.Owner && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {canEditRoles(
+                                      currentUserRoles,
+                                      user.rolesAssigned || [],
+                                    ) && (
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setSelectedUser(user);
+                                          setEditRolesModalOpen(true);
+                                        }}
+                                      >
+                                        <Shield className="h-4 w-4 mr-2" />
+                                        Edit Roles
+                                      </DropdownMenuItem>
+                                    )}
+                                    {user.inviteStatus ===
+                                      InviteStatus.Invited && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          handleResendInvitation(user.userId)
+                                        }
+                                      >
+                                        <Mail className="h-4 w-4 mr-2" />
+                                        Resend Invitation
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        handleRemoveUser(user.userId)
+                                      }
+                                      className="text-red-600"
+                                    >
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      Remove User
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  </div>
-
-                  {canManage && user.inviteStatus !== InviteStatus.Owner && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canEditRoles(currentUserRoles, user.rolesAssigned || []) && (
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setEditRolesModalOpen(true);
-                            }}
-                          >
-                            <Shield className="h-4 w-4 mr-2" />
-                            Edit Roles
-                          </DropdownMenuItem>
-                        )}
-                        {user.inviteStatus === InviteStatus.Invited && (
-                          <DropdownMenuItem onClick={() => handleResendInvitation(user.userId)}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Resend Invitation
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem 
-                          onClick={() => handleRemoveUser(user.userId)}
-                          className="text-red-600"
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Remove User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="settings">
@@ -635,23 +689,23 @@ export default function AccountManagement() {
               </TabsContent>
             </Tabs>
 
-      {/* Modals */}
-      <InviteUserModal
-        open={inviteModalOpen}
-        onOpenChange={setInviteModalOpen}
-        onInvite={handleInviteUser}
-        currentUserRoles={currentUserRoles}
-      />
+            {/* Modals */}
+            <InviteUserModal
+              open={inviteModalOpen}
+              onOpenChange={setInviteModalOpen}
+              onInvite={handleInviteUser}
+              currentUserRoles={currentUserRoles}
+            />
 
-      {selectedUser && (
-        <EditRolesModal
-          open={editRolesModalOpen}
-          onOpenChange={setEditRolesModalOpen}
-          user={selectedUser}
-          onUpdateRoles={handleUpdateRoles}
-          currentUserRoles={currentUserRoles}
-        />
-      )}
+            {selectedUser && (
+              <EditRolesModal
+                open={editRolesModalOpen}
+                onOpenChange={setEditRolesModalOpen}
+                user={selectedUser}
+                onUpdateRoles={handleUpdateRoles}
+                currentUserRoles={currentUserRoles}
+              />
+            )}
           </div>
         </div>
 

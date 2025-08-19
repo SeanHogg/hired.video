@@ -84,7 +84,10 @@ export class SettingsService {
    * Get all user settings
    */
   async getAllSettings(): Promise<AllSettings> {
-    const response = await apiClient.get<AllSettings>("/Settings", AllSettingsSchema);
+    const response = await apiClient.get<AllSettings>(
+      "/Settings",
+      AllSettingsSchema,
+    );
     return response.data;
   }
 
@@ -98,7 +101,7 @@ export class SettingsService {
   async getNotificationSettings(): Promise<NotificationSettings> {
     const response = await apiClient.get<NotificationSettings>(
       "/Settings/notifications",
-      NotificationSettingsSchema
+      NotificationSettingsSchema,
     );
     return response.data;
   }
@@ -106,11 +109,13 @@ export class SettingsService {
   /**
    * Update notification settings
    */
-  async updateNotificationSettings(settings: Partial<NotificationSettings>): Promise<NotificationSettings> {
+  async updateNotificationSettings(
+    settings: Partial<NotificationSettings>,
+  ): Promise<NotificationSettings> {
     const response = await apiClient.put<NotificationSettings>(
       "/Settings/notifications",
       settings,
-      NotificationSettingsSchema
+      NotificationSettingsSchema,
     );
     return response.data;
   }
@@ -125,7 +130,7 @@ export class SettingsService {
   async getPrivacySettings(): Promise<PrivacySettings> {
     const response = await apiClient.get<PrivacySettings>(
       "/Settings/privacy",
-      PrivacySettingsSchema
+      PrivacySettingsSchema,
     );
     return response.data;
   }
@@ -133,11 +138,13 @@ export class SettingsService {
   /**
    * Update privacy settings
    */
-  async updatePrivacySettings(settings: Partial<PrivacySettings>): Promise<PrivacySettings> {
+  async updatePrivacySettings(
+    settings: Partial<PrivacySettings>,
+  ): Promise<PrivacySettings> {
     const response = await apiClient.put<PrivacySettings>(
       "/Settings/privacy",
       settings,
-      PrivacySettingsSchema
+      PrivacySettingsSchema,
     );
     return response.data;
   }
@@ -152,7 +159,7 @@ export class SettingsService {
   async getJobPreferences(): Promise<JobPreferences> {
     const response = await apiClient.get<JobPreferences>(
       "/Settings/job-preferences",
-      JobPreferencesSchema
+      JobPreferencesSchema,
     );
     return response.data;
   }
@@ -160,11 +167,13 @@ export class SettingsService {
   /**
    * Update job preferences
    */
-  async updateJobPreferences(preferences: Partial<JobPreferences>): Promise<JobPreferences> {
+  async updateJobPreferences(
+    preferences: Partial<JobPreferences>,
+  ): Promise<JobPreferences> {
     const response = await apiClient.put<JobPreferences>(
       "/Settings/job-preferences",
       preferences,
-      JobPreferencesSchema
+      JobPreferencesSchema,
     );
     return response.data;
   }
@@ -179,7 +188,7 @@ export class SettingsService {
   async getAccountSettings(): Promise<AccountSettings> {
     const response = await apiClient.get<AccountSettings>(
       "/Settings/account",
-      AccountSettingsSchema
+      AccountSettingsSchema,
     );
     return response.data;
   }
@@ -187,11 +196,13 @@ export class SettingsService {
   /**
    * Update account settings
    */
-  async updateAccountSettings(settings: Partial<AccountSettings>): Promise<AccountSettings> {
+  async updateAccountSettings(
+    settings: Partial<AccountSettings>,
+  ): Promise<AccountSettings> {
     const response = await apiClient.put<AccountSettings>(
       "/Settings/account",
       settings,
-      AccountSettingsSchema
+      AccountSettingsSchema,
     );
     return response.data;
   }
@@ -206,7 +217,7 @@ export class SettingsService {
   async getSecuritySettings(): Promise<SecuritySettings> {
     const response = await apiClient.get<SecuritySettings>(
       "/Settings/security",
-      SecuritySettingsSchema
+      SecuritySettingsSchema,
     );
     return response.data;
   }
@@ -214,11 +225,13 @@ export class SettingsService {
   /**
    * Update security settings
    */
-  async updateSecuritySettings(settings: Partial<SecuritySettings>): Promise<SecuritySettings> {
+  async updateSecuritySettings(
+    settings: Partial<SecuritySettings>,
+  ): Promise<SecuritySettings> {
     const response = await apiClient.put<SecuritySettings>(
       "/Settings/security",
       settings,
-      SecuritySettingsSchema
+      SecuritySettingsSchema,
     );
     return response.data;
   }
@@ -227,13 +240,16 @@ export class SettingsService {
    * Enable two-factor authentication
    */
   async enableTwoFactor(): Promise<{ qrCode: string; backupCodes: string[] }> {
-    const response = await apiClient.post<{ qrCode: string; backupCodes: string[] }>(
+    const response = await apiClient.post<{
+      qrCode: string;
+      backupCodes: string[];
+    }>(
       "/Settings/security/2fa/enable",
       {},
       z.object({
         qrCode: z.string(),
         backupCodes: z.array(z.string()),
-      })
+      }),
     );
     return response.data;
   }
@@ -253,10 +269,9 @@ export class SettingsService {
    * Export user data (GDPR compliance)
    */
   async exportUserData(): Promise<Blob> {
-    const response = await apiClient.request<Blob>(
-      "/Settings/export",
-      { method: "GET" }
-    );
+    const response = await apiClient.request<Blob>("/Settings/export", {
+      method: "GET",
+    });
     return response.data;
   }
 

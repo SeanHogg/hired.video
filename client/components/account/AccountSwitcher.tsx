@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, ChevronDown, Check, Crown, Shield } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from "react";
+import { Building2, ChevronDown, Check, Crown, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,16 +8,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { accountService } from '@/lib/services/account-service';
-import { 
-  AccountOption, 
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { accountService } from "@/lib/services/account-service";
+import {
+  AccountOption,
   MyVideoResumeRole,
-  getRoleDisplayName 
-} from '@/types/account';
+  getRoleDisplayName,
+} from "@/types/account";
 
 interface AccountSwitcherProps {
   className?: string;
@@ -32,7 +32,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
   useEffect(() => {
     loadAvailableAccounts();
     // Get current account from localStorage
-    const savedAccountId = localStorage.getItem('currentAccountId');
+    const savedAccountId = localStorage.getItem("currentAccountId");
     setCurrentAccountId(savedAccountId);
   }, []);
 
@@ -41,7 +41,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
       const availableAccounts = await accountService.getAvailableAccounts();
       setAccounts(availableAccounts);
     } catch (error) {
-      console.error('Failed to load available accounts:', error);
+      console.error("Failed to load available accounts:", error);
       // Don't show error toast for this as it's not critical
     }
   };
@@ -53,20 +53,21 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
     try {
       await accountService.switchAccount(accountId);
       setCurrentAccountId(accountId);
-      
+
       toast({
-        title: 'Account Switched',
-        description: 'Successfully switched to the selected account.',
+        title: "Account Switched",
+        description: "Successfully switched to the selected account.",
       });
 
       // Refresh the page to update all data with new account context
       window.location.reload();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to switch account';
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to switch account";
       toast({
-        title: 'Error',
+        title: "Error",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -74,7 +75,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
   };
 
   const getCurrentAccount = (): AccountOption | null => {
-    return accounts.find(account => account.id === currentAccountId) || null;
+    return accounts.find((account) => account.id === currentAccountId) || null;
   };
 
   const getRoleIcon = (role: MyVideoResumeRole) => {
@@ -91,13 +92,13 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
   const getRoleBadgeColor = (role: MyVideoResumeRole): string => {
     switch (role) {
       case MyVideoResumeRole.AccountOwner:
-        return 'bg-purple-100 text-purple-800';
+        return "bg-purple-100 text-purple-800";
       case MyVideoResumeRole.AccountAdmin:
-        return 'bg-blue-100 text-blue-800';
+        return "bg-blue-100 text-blue-800";
       case MyVideoResumeRole.Recruiter:
-        return 'bg-green-100 text-green-800';
+        return "bg-green-100 text-green-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -111,8 +112,8 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className={`flex items-center gap-2 ${className}`}
           disabled={loading}
         >
@@ -125,15 +126,17 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
             </Avatar>
             <div className="flex flex-col items-start">
               <span className="text-sm font-medium">
-                {currentAccount?.name || 'Select Account'}
+                {currentAccount?.name || "Select Account"}
               </span>
               {currentAccount && (
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className={`text-xs ${getRoleBadgeColor(currentAccount.role)}`}
                 >
                   {getRoleIcon(currentAccount.role)}
-                  <span className="ml-1">{getRoleDisplayName(currentAccount.role)}</span>
+                  <span className="ml-1">
+                    {getRoleDisplayName(currentAccount.role)}
+                  </span>
                 </Badge>
               )}
             </div>
@@ -141,11 +144,11 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      
+
       <DropdownMenuContent align="end" className="w-80">
         <DropdownMenuLabel>Switch Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
+
         {accounts.map((account) => (
           <DropdownMenuItem
             key={account.id}
@@ -158,7 +161,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
                 <Building2 className="h-4 w-4" />
               </AvatarFallback>
             </Avatar>
-            
+
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{account.name}</span>
@@ -167,12 +170,14 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
                 )}
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <Badge 
-                  variant="secondary" 
+                <Badge
+                  variant="secondary"
                   className={`text-xs ${getRoleBadgeColor(account.role)}`}
                 >
                   {getRoleIcon(account.role)}
-                  <span className="ml-1">{getRoleDisplayName(account.role)}</span>
+                  <span className="ml-1">
+                    {getRoleDisplayName(account.role)}
+                  </span>
                 </Badge>
                 {account.isOwner && (
                   <Badge variant="outline" className="text-xs">
@@ -183,14 +188,15 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
             </div>
           </DropdownMenuItem>
         ))}
-        
+
         <DropdownMenuSeparator />
-        
+
         <DropdownMenuItem className="text-sm text-gray-600 p-3">
           <div>
             <p className="font-medium">Need to create a new account?</p>
             <p className="text-xs mt-1">
-              Contact support or upgrade your plan to create additional accounts.
+              Contact support or upgrade your plan to create additional
+              accounts.
             </p>
           </div>
         </DropdownMenuItem>

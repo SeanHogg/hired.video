@@ -20,7 +20,13 @@ export const JobSchema = z.object({
   description: z.string(),
   requirements: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
-  employmentType: z.enum(["full_time", "part_time", "contract", "internship", "remote"]),
+  employmentType: z.enum([
+    "full_time",
+    "part_time",
+    "contract",
+    "internship",
+    "remote",
+  ]),
   experienceLevel: z.enum(["entry", "mid", "senior", "executive"]),
   salaryMin: z.number().optional(),
   salaryMax: z.number().optional(),
@@ -56,7 +62,13 @@ export const CreateJobSchema = z.object({
   description: z.string().min(1),
   requirements: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
-  employmentType: z.enum(["full_time", "part_time", "contract", "internship", "remote"]),
+  employmentType: z.enum([
+    "full_time",
+    "part_time",
+    "contract",
+    "internship",
+    "remote",
+  ]),
   experienceLevel: z.enum(["entry", "mid", "senior", "executive"]),
   salaryMin: z.number().optional(),
   salaryMax: z.number().optional(),
@@ -118,12 +130,12 @@ export class JobService {
    */
   async getPublicJobs(filters?: JobFilters): Promise<PaginatedJobs> {
     const params = new URLSearchParams();
-    
+
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           if (Array.isArray(value)) {
-            value.forEach(v => params.append(key, v.toString()));
+            value.forEach((v) => params.append(key, v.toString()));
           } else {
             params.append(key, value.toString());
           }
@@ -131,18 +143,35 @@ export class JobService {
       });
     }
 
-    const endpoint = `/Job${params.toString() ? `?${params.toString()}` : ''}`;
+    const endpoint = `/Job${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<any>(endpoint, PaginatedJobsSchema);
 
     const dto = response.data as any;
     const items = (dto.items || dto.Items || []) as unknown[];
-    const total = (dto.total ?? dto.Total ?? (Array.isArray(items) ? items.length : 0)) as number;
+    const total = (dto.total ??
+      dto.Total ??
+      (Array.isArray(items) ? items.length : 0)) as number;
     const page = (dto.page ?? dto.Page ?? 1) as number;
-    const limit = (dto.limit ?? dto.Limit ?? (Array.isArray(items) ? items.length : 0)) as number;
-    const hasNext = (dto.hasNext ?? dto.hasNextPage ?? dto.HasNextPage ?? (page * limit < total)) as boolean;
-    const hasPrev = (dto.hasPrev ?? dto.hasPreviousPage ?? dto.HasPreviousPage ?? (page > 1)) as boolean;
+    const limit = (dto.limit ??
+      dto.Limit ??
+      (Array.isArray(items) ? items.length : 0)) as number;
+    const hasNext = (dto.hasNext ??
+      dto.hasNextPage ??
+      dto.HasNextPage ??
+      page * limit < total) as boolean;
+    const hasPrev = (dto.hasPrev ??
+      dto.hasPreviousPage ??
+      dto.HasPreviousPage ??
+      page > 1) as boolean;
 
-    return { items: items as JobSummary[], total, page, limit, hasNext, hasPrev };
+    return {
+      items: items as JobSummary[],
+      total,
+      page,
+      limit,
+      hasNext,
+      hasPrev,
+    };
   }
 
   /**
@@ -151,9 +180,9 @@ export class JobService {
   async getUserJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
       "/Job/GetSummaryItems",
-      z.array(JobSummarySchema)
+      z.array(JobSummarySchema),
     );
-    
+
     return response.data;
   }
 
@@ -189,7 +218,7 @@ export class JobService {
         body: formData,
         headers: {}, // Remove Content-Type to let browser set it for FormData
       },
-      JobSchema
+      JobSchema,
     );
 
     return response.data;
@@ -202,9 +231,9 @@ export class JobService {
     const response = await apiClient.post<Job>(
       "/Job/Extract",
       { url },
-      JobSchema
+      JobSchema,
     );
-    
+
     return response.data;
   }
 
@@ -250,9 +279,9 @@ export class JobService {
   async getSavedJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
       "/Job/saved",
-      z.array(JobSummarySchema)
+      z.array(JobSummarySchema),
     );
-    
+
     return response.data;
   }
 

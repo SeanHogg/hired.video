@@ -102,7 +102,10 @@ export default function PeopleDetail() {
         setError(null);
 
         // Try to determine if the ID is a UUID or a slug
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const isUUID =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            id,
+          );
 
         let profile: UserProfile;
         if (isUUID) {
@@ -121,7 +124,9 @@ export default function PeopleDetail() {
         setUserProfile(profile);
       } catch (err) {
         console.error("Failed to load user profile:", err);
-        setError(err instanceof Error ? err.message : "Failed to load user profile");
+        setError(
+          err instanceof Error ? err.message : "Failed to load user profile",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -132,45 +137,56 @@ export default function PeopleDetail() {
 
   // For backward compatibility with existing code, create a person object
   // that matches the expected structure from mock data
-  const person = userProfile ? {
-    id: userProfile.id,
-    slug: userProfile.slug || `${userProfile.firstName}-${userProfile.lastName}`.toLowerCase().replace(/\s+/g, '-'),
-    data: {
-      firstName: userProfile.firstName,
-      lastName: userProfile.lastName,
-      avatar: userProfile.profilePicture,
-      headline: `${userProfile.role} | ${userProfile.location || 'Remote'}`,
-      summary: userProfile.bio || `${userProfile.firstName} ${userProfile.lastName} is a ${userProfile.role} professional.`,
-      location: {
-        city: userProfile.location?.split(',')[0]?.trim() || '',
-        state: userProfile.location?.split(',')[1]?.trim() || '',
-        country: 'USA',
-        remote: true,
-      },
-      contact: {
-        email: userProfile.email,
-        website: userProfile.website,
-        linkedin: userProfile.linkedIn,
-        github: userProfile.github,
-      },
-      experience: [], // TODO: Add experience data when available from API
-      education: [], // TODO: Add education data when available from API
-      skills: userProfile.skills?.map(skill => ({
-        name: skill,
-        level: 'Intermediate' as const,
-        endorsed: false,
-      })) || [],
-      projects: [], // TODO: Add projects data when available from API
-      openToWork: userProfile.openToWork || false,
-      openToOpportunities: ['full-time'],
-    },
-    createdAt: userProfile.createdAt,
-    updatedAt: userProfile.updatedAt,
-  } : null;
+  const person = userProfile
+    ? {
+        id: userProfile.id,
+        slug:
+          userProfile.slug ||
+          `${userProfile.firstName}-${userProfile.lastName}`
+            .toLowerCase()
+            .replace(/\s+/g, "-"),
+        data: {
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          avatar: userProfile.profilePicture,
+          headline: `${userProfile.role} | ${userProfile.location || "Remote"}`,
+          summary:
+            userProfile.bio ||
+            `${userProfile.firstName} ${userProfile.lastName} is a ${userProfile.role} professional.`,
+          location: {
+            city: userProfile.location?.split(",")[0]?.trim() || "",
+            state: userProfile.location?.split(",")[1]?.trim() || "",
+            country: "USA",
+            remote: true,
+          },
+          contact: {
+            email: userProfile.email,
+            website: userProfile.website,
+            linkedin: userProfile.linkedIn,
+            github: userProfile.github,
+          },
+          experience: [], // TODO: Add experience data when available from API
+          education: [], // TODO: Add education data when available from API
+          skills:
+            userProfile.skills?.map((skill) => ({
+              name: skill,
+              level: "Intermediate" as const,
+              endorsed: false,
+            })) || [],
+          projects: [], // TODO: Add projects data when available from API
+          openToWork: userProfile.openToWork || false,
+          openToOpportunities: ["full-time"],
+        },
+        createdAt: userProfile.createdAt,
+        updatedAt: userProfile.updatedAt,
+      }
+    : null;
 
   // For now, use mock data for tracking and connections until API is available
   const isTracked = false; // TODO: Implement with real API
-  const [connectionStatus] = useState<"none" | "pending_received" | "pending_sent" | "connected">("none"); // TODO: Implement with real API
+  const [connectionStatus] = useState<
+    "none" | "pending_received" | "pending_sent" | "connected"
+  >("none"); // TODO: Implement with real API
   const isOwnProfile = user && userProfile && userProfile.id === user.id;
 
   // Check if person has an active public resume via API (simplified: any public resumes exist?)
@@ -178,17 +194,26 @@ export default function PeopleDetail() {
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      if (!userProfile?.id) { setHasActivePublicResume(false); return; }
+      if (!userProfile?.id) {
+        setHasActivePublicResume(false);
+        return;
+      }
       try {
         const list = await resumeService.getPublicResumes(1, 1);
         if (!isMounted) return;
-        setHasActivePublicResume((list.items ?? []).some(r => (r.userId === userProfile.id) && r.isPublic));
+        setHasActivePublicResume(
+          (list.items ?? []).some(
+            (r) => r.userId === userProfile.id && r.isPublic,
+          ),
+        );
       } catch {
         if (isMounted) setHasActivePublicResume(false);
       }
     };
     load();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [userProfile?.id]);
 
   const toggleSection = (section: string) => {
@@ -293,7 +318,8 @@ export default function PeopleDetail() {
             <div className="max-w-4xl mx-auto text-center">
               <Alert className="mb-6">
                 <AlertDescription>
-                  {error || "The profile you're looking for doesn't exist or has been"}
+                  {error ||
+                    "The profile you're looking for doesn't exist or has been"}
                 </AlertDescription>
               </Alert>
               <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
@@ -415,7 +441,9 @@ export default function PeopleDetail() {
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
-                              <span>{getRoleLabel((person as any).role || "0")}</span>
+                              <span>
+                                {getRoleLabel((person as any).role || "0")}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1">
                               <MapPin className="h-4 w-4" />
@@ -438,7 +466,11 @@ export default function PeopleDetail() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor((person as any).status || "active")}>
+                          <Badge
+                            className={getStatusColor(
+                              (person as any).status || "active",
+                            )}
+                          >
                             {(person as any).status || "active"}
                           </Badge>
                           {person.data.openToWork && (
@@ -932,15 +964,17 @@ export default function PeopleDetail() {
                             Languages
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {(person.data as any).languages.map((language: any, index: number) => (
-                              <Badge
-                                key={index}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {language}
-                              </Badge>
-                            ))}
+                            {(person.data as any).languages.map(
+                              (language: any, index: number) => (
+                                <Badge
+                                  key={index}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {language}
+                                </Badge>
+                              ),
+                            )}
                           </div>
                         </div>
                       )}
@@ -952,15 +986,17 @@ export default function PeopleDetail() {
                             Interests
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {(person.data as any).interests.map((interest: any, index: number) => (
-                              <Badge
-                                key={index}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {interest}
-                              </Badge>
-                            ))}
+                            {(person.data as any).interests.map(
+                              (interest: any, index: number) => (
+                                <Badge
+                                  key={index}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {interest}
+                                </Badge>
+                              ),
+                            )}
                           </div>
                         </div>
                       )}
@@ -981,7 +1017,9 @@ export default function PeopleDetail() {
                           Last active
                         </span>
                         <span>
-                          {new Date((person as any).lastActiveAt || person.updatedAt).toLocaleDateString()}
+                          {new Date(
+                            (person as any).lastActiveAt || person.updatedAt,
+                          ).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -1025,14 +1063,16 @@ export default function PeopleDetail() {
                               Preferred Roles
                             </h4>
                             <div className="space-y-1">
-                              {(person.data as any).preferredRoles.map((role: any, index: number) => (
-                                <div
-                                  key={index}
-                                  className="text-xs text-muted-foreground"
-                                >
-                                  • {role}
-                                </div>
-                              ))}
+                              {(person.data as any).preferredRoles.map(
+                                (role: any, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    • {role}
+                                  </div>
+                                ),
+                              )}
                             </div>
                           </div>
                         )}

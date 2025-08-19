@@ -12,7 +12,7 @@ import { apiClient } from "../api-client";
 
 export const SearchResultItemSchema = z.object({
   id: z.string(),
-  type: z.enum(['job', 'resume', 'people', 'company']),
+  type: z.enum(["job", "resume", "people", "company"]),
   title: z.string().default("").optional(),
   name: z.string().default("").optional(),
   summary: z.string().default("").optional(),
@@ -49,7 +49,9 @@ export const SearchResponseSchema = z.object({
 
 export const SearchFiltersSchema = z.object({
   search: z.string().optional(),
-  category: z.enum(['all', 'jobs', 'resumes', 'people', 'companies']).optional(),
+  category: z
+    .enum(["all", "jobs", "resumes", "people", "companies"])
+    .optional(),
   location: z.string().optional(),
   industry: z.string().optional(),
   experienceLevel: z.string().optional(),
@@ -79,21 +81,24 @@ export class SearchService {
     try {
       // Build query parameters
       const params = new URLSearchParams();
-      
-      if (filters.search) params.append('search', filters.search);
-      if (filters.category && filters.category !== 'all') params.append('category', filters.category);
-      if (filters.location) params.append('location', filters.location);
-      if (filters.industry) params.append('industry', filters.industry);
-      if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
-      if (filters.employmentType) params.append('employmentType', filters.employmentType);
-      if (filters.datePosted) params.append('datePosted', filters.datePosted);
-      
-      params.append('page', filters.page.toString());
-      params.append('limit', filters.limit.toString());
+
+      if (filters.search) params.append("search", filters.search);
+      if (filters.category && filters.category !== "all")
+        params.append("category", filters.category);
+      if (filters.location) params.append("location", filters.location);
+      if (filters.industry) params.append("industry", filters.industry);
+      if (filters.experienceLevel)
+        params.append("experienceLevel", filters.experienceLevel);
+      if (filters.employmentType)
+        params.append("employmentType", filters.employmentType);
+      if (filters.datePosted) params.append("datePosted", filters.datePosted);
+
+      params.append("page", filters.page.toString());
+      params.append("limit", filters.limit.toString());
 
       const response = await apiClient.get<SearchResponse>(
         `/search/public?${params.toString()}`,
-        SearchResponseSchema
+        SearchResponseSchema,
       );
 
       return response.data;
@@ -117,9 +122,9 @@ export class SearchService {
    * Get content by category with pagination
    */
   async getContentByCategory(
-    category: 'jobs' | 'resumes' | 'people' | 'companies',
+    category: "jobs" | "resumes" | "people" | "companies",
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<SearchResponse> {
     return this.searchPublicContent({
       category,
