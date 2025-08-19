@@ -13,8 +13,6 @@ import {
   ApiResponseSchema,
   ApiErrorResponseSchema,
   // Raw validation helper to normalize nulls
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-expect-error exported util exists
   nullToUndefined,
 } from "@shared/api";
 import type { AppError } from "./errors";
@@ -255,7 +253,12 @@ export class ApiClient {
     }
 
     // Extract and validate data
-    const successResponse = apiResponse as ApiSuccessResponse<T>;
+    const successResponse: ApiSuccessResponse<T> = {
+      success: true,
+      data: apiResponse.data,
+      message: apiResponse.message,
+      timestamp: apiResponse.timestamp,
+    };
 
     if (schema) {
       const dataValidation = validateApiResponse(successResponse.data, schema);
@@ -401,7 +404,6 @@ export class ApiClient {
     }
 
     if (schema) {
-      // @ts-expect-error util imported from shared
       const preprocessed = nullToUndefined ? nullToUndefined(responseData) : responseData;
       const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
       if (!validation.success) {
