@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useSidebar } from "@/hooks/use-sidebar";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL || "https://api.myvideoresu.me";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");

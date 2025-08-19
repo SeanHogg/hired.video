@@ -79,11 +79,11 @@ export class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   constructor(config: ApiClientConfig = {}) {
-    // Use environment variable or default to localhost backend
+    // Use environment variable or default to production backend
     this.baseUrl =
       config.baseUrl ||
       import.meta.env.VITE_API_URL ||
-      "http://localhost:5000/api";
+      "https://api.myvideoresu.me/api";
     this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {

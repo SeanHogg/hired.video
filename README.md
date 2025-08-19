@@ -175,10 +175,15 @@ npm run typecheck
 Create a `.env` file with:
 
 ```
-VITE_API_BASE_URL=http://localhost:5000
+VITE_API_URL=https://api.myvideoresu.me/api
 VITE_OPENROUTER_API_KEY=your_openrouter_key
 VITE_APP_NAME=MyVideoResume
 VITE_APP_VERSION=1.0.0
+```
+
+For local development, use:
+```
+VITE_API_URL=http://localhost:5000/api
 ```
 
 ### Development Commands
@@ -332,7 +337,7 @@ npm run preview
 
 ```bash
 # Production environment variables
-VITE_API_BASE_URL=https://api.myvideoresume.com
+VITE_API_URL=https://api.myvideoresu.me/api
 VITE_OPENROUTER_API_KEY=prod_openrouter_key
 VITE_ENVIRONMENT=production
 ```

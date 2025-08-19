@@ -17,7 +17,7 @@ import Sidebar from "@/components/Sidebar";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.myvideoresu.me";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
