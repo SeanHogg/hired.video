@@ -233,7 +233,7 @@ export default function Index() {
             case "people":
               return {
                 id: item.id,
-                name: item.name || item.title,
+                name: item.name ?? item.title ?? "",
                 title: item.headline || item.summary || "Professional",
                 summary: item.headline || item.summary || "Professional",
                 avatar: item.avatar,
@@ -254,7 +254,7 @@ export default function Index() {
             case "company":
               return {
                 id: item.id,
-                name: item.name || item.title,
+                name: item.name ?? item.title ?? "",
                 title: item.description || item.summary || "Company",
                 summary: item.description || item.summary || "Company",
                 logo: item.logo,
@@ -375,7 +375,7 @@ export default function Index() {
                 <ResumeCard
                   key={item.id}
                   id={item.id}
-                  name={item.name || item.title}
+                  name={item.name ?? item.title ?? ""}
                   summary={item.summary}
                   createdAt={item.createdAt}
                   views={item.views}
@@ -713,7 +713,7 @@ export default function Index() {
                         );
                       } else if (item.type === "companies") {
                         const companyName =
-                          item.name || item.title || "Company";
+                          (item.name ?? item.title ?? "Company");
                         const companyData = {
                           id: item.id,
                           slug: `${companyName.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
@@ -799,7 +799,7 @@ export default function Index() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <h3 className="font-semibold text-lg truncate">
-                                  {item.name || item.title}
+                                  {(item.name ?? item.title ?? "")}
                                 </h3>
                                 <p className="text-muted-foreground">
                                   {item.title}
