@@ -1,6 +1,6 @@
 # MyVideoResume Platform - Complete Documentation
 
-A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools.
+A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools. 
 
 ## 🚀 Platform Overview
 
