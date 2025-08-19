@@ -111,6 +111,17 @@ export default function PeopleCard({
     }
   };
 
+  // Derive safe display name and initials
+  const displayFullName = (person.fullName && person.fullName.trim().length > 0)
+    ? person.fullName
+    : (person as any)?.name?.toString()?.trim?.() || `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "User";
+  const firstInitial = ((person.firstName?.[0]) ?? displayFullName?.trim()?.[0] ?? "?")
+    .toString()
+    .toUpperCase();
+  const lastInitial = ((person.lastName?.[0]) ?? displayFullName?.trim()?.split(" ").slice(-1)[0]?.[0] ?? "")
+    .toString()
+    .toUpperCase();
+
   return (
     <Card className="hover:shadow-lg transition-shadow relative">
       <CardHeader className="pb-3">
@@ -118,10 +129,10 @@ export default function PeopleCard({
           <div className="flex items-start gap-3 flex-1">
             {/* Profile Avatar */}
             <Avatar className="w-12 h-12 flex-shrink-0">
-              <AvatarImage src={person.avatar} alt={person.fullName} />
+              <AvatarImage src={person.avatar} alt={displayFullName} />
               <AvatarFallback className="text-sm">
-                {person.firstName.charAt(0)}
-                {person.lastName.charAt(0)}
+                {firstInitial}
+                {lastInitial}
               </AvatarFallback>
             </Avatar>
 
