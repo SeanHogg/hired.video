@@ -255,7 +255,7 @@ export class ApiClient {
     // Extract and validate data
     const successResponse: ApiSuccessResponse<T> = {
       success: true,
-      data: apiResponse.data,
+      data: apiResponse.data as T,
       message: apiResponse.message,
       timestamp: apiResponse.timestamp,
     };

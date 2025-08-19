@@ -145,14 +145,14 @@ export default function People() {
       avatar: person.avatar,
       headline: person.headline,
       location: person.location || '',
-      role: person.role,
+      role: typeof person.role === 'number' ? person.role.toString() : person.role,
       visibility: 'public', // Default for tracked users
       status: 'active', // Default status
       companyId: '', // Not available in UserMetadataDTO
       companyName: person.currentCompany || '',
       createdAt: person.createdAt,
       updatedAt: person.updatedAt,
-      lastActiveAt: new Date(), // Default to now
+      lastActiveAt: new Date().toISOString(), // Default to now
       profileViews: person.profileViews || 0,
       connectionCount: 0, // Not available in UserMetadataDTO
       followerCount: 0, // Not available in UserMetadataDTO
@@ -175,6 +175,35 @@ export default function People() {
     return {
       tracked: [] as PublicUser[]
     };
+  };
+
+  // Placeholder functions for people tracking
+  const addTrackedPerson = async (personId: string, userId: string) => {
+    try {
+      // TODO: Implement API call to track person when backend supports it
+      console.log(`Track person ${personId} for user ${userId}`);
+      // For now, we could use userService to follow the user
+      // await userService.followUser(personId);
+    } catch (error) {
+      console.error("Failed to track person:", error);
+    }
+  };
+
+  const removeTrackedPerson = async (personId: string, userId: string) => {
+    try {
+      // TODO: Implement API call to untrack person when backend supports it
+      console.log(`Untrack person ${personId} for user ${userId}`);
+      // For now, we could use userService to unfollow the user
+      // await userService.unfollowUser(personId);
+    } catch (error) {
+      console.error("Failed to untrack person:", error);
+    }
+  };
+
+  const getConnectionStatus = (userId: string, personId: string): "none" => {
+    // TODO: Implement API call to get connection status when backend supports it
+    console.log(`Get connection status between ${userId} and ${personId}`);
+    return "none";
   };
 
   // Helper functions
@@ -275,7 +304,7 @@ export default function People() {
 
   // If user is authenticated, show the actual people page
   if (isAuthenticated && user) {
-    const peopleData: PeopleData = getPeopleForUser();
+    const peopleData: PeopleData = getPeopleForUser() as PeopleData;
     const isJobSeeker = user.role === "job_seeker";
     const isRecruiterOrBusiness =
       user.role === "recruiter" || user.role === "business";
@@ -396,18 +425,32 @@ export default function People() {
                       {people.map((person) => {
                         const personMetadata = {
                           id: person.id,
-                          firstName: person.firstName,
-                          lastName: person.lastName,
-                          fullName: `${person.firstName} ${person.lastName}`,
-                          avatar: person.profilePicture,
-                          bio: person.bio,
+                          slug: person.slug,
+                          firstName: (person as any).firstName || person.fullName?.split(' ')[0] || '',
+                          lastName: (person as any).lastName || person.fullName?.split(' ').slice(1).join(' ') || '',
+                          fullName: person.fullName || `${(person as any).firstName || ''} ${(person as any).lastName || ''}`.trim(),
+                          avatar: (person as any).profilePicture || person.avatar || '',
+                          headline: person.headline || '',
+                          bio: (person as any).bio || person.headline || '',
                           location: person.location || "Location not specified",
-                          role: person.role,
+                          role: typeof person.role === 'number' ? person.role.toString() : person.role,
                           skills: person.skills,
                           openToWork: person.openToWork,
-                          slug: person.slug,
+                          visibility: "public" as const,
+                          status: "active" as const,
+                          companyId: (person as any).companyId || "",
+                          companyName: person.currentCompany || "",
                           createdAt: person.createdAt,
                           updatedAt: person.updatedAt,
+                          lastActiveAt: person.updatedAt || "",
+                          profileViews: (person as any).profileViews || 0,
+                          connectionCount: 0,
+                          followerCount: 0,
+                          isVerified: person.isVerified || false,
+                          isPremium: person.isPremium || false,
+                          experienceLevel: "Mid Level",
+                          currentPosition: person.currentRole || "",
+                          currentCompany: person.currentCompany || "",
                         };
 
                         return (
@@ -566,7 +609,7 @@ export default function People() {
                       avatar: person.avatar,
                       headline: person.headline,
                       location: person.location || '',
-                      role: person.role || 0,
+                      role: typeof person.role === 'number' ? person.role.toString() : (person.role || "0"),
                       visibility: 'public' as const, // Default for public users
                       status: 'active' as const, // Default status
                       companyId: '', // Not available in PublicUser
@@ -583,6 +626,7 @@ export default function People() {
                       experienceLevel: getExperienceLevel(person),
                       currentPosition: getCurrentPosition(person),
                       currentCompany: person.currentCompany || '',
+                      ownership: "tracked" as const,
                     };
 
                     return (

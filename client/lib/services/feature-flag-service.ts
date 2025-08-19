@@ -24,7 +24,7 @@ export const FeatureFlagSchema = z.object({
 
 export const FeatureFlagsResponseSchema = z.object({
   flags: z.array(FeatureFlagSchema),
-  userFlags: z.record(z.boolean()),
+  userFlags: z.record(z.string(), z.boolean()),
 });
 
 // ============================================================================

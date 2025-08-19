@@ -58,6 +58,10 @@ export default function Jobs() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [jobsData, setJobsData] = useState<{ owned: JobWithOwnership[]; tracked: JobWithOwnership[] }>({
+    owned: [],
+    tracked: []
+  });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
 
@@ -148,13 +152,61 @@ export default function Jobs() {
     return { owned: [], tracked: [] };
   };
 
+  // Load user's jobs when authenticated
+  useEffect(() => {
+    const loadUserJobs = async () => {
+      if (!isAuthenticated || !user) return;
+
+      try {
+        setIsLoading(true);
+        // Get user's owned and tracked jobs
+        const ownedJobs = await jobService.getUserJobs();
+        const trackedJobs = await jobService.getSavedJobs();
+
+        setJobsData({
+          owned: ownedJobs.map((j) => ({
+            ...j,
+            ownership: "owned" as const,
+            slug: (j as any).slug || "",
+            experienceLevel: (j as any).experienceLevel || "entry",
+            status: "active" as const,
+            privacy: "public" as const,
+            description: (j as any).description || "",
+            views: (j as any).views || 0,
+            applications: (j as any).applications || 0,
+            summary: (j as any).summary || "",
+            userId: (j as any).userId || "",
+            createdAt: (j as any).createdAt || "",
+            updatedAt: (j as any).updatedAt || "",
+          })),
+          tracked: trackedJobs.map((j) => ({
+            ...j,
+            ownership: "tracked" as const,
+            slug: (j as any).slug || "",
+            experienceLevel: (j as any).experienceLevel || "entry",
+            status: "active" as const,
+            privacy: "public" as const,
+            description: (j as any).description || "",
+            views: (j as any).views || 0,
+            applications: (j as any).applications || 0,
+            summary: (j as any).summary || "",
+            userId: (j as any).userId || "",
+            createdAt: (j as any).createdAt || "",
+            updatedAt: (j as any).updatedAt || "",
+          })),
+        });
+      } catch (error) {
+        console.error("Failed to load user jobs:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserJobs();
+  }, [isAuthenticated, user]);
+
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    const jobsOwnedTracked = getAllJobsForUser(user.id);
-    const jobsData: { owned: JobWithOwnership[]; tracked: JobWithOwnership[] } = {
-      owned: jobsOwnedTracked.owned.map((j) => ({ ...j, ownership: "owned" as const })),
-      tracked: jobsOwnedTracked.tracked.map((j) => ({ ...j, ownership: "tracked" as const })),
-    };
     const isJobSeeker = user.role === "job_seeker";
     const isRecruiterOrBusiness =
       user.role === "recruiter" || user.role === "business";
@@ -296,16 +348,27 @@ export default function Jobs() {
                       {jobs.map((job) => {
                         const jobMetadata = {
                           id: job.id,
+                          slug: (job as any).slug || "",
                           title: job.title,
                           company: job.company,
+                          companyId: (job as any).companyId || "",
                           location: job.location,
+                          description: (job as any).description || "",
                           salary: job.salaryMin && job.salaryMax
                             ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
                             : undefined,
                           employmentType: job.employmentType,
-                          experienceLevel: job.experienceLevel,
-                          postedDate: job.postedDate,
-                          isRemote: job.isRemote,
+                          experienceLevel: (job as any).experienceLevel || "entry",
+                          postedDate: job.postedDate || "",
+                          isRemote: job.isRemote || false,
+                          status: "active" as const,
+                          privacy: "public" as const,
+                          views: (job as any).views || 0,
+                          applications: (job as any).applications || 0,
+                          createdAt: (job as any).createdAt || "",
+                          updatedAt: (job as any).updatedAt || "",
+                          summary: (job as any).summary || "",
+                          userId: (job as any).userId || "",
                         };
 
                         return (
@@ -430,16 +493,27 @@ export default function Jobs() {
                   .map((job) => {
                     const jobMetadata = {
                       id: job.id,
+                      slug: (job as any).slug || "",
                       title: job.title,
                       company: job.company,
+                      companyId: (job as any).companyId || "",
                       location: job.location,
+                      description: (job as any).description || "",
                       salary: job.salaryMin && job.salaryMax
                         ? `$${(job.salaryMin / 1000).toFixed(0)}k - $${(job.salaryMax / 1000).toFixed(0)}k`
                         : undefined,
                       employmentType: job.employmentType,
-                      experienceLevel: job.experienceLevel,
-                      postedDate: job.postedDate,
-                      isRemote: job.isRemote,
+                      experienceLevel: (job as any).experienceLevel || "entry",
+                      postedDate: job.postedDate || "",
+                      isRemote: job.isRemote || false,
+                      status: "active" as const,
+                      privacy: "public" as const,
+                      views: (job as any).views || 0,
+                      applications: (job as any).applications || 0,
+                      createdAt: (job as any).createdAt || "",
+                      updatedAt: (job as any).updatedAt || "",
+                      summary: (job as any).summary || "",
+                      userId: (job as any).userId || "",
                     };
 
                     return <JobCard key={job.id} job={jobMetadata} />;

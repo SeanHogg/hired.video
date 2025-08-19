@@ -62,6 +62,8 @@ import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { generateResumeId } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import type {
   Resume,
   CreateResumeRequest,
@@ -84,6 +86,7 @@ export default function Resumes() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -94,6 +97,7 @@ export default function Resumes() {
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -117,24 +121,28 @@ export default function Resumes() {
   });
 
   // Get user's resumes from centralized mock data
-  const getUserResumes = (): ResumeWithOwnership[] => {
+  const getUserResumes = async (): Promise<ResumeWithOwnership[]> => {
     if (!user?.id) return [];
 
-    const { owned, tracked } = getAllResumesForUser(user.id);
+    try {
+      // Get user's owned resumes
+      const owned = await resumeService.getUserResumes();
+      // TODO: Implement tracked resumes functionality when API supports it
+      const tracked: any[] = [];
 
     const ownedWithOwnership: ResumeWithOwnership[] = owned.map((resume) => ({
       id: resume.id,
       slug: resume.slug,
       name: resume.name,
-      privacy: resume.privacy,
-      isMaster: resume.isMaster,
-      isActive: resume.isActive,
-      parentId: resume.parentId,
+      privacy: (resume as any).privacy || "private",
+      isMaster: (resume as any).isMaster || false,
+      isActive: (resume as any).isActive || true,
+      parentId: (resume as any).parentId || null,
       createdAt: resume.createdAt,
       updatedAt: resume.updatedAt,
-      views: resume.views,
-      summary: resume.data.Basics.Summary,
-      title: resume.data.Basics.Label,
+      views: (resume as any).views || 0,
+      summary: (resume as any).data?.Basics?.Summary || "",
+      title: (resume as any).data?.Basics?.Label || resume.name || "",
       userId: resume.userId,
       ownership: "owned" as const,
     }));
@@ -158,7 +166,11 @@ export default function Resumes() {
       }),
     );
 
-    return [...ownedWithOwnership, ...trackedWithOwnership];
+      return [...ownedWithOwnership, ...trackedWithOwnership];
+    } catch (error) {
+      console.error("Failed to get user resumes:", error);
+      return [];
+    }
   };
 
   useEffect(() => {
@@ -171,12 +183,15 @@ export default function Resumes() {
 
   const loadResumes = async () => {
     setLoading(true);
+    setError(null);
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      setResumes(getUserResumes());
+      const userResumes = await getUserResumes();
+      setResumes(userResumes);
     } catch (error) {
       console.error("Failed to load resumes:", error);
+      setError("Failed to load resumes. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -187,7 +202,8 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const resumeMetadata = getUserResumes().find((r) => r.id === resumeId);
+      const userResumes = await getUserResumes();
+      const resumeMetadata = userResumes.find((r) => r.id === resumeId);
       const mockResume: Resume = {
         id: resumeId,
         slug: resumeMetadata?.slug || "software-engineer-resume",
@@ -334,18 +350,36 @@ export default function Resumes() {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleTrack = (item: ResumeWithOwnership) => {
+  const handleTrack = async (item: ResumeWithOwnership) => {
     if (user?.id && item.id) {
-      if (isResumeTrackedByUser(item.id, user.id)) {
-        removeTrackedResume(item.id, user.id);
-        setSuccessMessage("Resume removed from tracking list!");
-      } else {
-        addTrackedResume(item.id, user.id);
-        setSuccessMessage("Resume added to tracking list!");
+      try {
+        // Check if resume is currently being watched (simplified check)
+        const isWatched = (item as any).isWatched || false;
+
+        if (isWatched) {
+          await resumeService.unwatchResume(item.id);
+          toast({
+            title: "Success",
+            description: "Resume removed from tracking list!",
+          });
+        } else {
+          await resumeService.watchResume(item.id);
+          toast({
+            title: "Success",
+            description: "Resume added to tracking list!",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to toggle resume tracking:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update tracking status",
+          variant: "destructive",
+        });
       }
       // Refresh the resume list
-      setResumes(getUserResumes());
-      setTimeout(() => setSuccessMessage(null), 3000);
+      const userResumes = await getUserResumes();
+      setResumes(userResumes);
     }
   };
 

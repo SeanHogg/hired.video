@@ -368,7 +368,9 @@ export const ResumeDataSchema = z.object({
       Version: NonEmptyStringSchema.default("1.0.0"),
       LastModified: DateSchema.optional(),
     })
-    .default({}),
+    .default({
+      Version: "1.0.0",
+    }),
 });
 
 // ============================================================================

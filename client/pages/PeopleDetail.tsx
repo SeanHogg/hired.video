@@ -170,7 +170,7 @@ export default function PeopleDetail() {
 
   // For now, use mock data for tracking and connections until API is available
   const isTracked = false; // TODO: Implement with real API
-  const connectionStatus = "none"; // TODO: Implement with real API
+  const [connectionStatus] = useState<"none" | "pending_received" | "pending_sent" | "connected">("none"); // TODO: Implement with real API
   const isOwnProfile = user && userProfile && userProfile.id === user.id;
 
   // Check if person has an active public resume via API (simplified: any public resumes exist?)
@@ -402,10 +402,10 @@ export default function PeopleDetail() {
                             <CardTitle className="text-3xl">
                               {person.data.firstName} {person.data.lastName}
                             </CardTitle>
-                            {person.isVerified && (
+                            {(person as any).isVerified && (
                               <CheckCircle className="h-6 w-6 text-blue-600" />
                             )}
-                            {person.isPremium && (
+                            {(person as any).isPremium && (
                               <Star className="h-6 w-6 text-yellow-500" />
                             )}
                           </div>
@@ -415,7 +415,7 @@ export default function PeopleDetail() {
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
-                              <span>{getRoleLabel(person.role)}</span>
+                              <span>{getRoleLabel((person as any).role || "0")}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <MapPin className="h-4 w-4" />
@@ -438,8 +438,8 @@ export default function PeopleDetail() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge className={getStatusColor(person.status)}>
-                            {person.status}
+                          <Badge className={getStatusColor((person as any).status || "active")}>
+                            {(person as any).status || "active"}
                           </Badge>
                           {person.data.openToWork && (
                             <Badge
@@ -566,7 +566,7 @@ export default function PeopleDetail() {
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                           <div className="text-2xl font-bold text-primary">
-                            {person.connectionCount}
+                            {(person as any).connectionCount || 0}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Connections
@@ -574,7 +574,7 @@ export default function PeopleDetail() {
                         </div>
                         <div>
                           <div className="text-2xl font-bold text-primary">
-                            {person.followerCount}
+                            {(person as any).followerCount || 0}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Followers
@@ -582,7 +582,7 @@ export default function PeopleDetail() {
                         </div>
                         <div>
                           <div className="text-2xl font-bold text-primary">
-                            {person.profileViews}
+                            {(person as any).profileViews || 0}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Profile Views
@@ -750,13 +750,13 @@ export default function PeopleDetail() {
                                   </div>
                                   <div className="text-sm text-muted-foreground">
                                     {skill.level}
-                                    {skill.yearsOfExperience &&
-                                      ` • ${skill.yearsOfExperience} years`}
+                                    {(skill as any).yearsOfExperience &&
+                                      ` • ${(skill as any).yearsOfExperience} years`}
                                   </div>
                                 </div>
-                                {skill.endorsements && (
+                                {(skill as any).endorsements && (
                                   <Badge variant="outline" className="text-xs">
-                                    {skill.endorsements} endorsements
+                                    {(skill as any).endorsements} endorsements
                                   </Badge>
                                 )}
                               </div>
@@ -863,11 +863,11 @@ export default function PeopleDetail() {
                       </a>
                     </div>
 
-                    {person.data.contact.phone && (
+                    {(person.data.contact as any).phone && (
                       <div className="flex items-center gap-3">
                         <Phone className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">
-                          {person.data.contact.phone}
+                          {(person.data.contact as any).phone}
                         </span>
                       </div>
                     )}
@@ -925,14 +925,14 @@ export default function PeopleDetail() {
                     <CardTitle>Additional Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {person.data.languages &&
-                      person.data.languages.length > 0 && (
+                    {(person.data as any).languages &&
+                      (person.data as any).languages.length > 0 && (
                         <div>
                           <h4 className="font-medium text-sm mb-2">
                             Languages
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {person.data.languages.map((language, index) => (
+                            {(person.data as any).languages.map((language: any, index: number) => (
                               <Badge
                                 key={index}
                                 variant="outline"
@@ -945,14 +945,14 @@ export default function PeopleDetail() {
                         </div>
                       )}
 
-                    {person.data.interests &&
-                      person.data.interests.length > 0 && (
+                    {(person.data as any).interests &&
+                      (person.data as any).interests.length > 0 && (
                         <div>
                           <h4 className="font-medium text-sm mb-2">
                             Interests
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {person.data.interests.map((interest, index) => (
+                            {(person.data as any).interests.map((interest: any, index: number) => (
                               <Badge
                                 key={index}
                                 variant="outline"
@@ -981,7 +981,7 @@ export default function PeopleDetail() {
                           Last active
                         </span>
                         <span>
-                          {new Date(person.lastActiveAt).toLocaleDateString()}
+                          {new Date((person as any).lastActiveAt || person.updatedAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -1018,14 +1018,14 @@ export default function PeopleDetail() {
                         </div>
                       )}
 
-                      {person.data.preferredRoles &&
-                        person.data.preferredRoles.length > 0 && (
+                      {(person.data as any).preferredRoles &&
+                        (person.data as any).preferredRoles.length > 0 && (
                           <div>
                             <h4 className="font-medium text-sm mb-2">
                               Preferred Roles
                             </h4>
                             <div className="space-y-1">
-                              {person.data.preferredRoles.map((role, index) => (
+                              {(person.data as any).preferredRoles.map((role: any, index: number) => (
                                 <div
                                   key={index}
                                   className="text-xs text-muted-foreground"
@@ -1037,15 +1037,15 @@ export default function PeopleDetail() {
                           </div>
                         )}
 
-                      {person.data.salaryExpectation && (
+                      {(person.data as any).salaryExpectation && (
                         <div>
                           <h4 className="font-medium text-sm mb-2">
                             Salary Expectation
                           </h4>
                           <p className="text-xs text-muted-foreground">
-                            {person.data.salaryExpectation.min &&
-                            person.data.salaryExpectation.max
-                              ? `$${(person.data.salaryExpectation.min / 1000).toFixed(0)}k - $${(person.data.salaryExpectation.max / 1000).toFixed(0)}k ${person.data.salaryExpectation.currency}`
+                            {(person.data as any).salaryExpectation.min &&
+                            (person.data as any).salaryExpectation.max
+                              ? `$${((person.data as any).salaryExpectation.min / 1000).toFixed(0)}k - $${((person.data as any).salaryExpectation.max / 1000).toFixed(0)}k ${(person.data as any).salaryExpectation.currency}`
                               : "Negotiable"}
                           </p>
                         </div>

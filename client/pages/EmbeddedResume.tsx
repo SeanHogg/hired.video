@@ -11,12 +11,8 @@ import { resumeService } from '@/lib/services/resume-service';
 import type { UserProfile } from '@/lib/services/user-service';
 import type { Resume } from '@/lib/services/resume-service';
 
-interface EmbeddedResumeParams {
-  identifier: string; // Can be UUID or slug
-}
-
 export default function EmbeddedResume() {
-  const { identifier } = useParams<EmbeddedResumeParams>();
+  const { identifier } = useParams<{ identifier: string }>();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +66,7 @@ export default function EmbeddedResume() {
             // Try to get user's default resume
             try {
               const userResumes = await resumeService.getUserResumes();
-              const defaultResume = userResumes.find(r => r.isDefault) || userResumes[0];
+              const defaultResume = userResumes.find(r => (r as any).isDefault || r.isPrimaryDefault) || userResumes[0];
               if (defaultResume) {
                 resumeData = await resumeService.getResumeById(defaultResume.id);
               }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { generateResumeId } from "@/lib/utils";
 import type { CreateResumeRequest, ResumeData } from "@/types/resume";
 
 export default function ResumeCreatePage() {

@@ -312,7 +312,7 @@ export function validateConfig(): { valid: boolean; errors?: string[] } {
     if (error instanceof z.ZodError) {
       return {
         valid: false,
-        errors: error.errors.map(
+        errors: error.issues.map(
           (err) => `${err.path.join(".")}: ${err.message}`,
         ),
       };

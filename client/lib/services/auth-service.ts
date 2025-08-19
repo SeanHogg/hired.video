@@ -27,7 +27,7 @@ export const RegisterRequestSchema = z.object({
   confirmPassword: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z.enum(["job_seeker", "employer", "recruiter"]).optional(),
+  role: z.enum(["job_seeker", "business", "recruiter"]).optional(),
 });
 
 // Use the shared login response schema from @shared/api

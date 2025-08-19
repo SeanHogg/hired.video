@@ -201,7 +201,7 @@ export class UserService {
   /**
    * Search users with filters
    */
-  async searchUsers(filters: UserFilters): Promise<PaginatedUsers> {
+  async searchUsers(filters: UserFilters): Promise<PaginatedPublicUsers> {
     return this.getPublicUsers(filters);
   }
 

@@ -56,13 +56,11 @@ import {
 } from "@/components/ui/card";
 import VideoCard from "@/components/VideoCard";
 import PeopleCard from "@/components/PeopleCard";
-import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-// Removed legacy companyService usage - unified search only
-// import { companyService, type CompanyFilters, type Company } from "@/lib/services/company-service";
+import { companyService } from "@/lib/services/company-service";
 import { dashboardService, type DashboardStats, type HomepageContent } from "@/lib/services/dashboard-service";
 import { searchService, type SearchResponse, type SearchFilters } from "@/lib/services/search-service";
 import { jobService } from "@/lib/services/job-service";
@@ -76,9 +74,9 @@ export default function Index() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    searchRadius: "25",
+    page: 1,
+    limit: 20,
     experienceLevel: "all",
-    education: "all",
     datePosted: "all",
   });
   const {
@@ -106,26 +104,27 @@ export default function Index() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
 
+  // Load dashboard data function
+  const loadContent = async () => {
+    try {
+      setIsLoadingContent(true);
+      setContentError(null);
+      // Call unified search once to get all content types
+      const content = await searchService.searchPublicContent({
+        page: 1,
+        limit: 16, // Get enough items to distribute across all categories
+      });
+      setSearchResults(content);
+    } catch (error) {
+      console.error('Failed to load homepage content:', error);
+      setContentError('Failed to load content');
+    } finally {
+      setIsLoadingContent(false);
+    }
+  };
+
   // Load dashboard data on component mount - now with progressive loading
   useEffect(() => {
-    const loadContent = async () => {
-      try {
-        setIsLoadingContent(true);
-        setContentError(null);
-        // Call unified search once to get all content types
-        const content = await searchService.searchPublicContent({
-          page: 1,
-          limit: 16, // Get enough items to distribute across all categories
-        });
-        setSearchResults(content);
-      } catch (error) {
-        console.error('Failed to load homepage content:', error);
-        setContentError('Failed to load content');
-      } finally {
-        setIsLoadingContent(false);
-      }
-    };
-
     loadContent();
   }, []);
 
@@ -167,7 +166,13 @@ export default function Index() {
   };
 
   // Interactive company functions
-  // Removed fetchCompanies; companies come from unified search
+  const fetchCompanies = async () => {
+    try {
+      await loadContent(); // Refresh all content including companies
+    } catch (error) {
+      console.error("Failed to refresh companies:", error);
+    }
+  };
 
   const handleFollowCompany = async (companyId: string) => {
     if (user) {
@@ -336,7 +341,15 @@ export default function Index() {
             } else if (itemType === 'people') {
               return <PeopleCard key={item.id} person={item} />;
             } else if (itemType === 'resumes') {
-              return <ResumeCard key={item.id} resume={item} />;
+              return <ResumeCard
+                key={item.id}
+                id={item.id}
+                name={item.name || item.title}
+                summary={item.summary}
+                createdAt={item.createdAt}
+                views={item.views}
+                privacy={item.privacy}
+              />;
             }
             return null;
           })}
@@ -368,9 +381,9 @@ export default function Index() {
 
   const handleClearFilters = () => {
     setSearchFilters({
-      searchRadius: "25",
+      page: 1,
+      limit: 20,
       experienceLevel: "all",
-      education: "all",
       datePosted: "all",
     });
   };
@@ -666,8 +679,8 @@ export default function Index() {
                           slug: `${companyName.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
                           name: companyName,
                           logo: item.logo || "",
-                          tagline: item.tagline || item.summary || "",
-                          industry: item.industry || "Technology",
+                          tagline: (item as any).tagline || item.summary || "",
+                          industry: (item as any).industry || "Technology",
                           size: item.size || "Unknown",
                           location: item.location || "Unknown location",
                           status: "active" as const,

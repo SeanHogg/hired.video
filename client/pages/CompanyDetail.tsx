@@ -220,9 +220,9 @@ export default function CompanyDetail() {
   };
 
   const completedTasks =
-    (rawCompany || company)?.onboardingTasks.filter((task) => task.completed)
+    company?.onboardingTasks?.filter((task) => task.completed)
       .length || 0;
-  const totalTasks = (rawCompany || company)?.onboardingTasks.length || 1;
+  const totalTasks = company?.onboardingTasks?.length || 1;
   const onboardingProgress = Math.round((completedTasks / totalTasks) * 100);
 
   return (
@@ -310,7 +310,7 @@ export default function CompanyDetail() {
                           {isOwner ? (
                             <Button asChild>
                               <Link
-                                to={`/companies/edit/${rawCompany?.id || company.id}`}
+                                to={`/companies/edit/${company.id}`}
                               >
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Company
@@ -396,8 +396,8 @@ export default function CompanyDetail() {
               <div className="lg:col-span-2 space-y-6">
                 {/* Onboarding Tasks (Only for owners with incomplete onboarding) */}
                 {isOwner &&
-                  ((rawCompany || company).status === "draft" ||
-                    (rawCompany || company).status === "onboarding") && (
+                  (company?.status === "draft" ||
+                    company?.status === "onboarding") && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -425,7 +425,7 @@ export default function CompanyDetail() {
                           />
 
                           <div className="space-y-3">
-                            {(rawCompany || company).onboardingTasks
+                            {(company?.onboardingTasks || [])
                               .sort((a, b) => a.order - b.order)
                               .map((task) => (
                                 <div
@@ -470,7 +470,7 @@ export default function CompanyDetail() {
                           </div>
 
                           {onboardingProgress === 100 &&
-                            (rawCompany || company).status !== "active" && (
+                            company?.status !== "active" && (
                               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                                 <div className="flex items-center gap-2 text-green-800">
                                   <CheckCircle className="h-5 w-5" />

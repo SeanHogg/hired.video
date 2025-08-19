@@ -38,9 +38,9 @@ export default function ResumeEditPage() {
         // Simulate API call
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const foundResume = getResumeById(id);
+        const foundResume = await resumeService.getResumeById(id);
         if (foundResume) {
-          setResume(foundResume);
+          setResume(foundResume as any);
         } else {
           navigate("/resumes");
         }

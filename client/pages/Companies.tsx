@@ -115,6 +115,28 @@ export default function Companies() {
     }
   };
 
+  const handleTrackCompany = async (companyId: string) => {
+    if (user) {
+      try {
+        await companyService.followCompany(companyId);
+        await fetchCompanies();
+      } catch (error) {
+        console.error("Failed to track company:", error);
+      }
+    }
+  };
+
+  const handleUntrackCompany = async (companyId: string) => {
+    if (user) {
+      try {
+        await companyService.unfollowCompany(companyId);
+        await fetchCompanies();
+      } catch (error) {
+        console.error("Failed to untrack company:", error);
+      }
+    }
+  };
+
   const handleSearch = (query: string) => {
     setSearchFilters((prev) => ({ ...prev, search: query }));
   };
@@ -277,28 +299,40 @@ export default function Companies() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {companies.map((company) => {
                           const companyMetadata = {
-                            id: company.id,
-                            name: company.name,
-                            logo: company.logo,
-                            description: company.description,
-                            industry: company.industry,
-                            size: company.size,
-                            location: company.location,
-                            website: company.website,
-                            founded: company.founded,
-                            followersCount: company.followersCount,
-                            jobsCount: company.jobsCount,
-                            isPublic: company.isPublic,
-                            createdAt: company.createdAt,
-                            updatedAt: company.updatedAt,
+                            id: company.id || "",
+                            slug: (company as any).slug || "",
+                            name: company.name || "",
+                            logo: company.logo || "",
+                            description: (company as any).description || "",
+                            tagline: company.tagline || "",
+                            industry: company.industry || "",
+                            size: company.size || "",
+                            location: company.location || "",
+                            website: (company as any).website || "",
+                            founded: (company as any).founded || "",
+                            followersCount: (company as any).followersCount || 0,
+                            jobsCount: (company as any).jobCount || 0,
+                            isPublic: (company as any).isPublic || true,
+                            status: (company.status as any) || "active",
+                            visibility: (company.visibility as any) || "public",
+                            createdAt: company.createdAt || "",
+                            updatedAt: company.updatedAt || "",
+                            teamMembers: (company as any).teamMembers || [],
+                            onboardingProgress: company.onboardingProgress || 0,
+                            views: (company as any).views || 0,
+                            followers: (company as any).followers || 0,
+                            jobCount: (company as any).jobCount || 0,
+                            activeJobCount: (company as any).activeJobCount || 0,
+                            userId: (company as any).userId || "",
+                            ownership: "tracked" as const,
                           };
 
                           return (
                             <CompanyCard
                               key={company.id}
                               company={companyMetadata}
-                              onFollow={handleFollowCompany}
-                              onUnfollow={handleUnfollowCompany}
+                              onTrack={handleFollowCompany}
+                              onUntrack={handleUnfollowCompany}
                             />
                           );
                         })}
@@ -438,25 +472,26 @@ export default function Companies() {
                   .slice(0, 3)
                   .map((company) => {
                     const companyMetadata = {
-                      id: company.id,
-                      slug: company.slug,
-                      name: company.data.name,
-                      logo: company.data.logo,
-                      tagline: company.data.tagline,
-                      industry: company.data.industry,
-                      size: company.data.size,
-                      location: `${company.data.headquarters.city}, ${company.data.headquarters.state}`,
-                      status: company.status,
-                      visibility: company.visibility,
-                      createdAt: company.createdAt,
-                      updatedAt: company.updatedAt,
-                      views: company.views,
-                      followers: company.followers,
-                      jobCount: company.jobCount,
-                      activeJobCount: company.activeJobCount,
-                      userId: company.userId,
-                      teamMembers: company.teamMembers,
-                      onboardingProgress: 100,
+                      id: company.id || "",
+                      slug: company.slug || "",
+                      name: (company as any).name || "",
+                      logo: (company as any).logo || "",
+                      tagline: company.tagline || "",
+                      industry: company.industry || "",
+                      size: company.size || "",
+                      location: company.location || "",
+                      status: (company.status as any) || "active",
+                      visibility: (company.visibility as any) || "public",
+                      createdAt: company.createdAt || "",
+                      updatedAt: company.updatedAt || "",
+                      views: (company as any).views || 0,
+                      followers: (company as any).followers || 0,
+                      jobCount: (company as any).jobCount || 0,
+                      activeJobCount: (company as any).activeJobCount || 0,
+                      userId: (company as any).userId || "",
+                      teamMembers: (company as any).teamMembers || [],
+                      onboardingProgress: company.onboardingProgress || 100,
+                      ownership: "tracked" as const,
                     };
 
                     return (

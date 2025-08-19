@@ -1,5 +1,6 @@
 import { Edit, ArrowLeft, Briefcase } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -25,8 +26,26 @@ export default function JobEditPage() {
     toggleSidebar,
   } = useSidebar();
   const { user } = useAuth();
+  const [job, setJob] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const job = id ? getJobById(id) : null;
+  useEffect(() => {
+    const loadJob = async () => {
+      if (!id) return;
+
+      setLoading(true);
+      try {
+        const jobData = await jobService.getJobById(id);
+        setJob(jobData);
+      } catch (error) {
+        console.error("Failed to load job:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadJob();
+  }, [id]);
 
   return (
     <div className="min-h-screen bg-background">

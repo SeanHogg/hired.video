@@ -578,13 +578,13 @@ export default function JobDetail() {
                           </li>
                         ))}
                       </ul>
-                      {job.data.education && (
+                      {(job.data as any).education && (
                         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                           <p className="text-sm font-medium text-blue-900 mb-1">
                             Education
                           </p>
                           <p className="text-sm text-blue-700">
-                            {job.data.education}
+                            {(job.data as any).education}
                           </p>
                         </div>
                       )}

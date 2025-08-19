@@ -162,6 +162,7 @@ export class DashboardService {
    */
   async searchContent(query: string, category: string = 'all', limit: number = 20): Promise<SearchResponse> {
     return searchService.searchPublicContent({
+      page: 1,
       search: query,
       category: category as 'all' | 'jobs' | 'resumes' | 'people' | 'companies',
       limit,

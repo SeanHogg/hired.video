@@ -68,7 +68,7 @@ export class ValidationError extends AppError {
     zodError: z.ZodError,
     context?: Record<string, unknown>,
   ): ValidationError {
-    const message = zodError.errors
+    const message = zodError.issues
       .map((err) => `${err.path.join(".")}: ${err.message}`)
       .join(", ");
     return new ValidationError(
