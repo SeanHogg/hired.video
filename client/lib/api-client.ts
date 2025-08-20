@@ -425,6 +425,45 @@ export class ApiClient {
     return { data: responseData as T };
   }
 
+  // Raw request for endpoints that return non-standard envelopes (any method)
+  async requestRaw<T>(
+    endpoint: string,
+    config: RequestConfig = {},
+    schema?: z.ZodSchema<T>,
+  ): Promise<{ data: T }> {
+    const url = this.createUrl(endpoint);
+    const response = await this.executeRequest(url, config);
+
+    let responseData: unknown;
+    try {
+      responseData = await response.json();
+    } catch (error) {
+      throw new NetworkError(
+        "Invalid JSON response",
+        error instanceof Error ? error : undefined,
+      );
+    }
+
+    if (!response.ok) {
+      this.handleErrorResponse(response.status, responseData);
+    }
+
+    if (schema) {
+      const preprocessed = nullToUndefined
+        ? nullToUndefined(responseData)
+        : responseData;
+      const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
+      if (!validation.success) {
+        throw new ValidationError(
+          `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
+        );
+      }
+      return { data: validation.data };
+    }
+
+    return { data: responseData as T };
+  }
+
   async post<T>(
     endpoint: string,
     body?: unknown,

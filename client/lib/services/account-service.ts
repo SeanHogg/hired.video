@@ -11,36 +11,20 @@ import {
   AccountOption,
   MyVideoResumeRole,
 } from "@/types/account";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://api.myvideoresu.me";
+import { apiClient } from "@/lib/api-client";
 
 class AccountService {
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem("authToken");
-    return {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    };
-  }
+  // Requests go through apiClient; no per-service base URL or headers needed
 
   /**
    * Get all users associated with the current account
    */
   async getAccountUsers(): Promise<AccountUser[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/users`, {
-        method: "GET",
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch account users: ${response.statusText}`,
-        );
-      }
-
-      const data: AccountUsersResponse = await response.json();
+      const { data } = await apiClient.requestRaw<AccountUsersResponse>(
+        "/account/users",
+        { method: "GET" },
+      );
 
       if (data.errorMessage) {
         throw new Error(data.errorMessage);
@@ -58,17 +42,10 @@ class AccountService {
    */
   async inviteUser(request: InviteUserRequest): Promise<InviteUserResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/invite`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to invite user: ${response.statusText}`);
-      }
-
-      const data: InviteUserResponse = await response.json();
+      const { data } = await apiClient.requestRaw<InviteUserResponse>(
+        "/account/invite",
+        { method: "POST", body: request },
+      );
       return data;
     } catch (error) {
       console.error("Error inviting user:", error);
@@ -81,15 +58,10 @@ class AccountService {
    */
   async updateUserRoles(request: UpdateUserRolesRequest): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/roles`, {
-        method: "PUT",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update user roles: ${response.statusText}`);
-      }
+      await apiClient.requestRaw(
+        "/account/roles",
+        { method: "PUT", body: request },
+      );
     } catch (error) {
       console.error("Error updating user roles:", error);
       throw error;
@@ -101,17 +73,10 @@ class AccountService {
    */
   async removeUser(userId: string): Promise<void> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/account/users/${userId}`,
-        {
-          method: "DELETE",
-          headers: this.getAuthHeaders(),
-        },
+      await apiClient.requestRaw(
+        `/account/users/${userId}`,
+        { method: "DELETE" },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to remove user: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Error removing user:", error);
       throw error;
@@ -123,18 +88,10 @@ class AccountService {
    */
   async resendInvitation(userId: string): Promise<void> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/account/invite/resend`,
-        {
-          method: "POST",
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify({ userId }),
-        },
+      await apiClient.requestRaw(
+        "/account/invite/resend",
+        { method: "POST", body: { userId } },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to resend invitation: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Error resending invitation:", error);
       throw error;
@@ -146,35 +103,22 @@ class AccountService {
    */
   async getAvailableAccounts(): Promise<AccountOption[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/available`, {
-        method: "GET",
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch available accounts: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
+      const { data } = await apiClient.requestRaw<{ result?: any[] }>(
+        "/account/available",
+        { method: "GET" },
+      );
       const accounts = data.result || [];
 
-      // Transform backend DTO to frontend interface
       return accounts.map((account: any) => ({
         id: account.id,
         name: account.name,
-        type: account.type,
         role: account.role,
-        isCurrent: account.isCurrent,
-        logoUrl: account.logoUrl,
-        memberCount: account.memberCount,
-        isActive: account.isActive,
-        joinedDate: new Date(account.joinedDate),
+        logoUrl: account.logoUrl ?? undefined,
+        isOwner: account.role === MyVideoResumeRole.AccountOwner,
+        isAdmin: account.role === MyVideoResumeRole.AccountAdmin,
       }));
     } catch (error) {
       console.error("Error fetching available accounts:", error);
-      // Return empty array if API not implemented yet
       return [];
     }
   }
@@ -184,22 +128,13 @@ class AccountService {
    */
   async switchAccount(accountId: string): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/switch`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ accountId }),
-      });
+      const { data } = await apiClient.requestRaw<{ result?: any }>(
+        "/account/switch",
+        { method: "POST", body: { accountId } },
+      );
 
-      if (!response.ok) {
-        throw new Error(`Failed to switch account: ${response.statusText}`);
-      }
-
-      const data = await response.json();
       const switchResult = data.result;
-
-      // Update local storage with new account context
       localStorage.setItem("currentAccountId", accountId);
-
       return switchResult;
     } catch (error) {
       console.error("Error switching account:", error);
@@ -224,18 +159,10 @@ class AccountService {
    */
   async acceptInvitation(inviteId: string): Promise<void> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/account/invite/accept`,
-        {
-          method: "POST",
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify({ inviteId }),
-        },
+      await apiClient.requestRaw(
+        "/account/invite/accept",
+        { method: "POST", body: { inviteId } },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to accept invitation: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Error accepting invitation:", error);
       throw error;
@@ -247,18 +174,10 @@ class AccountService {
    */
   async rejectInvitation(inviteId: string): Promise<void> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/account/invite/reject`,
-        {
-          method: "POST",
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify({ inviteId }),
-        },
+      await apiClient.requestRaw(
+        "/account/invite/reject",
+        { method: "POST", body: { inviteId } },
       );
-
-      if (!response.ok) {
-        throw new Error(`Failed to reject invitation: ${response.statusText}`);
-      }
     } catch (error) {
       console.error("Error rejecting invitation:", error);
       throw error;
@@ -270,21 +189,10 @@ class AccountService {
    */
   async getPendingInvitations(): Promise<AccountUser[]> {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/account/invitations/pending`,
-        {
-          method: "GET",
-          headers: this.getAuthHeaders(),
-        },
+      const { data } = await apiClient.requestRaw<{ result?: AccountUser[] }>(
+        "/account/invitations/pending",
+        { method: "GET" },
       );
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch pending invitations: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
       return data.result || [];
     } catch (error) {
       console.error("Error fetching pending invitations:", error);
@@ -297,18 +205,10 @@ class AccountService {
    */
   async getAccountSettings(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/settings`, {
-        method: "GET",
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch account settings: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
+      const { data } = await apiClient.requestRaw<{ result?: any }>(
+        "/account/settings",
+        { method: "GET" },
+      );
       return data.result || data;
     } catch (error) {
       console.error("Error fetching account settings:", error);
@@ -321,19 +221,10 @@ class AccountService {
    */
   async updateAccountSettings(settings: any): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/settings`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(settings),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to update account settings: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
+      const { data } = await apiClient.requestRaw<{ result?: any }>(
+        "/account/settings",
+        { method: "POST", body: settings },
+      );
       return data.result || data;
     } catch (error) {
       console.error("Error updating account settings:", error);
@@ -346,18 +237,10 @@ class AccountService {
    */
   async getAccountAnalytics(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/account/analytics`, {
-        method: "GET",
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch account analytics: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
+      const { data } = await apiClient.requestRaw<{ result?: any }>(
+        "/account/analytics",
+        { method: "GET" },
+      );
       return data.result || data;
     } catch (error) {
       console.error("Error fetching account analytics:", error);
