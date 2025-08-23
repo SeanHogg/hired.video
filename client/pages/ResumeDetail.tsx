@@ -624,46 +624,7 @@ export default function ResumeDetail() {
                 </section>
               )}
 
-            {/* Resume Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Resume Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">
-                      {resume.views}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Total Views</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">
-                      {new Date(resume.createdAt).toLocaleDateString()}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Created</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">
-                      {new Date(resume.updatedAt).toLocaleDateString()}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Last Updated
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-primary mb-2">
-                      {resume.privacy === "public"
-                        ? "Public"
-                        : resume.privacy === "recruiter_only"
-                          ? "Recruiters"
-                          : "Private"}
-                    </div>
-                    <p className="text-sm text-muted-foreground">Visibility</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
 
           <Footer />
