@@ -14,10 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { resumeService } from "@/lib/services/resume-service";
 import type {
   ResumePrivacy,
   UploadResumeRequest,
   ResumeUploadResponse,
+  ResumeData,
 } from "@/types/resume";
 
 interface ResumeUploadProps {
@@ -91,52 +93,109 @@ export default function ResumeUpload({
     }
   };
 
-  const simulateUpload = async (
-    uploadRequest: UploadResumeRequest,
-  ): Promise<ResumeUploadResponse> => {
-    console.log(
-      "Starting upload for:",
-      uploadRequest.name,
-      "Privacy:",
-      uploadRequest.privacy,
-    );
-
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 10) {
-      setUploadProgress(i);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    // Simulate API response with sample data
+  // Convert API MetaResume (camelCase) to UI ResumeData (PascalCase keys)
+  const mapMetaResumeToResumeData = (meta: any): ResumeData => {
+    const basics = meta?.basics || {};
+    const location = basics?.location || null;
     return {
-      id: `resume_${Date.now()}`,
-      data: {
-        Basics: {
-          Name: "Extracted Name",
-          Label: "Professional Title",
-          Image: "",
-          Email: "extracted@email.com",
-          Phone: "555-0123",
-          Url: "",
-          Summary: "Extracted professional summary from the uploaded resume...",
-          Location: null,
-        },
-        Work: [],
-        Volunteer: [],
-        Education: [],
-        Awards: [],
-        Certificates: [],
-        Publications: [],
-        Skills: [],
-        Languages: [],
-        Interests: [],
-        References: [],
-        Projects: [],
+      Basics: {
+        Name: basics.name || "",
+        Label: basics.label || "",
+        Image: basics.image || "",
+        Email: basics.email || "",
+        Phone: basics.phone || "",
+        Url: basics.url || "",
+        Summary: basics.summary || "",
+        Location: location
+          ? {
+              Address: location.address || "",
+              PostalCode: location.postalCode || "",
+              City: location.city || "",
+              CountryCode: location.countryCode || "",
+              Region: location.region || "",
+            }
+          : null,
       },
-      message: "Resume successfully uploaded and processed",
-      confidence: 0.85,
+      Work: (meta?.work || []).map((w: any) => ({
+        Name: w.name || "",
+        Position: w.position || "",
+        Summary: w.summary || "",
+        StartDate: w.startDate || "",
+        EndDate: w.endDate || "",
+        Highlights: Array.isArray(w.highlights) ? w.highlights : [],
+        Url: w.url || "",
+      })),
+      Volunteer: (meta?.volunteer || []).map((v: any) => ({
+        Organization: v.organization || "",
+        Position: v.position || "",
+        Summary: v.summary || "",
+        StartDate: v.startDate || "",
+        EndDate: v.endDate || "",
+        Highlights: Array.isArray(v.highlights) ? v.highlights : null,
+        Url: v.url || "",
+      })),
+      Education: (meta?.education || []).map((e: any) => ({
+        Institution: e.institution || "",
+        Area: e.area || "",
+        StudyType: e.studyType || "",
+        StartDate: e.startDate || "",
+        EndDate: e.endDate || "",
+        Score: e.score || "",
+        Courses: Array.isArray(e.courses) ? e.courses : null,
+        Url: e.url || "",
+      })),
+      Awards: (meta?.awards || []).map((a: any) => ({
+        Title: a.title || "",
+        Date: a.date || "",
+        Awarder: a.awarder || "",
+        Summary: a.summary || "",
+      })),
+      Certificates: (meta?.certificates || []).map((c: any) => ({
+        Name: c.name || "",
+        Date: c.date || "",
+        Issuer: c.issuer || "",
+        Url: c.url || "",
+      })),
+      Publications: (meta?.publications || []).map((p: any) => ({
+        Name: p.name || "",
+        Publisher: p.publisher || "",
+        ReleaseDate: p.releaseDate || "",
+        Url: p.url || "",
+        Summary: p.summary || "",
+      })),
+      Skills: (meta?.skills || []).map((s: any) => ({
+        Name: s.name || "",
+        Level: s.level || "",
+        Keywords: Array.isArray(s.keywords) ? s.keywords : [],
+      })),
+      Languages: (meta?.languages || []).map((l: any) => ({
+        Language: l.language || "",
+        Fluency: l.fluency || "",
+      })),
+      Interests: (meta?.interests || []).map((i: any) => ({
+        Name: i.name || "",
+        Keywords: Array.isArray(i.keywords) ? i.keywords : [],
+      })),
+      References: (meta?.references || []).map((r: any) => ({
+        Name: r.name || "",
+        Reference: r.reference || "",
+      })),
+      Projects: (meta?.projects || []).map((p: any) => ({
+        Name: p.name || "",
+        Description: p.description || "",
+        Highlights: Array.isArray(p.highlights) ? p.highlights : [],
+        Keywords: Array.isArray(p.keywords) ? p.keywords : [],
+        StartDate: p.startDate || "",
+        EndDate: p.endDate || "",
+        Url: p.url || "",
+        Roles: Array.isArray(p.roles) ? p.roles : [],
+        Entity: p.entity || "",
+        Type: p.type || "",
+      })),
+      Meta: undefined,
     };
   };
+
 
   const handleUpload = async () => {
     if (!file || !name.trim()) return;
@@ -153,7 +212,19 @@ export default function ResumeUpload({
         isMaster,
       };
 
-      const response = await simulateUpload(uploadRequest);
+      // Call backend to create resume from file
+      const created = await resumeService.createResumeFromFile(uploadRequest.file);
+
+      // Map API entity to ResumeData for the builder
+      const uploadedData = mapMetaResumeToResumeData(created.metaResume);
+
+      const response: ResumeUploadResponse = {
+        id: created.id || `resume_${Date.now()}`,
+        data: uploadedData,
+        message: created.name || "Resume uploaded",
+        confidence: 1,
+      };
+
       onUploadSuccess(response);
     } catch (_err) {
       console.error("Resume upload failed:", _err);

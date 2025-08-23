@@ -36,7 +36,7 @@ export default function SentimentAnalysis() {
   // Fetch user's resumes if authenticated
   const { data: resumes = [] } = useQuery({
     queryKey: ["resumes"],
-    queryFn: () => resumeService.getResumes(),
+    queryFn: () => resumeService.getUserResumes(),
     enabled: isAuthenticated,
   });
 
