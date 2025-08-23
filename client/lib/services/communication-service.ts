@@ -300,7 +300,8 @@ export class CommunicationService {
       return response.data;
     } catch (error) {
       console.error("Failed to create email template:", error);
-      throw new Error("Failed to create email template");
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 
@@ -318,7 +319,8 @@ export class CommunicationService {
       return response.data;
     } catch (error) {
       console.error(`Failed to update email template ${request.id}:`, error);
-      throw new Error(`Failed to update email template ${request.id}`);
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 
@@ -330,7 +332,8 @@ export class CommunicationService {
       await apiClient.delete(`${this.baseUrl}/email-templates/${templateId}`);
     } catch (error) {
       console.error(`Failed to delete email template ${templateId}:`, error);
-      throw new Error(`Failed to delete email template ${templateId}`);
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 
@@ -506,7 +509,8 @@ export class CommunicationService {
       return response.data;
     } catch (error) {
       console.error("Failed to create external contact:", error);
-      throw new Error("Failed to create external contact");
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 
@@ -524,7 +528,8 @@ export class CommunicationService {
       return response.data;
     } catch (error) {
       console.error(`Failed to update external contact ${request.id}:`, error);
-      throw new Error(`Failed to update external contact ${request.id}`);
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 
@@ -536,7 +541,8 @@ export class CommunicationService {
       await apiClient.delete(`${this.baseUrl}/external-contacts/${contactId}`);
     } catch (error) {
       console.error(`Failed to delete external contact ${contactId}:`, error);
-      throw new Error(`Failed to delete external contact ${contactId}`);
+      // Re-throw the original error to preserve API error messages
+      throw error;
     }
   }
 

@@ -152,6 +152,10 @@ export class ApiClient {
   }
 
   private createUrl(endpoint: string): string {
+    // Allow absolute URLs to pass through untouched
+    if (/^https?:\/\//i.test(endpoint)) {
+      return endpoint;
+    }
     const cleanEndpoint = endpoint.startsWith("/")
       ? endpoint.slice(1)
       : endpoint;
@@ -432,7 +436,11 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
-    const response = await this.executeRequest(url, config);
+
+    // Apply request interceptors (e.g., Authorization header injection)
+    const processedConfig = await this.applyRequestInterceptors(config);
+
+    const response = await this.executeRequest(url, processedConfig);
 
     let responseData: unknown;
     try {

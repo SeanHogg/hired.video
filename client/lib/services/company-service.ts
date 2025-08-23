@@ -94,7 +94,7 @@ export class CompanyService {
       });
     }
 
-    const endpoint = `/Companies/public${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/Companies/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<PaginatedCompanies>(
       endpoint,
       PaginatedCompaniesSchema,
@@ -108,7 +108,7 @@ export class CompanyService {
    */
   async getCompanyById(id: string): Promise<Company> {
     const response = await apiClient.get<Company>(
-      `/Companies/${id}`,
+      `/api/Companies/${id}`,
       CompanyMetadataSchema,
     );
     return response.data;
@@ -124,7 +124,7 @@ export class CompanyService {
     });
 
     const response = await apiClient.get<any[]>(
-      `/Companies/${id}/jobs?${params.toString()}`,
+      `/api/Companies/${id}/jobs?${params.toString()}`,
       z.array(z.any()), // We'll use the Job schema from job-service when available
     );
 
@@ -135,14 +135,14 @@ export class CompanyService {
    * Follow a company
    */
   async followCompany(id: string): Promise<void> {
-    await apiClient.post(`/Companies/${id}/follow`);
+    await apiClient.post(`/api/Companies/${id}/follow`);
   }
 
   /**
    * Unfollow a company
    */
   async unfollowCompany(id: string): Promise<void> {
-    await apiClient.delete(`/Companies/${id}/follow`);
+    await apiClient.delete(`/api/Companies/${id}/follow`);
   }
 
   /**
@@ -150,7 +150,7 @@ export class CompanyService {
    */
   async getFollowedCompanies(): Promise<Company[]> {
     const response = await apiClient.get<Company[]>(
-      "/Companies/me/followed",
+      "/api/Companies/me/followed",
       z.array(CompanyMetadataSchema),
     );
 
@@ -163,7 +163,7 @@ export class CompanyService {
   async isFollowingCompany(id: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ isFollowing: boolean }>(
-        `/Companies/${id}/following-status`,
+        `/api/Companies/${id}/following-status`,
         z.object({ isFollowing: z.boolean() }),
       );
       return response.data.isFollowing;
@@ -192,7 +192,7 @@ export class CompanyService {
       followersCount: number;
       activeJobsCount: number;
     }>(
-      `/Companies/${id}/stats`,
+      `/api/Companies/${id}/stats`,
       z.object({
         jobsCount: z.number(),
         followersCount: z.number(),
@@ -207,7 +207,7 @@ export class CompanyService {
    */
   async getTrendingCompanies(limit = 10): Promise<Company[]> {
     const response = await apiClient.get<Company[]>(
-      `/Companies/trending?limit=${limit}`,
+      `/api/Companies/trending?limit=${limit}`,
       z.array(CompanyMetadataSchema),
     );
 

@@ -16,9 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSidebar } from "@/hooks/use-sidebar";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://api.myvideoresu.me";
+import { apiClient } from "@/lib/api-client";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -50,26 +48,16 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/Account/ResetPassword?userName=${encodeURIComponent(email)}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
+      // This MVC endpoint lives at the API root (no '/api' segment)
+      const apiRoot = (import.meta.env.VITE_API_URL || "https://api.myvideoresu.me/api").replace(/\/api\/?$/, "");
+      const { data } = await apiClient.requestRaw<unknown>(
+        `${apiRoot}/Account/ResetPassword?userName=${encodeURIComponent(email)}`,
+        { method: "GET" },
       );
 
-      if (response.ok) {
-        setSuccess(true);
-      } else {
-        const errorText = await response.text();
-        setError(
-          errorText || "Failed to send password reset email. Please try again.",
-        );
-      }
+      setSuccess(true);
     } catch (err) {
-      setError("Network error. Please check your connection and try again.");
+      setError("Failed to send password reset email. Please try again.");
     } finally {
       setLoading(false);
     }

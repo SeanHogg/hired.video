@@ -160,7 +160,7 @@ export class UserService {
       });
     }
 
-    const endpoint = `/Users/public${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/Users/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<PaginatedPublicUsers>(
       endpoint,
       PaginatedPublicUsersSchema,
@@ -173,9 +173,9 @@ export class UserService {
    * Get user by ID
    */
   async getUserById(id: string): Promise<UserProfile> {
-    // Use raw client due to backend returning nested 'data' and mixed types
-    const response = await apiClient.getRaw<any>(`/Users/${id}`);
-    const payload = response.data?.data ?? response.data;
+    // Now using standard ApiResponse format
+    const response = await apiClient.get<any>(`/api/Users/${id}`);
+    const payload = response.data;
 
     const dataBlock = payload?.data ?? {};
 
@@ -209,7 +209,7 @@ export class UserService {
    */
   async getUserBySlug(slug: string): Promise<UserProfile> {
     const response = await apiClient.get<UserProfile>(
-      `/Users/slug/${slug}`,
+      `/api/Users/slug/${slug}`,
       UserProfileSchema,
     );
     return response.data;
@@ -220,7 +220,7 @@ export class UserService {
    */
   async getCurrentUser(): Promise<UserProfile> {
     const response = await apiClient.get<UserProfile>(
-      "/Users/me",
+      "/api/Users/me",
       UserProfileSchema,
     );
     return response.data;
@@ -231,7 +231,7 @@ export class UserService {
    */
   async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
     const response = await apiClient.put<UserProfile>(
-      "/Users/me",
+      "/api/Users/me",
       updates,
       UserProfileSchema,
     );
@@ -256,7 +256,7 @@ export class UserService {
     request: SendConnectionRequest,
   ): Promise<Connection> {
     const response = await apiClient.post<Connection>(
-      "/Users/connections",
+      "/api/Users/connections",
       request,
       ConnectionSchema,
     );
@@ -268,7 +268,7 @@ export class UserService {
    */
   async getMyConnections(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      "/Users/me/connections",
+      "/api/Users/me/connections",
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -279,7 +279,7 @@ export class UserService {
    */
   async getPendingConnectionRequests(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      "/Users/me/connections/pending",
+      "/api/Users/me/connections/pending",
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -289,14 +289,14 @@ export class UserService {
    * Accept connection request
    */
   async acceptConnectionRequest(connectionId: string): Promise<void> {
-    await apiClient.put(`/Users/connections/${connectionId}/accept`);
+    await apiClient.put(`/api/Users/connections/${connectionId}/accept`);
   }
 
   /**
    * Reject connection request
    */
   async rejectConnectionRequest(connectionId: string): Promise<void> {
-    await apiClient.delete(`/Users/connections/${connectionId}`);
+    await apiClient.delete(`/api/Users/connections/${connectionId}`);
   }
 
   /**
@@ -304,7 +304,7 @@ export class UserService {
    */
   async getUserConnections(userId: string): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      `/Users/${userId}/connections`,
+      `/api/Users/${userId}/connections`,
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -319,7 +319,7 @@ export class UserService {
   ): Promise<Connection | null> {
     try {
       const response = await apiClient.get<Connection>(
-        `/Users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
+        `/api/Users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
         ConnectionSchema,
       );
       return response.data;
@@ -334,7 +334,7 @@ export class UserService {
    */
   async getRecommendedConnections(): Promise<UserProfile[]> {
     const response = await apiClient.get<UserProfile[]>(
-      "/Users/me/recommendations",
+      "/api/Users/me/recommendations",
       z.array(UserProfileSchema),
     );
     return response.data;
@@ -350,7 +350,7 @@ export class UserService {
   async canMessageUser(userId: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ canMessage: boolean }>(
-        `/Users/${userId}/can-message`,
+        `/api/Users/${userId}/can-message`,
         z.object({ canMessage: z.boolean() }),
       );
       return response.data.canMessage;
@@ -372,7 +372,7 @@ export class UserService {
       connectionCount: number;
       jobApplicationCount: number;
     }>(
-      `/Users/${userId}/stats`,
+      `/api/Users/${userId}/stats`,
       z.object({
         resumeCount: z.number(),
         connectionCount: z.number(),

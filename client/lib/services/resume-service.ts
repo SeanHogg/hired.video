@@ -295,7 +295,7 @@ export class ResumeService {
     });
 
     const response = await apiClient.get<any>(
-      `/Resume/public?${params.toString()}`,
+      `/api/Resume/public?${params.toString()}`,
       PaginatedResumesSchema,
     );
 
@@ -365,7 +365,7 @@ export class ResumeService {
    */
   async getUserResumes(): Promise<ResumeSummary[]> {
     const response = await apiClient.get<ResumeSummary[]>(
-      "/Resume/GetResumesOwnedbyAuthUser",
+      "/api/Resume/GetResumesOwnedbyAuthUser",
       z.array(ResumeSummarySchema),
     );
 
@@ -376,7 +376,7 @@ export class ResumeService {
    * Get specific resume by ID
    */
   async getResumeById(id: string): Promise<Resume> {
-    const response = await apiClient.get<Resume>(`/Resume/${id}`, ResumeSchema);
+    const response = await apiClient.get<Resume>(`/api/Resume/${id}`, ResumeSchema);
     return response.data;
   }
 
@@ -385,7 +385,7 @@ export class ResumeService {
    */
   async createResume(resumeData: CreateResume): Promise<Resume> {
     const response = await apiClient.post<Resume>(
-      "/Resume/Save",
+      "/api/Resume/Save",
       resumeData,
       ResumeSchema,
     );
@@ -401,7 +401,7 @@ export class ResumeService {
 
     // Note: This will need special handling for FormData
     const response = await apiClient.request<Resume>(
-      "/Resume/CreateFromFile",
+      "/api/Resume/CreateFromFile",
       {
         method: "POST",
         body: formData,
@@ -421,7 +421,7 @@ export class ResumeService {
     updates: Partial<CreateResume>,
   ): Promise<Resume> {
     const response = await apiClient.put<Resume>(
-      `/Resume/${id}`,
+      `/api/Resume/${id}`,
       updates,
       ResumeSchema,
     );
@@ -432,7 +432,7 @@ export class ResumeService {
    * Delete resume
    */
   async deleteResume(id: string): Promise<void> {
-    await apiClient.delete(`/Resume/${id}`);
+    await apiClient.delete(`/api/Resume/${id}`);
   }
 
   /**
@@ -440,7 +440,7 @@ export class ResumeService {
    */
   async cloneResume(id: string): Promise<Resume> {
     const response = await apiClient.post<Resume>(
-      `/Resume/${id}/clone`,
+      `/api/Resume/${id}/clone`,
       {},
       ResumeSchema,
     );
@@ -452,7 +452,7 @@ export class ResumeService {
    */
   async exportResume(id: string, format = "pdf"): Promise<Blob> {
     const response = await apiClient.request<Blob>(
-      `/Resume/${id}/export?format=${format}`,
+      `/api/Resume/${id}/export?format=${format}`,
       { method: "GET" },
     );
 
@@ -464,14 +464,14 @@ export class ResumeService {
    * Watch/track resume
    */
   async watchResume(id: string): Promise<void> {
-    await apiClient.post(`/Resume/watch/${id}`);
+    await apiClient.post(`/api/Resume/watch/${id}`);
   }
 
   /**
    * Unwatch/untrack resume
    */
   async unwatchResume(id: string): Promise<void> {
-    await apiClient.post(`/Resume/unwatch/${id}`);
+    await apiClient.post(`/api/Resume/unwatch/${id}`);
   }
 
   /**
@@ -479,7 +479,7 @@ export class ResumeService {
    */
   async getResumeSummary(id: string): Promise<string> {
     const response = await apiClient.post<{ summary: string }>(
-      `/Resume/Summarize`,
+      `/api/Resume/Summarize`,
       { resumeId: id },
       z.object({ summary: z.string() }),
     );
@@ -494,7 +494,7 @@ export class ResumeService {
     id: string,
   ): Promise<{ sentiment: string; score: number }> {
     const response = await apiClient.post<{ sentiment: string; score: number }>(
-      `/Resume/SentimentPrediction`,
+      `/api/Resume/SentimentPrediction`,
       { resumeId: id },
       z.object({
         sentiment: z.string(),
@@ -510,7 +510,7 @@ export class ResumeService {
    */
   async parseResume(content: string): Promise<Partial<CreateResume>> {
     const response = await apiClient.post<Partial<CreateResume>>(
-      `/Resume/Parse`,
+      `/api/Resume/Parse`,
       { content },
       CreateResumeSchema.partial(),
     );

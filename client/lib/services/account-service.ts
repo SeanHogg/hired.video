@@ -21,16 +21,8 @@ class AccountService {
    */
   async getAccountUsers(): Promise<AccountUser[]> {
     try {
-      const { data } = await apiClient.requestRaw<AccountUsersResponse>(
-        "/account/users",
-        { method: "GET" },
-      );
-
-      if (data.errorMessage) {
-        throw new Error(data.errorMessage);
-      }
-
-      return data.result || [];
+      const response = await apiClient.get<AccountUser[]>("/api/account/users");
+      return response.data || [];
     } catch (error) {
       console.error("Error fetching account users:", error);
       throw error;
@@ -42,11 +34,11 @@ class AccountService {
    */
   async inviteUser(request: InviteUserRequest): Promise<InviteUserResponse> {
     try {
-      const { data } = await apiClient.requestRaw<InviteUserResponse>(
-        "/account/invite",
-        { method: "POST", body: request },
+      const response = await apiClient.post<InviteUserResponse>(
+        "/api/account/invite",
+        request,
       );
-      return data;
+      return response.data;
     } catch (error) {
       console.error("Error inviting user:", error);
       throw error;
@@ -58,10 +50,7 @@ class AccountService {
    */
   async updateUserRoles(request: UpdateUserRolesRequest): Promise<void> {
     try {
-      await apiClient.requestRaw(
-        "/account/roles",
-        { method: "PUT", body: request },
-      );
+      await apiClient.put("/api/account/roles", request);
     } catch (error) {
       console.error("Error updating user roles:", error);
       throw error;
@@ -73,10 +62,7 @@ class AccountService {
    */
   async removeUser(userId: string): Promise<void> {
     try {
-      await apiClient.requestRaw(
-        `/account/users/${userId}`,
-        { method: "DELETE" },
-      );
+      await apiClient.delete(`/api/account/users/${userId}`);
     } catch (error) {
       console.error("Error removing user:", error);
       throw error;
@@ -88,10 +74,7 @@ class AccountService {
    */
   async resendInvitation(userId: string): Promise<void> {
     try {
-      await apiClient.requestRaw(
-        "/account/invite/resend",
-        { method: "POST", body: { userId } },
-      );
+      await apiClient.post("/api/account/invite/resend", { userId });
     } catch (error) {
       console.error("Error resending invitation:", error);
       throw error;
@@ -103,11 +86,8 @@ class AccountService {
    */
   async getAvailableAccounts(): Promise<AccountOption[]> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: any[] }>(
-        "/account/available",
-        { method: "GET" },
-      );
-      const accounts = data.result || [];
+      const response = await apiClient.get<any[]>("/api/account/available");
+      const accounts = response.data || [];
 
       return accounts.map((account: any) => ({
         id: account.id,
@@ -128,14 +108,13 @@ class AccountService {
    */
   async switchAccount(accountId: string): Promise<any> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: any }>(
-        "/account/switch",
-        { method: "POST", body: { accountId } },
+      const response = await apiClient.post<any>(
+        "/api/account/switch",
+        { accountId },
       );
 
-      const switchResult = data.result;
       localStorage.setItem("currentAccountId", accountId);
-      return switchResult;
+      return response.data;
     } catch (error) {
       console.error("Error switching account:", error);
       throw error;
@@ -159,10 +138,7 @@ class AccountService {
    */
   async acceptInvitation(inviteId: string): Promise<void> {
     try {
-      await apiClient.requestRaw(
-        "/account/invite/accept",
-        { method: "POST", body: { inviteId } },
-      );
+      await apiClient.post("/api/account/invite/accept", { inviteId });
     } catch (error) {
       console.error("Error accepting invitation:", error);
       throw error;
@@ -174,10 +150,7 @@ class AccountService {
    */
   async rejectInvitation(inviteId: string): Promise<void> {
     try {
-      await apiClient.requestRaw(
-        "/account/invite/reject",
-        { method: "POST", body: { inviteId } },
-      );
+      await apiClient.post("/api/account/invite/reject", { inviteId });
     } catch (error) {
       console.error("Error rejecting invitation:", error);
       throw error;
@@ -189,11 +162,10 @@ class AccountService {
    */
   async getPendingInvitations(): Promise<AccountUser[]> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: AccountUser[] }>(
-        "/account/invitations/pending",
-        { method: "GET" },
+      const response = await apiClient.get<AccountUser[]>(
+        "/api/account/invitations/pending",
       );
-      return data.result || [];
+      return response.data || [];
     } catch (error) {
       console.error("Error fetching pending invitations:", error);
       return [];
@@ -205,11 +177,8 @@ class AccountService {
    */
   async getAccountSettings(): Promise<any> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: any }>(
-        "/account/settings",
-        { method: "GET" },
-      );
-      return data.result || data;
+      const response = await apiClient.get<any>("/api/account/settings");
+      return response.data;
     } catch (error) {
       console.error("Error fetching account settings:", error);
       throw error;
@@ -221,11 +190,8 @@ class AccountService {
    */
   async updateAccountSettings(settings: any): Promise<any> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: any }>(
-        "/account/settings",
-        { method: "POST", body: settings },
-      );
-      return data.result || data;
+      const response = await apiClient.post<any>("/api/account/settings", settings);
+      return response.data;
     } catch (error) {
       console.error("Error updating account settings:", error);
       throw error;
@@ -237,11 +203,8 @@ class AccountService {
    */
   async getAccountAnalytics(): Promise<any> {
     try {
-      const { data } = await apiClient.requestRaw<{ result?: any }>(
-        "/account/analytics",
-        { method: "GET" },
-      );
-      return data.result || data;
+      const response = await apiClient.get<any>("/api/account/analytics");
+      return response.data;
     } catch (error) {
       console.error("Error fetching account analytics:", error);
       throw error;

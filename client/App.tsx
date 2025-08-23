@@ -36,6 +36,7 @@ import Settings from "./pages/Settings";
 import Tasks from "./pages/Tasks";
 import TermsOfService from "./pages/TermsOfService";
 import Tools from "./pages/Tools";
+import SentimentAnalysis from "./pages/tools/SentimentAnalysis";
 import Outreach from "./pages/Outreach";
 import Help from "./pages/Help";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -189,6 +190,8 @@ const App = () => (
                   <Route path="/people/:id" element={<PeopleDetail />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/tools" element={<Tools />} />
+                  <Route path="/Tools/SentimentAnalysis" element={<SentimentAnalysis />} />
+                  <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
                   <Route path="/account" element={<AccountManagement />} />

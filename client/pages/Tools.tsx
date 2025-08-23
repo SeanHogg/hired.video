@@ -18,6 +18,7 @@ import {
   Globe,
   Award,
   TrendingUp,
+  Heart,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -196,6 +197,41 @@ export default function Tools() {
                     </CardContent>
                   </Card>
 
+                  <Card className="border-pink-200 hover:border-pink-300 transition-colors cursor-pointer group">
+                    <CardHeader>
+                      <Heart className="h-8 w-8 text-pink-600 mb-3 group-hover:scale-110 transition-transform" />
+                      <CardTitle className="text-lg">
+                        Sentiment Analysis
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        Discover how positive your resume sounds to employers
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          AI-powered tone analysis
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          Positivity scoring (0-100)
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          Improvement recommendations
+                        </div>
+                      </div>
+                      <CardContent className="pt-4">
+                        <Link to="/Tools/SentimentAnalysis">
+                          <Button variant="outline" size="sm" className="w-full">
+                            Analyze Resume
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </CardContent>
+                  </Card>
+
                   <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                     <CardHeader>
                       <Calculator className="h-8 w-8 text-primary mb-3" />
@@ -311,7 +347,7 @@ export default function Tools() {
                 <h2 className="text-3xl font-bold text-center mb-12">
                   Most Popular Tools
                 </h2>
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                   <Card className="hover:shadow-lg transition-shadow">
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -437,6 +473,73 @@ export default function Tools() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  <Link to="/Tools/SentimentAnalysis">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
+                              <Heart className="h-6 w-6 text-pink-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Sentiment Analysis
+                              </CardTitle>
+                              <CardDescription>
+                                Analyze your resume's emotional appeal
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-pink-100 text-pink-800"
+                          >
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">
+                                40%
+                              </div>
+                              <div className="text-muted-foreground">
+                                More Interviews
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-pink-600">
+                                0-100
+                              </div>
+                              <div className="text-muted-foreground">
+                                Score Range
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              AI-powered tone analysis
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Instant positivity scoring
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Personalized recommendations
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Analyze My Resume
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 </div>
               </div>
 
@@ -485,12 +588,53 @@ export default function Tools() {
                 </div>
               </div>
 
+              {/* Feature Spotlight - Sentiment Analysis */}
+              <div className="mb-16">
+                <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-8 border border-pink-100">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Heart className="h-8 w-8 text-pink-600" />
+                    </div>
+                    <h2 className="text-3xl font-bold mb-4">
+                      New: Resume Sentiment Analysis
+                    </h2>
+                    <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                      Discover how positive your resume sounds to employers with our AI-powered sentiment analysis tool
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-pink-600 mb-2">85%</div>
+                      <p className="text-sm text-muted-foreground">Analysis Accuracy</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-green-600 mb-2">40%</div>
+                      <p className="text-sm text-muted-foreground">More Interview Invites</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-600 mb-2">0-100</div>
+                      <p className="text-sm text-muted-foreground">Sentiment Score Range</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <Link to="/Tools/SentimentAnalysis">
+                      <Button size="lg" className="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90">
+                        <Heart className="mr-2 h-5 w-5" />
+                        Try Sentiment Analysis Free
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
               {/* Success Stories */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
                   Tool Success Stories
                 </h2>
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center mb-4">
@@ -539,6 +683,33 @@ export default function Tools() {
                           <p className="font-medium text-sm">Carlos Martinez</p>
                           <p className="text-xs text-muted-foreground">
                             Software Engineer
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center mb-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className="h-4 w-4 fill-yellow-400 text-yellow-400"
+                          />
+                        ))}
+                      </div>
+                      <p className="text-sm mb-4">
+                        "I never realized my resume sounded so negative! The sentiment analysis
+                        showed me exactly what to change. After improving my score from 35 to 78,
+                        I started getting way more interview calls."
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full" />
+                        <div>
+                          <p className="font-medium text-sm">Sarah Chen</p>
+                          <p className="text-xs text-muted-foreground">
+                            Marketing Manager
                           </p>
                         </div>
                       </div>
@@ -627,6 +798,21 @@ export default function Tools() {
                   </Button>
                 </CardContent>
               </Card>
+
+              <Link to="/Tools/SentimentAnalysis">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-6 text-center">
+                    <Heart className="h-8 w-8 mx-auto text-brand-purple mb-4" />
+                    <h3 className="font-semibold mb-2">Sentiment Analysis</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Analyze how positive your resume sounds
+                    </p>
+                    <Button variant="outline" size="sm">
+                      Analyze Resume
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
 
               <Card>
                 <CardContent className="p-6 text-center">

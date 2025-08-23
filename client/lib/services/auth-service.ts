@@ -139,7 +139,7 @@ export class AuthService {
    */
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await apiClient.post<LoginResponse>(
-      "/Auth/login",
+      "/api/Auth/login",
       credentials,
       LoginResponseSchema, // shared + optional refreshToken
     );
@@ -177,7 +177,7 @@ export class AuthService {
     const payload = { ...userData, userName: deriveUserName() } as any;
 
     const response = await apiClient.post<LoginResponse>(
-      "/Auth/register",
+      "/api/Auth/register",
       payload,
       LoginResponseSchema,
     );
@@ -199,7 +199,7 @@ export class AuthService {
   async logout(): Promise<void> {
     try {
       // Call backend logout endpoint if it exists
-      await apiClient.post("/Auth/logout");
+      await apiClient.post("/api/Auth/logout");
     } catch (error) {
       // Continue with local logout even if backend call fails
       console.warn("Backend logout failed:", error);
@@ -213,9 +213,9 @@ export class AuthService {
    * Get current user profile
    */
   async getCurrentUser(): Promise<UserProfile> {
-    logger.info("authService.getCurrentUser: GET /Users/me");
+    logger.info("authService.getCurrentUser: GET /api/Users/me");
     const response = await apiClient.get<UserProfileDTO>(
-      "/Users/me",
+      "/api/Users/me",
       UserProfileDTOSchema,
     );
     logger.info("authService.getCurrentUser: response received");
@@ -270,9 +270,9 @@ export class AuthService {
     if (anyUpdates.headline !== undefined)
       payload.headline = anyUpdates.headline;
 
-    logger.info("authService.updateProfile: PUT /Users/me", payload);
+    logger.info("authService.updateProfile: PUT /api/Users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(
-      "/Users/me",
+      "/api/Users/me",
       payload,
       UserProfileDTOSchema,
     );
@@ -318,7 +318,7 @@ export class AuthService {
     }
 
     const response = await apiClient.post<LoginResponse>(
-      "/Auth/refresh",
+      "/api/Auth/refresh",
       { refreshToken },
       LoginResponseSchema,
     );

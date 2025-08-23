@@ -143,7 +143,7 @@ export class JobService {
       });
     }
 
-    const endpoint = `/Job${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/Job${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<any>(endpoint, PaginatedJobsSchema);
 
     const dto = response.data as any;
@@ -179,7 +179,7 @@ export class JobService {
    */
   async getUserJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
-      "/Job/GetSummaryItems",
+      "/api/Job/GetSummaryItems",
       z.array(JobSummarySchema),
     );
 
@@ -191,7 +191,7 @@ export class JobService {
    */
   async getJobById(id: string): Promise<any> {
     // Bypass strict client-side schema; backend returns JobItemEntity shape
-    const response = await apiClient.get<any>(`/Job/${id}`);
+    const response = await apiClient.get<any>(`/api/Job/${id}`);
     return response.data;
   }
 
@@ -199,7 +199,7 @@ export class JobService {
    * Create new job
    */
   async createJob(jobData: CreateJob): Promise<Job> {
-    const response = await apiClient.post<Job>("/Job", jobData, JobSchema);
+    const response = await apiClient.post<Job>("/api/Job", jobData, JobSchema);
     return response.data;
   }
 
@@ -212,7 +212,7 @@ export class JobService {
 
     // Note: This will need special handling for FormData
     const response = await apiClient.request<Job>(
-      "/Job/CreateFromFile",
+      "/api/Job/CreateFromFile",
       {
         method: "POST",
         body: formData,
@@ -229,7 +229,7 @@ export class JobService {
    */
   async extractJobFromUrl(url: string): Promise<Job> {
     const response = await apiClient.post<Job>(
-      "/Job/Extract",
+      "/api/Job/Extract",
       { url },
       JobSchema,
     );
@@ -241,7 +241,7 @@ export class JobService {
    * Update existing job
    */
   async updateJob(id: string, updates: Partial<CreateJob>): Promise<Job> {
-    const response = await apiClient.put<Job>(`/Job/${id}`, updates, JobSchema);
+    const response = await apiClient.put<Job>(`/api/Job/${id}`, updates, JobSchema);
     return response.data;
   }
 
@@ -249,28 +249,28 @@ export class JobService {
    * Delete job
    */
   async deleteJob(id: string): Promise<void> {
-    await apiClient.delete(`/Job/${id}`);
+    await apiClient.delete(`/api/Job/${id}`);
   }
 
   /**
    * Apply to job
    */
   async applyToJob(jobId: string, resumeId?: string): Promise<void> {
-    await apiClient.post(`/Job/${jobId}/apply`, { resumeId });
+    await apiClient.post(`/api/Job/${jobId}/apply`, { resumeId });
   }
 
   /**
    * Save/bookmark job
    */
   async saveJob(jobId: string): Promise<void> {
-    await apiClient.post(`/Job/${jobId}/save`);
+    await apiClient.post(`/api/Job/${jobId}/save`);
   }
 
   /**
    * Remove saved job
    */
   async unsaveJob(jobId: string): Promise<void> {
-    await apiClient.delete(`/Job/${jobId}/save`);
+    await apiClient.delete(`/api/Job/${jobId}/save`);
   }
 
   /**
@@ -278,7 +278,7 @@ export class JobService {
    */
   async getSavedJobs(): Promise<JobSummary[]> {
     const response = await apiClient.get<JobSummary[]>(
-      "/Job/saved",
+      "/api/Job/saved",
       z.array(JobSummarySchema),
     );
 

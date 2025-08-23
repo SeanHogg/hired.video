@@ -16,8 +16,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import Sidebar from "@/components/Sidebar";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.myvideoresu.me";
+import { apiClient } from "@/lib/api-client";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -102,36 +101,32 @@ export default function ResetPassword() {
     setValidationErrors([]);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/Account/ConfirmPasswordReset`,
+      const { data } = await apiClient.requestRaw<{ message?: string }>(
+        "/account/confirm-password-reset",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+          body: {
             userId,
             token,
             newPassword: password,
-          }),
+          },
         },
       );
 
-      if (response.ok) {
+      const ok = true;
+
+      if (ok) {
         setSuccess(true);
-        // Redirect to login after 3 seconds
         setTimeout(() => {
           navigate(
             "/login?message=Password reset successful. Please sign in with your new password.",
           );
         }, 3000);
       } else {
-        const errorData = await response.json();
-        setError(
-          errorData.message || "Failed to reset password. Please try again.",
-        );
-        if (errorData.errors) {
-          setValidationErrors(errorData.errors);
+        try {
+          setError("Failed to reset password. Please try again.");
+        } catch {
+          setError("Failed to reset password. Please try again.");
         }
       }
     } catch (err) {

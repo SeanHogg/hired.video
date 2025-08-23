@@ -106,11 +106,11 @@ export class TaskService {
         assignedToUserId: request.assignedToUserId,
       };
 
-      const response = await apiClient.post<{ result: TaskDTO }>(
+      const response = await apiClient.post<TaskDTO>(
         `${this.baseUrl}/save`,
         taskDto,
       );
-      return response.data.result;
+      return response.data;
     } catch (error) {
       console.error("Failed to create task:", error);
       throw new Error("Failed to create task");
@@ -137,11 +137,11 @@ export class TaskService {
         updateDateTime: new Date().toISOString(),
       };
 
-      const response = await apiClient.post<{ result: TaskDTO }>(
+      const response = await apiClient.post<TaskDTO>(
         `${this.baseUrl}/save`,
         taskDto,
       );
-      return response.data.result;
+      return response.data;
     } catch (error) {
       console.error(`Failed to update task ${request.id}:`, error);
       throw new Error(`Failed to update task ${request.id}`);

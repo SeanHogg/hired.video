@@ -97,7 +97,7 @@ export class SearchService {
       params.append("limit", filters.limit.toString());
 
       const response = await apiClient.get<SearchResponse>(
-        `/search/public?${params.toString()}`,
+        `/api/search/public?${params.toString()}`,
         SearchResponseSchema,
       );
 
