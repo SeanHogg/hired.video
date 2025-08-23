@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { resumeService } from "./resume-service";
+
 
 // Schema for sentiment analysis response
 export const SentimentAnalysisResponseSchema = z.object({
@@ -38,7 +40,7 @@ export class SentimentService {
     return this.analyzeResumeSentiment(created.id);
   }
 
-  
+
 
   /**
    * Interpret sentiment score and provide recommendations
