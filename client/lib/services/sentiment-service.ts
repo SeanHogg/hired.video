@@ -18,70 +18,27 @@ export interface SentimentInterpretation {
 
 export class SentimentService {
   /**
-   * Analyze sentiment of raw text
+   * Analyze sentiment for an existing resume by ID (server endpoint)
    */
-  async analyzeSentiment(text: string): Promise<number> {
-    // SentimentController now returns ApiResponse<float> format
+  async analyzeResumeSentiment(resumeId: string): Promise<number> {
     const response = await apiClient.post<number>(
-      "/sentiment/sentimentprediction",
-      text,
+      "/api/Resume/SentimentPrediction",
+      resumeId,
       z.number()
     );
-
     return response.data;
   }
 
   /**
-   * Analyze sentiment of existing resume by ID
-   */
-  async analyzeResumeSentiment(resumeId: string): Promise<number> {
-    // The backend expects ApiResponse<float> format
-    const response = await apiClient.post<{ data: number }>(
-      "/api/Resume/SentimentPrediction",
-      resumeId,
-      z.object({ data: z.number() })
-    );
-
-    return response.data.data;
-  }
-
-  /**
-   * Extract text from uploaded file and analyze sentiment
+   * Analyze sentiment of an uploaded file by first creating a resume, then scoring it
    */
   async analyzeFileSentiment(file: File): Promise<number> {
-    // First, we need to extract text from the file
-    // This would typically involve uploading the file and getting text back
-    // For now, we'll simulate this process
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Note: This endpoint would need to be created to handle file upload and text extraction
-    // For now, we'll use a placeholder approach
-    const text = await this.extractTextFromFile(file);
-    return this.analyzeSentiment(text);
+    // Create a resume from uploaded file, then analyze by resume ID
+    const created = await resumeService.createResumeFromFile(file);
+    return this.analyzeResumeSentiment(created.id);
   }
 
-  /**
-   * Extract text from file (placeholder implementation)
-   */
-  private async extractTextFromFile(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        resolve(text || "");
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      
-      if (file.type === "text/plain") {
-        reader.readAsText(file);
-      } else {
-        // For PDF and Word files, we'd need a proper text extraction service
-        // For now, return a placeholder
-        resolve("Sample resume text for demonstration purposes.");
-      }
-    });
-  }
+  
 
   /**
    * Interpret sentiment score and provide recommendations

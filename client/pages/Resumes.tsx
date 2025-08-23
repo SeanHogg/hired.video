@@ -120,10 +120,8 @@ export default function Resumes() {
     item: null,
   });
 
-  // Get user's resumes from centralized mock data
+  // Get user's resumes from API
   const getUserResumes = async (): Promise<ResumeWithOwnership[]> => {
-    if (!user?.id) return [];
-
     try {
       // Get user's owned resumes
       const owned = await resumeService.getUserResumes();
@@ -176,17 +174,17 @@ export default function Resumes() {
   useEffect(() => {
     if (id) {
       loadResumeById(id);
-    } else {
+      return;
+    }
+    if (isAuthenticated) {
       loadResumes();
     }
-  }, [id]);
+  }, [id, isAuthenticated]);
 
   const loadResumes = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
       const userResumes = await getUserResumes();
       setResumes(userResumes);
     } catch (error) {
