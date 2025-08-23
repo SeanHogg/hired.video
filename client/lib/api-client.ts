@@ -83,7 +83,8 @@ export class ApiClient {
     this.baseUrl =
       config.baseUrl ||
       import.meta.env.VITE_API_URL ||
-      "https://api.myvideoresu.me/api";
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://api.myvideoresu.me"; // Do not include trailing /api; endpoints include /api
     this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {
@@ -162,6 +163,14 @@ export class ApiClient {
     const cleanBaseUrl = this.baseUrl.endsWith("/")
       ? this.baseUrl.slice(0, -1)
       : this.baseUrl;
+
+    // Guard against double /api when baseUrl already ends with /api and endpoint starts with api/
+    const baseEndsWithApi = /\/api$/i.test(cleanBaseUrl);
+    const endpointStartsWithApi = /^api\//i.test(cleanEndpoint);
+    if (baseEndsWithApi && endpointStartsWithApi) {
+      return `${cleanBaseUrl}/${cleanEndpoint.replace(/^api\//i, "")}`;
+    }
+
     return `${cleanBaseUrl}/${cleanEndpoint}`;
   }
 

@@ -17,9 +17,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
@@ -74,14 +72,7 @@ export default function Sidebar({
     return location.pathname.startsWith(item.href);
   };
 
-  const categories = [
-    { name: "Software Engineering", count: 156 },
-    { name: "Product Management", count: 89 },
-    { name: "UX/UI Design", count: 134 },
-    { name: "Data Science", count: 78 },
-    { name: "Marketing", count: 92 },
-    { name: "Sales", count: 67 },
-  ];
+
 
   return (
     <>
@@ -162,41 +153,7 @@ export default function Sidebar({
               </nav>
             </div>
 
-            {/* Categories - Show only in expanded state */}
-            {!collapsed && (
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Categories
-                </h3>
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <Link
-                      key={category.name}
-                      to={`/category/${category.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
-                      className="flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      onClick={onClose}
-                    >
-                      <span>{category.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {category.count}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {!collapsed && <Separator />}
-
-            {/* Quick Actions */}
-            <div>
-              {!collapsed && (
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Quick Actions
-                </h3>
-              )}
-              <div className="space-y-2" />
-            </div>
           </div>
 
           {/* Footer */}
