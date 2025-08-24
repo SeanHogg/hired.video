@@ -71,7 +71,10 @@ function TimelineItem({
 
   const formatDate = (dateString: string) => {
     if (dateString === "Present") return "Present";
-    return new Date(dateString).toLocaleDateString("en-US", {
+    if (!dateString) return "No date";
+    const dateObj = new Date(dateString);
+    if (isNaN(dateObj.getTime())) return "Invalid date";
+    return dateObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
     });

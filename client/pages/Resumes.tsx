@@ -62,7 +62,7 @@ import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateResumeId } from "@/lib/utils";
+import { generateResumeId, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Resume,
@@ -1153,9 +1153,7 @@ export default function Resumes() {
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <Calendar className="w-3 h-3" />
-                                        {masterResume.createdAt && !isNaN(new Date(masterResume.createdAt).getTime())
-                                          ? new Date(masterResume.createdAt).toLocaleDateString()
-                                          : "No date"}
+                                        {formatDate(masterResume.createdAt)}
                                       </div>
                                       {!masterResume.isActive && (
                                         <Button
@@ -1285,9 +1283,7 @@ export default function Resumes() {
                                               </div>
                                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                 <Calendar className="w-3 h-3" />
-                                                {new Date(
-                                                  variation.createdAt,
-                                                ).toLocaleDateString()}
+                                                {formatDate(variation.createdAt)}
                                               </div>
                                               {!variation.isActive && (
                                                 <Button

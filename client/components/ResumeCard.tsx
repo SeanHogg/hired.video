@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatDate } from "@/lib/utils";
 
 interface ResumeCardProps {
   id: string;
@@ -45,16 +46,7 @@ export default function ResumeCard({
   onView,
   onActions,
 }: ResumeCardProps) {
-  const formatDate = (date: string) => {
-    if (!date) return "No date";
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) return "Invalid date";
-    return dateObj.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
+
 
   const handleCardClick = () => {
     onView?.();

@@ -1009,7 +1009,9 @@ export default function PeopleDetail() {
                           Member since
                         </span>
                         <span>
-                          {new Date(person.createdAt).toLocaleDateString()}
+                          {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
+                            ? new Date(person.createdAt).toLocaleDateString()
+                            : "Unknown"}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -1017,9 +1019,12 @@ export default function PeopleDetail() {
                           Last active
                         </span>
                         <span>
-                          {new Date(
-                            (person as any).lastActiveAt || person.updatedAt,
-                          ).toLocaleDateString()}
+                          {(() => {
+                            const lastActive = (person as any).lastActiveAt || person.updatedAt;
+                            return lastActive && !isNaN(new Date(lastActive).getTime())
+                              ? new Date(lastActive).toLocaleDateString()
+                              : "Unknown";
+                          })()}
                         </span>
                       </div>
                     </div>

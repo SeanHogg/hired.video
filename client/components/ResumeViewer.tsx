@@ -32,6 +32,7 @@ import type {
   CreateResumeRequest,
 } from "@/types/resume";
 import ResumeBuilder from "./ResumeBuilder";
+import { formatDate } from "@/lib/utils";
 
 interface ResumeViewerProps {
   resume: Resume;
@@ -72,12 +73,8 @@ export default function ResumeViewer({
     setTimeout(() => setShowShareAlert(false), 3000);
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Present";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-    });
+  const formatDateForResume = (dateString: string) => {
+    return formatDate(dateString, { year: "numeric", month: "short" }, "Present");
   };
 
   const getPrivacyIcon = (privacy: ResumePrivacy) => {
@@ -271,8 +268,8 @@ export default function ResumeViewer({
                           </h3>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />
-                            {formatDate(work.StartDate)} -{" "}
-                            {formatDate(work.EndDate)}
+                            {formatDateForResume(work.StartDate)} -{" "}
+                            {formatDateForResume(work.EndDate)}
                           </div>
                         </div>
                         <p className="text-primary font-medium">{work.Name}</p>
@@ -317,8 +314,8 @@ export default function ResumeViewer({
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {formatDate(edu.StartDate)} -{" "}
-                          {formatDate(edu.EndDate)}
+                          {formatDateForResume(edu.StartDate)} -{" "}
+                          {formatDateForResume(edu.EndDate)}
                         </div>
                       </div>
                     </div>
@@ -359,13 +356,13 @@ export default function ResumeViewer({
               <p className="text-sm font-medium text-muted-foreground">
                 Created
               </p>
-              <p>{new Date(resume.createdAt).toLocaleDateString()}</p>
+              <p>{formatDate(resume.createdAt)}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">
                 Last Updated
               </p>
-              <p>{new Date(resume.updatedAt).toLocaleDateString()}</p>
+              <p>{formatDate(resume.updatedAt)}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Views</p>

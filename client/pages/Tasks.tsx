@@ -200,13 +200,17 @@ export default function Tasks() {
               <span className="text-muted-foreground">Start</span>
               <span>
                 {selectedTask.startDate
-                  ? new Date(selectedTask.startDate).toLocaleDateString()
+                  ? (selectedTask.startDate && !isNaN(new Date(selectedTask.startDate).getTime())
+                      ? new Date(selectedTask.startDate).toLocaleDateString()
+                      : "Invalid date")
                   : "-"}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Due</span>
-              <span>{new Date(selectedTask.dueDate).toLocaleDateString()}</span>
+              <span>{selectedTask.dueDate && !isNaN(new Date(selectedTask.dueDate).getTime())
+                ? new Date(selectedTask.dueDate).toLocaleDateString()
+                : "Invalid date"}</span>
             </div>
             {selectedTask.assignedTo && (
               <div className="flex items-center justify-between">

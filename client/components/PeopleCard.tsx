@@ -249,11 +249,15 @@ export default function PeopleCard({
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              Active {new Date(person.lastActiveAt).toLocaleDateString()}
+              Active {person.lastActiveAt && !isNaN(new Date(person.lastActiveAt).getTime())
+                ? new Date(person.lastActiveAt).toLocaleDateString()
+                : "Unknown"}
             </div>
             <div className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              Joined {new Date(person.createdAt).toLocaleDateString()}
+              Joined {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
+                ? new Date(person.createdAt).toLocaleDateString()
+                : "Unknown"}
             </div>
           </div>
 

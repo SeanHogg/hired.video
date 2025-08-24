@@ -38,8 +38,10 @@ export default function VideoCard({
   };
 
   const formatDate = (date: string) => {
+    if (!date) return "Unknown date";
     const now = new Date();
     const videoDate = new Date(date);
+    if (isNaN(videoDate.getTime())) return "Invalid date";
     const diffTime = Math.abs(now.getTime() - videoDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

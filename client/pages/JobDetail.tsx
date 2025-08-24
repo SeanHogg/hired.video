@@ -467,13 +467,17 @@ export default function JobDetail() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          Posted {new Date(job.createdAt).toLocaleDateString()}
+                          Posted {job.createdAt && !isNaN(new Date(job.createdAt).getTime())
+                            ? new Date(job.createdAt).toLocaleDateString()
+                            : "Unknown date"}
                         </div>
                         {job.expiresAt && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4" />
                             Expires{" "}
-                            {new Date(job.expiresAt).toLocaleDateString()}
+                            {!isNaN(new Date(job.expiresAt).getTime())
+                              ? new Date(job.expiresAt).toLocaleDateString()
+                              : "Unknown date"}
                           </div>
                         )}
                       </div>
@@ -812,14 +816,18 @@ export default function JobDetail() {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Posted</span>
                       <span className="font-medium">
-                        {new Date(job.createdAt).toLocaleDateString()}
+                        {job.createdAt && !isNaN(new Date(job.createdAt).getTime())
+                          ? new Date(job.createdAt).toLocaleDateString()
+                          : "Unknown date"}
                       </span>
                     </div>
                     {job.expiresAt && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Expires</span>
                         <span className="font-medium">
-                          {new Date(job.expiresAt).toLocaleDateString()}
+                          {!isNaN(new Date(job.expiresAt).getTime())
+                            ? new Date(job.expiresAt).toLocaleDateString()
+                            : "Unknown date"}
                         </span>
                       </div>
                     )}
