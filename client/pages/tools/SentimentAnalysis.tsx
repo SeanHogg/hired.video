@@ -21,8 +21,12 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 
 export default function SentimentAnalysis() {
+  const location = useLocation();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+
+  // SEO for sentiment analysis page
+  useSEO(location.pathname);
   
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);

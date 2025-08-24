@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Target, CheckCircle2, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,8 +30,12 @@ interface ResumeData {
 }
 
 export default function JobResumeMatch() {
+  const location = useLocation();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated } = useAuth();
+
+  // SEO for job resume match page
+  useSEO(location.pathname);
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState<WizardStep>('job');
