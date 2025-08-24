@@ -28,7 +28,8 @@ import {
   Power,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -78,6 +79,7 @@ import {
 } from "@/types/resume";
 
 export default function Resumes() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -85,6 +87,9 @@ export default function Resumes() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for resumes page
+  useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const { id } = useParams();

@@ -10,6 +10,8 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -26,6 +28,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function TermsOfService() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -33,6 +36,9 @@ export default function TermsOfService() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for terms of service page
+  useSEO(location.pathname);
   const { isAuthenticated } = useAuth();
 
   return (

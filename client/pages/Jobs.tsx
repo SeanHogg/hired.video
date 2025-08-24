@@ -22,7 +22,8 @@ import {
   X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import Navigation from "@/components/Navigation";
@@ -50,6 +51,7 @@ import { useAuth } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
 
 export default function Jobs() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -57,6 +59,9 @@ export default function Jobs() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for jobs page
+  useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [jobs, setJobs] = useState<JobSummary[]>([]);

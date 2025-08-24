@@ -10,7 +10,8 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -34,6 +35,7 @@ import { useAuth } from "@/lib/auth";
 import type { CompanyWithOwnership } from "@/types/company";
 
 export default function Companies() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -41,6 +43,9 @@ export default function Companies() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for companies page
+  useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [companies, setCompanies] = useState<Company[]>([]);

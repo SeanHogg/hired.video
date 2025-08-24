@@ -28,7 +28,8 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
@@ -78,7 +79,11 @@ import type { CompanyWithOwnership } from "@/types/company";
 
 export default function Index() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
+
+  // SEO for homepage
+  useSEO(location.pathname);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({

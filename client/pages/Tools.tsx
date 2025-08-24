@@ -21,7 +21,8 @@ import {
   Heart,
 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -38,6 +39,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function Tools() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -46,6 +48,9 @@ export default function Tools() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+
+  // SEO for tools page
+  useSEO(location.pathname);
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {

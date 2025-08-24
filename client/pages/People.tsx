@@ -21,7 +21,8 @@ import {
   Building2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -65,6 +66,7 @@ type PeopleData =
     })[];
 
 export default function People() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -72,6 +74,9 @@ export default function People() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for people page
+  useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [people, setPeople] = useState<PublicUser[]>([]);

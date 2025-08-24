@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   Globe,
 } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import { useState } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -27,6 +29,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function PrivacyPolicy() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -34,6 +37,9 @@ export default function PrivacyPolicy() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for privacy policy page
+  useSEO(location.pathname);
   const { isAuthenticated } = useAuth();
 
   return (

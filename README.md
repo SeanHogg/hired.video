@@ -56,6 +56,7 @@ The platform supports sophisticated multi-tenant account structures with role-ba
 - **State Management**: React Query + Context API
 - **Authentication**: JWT with automatic token refresh
 - **AI Integration**: OpenRouter API for AI features
+- **Analytics**: Google Tag Manager (GTM-T6CSJ22D) for comprehensive tracking
 - **Icons**: Lucide React
 - **Forms**: React Hook Form with Zod validation
 - **UI Library**: Radix UI primitives with custom styling

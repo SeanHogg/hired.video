@@ -9,7 +9,8 @@ import {
   Building2,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -29,6 +30,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, type UserRole } from "@/lib/auth";
 
 export default function Signup() {
+  const location = useLocation();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -39,6 +41,9 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // SEO for signup page
+  useSEO(location.pathname);
   const {
     sidebarOpen,
     sidebarCollapsed,

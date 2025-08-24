@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Upload, Loader2, X, AlertTriangle, Heart, FileText, ArrowLeft, Lightbulb } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

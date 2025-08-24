@@ -28,7 +28,8 @@ import {
   Minus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -57,6 +58,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 
 export default function Pricing() {
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -64,6 +66,9 @@ export default function Pricing() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // SEO for pricing page
+  useSEO(location.pathname);
   const { isAuthenticated } = useAuth();
   const { addItem, openCart } = useCart();
 
