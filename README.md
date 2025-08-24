@@ -17,6 +17,8 @@ MyVideoResume is an enterprise-grade platform that combines video resume creatio
 - **📧 Communication & Outreach** - Professional networking, email templates, and campaign management
 - **🤖 AI Integration** - OpenRouter-powered AI assistant for career guidance and optimization
 - **🏢 Account & Organization Management** - Multi-tenant business accounts with team collaboration
+- **⚖️ Legal Compliance** - Comprehensive Privacy Policy and Terms of Service with multi-jurisdiction compliance
+- **📊 Analytics & Tracking** - Google Tag Manager integration for advanced analytics and user behavior tracking
 
 ### Account & Organization Management
 
