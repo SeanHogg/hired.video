@@ -713,7 +713,6 @@ export default function TermsOfService() {
                       Upon termination, your right to use the Services will cease immediately. If you wish to terminate your account, you may simply discontinue using the Services. All provisions of these Legal Terms which by their nature should survive termination shall survive termination.
                     </p>
                   </div>
-                  </div>
                 </CardContent>
               </Card>
 
