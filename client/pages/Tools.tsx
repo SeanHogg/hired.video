@@ -540,6 +540,73 @@ export default function Tools() {
                       </CardContent>
                     </Card>
                   </Link>
+
+                  <Link to="/Tools/JobResumeMatch">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <Target className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Job-Resume Match
+                              </CardTitle>
+                              <CardDescription>
+                                Analyze how well your resume matches a job
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800"
+                          >
+                            Popular
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">
+                                0-100
+                              </div>
+                              <div className="text-muted-foreground">
+                                Match Score
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-600">
+                                3-Step
+                              </div>
+                              <div className="text-muted-foreground">
+                                Easy Process
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              AI-powered job matching
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Detailed recommendations
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Tailoring suggestions
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Analyze Match
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 </div>
               </div>
 
@@ -809,6 +876,21 @@ export default function Tools() {
                     </p>
                     <Button variant="outline" size="sm">
                       Analyze Resume
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/Tools/JobResumeMatch">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardContent className="p-6 text-center">
+                    <Target className="h-8 w-8 mx-auto text-brand-blue mb-4" />
+                    <h3 className="font-semibold mb-2">Job-Resume Match</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      See how well your resume matches a job
+                    </p>
+                    <Button variant="outline" size="sm">
+                      Analyze Match
                     </Button>
                   </CardContent>
                 </Card>

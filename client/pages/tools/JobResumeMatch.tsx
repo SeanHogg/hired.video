@@ -1,0 +1,247 @@
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, Target, CheckCircle2, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import JobInputStep from "@/components/tools/JobInputStep";
+import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
+import MatchResultsStep from "@/components/tools/MatchResultsStep";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import { matchService, type JobResumeMatchResponse } from "@/lib/services/match-service";
+
+type WizardStep = 'job' | 'resume' | 'results';
+
+interface JobData {
+  jobId?: string;
+  jobContent?: string;
+  source: 'url' | 'paste' | 'file' | 'existing';
+}
+
+interface ResumeData {
+  resumeId?: string;
+  resumeContent?: string;
+  source: 'existing' | 'paste' | 'file';
+}
+
+export default function JobResumeMatch() {
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const { isAuthenticated } = useAuth();
+
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState<WizardStep>('job');
+  const [jobData, setJobData] = useState<JobData | null>(null);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [matchResult, setMatchResult] = useState<JobResumeMatchResponse | null>(null);
+  
+  // Loading and error states
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Step navigation
+  const steps = [
+    { id: 'job', title: 'Select Job', description: 'Choose or input job details' },
+    { id: 'resume', title: 'Select Resume', description: 'Choose or input resume details' },
+    { id: 'results', title: 'Match Results', description: 'View analysis and recommendations' }
+  ];
+
+  const currentStepIndex = steps.findIndex(step => step.id === currentStep);
+
+  // Handlers
+  const handleJobSelected = (data: JobData) => {
+    setJobData(data);
+    setError(null);
+    setCurrentStep('resume');
+  };
+
+  const handleResumeSelected = async (data: ResumeData) => {
+    setResumeData(data);
+    setError(null);
+    setIsAnalyzing(true);
+
+    try {
+      // Call the match service with the collected data
+      const result = await matchService.matchJobWithResume({
+        jobId: jobData?.jobId,
+        jobContent: jobData?.jobContent,
+        resumeId: data.resumeId,
+        resumeContent: data.resumeContent,
+      });
+
+      setMatchResult(result);
+      setCurrentStep('results');
+    } catch (err) {
+      console.error("Match analysis failed:", err);
+      setError("Failed to analyze job-resume match. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleStartOver = () => {
+    setCurrentStep('job');
+    setJobData(null);
+    setResumeData(null);
+    setMatchResult(null);
+    setError(null);
+  };
+
+  const handleBackStep = () => {
+    if (currentStep === 'resume') {
+      setCurrentStep('job');
+      setResumeData(null);
+    } else if (currentStep === 'results') {
+      setCurrentStep('resume');
+      setMatchResult(null);
+    }
+    setError(null);
+  };
+
+  const canGoBack = currentStep !== 'job' && currentStep !== 'results';
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        <div className="pt-16 p-6">
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
+                  <Target className="h-6 w-6 text-brand-purple" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold">Job-Resume Match Analysis</h1>
+                  <p className="text-muted-foreground">
+                    Discover how well your resume matches a specific job opportunity
+                  </p>
+                </div>
+              </div>
+              <Link to="/tools">
+                <Button variant="outline">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Tools
+                </Button>
+              </Link>
+            </div>
+
+            {/* Progress Steps */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  {steps.map((step, index) => (
+                    <div key={step.id} className="flex items-center">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                          index < currentStepIndex 
+                            ? 'bg-primary border-primary text-primary-foreground'
+                            : index === currentStepIndex
+                            ? 'border-primary text-primary'
+                            : 'border-muted-foreground text-muted-foreground'
+                        }`}>
+                          {index < currentStepIndex ? (
+                            <CheckCircle2 className="h-5 w-5" />
+                          ) : (
+                            <span className="text-sm font-medium">{index + 1}</span>
+                          )}
+                        </div>
+                        <div className="hidden sm:block">
+                          <div className={`font-medium ${
+                            index <= currentStepIndex ? 'text-foreground' : 'text-muted-foreground'
+                          }`}>
+                            {step.title}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {step.description}
+                          </div>
+                        </div>
+                      </div>
+                      {index < steps.length - 1 && (
+                        <div className={`w-12 h-0.5 mx-4 ${
+                          index < currentStepIndex ? 'bg-primary' : 'bg-muted'
+                        }`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Step Content */}
+            <div className="space-y-6">
+              {currentStep === 'job' && (
+                <JobInputStep
+                  onJobSelected={handleJobSelected}
+                  isLoading={isAnalyzing}
+                  error={error}
+                />
+              )}
+
+              {currentStep === 'resume' && (
+                <ResumeSelectionStep
+                  onResumeSelected={handleResumeSelected}
+                  isLoading={isAnalyzing}
+                  error={error}
+                />
+              )}
+
+              {currentStep === 'results' && matchResult && (
+                <MatchResultsStep
+                  matchResult={matchResult}
+                  onStartOver={handleStartOver}
+                  isLoading={isAnalyzing}
+                />
+              )}
+
+              {/* Loading State */}
+              {isAnalyzing && (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <Loader2 className="h-16 w-16 mx-auto text-primary animate-spin mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Analyzing Match...</h3>
+                    <p className="text-muted-foreground">
+                      Our AI is comparing your resume with the job requirements. This may take a few moments.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Navigation Buttons */}
+              {canGoBack && !isAnalyzing && (
+                <div className="flex justify-between">
+                  <Button variant="outline" onClick={handleBackStep}>
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                </div>
+              )}
+
+              {/* Error Display */}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    </div>
+  );
+}

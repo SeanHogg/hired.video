@@ -37,6 +37,7 @@ import Tasks from "./pages/Tasks";
 import TermsOfService from "./pages/TermsOfService";
 import Tools from "./pages/Tools";
 import SentimentAnalysis from "./pages/tools/SentimentAnalysis";
+import JobResumeMatch from "./pages/tools/JobResumeMatch";
 import Outreach from "./pages/Outreach";
 import Help from "./pages/Help";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -192,6 +193,8 @@ const App = () => (
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/Tools/SentimentAnalysis" element={<SentimentAnalysis />} />
                   <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
+                  <Route path="/Tools/JobResumeMatch" element={<JobResumeMatch />} />
+                  <Route path="/tools/job-resume-match" element={<JobResumeMatch />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
                   <Route path="/account" element={<AccountManagement />} />

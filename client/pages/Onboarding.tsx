@@ -206,26 +206,30 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Sparkles className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold">Welcome to MyVideoResume!</h1>
-            </div>
-            <p className="text-muted-foreground text-lg">
-              Let's get your {user.persona.replace("_", " ")} profile set up in
-              just a few steps
-            </p>
-            <Badge variant="secondary" className="capitalize mt-2">
-              {user.persona.replace("_", " ")} Setup
-            </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 flex flex-col">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 container mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Sparkles className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold">Welcome to MyVideoResume!</h1>
           </div>
+          <p className="text-muted-foreground text-lg">
+            Let's get your {user.persona.replace("_", " ")} profile set up in
+            just a few steps
+          </p>
+          <Badge variant="secondary" className="capitalize mt-2">
+            {user.persona.replace("_", " ")} Setup
+          </Badge>
+        </div>
+      </div>
 
-          {/* Progress Overview */}
-          <Card className="mb-8">
+      {/* Main Content - Flexible */}
+      <div className="flex-1 container mx-auto px-4 pb-6 flex flex-col min-h-0">
+        <div className="max-w-4xl mx-auto flex flex-col h-full gap-6">
+
+          {/* Progress Overview - Fixed */}
+          <Card className="flex-shrink-0">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -246,100 +250,114 @@ export default function Onboarding() {
               </div>
             </CardHeader>
             <CardContent>
-              <Progress value={progressPercentage} className="h-3 mb-6" />
+              <Progress value={progressPercentage} className="h-3" />
+            </CardContent>
+          </Card>
 
-              {/* Steps List */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {steps.map((step, index) => (
-                  <div
-                    key={step.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      index === currentStep
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : step.completed
-                          ? "border-green-200 bg-green-50"
-                          : "border-muted bg-muted/20"
-                    }`}
-                    onClick={() => setCurrentStep(index)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-full ${
-                          step.completed
-                            ? "bg-green-500 text-white"
-                            : index === currentStep
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {step.completed ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <step.icon className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{step.title}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {step.description}
-                        </p>
+          {/* Steps and Form Layout - Flexible */}
+          <div className="flex-1 flex flex-col gap-6 min-h-0">
+
+            {/* Steps List - Scrollable */}
+            <Card className="flex-shrink-0">
+              <CardHeader>
+                <CardTitle>Setup Steps</CardTitle>
+                <CardDescription>Click on any step to navigate</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 overflow-x-auto pb-4 max-h-32 overflow-y-auto">
+                  {steps.map((step, index) => (
+                    <div
+                      key={step.id}
+                      className={`flex-shrink-0 p-4 rounded-lg border cursor-pointer transition-all min-w-[200px] ${
+                        index === currentStep
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : step.completed
+                            ? "border-green-200 bg-green-50"
+                            : "border-muted bg-muted/20"
+                      }`}
+                      onClick={() => setCurrentStep(index)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-full ${
+                            step.completed
+                              ? "bg-green-500 text-white"
+                              : index === currentStep
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {step.completed ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <step.icon className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm">{step.title}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {step.description}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Current Step */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {React.createElement(steps[currentStep].icon, {
-                  className: "h-5 w-5",
-                })}
-                {steps[currentStep].title}
-              </CardTitle>
-              <CardDescription>
-                {steps[currentStep].description}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CurrentStepComponent
-                onComplete={() => handleCompleteTask(steps[currentStep].id)}
-                isCompleted={steps[currentStep].completed}
-                user={user}
-              />
-            </CardContent>
-          </Card>
+            {/* Current Step Form - Fixed, Non-scrollable */}
+            <Card className="flex-1 flex flex-col">
+              <CardHeader className="flex-shrink-0">
+                <CardTitle className="flex items-center gap-2">
+                  {React.createElement(steps[currentStep].icon, {
+                    className: "h-5 w-5",
+                  })}
+                  {steps[currentStep].title}
+                </CardTitle>
+                <CardDescription>
+                  {steps[currentStep].description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <CurrentStepComponent
+                  onComplete={() => handleCompleteTask(steps[currentStep].id)}
+                  isCompleted={steps[currentStep].completed}
+                  user={user}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 0}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Previous
+      {/* Navigation - Fixed at bottom */}
+      <div className="flex-shrink-0 container mx-auto px-4 py-4 border-t bg-background/80 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentStep === 0}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Previous
+          </Button>
+
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={handleSkipToEnd}>
+              Skip Setup
             </Button>
-
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={handleSkipToEnd}>
-                Skip Setup
-              </Button>
-              <Button
-                onClick={handleNext}
-                className="gap-2"
-                disabled={!steps[currentStep].completed}
-              >
-                {currentStep === steps.length - 1
-                  ? "Complete Setup"
-                  : "Continue"}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button
+              onClick={handleNext}
+              className="gap-2"
+              disabled={!steps[currentStep].completed}
+            >
+              {currentStep === steps.length - 1
+                ? "Complete Setup"
+                : "Continue"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>
