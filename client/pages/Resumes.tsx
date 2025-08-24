@@ -1153,9 +1153,9 @@ export default function Resumes() {
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <Calendar className="w-3 h-3" />
-                                        {new Date(
-                                          masterResume.createdAt,
-                                        ).toLocaleDateString()}
+                                        {masterResume.createdAt && !isNaN(new Date(masterResume.createdAt).getTime())
+                                          ? new Date(masterResume.createdAt).toLocaleDateString()
+                                          : "No date"}
                                       </div>
                                       {!masterResume.isActive && (
                                         <Button

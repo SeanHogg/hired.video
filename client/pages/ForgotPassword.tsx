@@ -48,11 +48,13 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      // This MVC endpoint lives at the API root (no '/api' segment)
-      const apiRoot = (import.meta.env.VITE_API_URL || "https://api.myvideoresu.me/api").replace(/\/api\/?$/, "");
-      const { data } = await apiClient.requestRaw<unknown>(
-        `${apiRoot}/Account/ResetPassword?userName=${encodeURIComponent(email)}`,
-        { method: "GET" },
+      // Use the API endpoint for password reset
+      const { data } = await apiClient.requestRaw<{ message: string }>(
+        "/api/account/reset-password",
+        {
+          method: "POST",
+          body: { email }
+        },
       );
 
       setSuccess(true);

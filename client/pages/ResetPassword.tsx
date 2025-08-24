@@ -102,7 +102,7 @@ export default function ResetPassword() {
 
     try {
       const { data } = await apiClient.requestRaw<{ message?: string }>(
-        "/account/confirm-password-reset",
+        "/api/account/confirm-password-reset",
         {
           method: "POST",
           body: {

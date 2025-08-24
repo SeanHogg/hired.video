@@ -46,7 +46,10 @@ export default function ResumeCard({
   onActions,
 }: ResumeCardProps) {
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
+    if (!date) return "No date";
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return "Invalid date";
+    return dateObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
