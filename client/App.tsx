@@ -203,11 +203,14 @@ const App = () => (
                   <Route path="/help" element={<Help />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/insights/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route
                     path="/terms-of-service"
                     element={<TermsOfService />}
                   />
+                  <Route path="/insights/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/insights/terms-of-use" element={<TermsOfService />} />
                   <Route path="/cookies" element={<CookiePolicy />} />
 
                   {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}
