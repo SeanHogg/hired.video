@@ -41,7 +41,7 @@ export default function SummarizeResume() {
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
     queryKey: ["resumes"],
-    queryFn: () => resumeService.getResumes(),
+    queryFn: () => resumeService.getUserResumes(),
     enabled: isAuthenticated,
   });
 
@@ -162,14 +162,14 @@ export default function SummarizeResume() {
     setSummary(null);
 
     try {
-      const resume = await resumeService.getResume(selectedResumeId);
-      
+      const resume = await resumeService.getResumeById(selectedResumeId);
+
       const response = await fetch("/prompt/summarize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(resume.resumeSerialized),
+        body: JSON.stringify(resume.resumeSerialized || ""),
       });
 
       if (!response.ok) {
@@ -373,8 +373,8 @@ export default function SummarizeResume() {
                               <SelectValue placeholder="Choose a resume to summarize" />
                             </SelectTrigger>
                             <SelectContent>
-                              {resumes?.data?.map((resume) => (
-                                <SelectItem key={resume.id} value={resume.id}>
+                              {resumes?.map((resume) => (
+                                <SelectItem key={resume.id} value={resume.id || ""}>
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}

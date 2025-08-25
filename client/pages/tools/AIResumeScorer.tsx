@@ -63,7 +63,7 @@ export default function AIResumeScorer() {
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
     queryKey: ["resumes"],
-    queryFn: () => resumeService.getResumes(),
+    queryFn: () => resumeService.getUserResumes(),
     enabled: isAuthenticated,
   });
 
@@ -283,8 +283,8 @@ Return the response in JSON format with the following structure:
     setScoreResult(null);
 
     try {
-      const resume = await resumeService.getResume(selectedResumeId);
-      const result = await scoreResume(resume.resumeSerialized);
+      const resume = await resumeService.getResumeById(selectedResumeId);
+      const result = await scoreResume(resume.resumeSerialized || "");
       setScoreResult(result);
     } catch (err) {
       console.error("Resume scoring failed:", err);
@@ -537,8 +537,8 @@ Return the response in JSON format with the following structure:
                               <SelectValue placeholder="Choose a resume to score" />
                             </SelectTrigger>
                             <SelectContent>
-                              {resumes?.data?.map((resume) => (
-                                <SelectItem key={resume.id} value={resume.id}>
+                              {resumes?.map((resume) => (
+                                <SelectItem key={resume.id} value={resume.id || ""}>
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
