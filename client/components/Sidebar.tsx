@@ -69,6 +69,12 @@ export default function Sidebar({
     if (item.href === "/") {
       return location.pathname === "/";
     }
+
+    // Special handling for tools - match both /tools and /Tools paths
+    if (item.href === "/tools") {
+      return location.pathname.startsWith("/tools") || location.pathname.startsWith("/Tools");
+    }
+
     return location.pathname.startsWith(item.href);
   };
 

@@ -19,6 +19,7 @@ import {
   Award,
   TrendingUp,
   Heart,
+  ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -347,137 +348,12 @@ export default function Tools() {
                 </div>
               </div>
 
-              {/* Popular Tools */}
+              {/* Available Tools */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Most Popular Tools
+                  Available AI Tools
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                            <Brain className="h-6 w-6 text-brand-purple" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-xl">
-                              AI Resume Scorer
-                            </CardTitle>
-                            <CardDescription>
-                              Get instant feedback on your resume
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-yellow-100 text-yellow-800"
-                        >
-                          Hot
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>ATS Compatibility</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-4/5 h-full bg-green-500 rounded-full" />
-                            </div>
-                            <span className="text-green-600 font-medium">
-                              92%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Content Quality</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-5/6 h-full bg-blue-500 rounded-full" />
-                            </div>
-                            <span className="text-blue-600 font-medium">
-                              88%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Keywords Score</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="w-3/4 h-full bg-purple-500 rounded-full" />
-                            </div>
-                            <span className="text-purple-600 font-medium">
-                              85%
-                            </span>
-                          </div>
-                        </div>
-                        <Button className="w-full mt-4" variant="outline">
-                          Try Free Scan
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center">
-                            <Zap className="h-6 w-6 text-brand-blue" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-xl">
-                              Interview Coach
-                            </CardTitle>
-                            <CardDescription>
-                              Practice with AI-powered feedback
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">New</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">
-                              94%
-                            </div>
-                            <div className="text-muted-foreground">
-                              Success Rate
-                            </div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">
-                              25min
-                            </div>
-                            <div className="text-muted-foreground">
-                              Avg Session
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            200+ question database
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            Real-time speech analysis
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            Personalized improvement tips
-                          </div>
-                        </div>
-                        <Button className="w-full mt-4" variant="outline">
-                          Start Practice Session
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
 
                   <Link to="/Tools/SentimentAnalysis">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
@@ -498,9 +374,9 @@ export default function Tools() {
                           </div>
                           <Badge
                             variant="secondary"
-                            className="bg-pink-100 text-pink-800"
+                            className="bg-green-100 text-green-800"
                           >
-                            New
+                            Available
                           </Badge>
                         </div>
                       </CardHeader>
@@ -565,9 +441,9 @@ export default function Tools() {
                           </div>
                           <Badge
                             variant="secondary"
-                            className="bg-blue-100 text-blue-800"
+                            className="bg-green-100 text-green-800"
                           >
-                            Popular
+                            Available
                           </Badge>
                         </div>
                       </CardHeader>
@@ -607,6 +483,73 @@ export default function Tools() {
                           </div>
                           <Button className="w-full mt-4" variant="outline">
                             Analyze Match
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link to="/Tools/SummarizeResume">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                              <Sparkles className="h-6 w-6 text-green-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Resume Summarization
+                              </CardTitle>
+                              <CardDescription>
+                                Get AI-powered resume summaries
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800"
+                          >
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Powered
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-600">
+                                Fast
+                              </div>
+                              <div className="text-muted-foreground">
+                                Results
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Professional summaries
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Multiple input formats
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Instant results
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Summarize Resume
                           </Button>
                         </div>
                       </CardContent>
@@ -793,11 +736,11 @@ export default function Tools() {
               {/* Final CTA */}
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
                 <h3 className="text-2xl font-bold mb-4">
-                  Ready to Accelerate Your Career?
+                  Ready to Enhance Your Career?
                 </h3>
                 <p className="text-muted-foreground mb-6">
-                  Access all 25+ AI-powered tools and take your career to the
-                  next level.
+                  Access our AI-powered tools and take your career to the next level.
+                  More tools coming soon!
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -805,13 +748,15 @@ export default function Tools() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                     >
-                      Get Full Tool Access
+                      Get Started Today
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  <Button size="lg" variant="outline">
-                    Try Free Tools
-                  </Button>
+                  <Link to="/Tools/SentimentAnalysis">
+                    <Button size="lg" variant="outline">
+                      Try Sentiment Analysis
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -822,7 +767,7 @@ export default function Tools() {
     );
   }
 
-  // If user is authenticated, show the actual tools page (placeholder for now)
+  // If user is authenticated, show the actual tools page
   return (
     <div className="min-h-screen bg-background">
       <Sidebar
@@ -844,75 +789,165 @@ export default function Tools() {
               Access powerful tools to enhance your career.
             </p>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">Resume Optimizer</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Optimize your resume for ATS
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Use Tool
-                  </Button>
-                </CardContent>
-              </Card>
+            {/* Available Tools */}
+            <div className="mb-12">
+              <h2 className="text-2xl font-semibold mb-6">Available Tools</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Mic className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">Interview Coach</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Practice interviews with AI
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Start Practice
-                  </Button>
-                </CardContent>
-              </Card>
+                {/* Sentiment Analysis - Fully Implemented */}
+                <Link to="/Tools/SentimentAnalysis">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <Heart className="h-8 w-8 mx-auto text-brand-purple mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Sentiment Analysis</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Analyze how positive your resume sounds
+                      </p>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
+                        Available
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Analyze Resume
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
 
-              <Link to="/Tools/SentimentAnalysis">
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                {/* Job-Resume Match - Fully Implemented */}
+                <Link to="/Tools/JobResumeMatch">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <Target className="h-8 w-8 mx-auto text-brand-blue mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Job-Resume Match</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        See how well your resume matches a job
+                      </p>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
+                        Available
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Analyze Match
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Resume Summarization - Backend Ready */}
+                <Link to="/Tools/SummarizeResume">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <FileText className="h-8 w-8 mx-auto text-brand-green mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Resume Summarization</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Get AI-powered resume summaries
+                      </p>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 mb-3">
+                        New
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Summarize Resume
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Best Resume Generator - Chrome Extension */}
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                   <CardContent className="p-6 text-center">
-                    <Heart className="h-8 w-8 mx-auto text-brand-purple mb-4" />
-                    <h3 className="font-semibold mb-2">Sentiment Analysis</h3>
+                    <Sparkles className="h-8 w-8 mx-auto text-brand-purple mb-4 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-semibold mb-2">Best Resume Generator</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Analyze how positive your resume sounds
+                      Generate tailored resumes for specific jobs
                     </p>
-                    <Button variant="outline" size="sm">
-                      Analyze Resume
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 mb-3">
+                      Chrome Extension
+                    </Badge>
+                    <Button variant="outline" size="sm" className="w-full" asChild>
+                      <a href="https://myvideoresu.me/insights/how-to-use-job-seeker-chrome-plugin-extension" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Get Extension
+                      </a>
                     </Button>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Link to="/Tools/JobResumeMatch">
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                {/* PDF/Word to JSON - Backend Ready */}
+                <Link to="/Tools/pdftojson">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <FileText className="h-8 w-8 mx-auto text-brand-orange mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Document Converter</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Convert PDF/Word resumes to JSON
+                      </p>
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-800 mb-3">
+                        Beta
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Convert Document
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
+            </div>
+
+            {/* Coming Soon Tools */}
+            <div className="mb-12">
+              <h2 className="text-2xl font-semibold mb-6">Coming Soon</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                {/* AI Resume Scorer - Not Implemented */}
+                <Card className="opacity-75">
                   <CardContent className="p-6 text-center">
-                    <Target className="h-8 w-8 mx-auto text-brand-blue mb-4" />
-                    <h3 className="font-semibold mb-2">Job-Resume Match</h3>
+                    <Brain className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold mb-2">AI Resume Scorer</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      See how well your resume matches a job
+                      Get instant feedback on your resume
                     </p>
-                    <Button variant="outline" size="sm">
-                      Analyze Match
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
+                      Coming Soon
+                    </Badge>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      Coming Soon
                     </Button>
                   </CardContent>
                 </Card>
-              </Link>
 
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Calculator className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">Salary Calculator</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Know your market value
-                  </p>
-                  <Button variant="outline" size="sm">
-                    Calculate
-                  </Button>
-                </CardContent>
-              </Card>
+                {/* Interview Coach - Not Implemented */}
+                <Card className="opacity-75">
+                  <CardContent className="p-6 text-center">
+                    <Mic className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold mb-2">Interview Coach</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Practice interviews with AI
+                    </p>
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
+                      Coming Soon
+                    </Badge>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      Coming Soon
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Salary Calculator - Not Implemented */}
+                <Card className="opacity-75">
+                  <CardContent className="p-6 text-center">
+                    <Calculator className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold mb-2">Salary Calculator</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Know your market value
+                    </p>
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
+                      Coming Soon
+                    </Badge>
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      Coming Soon
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>

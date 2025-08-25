@@ -63,6 +63,8 @@
     --brand-purple-dark: 262 83% 15%;
     --brand-blue: 217 91% 60%;
     --brand-blue-light: 217 91% 95%;
+    --brand-green: 142 76% 36%;
+    --brand-orange: 25 95% 53%;
     --brand-gradient-start: 262 83% 58%;
     --brand-gradient-end: 217 91% 60%;
   }
@@ -111,6 +113,8 @@
     --brand-purple-dark: 262 83% 85%;
     --brand-blue: 217 91% 60%;
     --brand-blue-light: 217 91% 20%;
+    --brand-green: 142 76% 36%;
+    --brand-orange: 25 95% 53%;
     --brand-gradient-start: 262 83% 58%;
     --brand-gradient-end: 217 91% 60%;
   }
