@@ -226,6 +226,7 @@ const App = () => (
                   />
                   <Route path="/insights/terms-of-service" element={<TermsOfService />} />
                   <Route path="/insights/terms-of-use" element={<TermsOfService />} />
+                  <Route path="/insights/how-to-use-job-match-analysis-tool" element={<Navigate to="/Tools/JobResumeMatch" replace />} />
                   <Route path="/cookies" element={<CookiePolicy />} />
 
                   {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}

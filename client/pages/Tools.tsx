@@ -348,10 +348,10 @@ export default function Tools() {
                 </div>
               </div>
 
-              {/* Available Tools */}
+              {/* AI-Powered Tools */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Available AI Tools
+                  AI-Powered Tools
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
 
@@ -789,9 +789,9 @@ export default function Tools() {
               Access powerful tools to enhance your career.
             </p>
 
-            {/* Available Tools */}
+            {/* AI-Powered Tools */}
             <div className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6">Available Tools</h2>
+              <h2 className="text-2xl font-semibold mb-6">AI-Powered Tools</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                 {/* Sentiment Analysis - Fully Implemented */}
@@ -946,13 +946,6 @@ export default function Tools() {
                     </CardContent>
                   </Card>
                 </Link>
-              </div>
-            </div>
-
-            {/* Additional Features */}
-            <div className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6">Additional Features</h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                 {/* Interview Coach - Available through AI Chat */}
                 <Link to="/chat">
@@ -972,25 +965,10 @@ export default function Tools() {
                     </CardContent>
                   </Card>
                 </Link>
-
-                {/* More tools coming soon placeholder */}
-                <Card className="opacity-75">
-                  <CardContent className="p-6 text-center">
-                    <Star className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-semibold mb-2">More Tools Coming</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      We're constantly adding new features
-                    </p>
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
-                      Stay Tuned
-                    </Badge>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      Coming Soon
-                    </Button>
-                  </CardContent>
-                </Card>
               </div>
             </div>
+
+
           </div>
         </div>
         <Footer />
