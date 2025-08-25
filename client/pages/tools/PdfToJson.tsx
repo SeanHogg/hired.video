@@ -31,6 +31,7 @@ export default function PdfToJson() {
   const [jsonResult, setJsonResult] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -61,6 +62,12 @@ export default function PdfToJson() {
 
   const handleConversion = async () => {
     if (!file) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsConverting(true);
     setError(null);
@@ -148,15 +155,15 @@ export default function PdfToJson() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay 
-              contentType="resume" 
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
               title="Document Converter Tool"
               message="Sign in to access our document conversion tool and convert your PDF/Word resumes to structured JSON format."
             />
           )}
-          
+
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">

@@ -37,6 +37,7 @@ export default function SummarizeResume() {
   const [summary, setSummary] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
@@ -79,6 +80,12 @@ export default function SummarizeResume() {
       return;
     }
 
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     setError(null);
     setSummary(null);
@@ -109,6 +116,12 @@ export default function SummarizeResume() {
 
   const handleFileSummarization = async () => {
     if (!file) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsAnalyzing(true);
     setError(null);
@@ -156,6 +169,12 @@ export default function SummarizeResume() {
 
   const handleResumeSummarization = async () => {
     if (!selectedResumeId) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsAnalyzing(true);
     setError(null);
@@ -221,15 +240,15 @@ export default function SummarizeResume() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay 
-              contentType="resume" 
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
               title="Resume Summarization Tool"
               message="Sign in to access our AI-powered resume summarization tool and get instant professional summaries."
             />
           )}
-          
+
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">

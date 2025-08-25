@@ -59,6 +59,7 @@ export default function AIResumeScorer() {
   const [scoreResult, setScoreResult] = useState<ResumeScore | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
@@ -225,6 +226,12 @@ Return the response in JSON format with the following structure:
       return;
     }
 
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsScoring(true);
     setError(null);
     setScoreResult(null);
@@ -242,6 +249,12 @@ Return the response in JSON format with the following structure:
 
   const handleFileScoring = async () => {
     if (!file) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsScoring(true);
     setError(null);
@@ -277,6 +290,12 @@ Return the response in JSON format with the following structure:
 
   const handleResumeScoring = async () => {
     if (!selectedResumeId) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsScoring(true);
     setError(null);
@@ -364,15 +383,15 @@ Return the response in JSON format with the following structure:
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay 
-              contentType="resume" 
-              title="AI Resume Scorer"
-              message="Sign in to access our AI-powered resume scoring tool and get instant feedback on your resume's effectiveness."
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
+              title="AI Resume Scorer Tool"
+              message="Sign in to access our AI-powered resume scoring tool and get detailed feedback on your resume's effectiveness."
             />
           )}
-          
+
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">

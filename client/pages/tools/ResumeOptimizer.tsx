@@ -58,6 +58,7 @@ export default function ResumeOptimizer() {
   const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
@@ -197,6 +198,12 @@ Return the response in JSON format with the following structure:
       return;
     }
 
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsOptimizing(true);
     setError(null);
     setOptimizationResult(null);
@@ -214,6 +221,12 @@ Return the response in JSON format with the following structure:
 
   const handleFileOptimization = async () => {
     if (!file) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsOptimizing(true);
     setError(null);
@@ -249,6 +262,12 @@ Return the response in JSON format with the following structure:
 
   const handleResumeOptimization = async () => {
     if (!selectedResumeId) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsOptimizing(true);
     setError(null);
@@ -336,15 +355,15 @@ Return the response in JSON format with the following structure:
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay 
-              contentType="resume" 
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
               title="Resume Optimizer Tool"
               message="Sign in to access our AI-powered resume optimization tool and get detailed ATS compatibility analysis."
             />
           )}
-          
+
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">

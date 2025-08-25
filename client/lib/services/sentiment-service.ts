@@ -22,15 +22,15 @@ export interface SentimentInterpretation {
 export class SentimentService {
   /**
    * Analyze sentiment of raw text using the Sentiment API controller
-   * Route (as required): /api/sentiment/sentimentprediction
+   * Route: /sentiment/sentimentprediction
    */
   async analyzeSentiment(text: string): Promise<number> {
-    const response = await apiClient.post<number>(
-      "/api/sentiment/sentimentprediction",
+    const response = await apiClient.post<{ result: number }>(
+      "/sentiment/sentimentprediction",
       text,
-      z.number()
+      z.object({ result: z.number() })
     );
-    return response.data;
+    return response.data.result;
   }
 
   /**
@@ -44,56 +44,16 @@ export class SentimentService {
   }
 
   /**
-   * Analyze an existing resume by first fetching it and sending its summary text.
-   * If the backend exposes a direct resume sentiment route, we can switch to it.
+   * Analyze an existing resume using the dedicated resume sentiment endpoint
+   * Route: /api/Resume/SentimentPrediction
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
-    // Fetch the resume and derive text content to send to the sentiment endpoint
-    const resume = await resumeService.getResumeById(resumeId);
-    const r: any = resume as any;
-
-    // Prefer server-provided serialized text if available
-    if (r?.resumeSerialized && typeof r.resumeSerialized === "string") {
-      return this.analyzeSentiment(r.resumeSerialized);
-    }
-
-    const parts: string[] = [];
-
-    // New metaResume shape
-    const basics = r?.metaResume?.basics;
-    if (basics?.label) parts.push(String(basics.label));
-    if (basics?.summary) parts.push(String(basics.summary));
-
-    const work = r?.metaResume?.work as any[] | undefined;
-    if (Array.isArray(work)) {
-      for (const w of work) {
-        if (w?.position) parts.push(String(w.position));
-        if (w?.summary) parts.push(String(w.summary));
-        if (Array.isArray(w?.highlights)) parts.push(...w.highlights.map((h: any) => String(h)));
-      }
-    }
-
-    // Legacy data shape (capitalized keys)
-    const legacyBasics = r?.data?.Basics;
-    if (legacyBasics?.Label) parts.push(String(legacyBasics.Label));
-    if (legacyBasics?.Summary) parts.push(String(legacyBasics.Summary));
-    const legacyWork = r?.data?.Work as any[] | undefined;
-    if (Array.isArray(legacyWork)) {
-      for (const w of legacyWork) {
-        if (w?.Position) parts.push(String(w.Position));
-        if (w?.Summary) parts.push(String(w.Summary));
-        if (Array.isArray(w?.Highlights)) parts.push(...w.Highlights.map((h: any) => String(h)));
-      }
-    }
-
-    const text = parts.filter(Boolean).join("\n").trim();
-    if (!text) {
-      // As a last resort, send the name to avoid empty body; backend should handle
-      const fallback = basics?.name || legacyBasics?.Name || "";
-      return this.analyzeSentiment(String(fallback));
-    }
-
-    return this.analyzeSentiment(text);
+    const response = await apiClient.post<{ result: number }>(
+      "/api/Resume/SentimentPrediction",
+      resumeId,
+      z.object({ result: z.number() })
+    );
+    return response.data.result;
   }
 
   /**

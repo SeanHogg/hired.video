@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import AuthOverlay from "@/components/AuthOverlay";
 import SentimentScoreDisplay from "@/components/tools/SentimentScoreDisplay";
 import SentimentRecommendations from "@/components/tools/SentimentRecommendations";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -33,6 +34,7 @@ export default function SentimentAnalysis() {
   const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
   const [sentimentScore, setSentimentScore] = useState<number | null>(null);
   
   // State for existing resume selection
@@ -95,6 +97,12 @@ export default function SentimentAnalysis() {
   const handleFileAnalysis = async () => {
     if (!file) return;
 
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     setError(null);
     setSentimentScore(null);
@@ -112,6 +120,12 @@ export default function SentimentAnalysis() {
 
   const handleResumeAnalysis = async () => {
     if (!selectedResumeId) return;
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
 
     setIsAnalyzing(true);
     setError(null);
@@ -162,7 +176,14 @@ export default function SentimentAnalysis() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-6">
+        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
+              title="Sentiment Analysis Tool"
+              message="Sign in to access our AI-powered sentiment analysis tool and discover how positive your resume sounds to employers."
+            />
+          )}
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">

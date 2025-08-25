@@ -56,6 +56,7 @@ export default function SalaryCalculator() {
   const [salaryData, setSalaryData] = useState<SalaryData | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   const industries = [
     "Technology",
@@ -87,6 +88,12 @@ export default function SalaryCalculator() {
   const calculateSalary = async () => {
     if (!jobTitle.trim() || !location_.trim()) {
       setError("Please enter both job title and location.");
+      return;
+    }
+
+    // Check authentication before proceeding
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
       return;
     }
 
@@ -239,15 +246,15 @@ export default function SalaryCalculator() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay 
-              contentType="resume" 
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="resume"
               title="Salary Calculator Tool"
               message="Sign in to access our salary calculator and discover your market value with personalized compensation insights."
             />
           )}
-          
+
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
