@@ -889,58 +889,100 @@ export default function Tools() {
                     </CardContent>
                   </Card>
                 </Link>
+
+                {/* Resume Optimizer - Now Available */}
+                <Link to="/Tools/ResumeOptimizer">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <Zap className="h-8 w-8 mx-auto text-brand-blue mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Resume Optimizer</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Optimize your resume for ATS systems
+                      </p>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
+                        Available
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Optimize Resume
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Salary Calculator - Now Available */}
+                <Link to="/Tools/SalaryCalculator">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <Calculator className="h-8 w-8 mx-auto text-brand-green mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Salary Calculator</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Know your market value
+                      </p>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
+                        Available
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Calculate Salary
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* AI Resume Scorer - Now Available */}
+                <Link to="/Tools/AIResumeScorer">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <Brain className="h-8 w-8 mx-auto text-brand-purple mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">AI Resume Scorer</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Get instant feedback on your resume
+                      </p>
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 mb-3">
+                        Hot
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Score My Resume
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
               </div>
             </div>
 
-            {/* Coming Soon Tools */}
+            {/* Additional Features */}
             <div className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6">Coming Soon</h2>
+              <h2 className="text-2xl font-semibold mb-6">Additional Features</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                {/* AI Resume Scorer - Not Implemented */}
-                <Card className="opacity-75">
-                  <CardContent className="p-6 text-center">
-                    <Brain className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-semibold mb-2">AI Resume Scorer</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Get instant feedback on your resume
-                    </p>
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
-                      Coming Soon
-                    </Badge>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      Coming Soon
-                    </Button>
-                  </CardContent>
-                </Card>
+                {/* Interview Coach - Available through AI Chat */}
+                <Link to="/chat">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <MessageSquare className="h-8 w-8 mx-auto text-brand-blue mb-4 group-hover:scale-110 transition-transform" />
+                      <h3 className="font-semibold mb-2">Interview Coach</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Practice interviews with AI Chat
+                      </p>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 mb-3">
+                        Available in AI Chat
+                      </Badge>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Start AI Chat
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Link>
 
-                {/* Interview Coach - Not Implemented */}
+                {/* More tools coming soon placeholder */}
                 <Card className="opacity-75">
                   <CardContent className="p-6 text-center">
-                    <Mic className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-semibold mb-2">Interview Coach</h3>
+                    <Star className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold mb-2">More Tools Coming</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Practice interviews with AI
+                      We're constantly adding new features
                     </p>
                     <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
-                      Coming Soon
-                    </Badge>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      Coming Soon
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Salary Calculator - Not Implemented */}
-                <Card className="opacity-75">
-                  <CardContent className="p-6 text-center">
-                    <Calculator className="h-8 w-8 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-semibold mb-2">Salary Calculator</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Know your market value
-                    </p>
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 mb-3">
-                      Coming Soon
+                      Stay Tuned
                     </Badge>
                     <Button variant="outline" size="sm" className="w-full" disabled>
                       Coming Soon

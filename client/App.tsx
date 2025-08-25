@@ -40,6 +40,9 @@ import SentimentAnalysis from "./pages/tools/SentimentAnalysis";
 import JobResumeMatch from "./pages/tools/JobResumeMatch";
 import SummarizeResume from "./pages/tools/SummarizeResume";
 import PdfToJson from "./pages/tools/PdfToJson";
+import ResumeOptimizer from "./pages/tools/ResumeOptimizer";
+import SalaryCalculator from "./pages/tools/SalaryCalculator";
+import AIResumeScorer from "./pages/tools/AIResumeScorer";
 import Outreach from "./pages/Outreach";
 import Help from "./pages/Help";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -201,6 +204,12 @@ const App = () => (
                   <Route path="/tools/summarize-resume" element={<SummarizeResume />} />
                   <Route path="/Tools/pdftojson" element={<PdfToJson />} />
                   <Route path="/tools/pdf-to-json" element={<PdfToJson />} />
+                  <Route path="/Tools/ResumeOptimizer" element={<ResumeOptimizer />} />
+                  <Route path="/tools/resume-optimizer" element={<ResumeOptimizer />} />
+                  <Route path="/Tools/SalaryCalculator" element={<SalaryCalculator />} />
+                  <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
+                  <Route path="/Tools/AIResumeScorer" element={<AIResumeScorer />} />
+                  <Route path="/tools/ai-resume-scorer" element={<AIResumeScorer />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
                   <Route path="/account" element={<AccountManagement />} />
