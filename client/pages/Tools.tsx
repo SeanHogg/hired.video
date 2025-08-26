@@ -938,8 +938,6 @@ export default function Tools() {
               </div>
             </div>
             <Footer />
-          </div>
-        </div>
       </>
     );
   }
