@@ -58,13 +58,12 @@ export default function Tools() {
   if (!isAuthenticated || !user) {
     return (
       <>
-        <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <div className={`min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5 ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}`}>
           <Navigation
             onMenuClick={openSidebar}
             onSidebarToggle={toggleSidebar}
