@@ -43,6 +43,7 @@ import PdfToJson from "./pages/tools/PdfToJson";
 import ResumeOptimizer from "./pages/tools/ResumeOptimizer";
 import SalaryCalculator from "./pages/tools/SalaryCalculator";
 import AIResumeScorer from "./pages/tools/AIResumeScorer";
+import ValueProposition from "./pages/tools/ValueProposition";
 import Outreach from "./pages/Outreach";
 import Help from "./pages/Help";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -210,6 +211,8 @@ const App = () => (
                   <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
                   <Route path="/Tools/AIResumeScorer" element={<AIResumeScorer />} />
                   <Route path="/tools/ai-resume-scorer" element={<AIResumeScorer />} />
+                  <Route path="/Tools/ValueProposition" element={<ValueProposition />} />
+                  <Route path="/tools/value-proposition" element={<ValueProposition />} />
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
                   <Route path="/account" element={<AccountManagement />} />

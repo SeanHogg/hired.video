@@ -21,6 +21,7 @@ import {
   Heart,
   ExternalLink,
   Chrome,
+  PenTool,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -658,6 +659,71 @@ export default function Tools() {
                           </div>
                           <Button className="w-full mt-4" variant="outline">
                             Convert Document
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  {/* Value Proposition Generator */}
+                  <Link to="/Tools/ValueProposition">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <PenTool className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Value Proposition Generator
+                              </CardTitle>
+                              <CardDescription>
+                                Create compelling value proposition letters
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-600">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Powered
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-600">
+                                300+
+                              </div>
+                              <div className="text-muted-foreground">
+                                Words
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Personalized content
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Company alignment
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Professional format
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Generate Value Proposition
                           </Button>
                         </div>
                       </CardContent>
@@ -1352,6 +1418,71 @@ export default function Tools() {
                         </div>
                         <Button className="w-full mt-4" variant="outline">
                           Summarize Resume
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Value Proposition Generator */}
+                <Link to="/Tools/ValueProposition">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <PenTool className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl">
+                              Value Proposition Generator
+                            </CardTitle>
+                            <CardDescription>
+                              Create compelling value proposition letters
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                          New
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              AI
+                            </div>
+                            <div className="text-muted-foreground">
+                              Powered
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              300+
+                            </div>
+                            <div className="text-muted-foreground">
+                              Words
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Personalized content
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Company alignment
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Professional format
+                          </div>
+                        </div>
+                        <Button className="w-full mt-4" variant="outline">
+                          Generate Value Proposition
                         </Button>
                       </div>
                     </CardContent>
