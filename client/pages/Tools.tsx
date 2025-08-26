@@ -57,7 +57,8 @@ export default function Tools() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -937,10 +938,10 @@ export default function Tools() {
                 </div>
               </div>
             </div>
+            <Footer />
           </div>
-          <Footer />
         </div>
-      </div>
+      </>
     );
   }
 
