@@ -151,17 +151,179 @@ The frontend integrates with a comprehensive .NET Core API providing:
 
 - **Node.js 18+** - Latest LTS version recommended
 - **npm or yarn** - Package manager
-- **.NET Core API** - Backend service running on localhost:5000
+- **.NET 9 SDK** - For backend API development
+- **SQL Server** - Database (LocalDB, Express, or full SQL Server)
+- **Visual Studio Code** - Recommended IDE with extensions
+- **Git** - Version control
 
-### Installation
+### Project Structure Setup
+
+The MyVideoResume platform consists of three repositories that work together:
+
+```
+MyVideoResume/                    # Parent folder
+├── myvideoresume-frontend/       # React frontend (this repo)
+├── myvideoresume-api/           # .NET Core API backend
+└── myvideoresume-chrome-extension/  # Chrome extension
+```
+
+### Complete Installation Guide
+
+#### 1. Clone All Repositories
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd myvideoresume-frontend
+# Create parent directory
+mkdir MyVideoResume
+cd MyVideoResume
+
+# Clone all three repositories
+git clone https://github.com/your-org/myvideoresume-frontend.git
+git clone https://github.com/your-org/myvideoresume-api.git
+git clone https://github.com/your-org/myvideoresume-chrome-extension.git
+
+# Open the parent folder in VS Code
+code .
+```
+
+#### 2. Backend API Setup
+
+```bash
+# Navigate to API folder
+cd myvideoresume-api
+
+# Restore NuGet packages
+dotnet restore
+
+# Create appsettings.Development.json
+cp appsettings.json appsettings.Development.json
+```
+
+**Configure appsettings.Development.json:**
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=MyVideoResumeDB;Trusted_Connection=true;MultipleActiveResultSets=true"
+  },
+  "JwtSettings": {
+    "SecretKey": "your-super-secret-jwt-key-here-minimum-32-characters",
+    "Issuer": "MyVideoResume",
+    "Audience": "MyVideoResume",
+    "ExpirationInMinutes": 60
+  },
+  "OpenAIKey": "your-openrouter-api-key-here",
+  "OpenAIModel": "meta-llama/llama-3.1-8b-instruct:free",
+  "EmailSettings": {
+    "SmtpServer": "smtp.gmail.com",
+    "SmtpPort": 587,
+    "SmtpUsername": "your-email@gmail.com",
+    "SmtpPassword": "your-app-password",
+    "FromEmail": "your-email@gmail.com",
+    "FromName": "MyVideoResume"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+#### 3. Database Setup
+
+```bash
+# From the myvideoresume-api folder
+cd myvideoresume-api
+
+# Install Entity Framework tools (if not already installed)
+dotnet tool install --global dotnet-ef
+
+# Create the database and run migrations
+dotnet ef database update
+
+# If you need to create a new migration (for development)
+dotnet ef migrations add InitialCreate
+
+# Build and run the API
+dotnet build
+dotnet run
+```
+
+The API will be available at `https://localhost:5001` and `http://localhost:5000`
+
+#### 4. Frontend Setup
+
+```bash
+# Navigate to frontend folder
+cd ../myvideoresume-frontend
 
 # Install dependencies
 npm install
+
+# Create .env file
+cp .env.example .env
+```
+
+**Configure .env file:**
+
+```env
+# API Configuration
+VITE_API_URL=http://localhost:5000/api
+
+# AI Configuration
+VITE_OPENROUTER_API_KEY=your_openrouter_key
+
+# App Configuration
+VITE_APP_NAME=MyVideoResume
+VITE_APP_VERSION=1.0.0
+VITE_ENVIRONMENT=development
+
+# Analytics (optional for development)
+VITE_GTM_ID=GTM-T6CSJ22D
+```
+
+#### 5. Chrome Extension Setup (Optional)
+
+```bash
+# Navigate to extension folder
+cd ../myvideoresume-chrome-extension
+
+# Install dependencies
+npm install
+
+# Build extension
+npm run build
+
+# Load extension in Chrome:
+# 1. Open Chrome and go to chrome://extensions/
+# 2. Enable "Developer mode"
+# 3. Click "Load unpacked" and select the dist/ folder
+```
+
+### Development Commands
+
+#### Backend API
+```bash
+cd myvideoresume-api
+
+# Run in development mode
+dotnet run
+
+# Run with hot reload
+dotnet watch run
+
+# Build for production
+dotnet build --configuration Release
+
+# Run tests
+dotnet test
+```
+
+#### Frontend
+```bash
+cd myvideoresume-frontend
 
 # Start development server
 npm run dev
@@ -169,34 +331,333 @@ npm run dev
 # Build for production
 npm run build
 
-# Run type checking
+# Preview production build
+npm run preview
+
+# Type checking
 npm run typecheck
+
+# Linting
+npm run lint
 ```
 
-### Environment Variables
+#### Chrome Extension
+```bash
+cd myvideoresume-chrome-extension
 
-Create a `.env` file with:
+# Development build with watch
+npm run dev
 
-```
-VITE_API_URL=https://api.myvideoresu.me/api
-VITE_OPENROUTER_API_KEY=your_openrouter_key
-VITE_APP_NAME=MyVideoResume
-VITE_APP_VERSION=1.0.0
-```
+# Production build
+npm run build
 
-For local development, use:
-```
-VITE_API_URL=http://localhost:5000/api
+# Package for distribution
+npm run package
 ```
 
-### Development Commands
+### VS Code Workspace Setup
+
+#### Recommended Extensions
+
+Install these VS Code extensions for the best development experience:
+
+**Frontend Development:**
+- ES7+ React/Redux/React-Native snippets
+- TypeScript Importer
+- Tailwind CSS IntelliSense
+- Auto Rename Tag
+- Bracket Pair Colorizer
+- GitLens
+
+**Backend Development:**
+- C# Dev Kit
+- .NET Install Tool
+- NuGet Gallery
+- REST Client
+- SQL Server (mssql)
+
+**General Development:**
+- Prettier - Code formatter
+- ESLint
+- Thunder Client (API testing)
+- Git Graph
+- Todo Tree
+
+#### Workspace Configuration
+
+Create `.vscode/settings.json` in the parent MyVideoResume folder:
+
+```json
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "files.associations": {
+    "*.json": "jsonc"
+  },
+  "dotnet.defaultSolution": "myvideoresume-api/MyVideoResume.sln"
+}
+```
+
+Create `.vscode/launch.json` for debugging:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (API)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/myvideoresume-api/Server/bin/Debug/net9.0/MyVideoResume.Server.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/myvideoresume-api/Server",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}
+```
+
+### Database Management
+
+#### Common Entity Framework Commands
 
 ```bash
-npm run dev        # Start dev server (client + server)
-npm run build      # Production build
-npm run preview    # Preview production build
-npm run typecheck  # TypeScript validation
-npm run lint       # ESLint code quality check
+# From myvideoresume-api folder
+
+# Check migration status
+dotnet ef migrations list
+
+# Create a new migration
+dotnet ef migrations add MigrationName
+
+# Update database to latest migration
+dotnet ef database update
+
+# Rollback to specific migration
+dotnet ef database update PreviousMigrationName
+
+# Remove last migration (if not applied to database)
+dotnet ef migrations remove
+
+# Generate SQL script for migration
+dotnet ef migrations script
+
+# Drop database (careful!)
+dotnet ef database drop
+```
+
+#### Database Connection Troubleshooting
+
+**LocalDB Issues:**
+```bash
+# Check LocalDB instances
+sqllocaldb info
+
+# Start LocalDB instance
+sqllocaldb start mssqllocaldb
+
+# Create new LocalDB instance if needed
+sqllocaldb create mssqllocaldb
+```
+
+**Connection String Alternatives:**
+
+For SQL Server Express:
+```json
+"DefaultConnection": "Server=.\\SQLEXPRESS;Database=MyVideoResumeDB;Trusted_Connection=true;MultipleActiveResultSets=true"
+```
+
+For Docker SQL Server:
+```json
+"DefaultConnection": "Server=localhost,1433;Database=MyVideoResumeDB;User Id=sa;Password=YourPassword123!;TrustServerCertificate=true"
+```
+
+### Environment Configuration
+
+#### Production Environment Variables
+
+**Frontend (.env.production):**
+```env
+VITE_API_URL=https://api.myvideoresu.me/api
+VITE_OPENROUTER_API_KEY=prod_openrouter_key
+VITE_APP_NAME=MyVideoResume
+VITE_APP_VERSION=1.0.0
+VITE_ENVIRONMENT=production
+VITE_GTM_ID=GTM-T6CSJ22D
+```
+
+**Backend (appsettings.Production.json):**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "your-production-connection-string"
+  },
+  "JwtSettings": {
+    "SecretKey": "your-production-jwt-secret-key",
+    "ExpirationInMinutes": 1440
+  },
+  "OpenAIKey": "your-production-openrouter-key",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+```
+
+### Development Workflow
+
+#### Starting the Development Environment
+
+1. **Start the Backend API:**
+```bash
+cd myvideoresume-api
+dotnet run
+# API will be available at http://localhost:5000
+```
+
+2. **Start the Frontend:**
+```bash
+cd myvideoresume-frontend
+npm run dev
+# Frontend will be available at http://localhost:5173
+```
+
+3. **Verify the Connection:**
+- Open http://localhost:5173 in your browser
+- Try logging in or creating an account
+- Check browser developer tools for any API connection errors
+
+#### Common Development Tasks
+
+**Adding a New Feature:**
+1. Create API endpoints in the backend
+2. Update database models and run migrations if needed
+3. Create TypeScript types in the frontend
+4. Implement API service methods
+5. Create UI components and pages
+6. Add routing and navigation
+7. Test the complete flow
+
+**Database Changes:**
+1. Modify entity models in the backend
+2. Create and apply migrations
+3. Update API endpoints if needed
+4. Update frontend TypeScript types
+5. Test data flow end-to-end
+
+### Troubleshooting
+
+#### Common Issues and Solutions
+
+**1. API Connection Errors**
+```
+Error: Network Error / CORS Error
+```
+**Solution:**
+- Ensure the API is running on http://localhost:5000
+- Check VITE_API_URL in .env file
+- Verify CORS configuration in the API
+
+**2. Database Connection Issues**
+```
+Error: Cannot open database
+```
+**Solution:**
+- Check LocalDB is running: `sqllocaldb info`
+- Verify connection string in appsettings.Development.json
+- Run database update: `dotnet ef database update`
+
+**3. JWT Authentication Errors**
+```
+Error: 401 Unauthorized
+```
+**Solution:**
+- Check JWT secret key in appsettings
+- Verify token expiration settings
+- Clear browser localStorage and login again
+
+**4. Build Errors**
+```
+Error: Module not found
+```
+**Solution:**
+- Delete node_modules and package-lock.json
+- Run `npm install` again
+- Check import paths and TypeScript types
+
+**5. Migration Errors**
+```
+Error: Migration already applied
+```
+**Solution:**
+- Check migration status: `dotnet ef migrations list`
+- Remove problematic migration: `dotnet ef migrations remove`
+- Create new migration with different name
+
+#### Performance Optimization
+
+**Frontend:**
+- Use React.lazy() for code splitting
+- Implement proper memoization with useMemo/useCallback
+- Optimize bundle size with tree shaking
+- Use React Query for efficient data caching
+
+**Backend:**
+- Implement proper database indexing
+- Use async/await for database operations
+- Add response caching where appropriate
+- Optimize Entity Framework queries
+
+### Testing
+
+#### Frontend Testing
+```bash
+cd myvideoresume-frontend
+
+# Run unit tests
+npm run test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+#### Backend Testing
+```bash
+cd myvideoresume-api
+
+# Run all tests
+dotnet test
+
+# Run tests with coverage
+dotnet test --collect:"XPlat Code Coverage"
+
+# Run specific test project
+dotnet test MyVideoResume.Tests
+```
+
+#### Integration Testing
+```bash
+# Start both frontend and backend
+# Run end-to-end tests
+npm run test:e2e
+```
 ```
 
 ## 📱 Responsive Design
