@@ -394,7 +394,14 @@ export default function Index() {
                 />
               );
             } else if (itemType === "people") {
-              return <PeopleCard key={item.id} person={item} />;
+              return (
+                <PeopleCard
+                  key={item.id}
+                  person={item}
+                  onView={() => handleView(item)}
+                  onActions={() => handleOpenActions(item)}
+                />
+              );
             } else if (itemType === "resumes") {
               return (
                 <ResumeCard
@@ -743,6 +750,8 @@ export default function Index() {
                             key={item.id}
                             person={personData}
                             onConnect={() => navigate(`/people/${item.id}`)}
+                            onView={() => handleView(item)}
+                            onActions={() => handleOpenActions(item)}
                           />
                         );
                       } else if (item.type === "companies") {

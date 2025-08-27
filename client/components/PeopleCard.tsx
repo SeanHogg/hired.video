@@ -43,6 +43,8 @@ interface PeopleCardProps {
   onMessage?: (_personId: string) => void;
   onAcceptConnection?: (_personId: string) => void;
   onRejectConnection?: (_personId: string) => void;
+  onView?: () => void;
+  onActions?: () => void;
 }
 
 export default function PeopleCard({
@@ -55,6 +57,8 @@ export default function PeopleCard({
   onMessage,
   onAcceptConnection,
   onRejectConnection,
+  onView,
+  onActions,
 }: PeopleCardProps) {
   const { user } = useAuth();
 
@@ -261,102 +265,128 @@ export default function PeopleCard({
             </div>
           </div>
 
-          {/* Actions */}
+          {/* View and Actions Buttons */}
           <div className="flex items-center gap-2 pt-2">
-            {/* Connection Actions */}
-            {user && person.id !== user.id && (
-              <>
-                {isPendingReceived ? (
-                  <div className="flex gap-1 flex-1">
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => onAcceptConnection?.(person.id)}
-                    >
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Accept
-                    </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onView) {
+                  onView();
+                } else {
+                  // Fallback to direct navigation
+                  window.location.href = `/people/${person.id}`;
+                }
+              }}
+            >
+              View
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onActions) {
+                  onActions();
+                } else {
+                  // Fallback behavior - could show a simple menu or navigate to profile
+                  console.log("Actions clicked for person:", person.id);
+                }
+              }}
+            >
+              Actions
+            </Button>
+          </div>
+
+          {/* Connection Actions (Secondary Row) */}
+          {user && person.id !== user.id && (
+            <div className="flex items-center gap-2 pt-2">
+              {isPendingReceived ? (
+                <div className="flex gap-1 flex-1">
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => onAcceptConnection?.(person.id)}
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Accept
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onRejectConnection?.(person.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : isPendingSent ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  disabled
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  Pending
+                </Button>
+              ) : isConnected ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onMessage?.(person.id)}
+                >
+                  <MessageCircle className="h-3 w-3 mr-1" />
+                  Message
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onConnect?.(person.id)}
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Connect
+                </Button>
+              )}
+
+              {/* Track/Untrack */}
+              {!isConnected && (
+                <div>
+                  {isTracked ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onRejectConnection?.(person.id)}
+                      onClick={() => onUntrack?.(person.id)}
                     >
-                      <X className="h-3 w-3" />
+                      <BookmarkCheck className="h-3 w-3" />
                     </Button>
-                  </div>
-                ) : isPendingSent ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    disabled
-                  >
-                    <Clock className="h-3 w-3 mr-1" />
-                    Pending
-                  </Button>
-                ) : isConnected ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onMessage?.(person.id)}
-                  >
-                    <MessageCircle className="h-3 w-3 mr-1" />
-                    Message
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onConnect?.(person.id)}
-                  >
-                    <UserPlus className="h-3 w-3 mr-1" />
-                    Connect
-                  </Button>
-                )}
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onTrack?.(person.id)}
+                    >
+                      <Bookmark className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* View Profile */}
-                <Button asChild variant="outline" size="sm">
-                  <Link to={`/people/${person.id}`}>
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                </Button>
-
-                {/* Track/Untrack */}
-                {!isConnected && (
-                  <div>
-                    {isTracked ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onUntrack?.(person.id)}
-                      >
-                        <BookmarkCheck className="h-3 w-3" />
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onTrack?.(person.id)}
-                      >
-                        <Bookmark className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Own Profile */}
-            {user && person.id === user.id && (
+          {/* Own Profile */}
+          {user && person.id === user.id && (
+            <div className="flex items-center gap-2 pt-2">
               <Button asChild className="flex-1">
                 <Link to="/profile">
                   Edit Profile
                   <ExternalLink className="h-3 w-3 ml-1" />
                 </Link>
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
