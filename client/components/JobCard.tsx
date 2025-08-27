@@ -29,6 +29,8 @@ interface JobCardProps {
   showOwnership?: boolean;
   onTrack?: (_jobId: string) => void;
   onUntrack?: (_jobId: string) => void;
+  onView?: () => void;
+  onActions?: () => void;
 }
 
 export default function JobCard({
@@ -36,6 +38,8 @@ export default function JobCard({
   showOwnership = false,
   onTrack,
   onUntrack,
+  onView,
+  onActions,
 }: JobCardProps) {
   const { user } = useAuth();
 
@@ -172,43 +176,36 @@ export default function JobCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2">
-            <Button asChild size="sm" className="flex-1">
-              <Link to={`/jobs/${job.id}`}>
-                View Details
-                <ExternalLink className="h-3 w-3 ml-1" />
-              </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onView) {
+                  onView();
+                } else {
+                  // Fallback to direct navigation
+                  window.location.href = `/jobs/${job.id}`;
+                }
+              }}
+            >
+              View
             </Button>
-
-            {canEdit && (
-              <Button asChild variant="outline" size="sm">
-                <Link to={`/jobs/edit/${job.id}`}>
-                  <Edit className="h-3 w-3 mr-1" />
-                  Edit
-                </Link>
-              </Button>
-            )}
-
-            {!isOwned && user && (
-              <div>
-                {isTracked ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onUntrack?.(job.id)}
-                  >
-                    <BookmarkCheck className="h-3 w-3" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onTrack?.(job.id)}
-                  >
-                    <Bookmark className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            )}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onActions) {
+                  onActions();
+                } else {
+                  // Fallback behavior - could show a simple menu or navigate to edit
+                  console.log("Actions clicked for job:", job.id);
+                }
+              }}
+            >
+              Actions
+            </Button>
           </div>
         </div>
       </CardContent>

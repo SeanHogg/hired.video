@@ -33,6 +33,8 @@ interface CompanyCardProps {
   showOwnership?: boolean;
   onTrack?: (_companyId: string) => void;
   onUntrack?: (_companyId: string) => void;
+  onView?: () => void;
+  onActions?: () => void;
 }
 
 export default function CompanyCard({
@@ -40,6 +42,8 @@ export default function CompanyCard({
   showOwnership = false,
   onTrack,
   onUntrack,
+  onView,
+  onActions,
 }: CompanyCardProps) {
   const { user } = useAuth();
 
@@ -234,44 +238,36 @@ export default function CompanyCard({
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2">
-            <Button asChild size="sm" className="flex-1">
-              <Link to={`/companies/${company.id}`}>
-                View Company
-                <ExternalLink className="h-3 w-3 ml-1" />
-              </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onView) {
+                  onView();
+                } else {
+                  // Fallback to direct navigation
+                  window.location.href = `/companies/${company.id}`;
+                }
+              }}
+            >
+              View
             </Button>
-
-            {canEdit ? (
-              <Button asChild variant="outline" size="sm">
-                <Link to={`/companies/edit/${company.id}`}>
-                  <Edit className="h-3 w-3 mr-1" />
-                  Edit
-                </Link>
-              </Button>
-            ) : (
-              !isOwned &&
-              user && (
-                <div>
-                  {isTracked ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onUntrack?.(company.id)}
-                    >
-                      <BookmarkCheck className="h-3 w-3" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onTrack?.(company.id)}
-                    >
-                      <Bookmark className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              )
-            )}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onActions) {
+                  onActions();
+                } else {
+                  // Fallback behavior - could show a simple menu or navigate to edit
+                  console.log("Actions clicked for company:", company.id);
+                }
+              }}
+            >
+              Actions
+            </Button>
           </div>
 
           {/* Quick Actions for Jobs */}

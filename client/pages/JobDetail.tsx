@@ -42,6 +42,7 @@ import { Separator } from "@/components/ui/separator";
 import { jobService } from "@/lib/services/job-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useJobPermissions } from "@/hooks/use-job-permissions";
 
 type UIJobRequirement = { skill: string; level: string; required: boolean };
 type UIJobBenefit = { type: string; description: string };
@@ -223,6 +224,7 @@ export default function JobDetail() {
   }, [id]);
 
   const isOwner = user && job && job.userId === user.id;
+  const permissions = useJobPermissions(job);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -382,7 +384,7 @@ export default function JobDetail() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {isOwner ? (
+                          {permissions.canEdit ? (
                             <Button asChild>
                               <Link to={`/jobs/edit/${job.id}`}>
                                 <Edit className="h-4 w-4 mr-2" />
@@ -750,7 +752,7 @@ export default function JobDetail() {
                 </Card>
 
                 {/* Apply Section */}
-                {!isOwner && (
+                {!permissions.canEdit && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Ready to Apply?</CardTitle>

@@ -155,6 +155,12 @@ export default function Index() {
   const handleView = (item: any) => {
     if (item.type === "resume") {
       navigate(`/resumes/${item.id}`);
+    } else if (item.type === "job") {
+      navigate(`/jobs/${item.id}`);
+    } else if (item.type === "company") {
+      navigate(`/companies/${item.id}`);
+    } else if (item.type === "people") {
+      navigate(`/people/${item.id}`);
     } else {
       console.log("View item:", item.id);
     }
@@ -370,9 +376,23 @@ export default function Index() {
           {items.slice(0, 4).map((item) => {
             // Render appropriate card based on item type
             if (itemType === "jobs") {
-              return <JobCard key={item.id} job={item} />;
+              return (
+                <JobCard
+                  key={item.id}
+                  job={item}
+                  onView={() => handleView(item)}
+                  onActions={() => handleOpenActions(item)}
+                />
+              );
             } else if (itemType === "companies") {
-              return <CompanyCard key={item.id} company={item} />;
+              return (
+                <CompanyCard
+                  key={item.id}
+                  company={item}
+                  onView={() => handleView(item)}
+                  onActions={() => handleOpenActions(item)}
+                />
+              );
             } else if (itemType === "people") {
               return <PeopleCard key={item.id} person={item} />;
             } else if (itemType === "resumes") {
@@ -385,6 +405,8 @@ export default function Index() {
                   createdAt={item.createdAt}
                   views={item.views}
                   privacy={item.privacy}
+                  onView={() => handleView(item)}
+                  onActions={() => handleOpenActions(item)}
                 />
               );
             }
@@ -680,7 +702,14 @@ export default function Index() {
                           ownership: "tracked" as const,
                         };
 
-                        return <JobCard key={item.id} job={jobMetadata} />;
+                        return (
+                          <JobCard
+                            key={item.id}
+                            job={jobMetadata}
+                            onView={() => handleView(item)}
+                            onActions={() => handleOpenActions(item)}
+                          />
+                        );
                       } else if (item.type === "people") {
                         const personData = {
                           id: item.id,
@@ -741,7 +770,12 @@ export default function Index() {
                           onboardingProgress: 100,
                         };
                         return (
-                          <CompanyCard key={item.id} company={companyData} />
+                          <CompanyCard
+                            key={item.id}
+                            company={companyData}
+                            onView={() => handleView(item)}
+                            onActions={() => handleOpenActions(item)}
+                          />
                         );
                       } else if (item.type === "resume") {
                         return (

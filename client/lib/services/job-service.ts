@@ -204,6 +204,15 @@ export class JobService {
   }
 
   /**
+   * Update existing job
+   */
+  async updateJob(id: string, jobData: any): Promise<any> {
+    // Bypass strict client-side schema; backend expects JobItemEntity shape
+    const response = await apiClient.put<any>(`/api/Job/${id}`, jobData);
+    return response.data;
+  }
+
+  /**
    * Create job from file upload
    */
   async createJobFromFile(file: File): Promise<Job> {
@@ -237,13 +246,7 @@ export class JobService {
     return response.data;
   }
 
-  /**
-   * Update existing job
-   */
-  async updateJob(id: string, updates: Partial<CreateJob>): Promise<Job> {
-    const response = await apiClient.put<Job>(`/api/Job/${id}`, updates, JobSchema);
-    return response.data;
-  }
+
 
   /**
    * Delete job

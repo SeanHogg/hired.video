@@ -1489,120 +1489,14 @@ export default function Tools() {
                   </Card>
                 </Link>
 
-                {/* Best Resume Generator - Chrome Extension */}
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                  <CardContent className="p-6 text-center">
-                    <Sparkles className="h-8 w-8 mx-auto text-brand-purple mb-4 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Best Resume Generator</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Generate tailored resumes for specific jobs
-                    </p>
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 mb-3">
-                      Chrome Extension
-                    </Badge>
-                    <Button variant="outline" size="sm" className="w-full" asChild>
-                      <a href="https://myvideoresu.me/insights/how-to-use-job-seeker-chrome-plugin-extension" target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Get Extension
-                      </a>
-                    </Button>
-                  </CardContent>
-                </Card>
 
-                {/* PDF/Word to JSON - Backend Ready */}
-                <Link to="/Tools/pdftojson">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardContent className="p-6 text-center">
-                      <FileText className="h-8 w-8 mx-auto text-brand-orange mb-4 group-hover:scale-110 transition-transform" />
-                      <h3 className="font-semibold mb-2">Document Converter</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Convert PDF/Word resumes to JSON
-                      </p>
-                      <Badge variant="secondary" className="bg-orange-100 text-orange-800 mb-3">
-                        Beta
-                      </Badge>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Convert Document
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
 
-                {/* Resume Optimizer - Now Available */}
-                <Link to="/Tools/ResumeOptimizer">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardContent className="p-6 text-center">
-                      <Zap className="h-8 w-8 mx-auto text-brand-blue mb-4 group-hover:scale-110 transition-transform" />
-                      <h3 className="font-semibold mb-2">Resume Optimizer</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Optimize your resume for ATS systems
-                      </p>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
-                        Available
-                      </Badge>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Optimize Resume
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
 
-                {/* Salary Calculator - Now Available */}
-                <Link to="/Tools/SalaryCalculator">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardContent className="p-6 text-center">
-                      <Calculator className="h-8 w-8 mx-auto text-brand-green mb-4 group-hover:scale-110 transition-transform" />
-                      <h3 className="font-semibold mb-2">Salary Calculator</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Know your market value
-                      </p>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 mb-3">
-                        Available
-                      </Badge>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Calculate Salary
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
 
-                {/* AI Resume Scorer - Now Available */}
-                <Link to="/Tools/AIResumeScorer">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardContent className="p-6 text-center">
-                      <Brain className="h-8 w-8 mx-auto text-brand-purple mb-4 group-hover:scale-110 transition-transform" />
-                      <h3 className="font-semibold mb-2">AI Resume Scorer</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Get instant feedback on your resume
-                      </p>
-                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 mb-3">
-                        Hot
-                      </Badge>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Score My Resume
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
 
-                {/* Interview Coach - Available through AI Chat */}
-                <Link to="/chat">
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardContent className="p-6 text-center">
-                      <MessageSquare className="h-8 w-8 mx-auto text-brand-blue mb-4 group-hover:scale-110 transition-transform" />
-                      <h3 className="font-semibold mb-2">Interview Coach</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Practice interviews with AI Chat
-                      </p>
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 mb-3">
-                        Available in AI Chat
-                      </Badge>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Start AI Chat
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Link>
+
+
+
 
                 {/* Sentiment Analysis */}
                 <Link to="/Tools/SentimentAnalysis">

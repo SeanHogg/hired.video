@@ -15,6 +15,7 @@ import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { aiService } from "@/lib/services/ai-service";
 
 interface SalaryData {
   baseSalary: number;
@@ -102,111 +103,93 @@ export default function SalaryCalculator() {
     setSalaryData(null);
 
     try {
-      // Simulate API call - in real implementation, this would call salary data APIs
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create AI prompt for salary analysis
+      const prompt = `You are a professional salary analyst with access to current market data. Analyze the following job details and provide a comprehensive salary breakdown in JSON format.
 
-      // Mock salary calculation based on inputs
-      const baseSalaryMap: { [key: string]: number } = {
-        "software engineer": 95000,
-        "data scientist": 110000,
-        "product manager": 120000,
-        "marketing manager": 75000,
-        "sales manager": 85000,
-        "accountant": 55000,
-        "nurse": 70000,
-        "teacher": 45000,
-        "designer": 65000,
-        "analyst": 60000,
-      };
+Job Details:
+- Job Title: ${jobTitle}
+- Location: ${location_}
+- Years of Experience: ${experience[0]}
+- Education Level: ${education || 'Not specified'}
+- Industry: ${industry || 'Not specified'}
+- Company: ${company || 'Not specified'}
 
-      const locationMultipliers: { [key: string]: number } = {
-        "san francisco": 1.4,
-        "new york": 1.3,
-        "seattle": 1.2,
-        "boston": 1.15,
-        "chicago": 1.05,
-        "austin": 1.1,
-        "denver": 1.0,
-        "atlanta": 0.95,
-        "phoenix": 0.9,
-        "dallas": 0.95,
-      };
+Please provide a detailed salary analysis in the following JSON format (return ONLY valid JSON, no additional text):
 
-      const industryMultipliers: { [key: string]: number } = {
-        "technology": 1.2,
-        "finance": 1.15,
-        "healthcare": 1.05,
-        "consulting": 1.1,
-        "education": 0.8,
-        "non-profit": 0.75,
-        "government": 0.9,
-      };
+{
+  "baseSalary": [estimated base salary as number],
+  "lowRange": [25th percentile salary as number],
+  "highRange": [75th percentile salary as number],
+  "marketAverage": [market average salary as number],
+  "percentile25": [25th percentile as number],
+  "percentile75": [75th percentile as number],
+  "totalCompensation": [total comp including benefits as number],
+  "locationAdjustment": [percentage adjustment for location as number, can be negative],
+  "experienceAdjustment": [percentage adjustment for experience as number],
+  "industryComparison": [
+    {"industry": "Technology", "averageSalary": [number], "difference": [percentage difference as number]},
+    {"industry": "Finance", "averageSalary": [number], "difference": [percentage difference as number]},
+    {"industry": "Healthcare", "averageSalary": [number], "difference": [percentage difference as number]},
+    {"industry": "Education", "averageSalary": [number], "difference": [percentage difference as number]}
+  ]
+}
 
-      // Find base salary
-      const jobKey = jobTitle.toLowerCase();
-      let baseSalary = 65000; // default
-      
-      for (const [key, salary] of Object.entries(baseSalaryMap)) {
-        if (jobKey.includes(key)) {
-          baseSalary = salary;
-          break;
+Base your analysis on current 2024 market data, considering cost of living adjustments, industry standards, and experience premiums. Ensure all numbers are realistic and based on actual market conditions.`;
+
+      // Call AI service
+      const response = await aiService.chat([
+        {
+          role: "user",
+          content: prompt
         }
+      ], {
+        model: "meta-llama/llama-3.1-8b-instruct:free",
+        maxTokens: 1000,
+        temperature: 0.3 // Lower temperature for more consistent numerical outputs
+      });
+
+      // Parse AI response
+      let aiSalaryData: SalaryData;
+      try {
+        // Extract JSON from response (in case AI adds extra text)
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : response.content;
+        aiSalaryData = JSON.parse(jsonString);
+
+        // Validate and sanitize the data
+        if (!aiSalaryData.baseSalary || typeof aiSalaryData.baseSalary !== 'number') {
+          throw new Error('Invalid salary data from AI');
+        }
+
+        // Ensure all required fields exist with reasonable defaults
+        aiSalaryData = {
+          baseSalary: Math.round(aiSalaryData.baseSalary),
+          lowRange: Math.round(aiSalaryData.lowRange || aiSalaryData.baseSalary * 0.8),
+          highRange: Math.round(aiSalaryData.highRange || aiSalaryData.baseSalary * 1.3),
+          marketAverage: Math.round(aiSalaryData.marketAverage || aiSalaryData.baseSalary * 1.05),
+          percentile25: Math.round(aiSalaryData.percentile25 || aiSalaryData.baseSalary * 0.85),
+          percentile75: Math.round(aiSalaryData.percentile75 || aiSalaryData.baseSalary * 1.2),
+          totalCompensation: Math.round(aiSalaryData.totalCompensation || aiSalaryData.baseSalary * 1.25),
+          locationAdjustment: Math.round(aiSalaryData.locationAdjustment || 0),
+          experienceAdjustment: Math.round(aiSalaryData.experienceAdjustment || experience[0] * 5),
+          industryComparison: aiSalaryData.industryComparison || [
+            { industry: "Technology", averageSalary: Math.round(aiSalaryData.baseSalary * 1.1), difference: 10 },
+            { industry: "Finance", averageSalary: Math.round(aiSalaryData.baseSalary * 1.05), difference: 5 },
+            { industry: "Healthcare", averageSalary: Math.round(aiSalaryData.baseSalary * 0.95), difference: -5 },
+            { industry: "Education", averageSalary: Math.round(aiSalaryData.baseSalary * 0.8), difference: -20 }
+          ]
+        };
+
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", parseError);
+        console.log("AI Response:", response.content);
+        throw new Error("Failed to parse salary analysis from AI. Please try again.");
       }
 
-      // Apply location adjustment
-      const locationKey = location_.toLowerCase();
-      let locationMultiplier = 1.0;
-      
-      for (const [key, multiplier] of Object.entries(locationMultipliers)) {
-        if (locationKey.includes(key)) {
-          locationMultiplier = multiplier;
-          break;
-        }
-      }
-
-      // Apply industry adjustment
-      const industryMultiplier = industryMultipliers[industry.toLowerCase()] || 1.0;
-
-      // Apply experience adjustment
-      const experienceMultiplier = 1 + (experience[0] * 0.05); // 5% per year
-
-      // Apply education adjustment
-      const educationMultipliers: { [key: string]: number } = {
-        "high school": 0.9,
-        "associate degree": 0.95,
-        "bachelor's degree": 1.0,
-        "master's degree": 1.15,
-        "phd/doctorate": 1.3,
-        "professional certification": 1.1,
-      };
-      const educationMultiplier = educationMultipliers[education.toLowerCase()] || 1.0;
-
-      const adjustedSalary = Math.round(
-        baseSalary * locationMultiplier * industryMultiplier * experienceMultiplier * educationMultiplier
-      );
-
-      const mockData: SalaryData = {
-        baseSalary: adjustedSalary,
-        lowRange: Math.round(adjustedSalary * 0.8),
-        highRange: Math.round(adjustedSalary * 1.3),
-        marketAverage: Math.round(adjustedSalary * 1.05),
-        percentile25: Math.round(adjustedSalary * 0.85),
-        percentile75: Math.round(adjustedSalary * 1.2),
-        totalCompensation: Math.round(adjustedSalary * 1.25), // including benefits
-        locationAdjustment: Math.round((locationMultiplier - 1) * 100),
-        experienceAdjustment: Math.round((experienceMultiplier - 1) * 100),
-        industryComparison: [
-          { industry: "Technology", averageSalary: Math.round(adjustedSalary * 1.1), difference: 10 },
-          { industry: "Finance", averageSalary: Math.round(adjustedSalary * 1.05), difference: 5 },
-          { industry: "Healthcare", averageSalary: Math.round(adjustedSalary * 0.95), difference: -5 },
-          { industry: "Education", averageSalary: Math.round(adjustedSalary * 0.8), difference: -20 },
-        ]
-      };
-
-      setSalaryData(mockData);
+      setSalaryData(aiSalaryData);
     } catch (err) {
       console.error("Salary calculation failed:", err);
-      setError("Failed to calculate salary. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to calculate salary. Please try again.");
     } finally {
       setIsCalculating(false);
     }
@@ -272,9 +255,9 @@ export default function SalaryCalculator() {
                   <Calculator className="h-6 w-6 text-brand-green" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Salary Calculator</h1>
+                  <h1 className="text-3xl font-bold">AI-Powered Salary Calculator</h1>
                   <p className="text-muted-foreground">
-                    Discover your market value and get personalized salary insights
+                    Get AI-driven salary insights based on current market data and trends
                   </p>
                 </div>
               </div>
@@ -287,10 +270,10 @@ export default function SalaryCalculator() {
                       <DollarSign className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-blue-900 mb-1">How it works</h3>
+                      <h3 className="font-semibold text-blue-900 mb-1">AI-Powered Analysis</h3>
                       <p className="text-sm text-blue-800">
-                        Our calculator analyzes job market data, location factors, experience level, and industry trends 
-                        to provide accurate salary estimates and compensation insights.
+                        Our AI analyzes current market data, location cost-of-living, experience premiums, and industry standards
+                        to provide personalized salary estimates and comprehensive compensation insights.
                       </p>
                     </div>
                   </div>
@@ -406,12 +389,12 @@ export default function SalaryCalculator() {
                       {isCalculating ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Calculating...
+                          AI Analyzing...
                         </>
                       ) : (
                         <>
                           <Calculator className="h-4 w-4 mr-2" />
-                          Calculate Salary
+                          Get AI Salary Analysis
                         </>
                       )}
                     </Button>
@@ -434,7 +417,7 @@ export default function SalaryCalculator() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <DollarSign className="h-5 w-5" />
-                          Your Estimated Salary
+                          AI Salary Analysis
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -595,6 +578,19 @@ export default function SalaryCalculator() {
                 )}
               </div>
             </div>
+
+            {/* AI Disclaimer */}
+            {salaryData && (
+              <div className="mt-8">
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertDescription className="text-amber-800">
+                    <strong>AI-Generated Estimates:</strong> These salary estimates are generated by AI based on market analysis and should be used as a general guide.
+                    Actual salaries may vary based on specific company policies, negotiation, additional skills, and current market conditions.
+                    We recommend using multiple sources and conducting your own research for the most accurate salary information.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
           </div>
           <Footer />
         </div>

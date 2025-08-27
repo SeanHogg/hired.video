@@ -106,7 +106,18 @@ export default function CompanyDetail() {
   };
 
   const handleTrackCompany = async () => {
-    if (!isAuthenticated || !company) {
+    if (!isAuthenticated) {
+      // Redirect to login if not authenticated
+      navigate('/login', {
+        state: {
+          from: `/companies/${id}`,
+          message: 'Please log in to follow companies'
+        }
+      });
+      return;
+    }
+
+    if (!company) {
       return;
     }
 
@@ -238,10 +249,7 @@ export default function CompanyDetail() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay contentType="company" title={company?.data.name} />
-          )}
+        <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
             {/* Back Button */}
             <div className="mb-6">
@@ -318,15 +326,22 @@ export default function CompanyDetail() {
                               variant="outline"
                               onClick={handleTrackCompany}
                             >
-                              {isTracked ? (
-                                <>
-                                  <BookmarkCheck className="h-4 w-4 mr-2" />
-                                  Following
-                                </>
+                              {isAuthenticated ? (
+                                isTracked ? (
+                                  <>
+                                    <BookmarkCheck className="h-4 w-4 mr-2" />
+                                    Following
+                                  </>
+                                ) : (
+                                  <>
+                                    <Bookmark className="h-4 w-4 mr-2" />
+                                    Follow
+                                  </>
+                                )
                               ) : (
                                 <>
                                   <Bookmark className="h-4 w-4 mr-2" />
-                                  Follow
+                                  Follow Company
                                 </>
                               )}
                             </Button>
