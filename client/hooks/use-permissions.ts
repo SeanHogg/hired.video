@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/lib/auth';
 import { MyVideoResumeRole } from '@/types/account';
 
 export interface Permission {
@@ -160,7 +160,7 @@ const ROLE_PERMISSIONS: RolePermissions[] = [
 export function usePermissions() {
   const { user } = useAuth();
 
-  const userRole = user?.role as MyVideoResumeRole;
+  const userRole = user?.role as unknown as MyVideoResumeRole;
   
   const rolePermissions = useMemo(() => {
     if (!userRole) return null;

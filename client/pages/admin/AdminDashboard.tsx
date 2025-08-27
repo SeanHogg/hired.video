@@ -20,7 +20,7 @@ import { BillingManagement } from '@/components/billing/BillingManagement';
 import { BillingAnalytics } from '@/components/billing/BillingAnalytics';
 import { usePermissions, PermissionGate, RoleGate } from '@/hooks/use-permissions';
 import { MyVideoResumeRole } from '@/types/account';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/lib/auth';
 
 interface QuickStat {
   title: string;
