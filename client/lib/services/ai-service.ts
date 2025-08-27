@@ -1,10 +1,11 @@
 /**
- * AI Service for handling OpenRouter API calls
+ * AI Service for handling backend AI API calls
  * Provides a clean interface for AI chat functionality
  */
 
-import { getAIConfig } from "@/lib/config";
+import { getApiConfig } from "@/lib/config";
 import { logger } from "@/lib/logger";
+import { apiClient } from "@/lib/api-client";
 
 // ============================================================================
 // TYPES
@@ -30,20 +31,24 @@ export interface AIServiceError {
   details?: any;
 }
 
+export interface BackendChatResponse {
+  message: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 // ============================================================================
 // AI SERVICE CLASS
 // ============================================================================
 
 class AIService {
-  private readonly baseURL = "https://openrouter.ai/api/v1";
-  private readonly defaultHeaders = {
-    "Content-Type": "application/json",
-    "HTTP-Referer": window.location.origin,
-    "X-Title": "MyVideoResume - AI HR Assistant",
-  };
+  private readonly apiConfig = getApiConfig();
 
   /**
-   * Send a chat completion request to OpenRouter
+   * Send a chat completion request to backend API
    */
   async sendChatMessage(
     messages: ChatMessage[],
@@ -54,65 +59,35 @@ class AIService {
     },
   ): Promise<ChatResponse> {
     try {
-      const config = getAIConfig();
+      logger.info("Sending AI chat request to backend");
 
-      // Check if API key is available
-      if (!config.apiKey) {
-        logger.warn(
-          "OpenRouter API key not configured, falling back to mock response",
-        );
-        return this.getMockResponse(
-          messages[messages.length - 1]?.content || "",
-        );
-      }
-      const response = await fetch(`${this.baseURL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          ...this.defaultHeaders,
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: options?.model || config.model,
-          messages,
-          max_tokens: options?.maxTokens || config.maxTokens,
-          temperature: options?.temperature || config.temperature,
-          stream: false,
-        }),
-      });
+      // Extract user message and history
+      const userMessage = messages[messages.length - 1]?.content || "";
+      const history = messages.slice(0, -1).filter(msg => msg.role !== "system");
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          `OpenRouter API error: ${response.status} - ${errorData.error?.message || response.statusText}`,
-        );
+      const requestData = {
+        message: userMessage,
+        history: history.length > 0 ? history : undefined,
+        maxTokens: options?.maxTokens,
+        temperature: options?.temperature,
+      };
+
+      const response = await apiClient.post<BackendChatResponse>("/api/chat/message", requestData);
+
+      if (!response.data) {
+        throw new Error("Invalid response from backend AI API");
       }
 
-      const data = await response.json();
-
-      if (!data.choices?.[0]?.message) {
-        throw new Error("Invalid response format from OpenRouter API");
-      }
-
-      const message = data.choices[0].message.content;
-      const usage = data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens,
-            completionTokens: data.usage.completion_tokens,
-            totalTokens: data.usage.total_tokens,
-          }
-        : undefined;
-
-      logger.info("AI chat response received", {
-        messageLength: message.length,
-        usage,
+      logger.info("AI chat response received from backend", {
+        messageLength: response.data.message?.length || 0,
+        usage: response.data.usage,
       });
 
       return {
-        message,
-        usage,
+        message: response.data.message,
+        usage: response.data.usage,
       };
     } catch (error) {
-      // Handle both API errors and configuration errors
       logger.error("AI service error", error);
 
       // Fallback to mock response on any error
@@ -241,18 +216,12 @@ export async function sendHRMessage(
 }
 
 /**
- * Check if AI service is properly configured
+ * Check if AI service is properly configured (always true since backend handles it)
  */
 export function isAIServiceConfigured(): boolean {
   try {
-    const config = getAIConfig();
-    const isConfigured = !!config.apiKey;
-    logger.info("AI service configuration check", {
-      isConfigured,
-      hasApiKey: !!config.apiKey,
-      model: config.model,
-    });
-    return isConfigured;
+    logger.info("AI service configuration check - backend handles AI configuration");
+    return true; // Backend handles AI configuration
   } catch (error) {
     logger.error("Error checking AI service configuration", error);
     return false;
