@@ -137,7 +137,7 @@ Please provide a detailed salary analysis in the following JSON format (return O
 Base your analysis on current 2024 market data, considering cost of living adjustments, industry standards, and experience premiums. Ensure all numbers are realistic and based on actual market conditions.`;
 
       // Call AI service
-      const response = await aiService.chat([
+      const response = await aiService.sendChatMessage([
         {
           role: "user",
           content: prompt
@@ -152,8 +152,8 @@ Base your analysis on current 2024 market data, considering cost of living adjus
       let aiSalaryData: SalaryData;
       try {
         // Extract JSON from response (in case AI adds extra text)
-        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : response.content;
+        const jsonMatch = response.message.match(/\{[\s\S]*\}/);
+        const jsonString = jsonMatch ? jsonMatch[0] : response.message;
         aiSalaryData = JSON.parse(jsonString);
 
         // Validate and sanitize the data
@@ -182,7 +182,7 @@ Base your analysis on current 2024 market data, considering cost of living adjus
 
       } catch (parseError) {
         console.error("Failed to parse AI response:", parseError);
-        console.log("AI Response:", response.content);
+        console.log("AI Response:", response.message);
         throw new Error("Failed to parse salary analysis from AI. Please try again.");
       }
 

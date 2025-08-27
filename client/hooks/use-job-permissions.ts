@@ -56,8 +56,8 @@ export function useJobPermissions(job: Job | null): JobPermissions {
     // 2. Company associations
     // 3. Account ownership
     
-    const isRecruiter = user.roles?.includes("Recruiter") || user.roles?.includes("Employer");
-    const isJobSeeker = user.roles?.includes("JobSeeker");
+    const isRecruiter = user.role === "recruiter" || user.role === "business";
+    const isJobSeeker = user.role === "job_seeker";
 
     let canEdit = false;
     let canDelete = false;
@@ -98,8 +98,8 @@ export function useCanCreateJobs(): boolean {
   if (!user) return false;
   
   // Only recruiters and employers can create jobs, not job seekers
-  const isRecruiter = user.roles?.includes("Recruiter") || user.roles?.includes("Employer");
-  const isJobSeeker = user.roles?.includes("JobSeeker");
+  const isRecruiter = user.role === "recruiter" || user.role === "business";
+  const isJobSeeker = user.role === "job_seeker";
   
   return isRecruiter && !isJobSeeker;
 }
