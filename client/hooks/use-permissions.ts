@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { MyVideoResumeRole } from '@/types/account';
 
@@ -309,10 +309,10 @@ export function PermissionGate({
   const { hasPermission } = usePermissions();
   
   if (hasPermission(resource, action)) {
-    return <>{children}</>;
+    return React.createElement(React.Fragment, null, children);
   }
-  
-  return <>{fallback}</>;
+
+  return React.createElement(React.Fragment, null, fallback);
 }
 
 // Helper component for role-based rendering
@@ -328,8 +328,8 @@ export function RoleGate({
   const { hasAnyRole } = usePermissions();
   
   if (hasAnyRole(roles)) {
-    return <>{children}</>;
+    return React.createElement(React.Fragment, null, children);
   }
-  
-  return <>{fallback}</>;
+
+  return React.createElement(React.Fragment, null, fallback);
 }
