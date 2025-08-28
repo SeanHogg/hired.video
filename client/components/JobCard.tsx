@@ -7,27 +7,26 @@ import {
   Users,
   UserCheck,
   Edit,
-  ExternalLink,
-  Bookmark,
-  BookmarkCheck,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
+import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
+import CardActions from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
 import type { JobMetadata, JobWithOwnership } from "@/types/job";
+import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;
   showOwnership?: boolean;
+  actions?: DynamicCardAction[];
+  userContext?: UserContext;
+  itemOwnership?: ItemOwnership;
+  // eslint-disable-next-line no-unused-vars
   onTrack?: (_jobId: string) => void;
+  // eslint-disable-next-line no-unused-vars
   onUntrack?: (_jobId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -36,8 +35,11 @@ interface JobCardProps {
 export default function JobCard({
   job,
   showOwnership = false,
-  onTrack,
-  onUntrack,
+  actions,
+  userContext: _userContext, // eslint-disable-line no-unused-vars
+  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
+  onTrack: _onTrack, // eslint-disable-line no-unused-vars
+  onUntrack: _onUntrack, // eslint-disable-line no-unused-vars
   onView,
   onActions,
 }: JobCardProps) {
@@ -79,51 +81,80 @@ export default function JobCard({
     }
   };
 
+  // Prepare badges for header
+  const badges = [];
+
+  if (showOwnership && isTracked) {
+    badges.push({
+      text: "Tracked",
+      variant: "outline" as const,
+      className: "text-xs bg-blue-50 text-blue-700",
+      icon: UserCheck
+    });
+  }
+
+  if (canEdit && job.status === "draft") {
+    badges.push({
+      text: "Draft",
+      variant: "outline" as const,
+      className: "text-xs bg-orange-50 text-orange-700",
+      icon: Edit
+    });
+  }
+
+  badges.push({
+    text: job.status,
+    variant: "secondary" as const,
+    className: getStatusColor(job.status)
+  });
+
+  if (getPrivacyIcon(job.privacy)) {
+    badges.push({
+      text: "",
+      variant: "outline" as const,
+      className: "text-xs",
+      icon: () => getPrivacyIcon(job.privacy)
+    });
+  }
+
+  // Use dynamic actions if provided, otherwise fallback to default actions
+  const cardActions = actions || [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline" as const,
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/jobs/${job.id}`;
+        }
+      }
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      variant: "default" as const,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          // eslint-disable-next-line no-console
+          console.log("Actions clicked for job:", job.id);
+        }
+      }
+    }
+  ];
+
   return (
-    <Card className="hover:shadow-lg transition-shadow relative">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <CardTitle className="text-lg hover:text-primary">
-                <Link to={`/jobs/${job.id}`}>{job.title}</Link>
-              </CardTitle>
-              {showOwnership && isTracked && (
-                <Badge
-                  variant="outline"
-                  className="text-xs bg-blue-50 text-blue-700"
-                >
-                  <UserCheck className="h-3 w-3 mr-1" />
-                  Tracked
-                </Badge>
-              )}
-              {canEdit && job.status === "draft" && (
-                <Badge
-                  variant="outline"
-                  className="text-xs bg-orange-50 text-orange-700"
-                >
-                  <Edit className="h-3 w-3 mr-1" />
-                  Draft
-                </Badge>
-              )}
-            </div>
-            <CardDescription className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              {job.company}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-1">
-            <Badge variant="secondary" className={getStatusColor(job.status)}>
-              {job.status}
-            </Badge>
-            {getPrivacyIcon(job.privacy) && (
-              <Badge variant="outline" className="text-xs">
-                {getPrivacyIcon(job.privacy)}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
+    <BaseCard>
+      <CardHeaderWithAvatar
+        title={job.title}
+        subtitle={`${job.company}`}
+        badges={badges}
+        linkTo={`/jobs/${job.id}`}
+      />
 
       <CardContent>
         <div className="space-y-3">
@@ -174,41 +205,10 @@ export default function JobCard({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onView) {
-                  onView();
-                } else {
-                  // Fallback to direct navigation
-                  window.location.href = `/jobs/${job.id}`;
-                }
-              }}
-            >
-              View
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onActions) {
-                  onActions();
-                } else {
-                  // Fallback behavior - could show a simple menu or navigate to edit
-                  console.log("Actions clicked for job:", job.id);
-                }
-              }}
-            >
-              Actions
-            </Button>
-          </div>
         </div>
       </CardContent>
-    </Card>
+
+      <CardActions actions={cardActions} />
+    </BaseCard>
   );
 }

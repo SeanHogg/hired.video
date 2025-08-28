@@ -1,0 +1,190 @@
+/**
+ * Normalized Card Data Interfaces
+ * 
+ * These interfaces define consistent data structures for all card components,
+ * eliminating the architectural inconsistencies found in the current implementation.
+ */
+
+// Base interface for all card types
+export interface BaseCardData {
+  id: string;
+  slug?: string;
+  createdAt: string;
+  updatedAt?: string;
+  views?: number;
+}
+
+// Enhanced user context and permissions
+export interface UserContext {
+  userId: string;
+  role: "account_owner" | "recruiter" | "regular_user" | "admin";
+  accountId?: string;
+  permissions: string[];
+  isAuthenticated: boolean;
+}
+
+// Enhanced ownership and interaction patterns
+export interface ItemOwnership {
+  ownership: "owned" | "tracked" | "account_owned" | "none";
+  ownerId?: string;
+  accountId?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canManage?: boolean;
+  showOwnership?: boolean;
+}
+
+export interface CardInteractions {
+  onView?: () => void;
+  onActions?: () => void;
+  // eslint-disable-next-line no-unused-vars
+  onTrack?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onUntrack?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onEdit?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onDelete?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onManage?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onAssign?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onContact?: (id: string) => void;
+  // eslint-disable-next-line no-unused-vars
+  onReview?: (id: string) => void;
+}
+
+// Job Card Data
+export interface NormalizedJobData extends BaseCardData {
+  title: string;
+  company: string;
+  location: string;
+  salary?: string;
+  employmentType: string;
+  experienceLevel: string;
+  status: "active" | "paused" | "closed" | "draft";
+  privacy: "public" | "private";
+  summary: string;
+  applications?: number;
+  expiresAt?: string;
+  userId?: string;
+  companyId?: string;
+}
+
+// Company Card Data
+export interface NormalizedCompanyData extends BaseCardData {
+  name: string;
+  logo?: string;
+  tagline?: string;
+  industry: string;
+  size: string;
+  location: string;
+  status: "active" | "onboarding" | "draft" | "paused" | "inactive";
+  visibility: "public" | "private";
+  followers?: number;
+  jobCount?: number;
+  activeJobCount?: number;
+  userId?: string;
+  teamMembers?: string[];
+  onboardingProgress?: number;
+}
+
+// People Card Data
+export interface NormalizedPersonData extends BaseCardData {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  avatar?: string;
+  headline?: string;
+  location?: string;
+  role?: string;
+  visibility: "public" | "private";
+  status: "active" | "inactive";
+  companyId?: string;
+  companyName?: string;
+  lastActiveAt?: string;
+  profileViews?: number;
+  connectionCount?: number;
+  followerCount?: number;
+  isVerified?: boolean;
+  isPremium?: boolean;
+  openToWork?: boolean;
+  experienceLevel?: "entry" | "mid" | "senior" | "executive";
+  currentPosition?: string;
+  currentCompany?: string;
+}
+
+// Resume Card Data
+export interface NormalizedResumeData extends BaseCardData {
+  name: string;
+  title?: string;
+  summary: string;
+  privacy: "public" | "recruiter_only" | "private" | "draft";
+  isMaster?: boolean;
+  isActive?: boolean;
+  parentId?: string | null;
+}
+
+// Video Card Data
+export interface NormalizedVideoData extends BaseCardData {
+  title: string;
+  description: string;
+  thumbnail?: string;
+  duration: string;
+  type: "resume" | "job_description";
+  profession?: string;
+  company?: string;
+}
+
+// Union type for all normalized card data
+export type NormalizedCardData = 
+  | NormalizedJobData 
+  | NormalizedCompanyData 
+  | NormalizedPersonData 
+  | NormalizedResumeData 
+  | NormalizedVideoData;
+
+// Card type discriminator
+export type CardType = "job" | "company" | "person" | "resume" | "video";
+
+// Card rendering context
+export interface CardContext {
+  section: "featured" | "recent" | "latest" | "top" | "all";
+  userContext?: UserContext;
+  showOwnership?: boolean;
+  maxItems?: number;
+  interactions?: CardInteractions;
+}
+
+// Raw API data types (what we currently receive)
+export interface RawApiItem {
+  id: string;
+  type: string;
+  name?: string;
+  title?: string;
+  summary?: string;
+  createdAt?: string;
+  views?: number;
+  privacy?: string;
+  avatar?: string;
+  logo?: string;
+  location?: string;
+  company?: string;
+  profession?: string;
+  role?: string;
+  size?: string;
+  isVerified?: boolean;
+  isPremium?: boolean;
+  jobData?: {
+    id: string;
+    title: string;
+    company: string;
+    location: string;
+    employmentType: string;
+    postedDate: string;
+    views?: number;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any; // For additional properties we might not know about
+}

@@ -5,33 +5,33 @@ import {
   Briefcase,
   UserCheck,
   Edit,
-  ExternalLink,
-  Bookmark,
-  BookmarkCheck,
   Calendar,
   Building2,
   TrendingUp,
   AlertCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import BaseCard from "@/components/ui/BaseCard";
+import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
+import CardActions from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
+import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface CompanyCardProps {
   company: CompanyMetadata | CompanyWithOwnership;
   showOwnership?: boolean;
+  actions?: DynamicCardAction[];
+  userContext?: UserContext;
+  itemOwnership?: ItemOwnership;
+  // eslint-disable-next-line no-unused-vars
   onTrack?: (_companyId: string) => void;
+  // eslint-disable-next-line no-unused-vars
   onUntrack?: (_companyId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -40,8 +40,11 @@ interface CompanyCardProps {
 export default function CompanyCard({
   company,
   showOwnership = false,
-  onTrack,
-  onUntrack,
+  actions,
+  userContext: _userContext, // eslint-disable-line no-unused-vars
+  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
+  onTrack: _onTrack, // eslint-disable-line no-unused-vars
+  onUntrack: _onUntrack, // eslint-disable-line no-unused-vars
   onView,
   onActions,
 }: CompanyCardProps) {
@@ -106,54 +109,90 @@ export default function CompanyCard({
 
   const onboardingStatus = getOnboardingStatus();
 
+  // Prepare badges for header
+  const badges = [];
+
+  if (showOwnership && isTracked) {
+    badges.push({
+      text: "Following",
+      variant: "outline" as const,
+      className: "text-xs bg-blue-50 text-blue-700",
+      icon: UserCheck
+    });
+  }
+
+  if (canEdit && (company.status === "draft" || company.status === "onboarding")) {
+    badges.push({
+      text: "Setup Required",
+      variant: "outline" as const,
+      className: "text-xs bg-orange-50 text-orange-700",
+      icon: AlertCircle
+    });
+  }
+
+  badges.push({
+    text: company.status,
+    variant: "secondary" as const,
+    className: getStatusColor(company.status)
+  });
+
+  if (getVisibilityIcon(company.visibility)) {
+    badges.push({
+      text: "",
+      variant: "outline" as const,
+      className: "text-xs",
+      icon: () => getVisibilityIcon(company.visibility)
+    });
+  }
+
+  // Use dynamic actions if provided, otherwise fallback to default actions
+  const cardActions = actions || [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline" as const,
+      icon: Building2,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/companies/${company.id}`;
+        }
+      }
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      variant: "default" as const,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          // eslint-disable-next-line no-console
+          console.log("Actions clicked for company:", company.id);
+        }
+      }
+    }
+  ];
+
   return (
-    <Card className="hover:shadow-lg transition-shadow relative">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3 flex-1">
-            {/* Company Logo */}
-            <Avatar className="w-12 h-12 flex-shrink-0">
-              <AvatarImage src={company.logo} alt={company.name} />
-              <AvatarFallback className="text-sm">
-                {company.name.substring(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+    <BaseCard>
+      <CardHeaderWithAvatar
+        title={company.name}
+        subtitle={company.tagline}
+        avatar={{
+          src: company.logo,
+          fallback: company.name.substring(0, 2).toUpperCase(),
+          size: "md"
+        }}
+        badges={badges}
+        linkTo={`/companies/${company.id}`}
+      />
 
-            {/* Company Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-lg hover:text-primary truncate">
-                  <Link to={`/companies/${company.id}`}>{company.name}</Link>
-                </CardTitle>
-                {showOwnership && isTracked && (
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
-                  >
-                    <UserCheck className="h-3 w-3 mr-1" />
-                    Following
-                  </Badge>
-                )}
-                {canEdit &&
-                  (company.status === "draft" ||
-                    company.status === "onboarding") && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs bg-orange-50 text-orange-700 flex-shrink-0"
-                    >
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Setup Required
-                    </Badge>
-                  )}
-              </div>
-
-              {company.tagline && (
-                <CardDescription className="text-sm mb-2 line-clamp-1">
-                  {company.tagline}
-                </CardDescription>
-              )}
-
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <CardContent>
+        <div className="space-y-3">
+          {/* Company Details */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Building2 className="h-3 w-3" />
                   <span>{company.industry}</span>
@@ -167,8 +206,6 @@ export default function CompanyCard({
                   <span>{company.location}</span>
                 </div>
               </div>
-            </div>
-          </div>
 
           {/* Status and Visibility */}
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -186,23 +223,20 @@ export default function CompanyCard({
           </div>
         </div>
 
-        {/* Onboarding Progress */}
-        {onboardingStatus.show && canEdit && (
-          <div className="mt-3 p-3 bg-orange-50 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-orange-900">
-                Company Setup
-              </span>
-              <span className="text-xs text-orange-700">
-                {onboardingStatus.message}
-              </span>
+          {/* Onboarding Progress */}
+          {onboardingStatus.show && canEdit && (
+            <div className="mt-3 p-3 bg-orange-50 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-orange-900">
+                  Company Setup
+                </span>
+                <span className="text-xs text-orange-700">
+                  {onboardingStatus.message}
+                </span>
+              </div>
+              <Progress value={onboardingStatus.progress} className="h-2" />
             </div>
-            <Progress value={onboardingStatus.progress} className="h-2" />
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent>
+          )}
         <div className="space-y-3">
           {/* Job Statistics */}
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -236,40 +270,6 @@ export default function CompanyCard({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onView) {
-                  onView();
-                } else {
-                  // Fallback to direct navigation
-                  window.location.href = `/companies/${company.id}`;
-                }
-              }}
-            >
-              View
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onActions) {
-                  onActions();
-                } else {
-                  // Fallback behavior - could show a simple menu or navigate to edit
-                  console.log("Actions clicked for company:", company.id);
-                }
-              }}
-            >
-              Actions
-            </Button>
-          </div>
-
           {/* Quick Actions for Jobs */}
           {company.activeJobCount > 0 && (
             <div className="pt-2 border-t">
@@ -288,6 +288,8 @@ export default function CompanyCard({
           )}
         </div>
       </CardContent>
-    </Card>
+
+      <CardActions actions={cardActions} />
+    </BaseCard>
   );
 }

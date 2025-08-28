@@ -59,6 +59,9 @@ import VideoCard from "@/components/VideoCard";
 import PeopleCard from "@/components/PeopleCard";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
+import ContentSection from "@/components/ui/ContentSection";
+import { useCardRenderer } from "@/lib/card-factory";
+import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { companyService } from "@/lib/services/company-service";
@@ -332,97 +335,54 @@ export default function Index() {
         .filter(Boolean)
     : [];
 
-  // Helper function to render content section with loading states
-  const renderContentSection = (
-    title: string,
-    items: any[],
-    itemType: string,
-    isLoading: boolean,
-    error: string | null,
-  ) => {
-    if (isLoading) {
-      return (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          {renderSkeletonLoader(4, "h-40")}
-        </div>
-      );
-    }
+  // Create user context for dynamic actions
+  const userContext = user ? createUserContext({
+    userId: user.id,
+    role: user.role || "regular_user",
+    accountId: user.accountId,
+    permissions: user.permissions || []
+  }) : getDefaultUserContext();
 
-    if (error) {
-      return (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          {renderSectionError(error)}
-        </div>
-      );
+  // Create card renderers for different sections with user context
+  const featuredSectionRenderer = useCardRenderer({
+    section: "featured",
+    userContext,
+    showOwnership: false,
+    interactions: {
+      onView: handleView,
+      onActions: handleOpenActions
     }
+  });
 
-    if (!items || items.length === 0) {
-      return (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-muted-foreground text-center py-8">
-            No {itemType} found
-          </p>
-        </div>
-      );
+  const recentSectionRenderer = useCardRenderer({
+    section: "recent",
+    userContext,
+    showOwnership: false,
+    interactions: {
+      onView: handleView,
+      onActions: handleOpenActions
     }
+  });
 
-    return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {items.slice(0, 4).map((item) => {
-            // Render appropriate card based on item type
-            if (itemType === "jobs") {
-              return (
-                <JobCard
-                  key={item.id}
-                  job={item}
-                  onView={() => handleView(item)}
-                  onActions={() => handleOpenActions(item)}
-                />
-              );
-            } else if (itemType === "companies") {
-              return (
-                <CompanyCard
-                  key={item.id}
-                  company={item}
-                  onView={() => handleView(item)}
-                  onActions={() => handleOpenActions(item)}
-                />
-              );
-            } else if (itemType === "people") {
-              return (
-                <PeopleCard
-                  key={item.id}
-                  person={item}
-                  onView={() => handleView(item)}
-                  onActions={() => handleOpenActions(item)}
-                />
-              );
-            } else if (itemType === "resumes") {
-              return (
-                <ResumeCard
-                  key={item.id}
-                  id={item.id}
-                  name={item.name ?? item.title ?? ""}
-                  summary={item.summary}
-                  createdAt={item.createdAt}
-                  views={item.views}
-                  privacy={item.privacy}
-                  onView={() => handleView(item)}
-                  onActions={() => handleOpenActions(item)}
-                />
-              );
-            }
-            return null;
-          })}
-        </div>
-      </div>
-    );
-  };
+  const latestSectionRenderer = useCardRenderer({
+    section: "latest",
+    userContext,
+    showOwnership: false,
+    interactions: {
+      onView: handleView,
+      onActions: handleOpenActions
+    }
+  });
+
+  const topSectionRenderer = useCardRenderer({
+    section: "top",
+    userContext,
+    showOwnership: false,
+    interactions: {
+      onView: handleView,
+      onActions: handleOpenActions
+    }
+  });
 
   // Fetch companies when filters change or when companies category is selected
   // Removed legacy companies fetch effect
@@ -592,43 +552,48 @@ export default function Index() {
         <section className="py-8 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto space-y-12">
             {/* Recent Jobs Section */}
-            {renderContentSection(
-              "Recent Jobs",
-              searchResults?.items.filter((item) => item.type === "job") || [],
-              "jobs",
-              isLoadingContent,
-              contentError,
-            )}
+            <ContentSection
+              title="Recent Jobs"
+              items={searchResults?.items.filter((item) => item.type === "job") || []}
+              renderItem={recentSectionRenderer}
+              isLoading={isLoadingContent}
+              error={contentError}
+              emptyMessage="No jobs found"
+              onRetry={loadContent}
+            />
 
             {/* Featured Companies Section */}
-            {renderContentSection(
-              "Featured Companies",
-              searchResults?.items.filter((item) => item.type === "company") ||
-                [],
-              "companies",
-              isLoadingContent,
-              contentError,
-            )}
+            <ContentSection
+              title="Featured Companies"
+              items={searchResults?.items.filter((item) => item.type === "company") || []}
+              renderItem={featuredSectionRenderer}
+              isLoading={isLoadingContent}
+              error={contentError}
+              emptyMessage="No companies found"
+              onRetry={loadContent}
+            />
 
             {/* Top People Section */}
-            {renderContentSection(
-              "Top People",
-              searchResults?.items.filter((item) => item.type === "people") ||
-                [],
-              "people",
-              isLoadingContent,
-              contentError,
-            )}
+            <ContentSection
+              title="Top People"
+              items={searchResults?.items.filter((item) => item.type === "people") || []}
+              renderItem={topSectionRenderer}
+              isLoading={isLoadingContent}
+              error={contentError}
+              emptyMessage="No people found"
+              onRetry={loadContent}
+            />
 
             {/* Latest Resumes Section */}
-            {renderContentSection(
-              "Latest Resumes",
-              searchResults?.items.filter((item) => item.type === "resume") ||
-                [],
-              "resumes",
-              isLoadingContent,
-              contentError,
-            )}
+            <ContentSection
+              title="Latest Resumes"
+              items={searchResults?.items.filter((item) => item.type === "resume") || []}
+              renderItem={latestSectionRenderer}
+              isLoading={isLoadingContent}
+              error={contentError}
+              emptyMessage="No resumes found"
+              onRetry={loadContent}
+            />
           </div>
         </section>
 
