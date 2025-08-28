@@ -13,6 +13,8 @@ export interface BaseCardData {
   createdAt: string;
   updatedAt?: string;
   views?: number;
+  ownership: "owned" | "tracked" | "none";
+  showOwnership: boolean;
 }
 
 // Enhanced user context and permissions
