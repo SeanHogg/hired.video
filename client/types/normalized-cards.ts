@@ -8,6 +8,7 @@
 // Base interface for all card types
 export interface BaseCardData {
   id: string;
+  type: CardType;
   slug?: string;
   createdAt: string;
   updatedAt?: string;
@@ -132,7 +133,7 @@ export interface NormalizedVideoData extends BaseCardData {
   description: string;
   thumbnail?: string;
   duration: string;
-  type: "resume" | "job_description";
+  videoType: "resume" | "job_description";
   profession?: string;
   company?: string;
 }

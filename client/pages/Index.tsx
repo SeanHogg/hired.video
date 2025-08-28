@@ -165,7 +165,7 @@ export default function Index() {
     } else if (item.type === "people") {
       navigate(`/people/${item.id}`);
     } else {
-      console.log("View item:", item.id);
+      console.log("Unknown item type:", item.type, "for item:", item.id);
     }
   };
 
@@ -273,7 +273,7 @@ export default function Index() {
                 summary: item.description || item.summary || "Company",
                 logo: item.logo,
                 views: item.views || 0,
-                type: "companies" as const,
+                type: "company" as const,
                 contentType: "profile" as const,
                 profession: item.industry || "Technology",
                 company: item.name || item.title,
@@ -284,6 +284,10 @@ export default function Index() {
                 followers: 0, // TODO: Get from company profile
               };
             case "resume":
+              // Filter out DRAFT resumes - they should not be visible
+              if (item.privacy === "draft") {
+                return null;
+              }
               return {
                 id: item.id,
                 name: item.title || item.name || "Untitled Resume",
@@ -297,6 +301,7 @@ export default function Index() {
                 company: "Independent", // TODO: Get from resume data
                 createdAt: item.createdAt || new Date().toISOString(),
                 ownerId: item.id, // TODO: Get actual owner ID
+                privacy: item.privacy || "public"
               };
             case "job":
               return {
@@ -305,7 +310,8 @@ export default function Index() {
                 name: item.title,
                 summary: `${item.title} at ${item.company || "Unknown Company"}`,
                 views: item.views || 0,
-                type: "job_listing" as const,
+                applications: item.applications || 0,
+                type: "job" as const,
                 contentType: "job" as const,
                 profession: item.title,
                 company: item.company || "Unknown Company",
@@ -346,6 +352,17 @@ export default function Index() {
   // Create card renderers for different sections with user context
   const featuredSectionRenderer = useCardRenderer({
     section: "featured",
+    userContext,
+    showOwnership: false,
+    interactions: {
+      onView: handleView,
+      onActions: handleOpenActions
+    }
+  });
+
+  // Create card renderer for the "all" section (used in grid view)
+  const allSectionRenderer = useCardRenderer({
+    section: "all",
     userContext,
     showOwnership: false,
     interactions: {
@@ -650,19 +667,9 @@ export default function Index() {
               <>
                 {viewMode === "grid" ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {paginatedItems.map((item) => {
-                      // Use the unified card factory for consistent rendering
-                      const cardRenderer = useCardRenderer({
-                        section: "all",
-                        userContext,
-                        showOwnership: false,
-                        interactions: {
-                          onView: () => handleView(item),
-                          onActions: () => handleOpenActions(item)
-                        }
-                      });
-
-                      return cardRenderer.renderCard(item, 0);
+                    {paginatedItems.map((item, index) => {
+                      // Use the pre-created card renderer (it's a function, not an object)
+                      return allSectionRenderer(item, index);
                     })}
                   </div>
                 ) : (

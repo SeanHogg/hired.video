@@ -88,8 +88,8 @@ export function useCardRenderer({
             actions={jobActions}
             userContext={effectiveUserContext}
             itemOwnership={jobOwnership}
-            onView={interactions.onView}
-            onActions={interactions.onActions}
+            onView={() => interactions.onView?.(normalizedData)}
+            onActions={() => interactions.onActions?.(normalizedData)}
             onTrack={interactions.onTrack}
             onUntrack={interactions.onUntrack}
           />
@@ -107,8 +107,8 @@ export function useCardRenderer({
             actions={companyActions}
             userContext={effectiveUserContext}
             itemOwnership={companyOwnership}
-            onView={interactions.onView}
-            onActions={interactions.onActions}
+            onView={() => interactions.onView?.(normalizedData)}
+            onActions={() => interactions.onActions?.(normalizedData)}
             onTrack={interactions.onTrack}
             onUntrack={interactions.onUntrack}
           />
@@ -120,8 +120,8 @@ export function useCardRenderer({
           <PeopleCard
             key={normalizedData.id}
             person={normalizedData}
-            onView={interactions.onView}
-            onActions={interactions.onActions}
+            onView={() => interactions.onView?.(normalizedData)}
+            onActions={() => interactions.onActions?.(normalizedData)}
             onTrack={interactions.onTrack}
             onUntrack={interactions.onUntrack}
           />
@@ -144,8 +144,8 @@ export function useCardRenderer({
             actions={resumeActions}
             userContext={effectiveUserContext}
             itemOwnership={resumeOwnership}
-            onView={interactions.onView}
-            onActions={interactions.onActions}
+            onView={() => interactions.onView?.(normalizedData)}
+            onActions={() => interactions.onActions?.(normalizedData)}
           />
         );
 
@@ -155,8 +155,8 @@ export function useCardRenderer({
           <VideoCard
             key={normalizedData.id}
             video={normalizedData}
-            onView={interactions.onView}
-            onActions={interactions.onActions}
+            onView={() => interactions.onView?.(normalizedData)}
+            onActions={() => interactions.onActions?.(normalizedData)}
           />
         );
 

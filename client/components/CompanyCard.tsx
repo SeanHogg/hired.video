@@ -9,6 +9,7 @@ import {
   Building2,
   TrendingUp,
   AlertCircle,
+  Share,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -145,13 +146,13 @@ export default function CompanyCard({
     });
   }
 
-  // Use dynamic actions if provided, otherwise fallback to default actions
-  const cardActions = actions || [
+  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
+  const cardActions = (actions && actions.length > 0) ? actions : [
     {
       id: "view",
       label: "View",
       variant: "outline" as const,
-      icon: Building2,
+      icon: Eye,
       onClick: () => {
         if (onView) {
           onView();
@@ -161,15 +162,23 @@ export default function CompanyCard({
       }
     },
     {
-      id: "actions",
-      label: "Actions",
+      id: "share",
+      label: "Share",
       variant: "default" as const,
+      icon: Share,
       onClick: () => {
         if (onActions) {
           onActions();
         } else {
-          // eslint-disable-next-line no-console
-          console.log("Actions clicked for company:", company.id);
+          // Default share functionality - copy link to clipboard
+          const url = `${window.location.origin}/companies/${company.id}`;
+          navigator.clipboard.writeText(url).then(() => {
+            // Could show a toast notification here
+            alert('Company link copied to clipboard!');
+          }).catch(() => {
+            // Fallback for older browsers
+            prompt('Copy this link:', url);
+          });
         }
       }
     }
@@ -192,29 +201,23 @@ export default function CompanyCard({
       <CardContent>
         <div className="space-y-3">
           {/* Company Details */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Building2 className="h-3 w-3" />
-                  <span>{company.industry}</span>
+          <div className="flex items-center flex-wrap gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1 min-w-0">
+                  <Building2 className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{company.industry}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  <span>{company.size}</span>
+                <div className="flex items-center gap-1 min-w-0">
+                  <Users className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{company.size}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  <span>{company.location}</span>
+                <div className="flex items-center gap-1 min-w-0">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{company.location}</span>
                 </div>
               </div>
 
-          {/* Status and Visibility */}
+          {/* Visibility (status is already shown in header) */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Badge
-              variant="secondary"
-              className={getStatusColor(company.status)}
-            >
-              {company.status}
-            </Badge>
             {getVisibilityIcon(company.visibility) && (
               <Badge variant="outline" className="text-xs">
                 {getVisibilityIcon(company.visibility)}

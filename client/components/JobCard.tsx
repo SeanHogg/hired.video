@@ -7,6 +7,7 @@ import {
   Users,
   UserCheck,
   Edit,
+  Share,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CardContent } from "@/components/ui/card";
@@ -117,8 +118,8 @@ export default function JobCard({
     });
   }
 
-  // Use dynamic actions if provided, otherwise fallback to default actions
-  const cardActions = actions || [
+  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
+  const cardActions = (actions && actions.length > 0) ? actions : [
     {
       id: "view",
       label: "View",
@@ -133,15 +134,23 @@ export default function JobCard({
       }
     },
     {
-      id: "actions",
-      label: "Actions",
+      id: "share",
+      label: "Share",
       variant: "default" as const,
+      icon: Share,
       onClick: () => {
         if (onActions) {
           onActions();
         } else {
-          // eslint-disable-next-line no-console
-          console.log("Actions clicked for job:", job.id);
+          // Default share functionality - copy link to clipboard
+          const url = `${window.location.origin}/jobs/${job.id}`;
+          navigator.clipboard.writeText(url).then(() => {
+            // Could show a toast notification here
+            alert('Job link copied to clipboard!');
+          }).catch(() => {
+            // Fallback for older browsers
+            prompt('Copy this link:', url);
+          });
         }
       }
     }
@@ -189,15 +198,15 @@ export default function JobCard({
           </div>
 
           {/* Stats */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-4">
+          <div className="pt-2 border-t space-y-2">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Eye className="h-3 w-3" />
-                {job.views} views
+                {job.views || 0} views
               </div>
               <div className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {job.applications} applications
+                {job.applications || 0} applications
               </div>
             </div>
             <div className="text-xs text-muted-foreground">

@@ -28,6 +28,7 @@ export function normalizeJobData(
   
   return {
     id: jobData.id || item.id,
+    type: "job" as const,
     title: jobData.title || item.title || "Untitled Position",
     company: jobData.company || item.company || "Unknown Company",
     location: jobData.location || item.location || "Remote",
@@ -58,6 +59,7 @@ export function normalizeCompanyData(
 ): NormalizedCompanyData {
   return {
     id: item.id,
+    type: "company" as const,
     name: item.name || item.title || "Unknown Company",
     logo: item.logo || item.avatar,
     tagline: item.tagline || item.summary,
@@ -93,6 +95,7 @@ export function normalizePersonData(
 
   return {
     id: item.id,
+    type: "people" as const,
     firstName,
     lastName,
     fullName,
@@ -131,6 +134,7 @@ export function normalizeResumeData(
 ): NormalizedResumeData {
   return {
     id: item.id,
+    type: "resume" as const,
     name: item.name || item.title || "Untitled Resume",
     title: item.title,
     summary: item.summary || "",
@@ -154,11 +158,12 @@ export function normalizeVideoData(
 ): NormalizedVideoData {
   return {
     id: item.id,
+    type: "video" as const,
     title: item.title || item.name || "Untitled Video",
     description: item.description || item.summary || "",
     thumbnail: item.thumbnail,
     duration: item.duration || "0:00",
-    type: item.type || "resume",
+    videoType: item.type || "resume",
     profession: item.profession,
     company: item.company,
     createdAt: item.createdAt || new Date().toISOString(),
@@ -210,27 +215,37 @@ export function getCardType(item: RawApiItem): CardType {
   if (item.type) {
     return item.type as CardType;
   }
-  
-  // Infer type from data structure
-  if (item.jobData || (item.title && item.company && item.location)) {
+
+  // Infer type from data structure - improved detection
+
+  // Company detection - look for company-specific fields
+  if (item.industry || item.size || item.logo ||
+      (item.title === 'Company') ||
+      (item.summary && item.summary.includes('Company'))) {
+    return "company";
+  }
+
+  // Job detection - look for job-specific fields
+  if (item.jobData || item.company || item.location || item.salary ||
+      (item.title && item.title.includes('Engineer')) ||
+      (item.summary && item.summary.includes('at Unknown Company'))) {
     return "job";
   }
-  
+
+  // Person detection
   if (item.firstName || item.lastName || item.role) {
     return "person";
   }
-  
+
+  // Resume detection
   if (item.privacy && (item.privacy === "public" || item.privacy === "private")) {
     return "resume";
   }
-  
+
+  // Video detection
   if (item.duration || item.thumbnail) {
     return "video";
   }
-  
-  if (item.industry || item.size) {
-    return "company";
-  }
-  
+
   return "job"; // Default fallback
 }

@@ -10,11 +10,16 @@ import {
   Target,
   Edit,
   UserCheck,
+  Share,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
+import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
+import CardActions from "@/components/ui/CardActions";
 import { formatDate } from "@/lib/utils";
+import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface ResumeCardProps {
   id: string;
@@ -28,11 +33,15 @@ interface ResumeCardProps {
   isActive?: boolean;
   parentId?: string;
   ownership?: "owned" | "tracked";
+  actions?: DynamicCardAction[];
+  userContext?: UserContext;
+  itemOwnership?: ItemOwnership;
   onView?: () => void;
   onActions?: () => void;
 }
 
 export default function ResumeCard({
+  id,
   name,
   title,
   summary,
@@ -43,14 +52,15 @@ export default function ResumeCard({
   isActive = false,
   parentId,
   ownership = "owned",
+  actions,
+  userContext: _userContext, // eslint-disable-line no-unused-vars
+  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
   onView,
   onActions,
 }: ResumeCardProps) {
 
 
-  const handleCardClick = () => {
-    onView?.();
-  };
+
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
@@ -97,137 +107,137 @@ export default function ResumeCard({
     }
   };
 
+  // Prepare badges for header (consistent with JobCard pattern)
+  const badges = [];
+
+  if (ownership === "tracked") {
+    badges.push({
+      text: "Tracked",
+      variant: "secondary" as const,
+      className: "text-xs bg-blue-100 text-blue-800",
+      icon: () => <UserCheck className="w-3 h-3" />
+    });
+  }
+
+  if (isActive) {
+    badges.push({
+      text: "Active",
+      variant: "secondary" as const,
+      className: "text-xs bg-green-100 text-green-800",
+      icon: () => <Target className="w-3 h-3" />
+    });
+  }
+
+  if (isMaster) {
+    badges.push({
+      text: "Master",
+      variant: "secondary" as const,
+      className: "text-xs bg-yellow-100 text-yellow-800",
+      icon: () => <Star className="w-3 h-3" />
+    });
+  }
+
+  if (parentId) {
+    badges.push({
+      text: "Variation",
+      variant: "outline" as const,
+      className: "text-xs",
+      icon: () => <Copy className="w-3 h-3" />
+    });
+  }
+
+  badges.push({
+    text: getPrivacyText(privacy),
+    variant: "secondary" as const,
+    className: `text-xs ${getPrivacyColor(privacy)}`,
+    icon: () => getPrivacyIcon(privacy)
+  });
+
+  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
+  const cardActions = (actions && actions.length > 0) ? actions : [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline" as const,
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/resumes/${id}`;
+        }
+      }
+    },
+    {
+      id: "share",
+      label: "Share",
+      variant: "default" as const,
+      icon: Share,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          // Default share functionality - copy link to clipboard
+          const url = `${window.location.origin}/resumes/${id}`;
+          navigator.clipboard.writeText(url).then(() => {
+            // Could show a toast notification here
+            alert('Resume link copied to clipboard!');
+          }).catch(() => {
+            // Fallback for older browsers
+            prompt('Copy this link:', url);
+          });
+        }
+      }
+    }
+  ];
+
   return (
-    <Card className="group cursor-pointer hover:shadow-lg transition-all duration-300 border hover:border-primary/30 overflow-hidden">
-      <CardContent className="p-0">
-        {/* Header with Name and Date */}
-        <div
-          className="p-4 border-b border-border bg-muted/30"
-          onClick={handleCardClick}
-        >
-          <div className="space-y-2">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  NAME
-                </p>
-                <h3 className="font-bold text-lg text-foreground leading-tight">
-                  {name}
-                </h3>
-                {title && (
-                  <p className="text-sm text-muted-foreground mt-1">{title}</p>
-                )}
+    <BaseCard>
+      <CardHeaderWithAvatar
+        title={name}
+        subtitle={title}
+        avatar={{
+          src: undefined, // Resumes don't typically have avatars
+          fallback: <FileText className="w-6 h-6" />,
+          size: "md"
+        }}
+        badges={badges}
+        linkTo={`/resumes/${id}`}
+      />
 
-                {/* Status badges */}
-                <div className="flex items-center gap-2 mt-2">
-                  {ownership === "tracked" && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs bg-blue-100 text-blue-800"
-                    >
-                      <UserCheck className="w-3 h-3 mr-1" />
-                      Tracked
-                    </Badge>
-                  )}
-                  {isActive && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs bg-green-100 text-green-800"
-                    >
-                      <Target className="w-3 h-3 mr-1" />
-                      Active
-                    </Badge>
-                  )}
-                  {isMaster && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs bg-yellow-100 text-yellow-800"
-                    >
-                      <Star className="w-3 h-3 mr-1" />
-                      Master
-                    </Badge>
-                  )}
-                  {parentId && (
-                    <Badge variant="outline" className="text-xs">
-                      <Copy className="w-3 h-3 mr-1" />
-                      Variation
-                    </Badge>
-                  )}
-                  <Badge className={`text-xs ${getPrivacyColor(privacy)}`}>
-                    {getPrivacyIcon(privacy)}
-                    <span className="ml-1">{getPrivacyText(privacy)}</span>
-                  </Badge>
-                </div>
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                <FileText className="w-3 h-3 mr-1" />
-                Resume
-              </Badge>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  <span>CREATED</span>
-                </div>
-                <span className="font-medium text-foreground">
-                  {formatDate(createdAt)}
-                </span>
-              </div>
-
-              {views > 0 && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Eye className="w-3 h-3" />
-                  <span>{views} views</span>
-                </div>
-              )}
-            </div>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Professional Summary */}
+          <div className="p-4 bg-primary text-primary-foreground rounded-lg">
+            <h4 className="font-bold text-lg mb-2">Professional Summary</h4>
+            <p className="text-sm leading-relaxed opacity-95 line-clamp-3">
+              {summary}
+            </p>
           </div>
-        </div>
 
-        {/* Details Section */}
-        <div
-          className="p-4 bg-primary text-primary-foreground"
-          onClick={handleCardClick}
-        >
-          <div className="space-y-3">
-            <h4 className="font-bold text-lg">Professional Summary</h4>
-            <div>
-              <p className="text-sm leading-relaxed opacity-95 line-clamp-3">
-                {summary}
-              </p>
+          {/* Metadata */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>CREATED</span>
+              </div>
+              <span className="font-medium text-foreground">
+                {formatDate(createdAt)}
+              </span>
             </div>
+
+            {views > 0 && (
+              <div className="flex items-center gap-1">
+                <Eye className="w-3 h-3" />
+                <span>{views} views</span>
+              </div>
+            )}
           </div>
-        </div>
-
-        {/* Actions Footer */}
-        <div className="p-4 flex items-center justify-between bg-background">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onView?.();
-            }}
-            className="gap-2"
-          >
-            <Eye className="w-4 h-4" />
-            View
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onActions?.();
-            }}
-          >
-            Actions
-          </Button>
         </div>
       </CardContent>
-    </Card>
+
+      <CardActions actions={cardActions} />
+    </BaseCard>
   );
 }

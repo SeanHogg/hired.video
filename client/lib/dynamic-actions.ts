@@ -68,7 +68,7 @@ export function generateJobActions(
     label: "View",
     variant: "outline",
     icon: Eye,
-    onClick: () => interactions.onView?.(),
+    onClick: () => interactions.onView?.(job),
     priority: 1
   });
 
@@ -205,10 +205,10 @@ export function generateCompanyActions(
   // View action - always available
   actions.push({
     id: "view",
-    label: "View Profile",
+    label: "View",
     variant: "outline",
-    icon: Building2,
-    onClick: () => interactions.onView?.(),
+    icon: Eye,
+    onClick: () => interactions.onView?.(company),
     priority: 1
   });
 
@@ -289,7 +289,7 @@ export function generateResumeActions(
     label: "View",
     variant: "outline",
     icon: Eye,
-    onClick: () => interactions.onView?.(),
+    onClick: () => interactions.onView?.(resume),
     priority: 1
   });
 

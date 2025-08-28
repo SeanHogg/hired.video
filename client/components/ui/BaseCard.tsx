@@ -47,7 +47,7 @@ export function BaseCard({
   const interactiveStyles = onClick ? "cursor-pointer" : "";
 
   return (
-    <Card 
+    <Card
       className={cn(
         baseStyles,
         variantStyles[variant],

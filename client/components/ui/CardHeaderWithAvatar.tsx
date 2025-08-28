@@ -62,11 +62,8 @@ export function CardHeaderWithAvatar({
   const avatarSize = avatar?.size || "md";
 
   return (
-    <CardHeader className={cn("pb-3", className)}>
-      <div className={cn(
-        "flex items-start justify-between",
-        layout === "vertical" && "flex-col gap-3"
-      )}>
+    <div className="p-6 pb-3">
+      <div className="flex items-start justify-between">
         <div className={cn(
           "flex items-start gap-3 flex-1",
           layout === "vertical" && "flex-col items-center text-center"
@@ -88,11 +85,22 @@ export function CardHeaderWithAvatar({
               "flex items-center gap-2 mb-1",
               layout === "vertical" && "flex-col gap-1"
             )}>
-              <CardTitle className={cn(
-                "text-lg hover:text-primary truncate",
-                layout === "vertical" && "text-center",
-                titleClassName
-              )}>
+              <CardTitle
+                className={cn(
+                  "text-lg hover:text-primary leading-tight",
+                  "w-full max-w-[280px] break-words", // Fixed width with word breaking
+                  layout === "vertical" && "text-center",
+                  titleClassName
+                )}
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  wordWrap: 'break-word',
+                  hyphens: 'auto'
+                }}
+              >
                 {linkTo ? (
                   <TitleComponent to={linkTo} className="hover:text-primary">
                     {title}
@@ -113,7 +121,11 @@ export function CardHeaderWithAvatar({
                       variant={badge.variant || "outline"}
                       className={cn("text-xs flex-shrink-0", badge.className)}
                     >
-                      {badge.icon && <badge.icon className="h-3 w-3 mr-1" />}
+                      {badge.icon && (
+                        typeof badge.icon === 'function'
+                          ? badge.icon()
+                          : React.createElement(badge.icon, { className: "h-3 w-3 mr-1" })
+                      )}
                       {badge.text}
                     </Badge>
                   ))}
@@ -133,7 +145,7 @@ export function CardHeaderWithAvatar({
           </div>
         </div>
       </div>
-    </CardHeader>
+    </div>
   );
 }
 
