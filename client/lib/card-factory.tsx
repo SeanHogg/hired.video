@@ -114,7 +114,7 @@ export function useCardRenderer({
           />
         );
 
-      case "person":
+      case "people":
         normalizedData = normalizePersonData(item, context);
         return (
           <PeopleCard
@@ -208,7 +208,7 @@ export function renderCardItem(
         />
       );
 
-    case "person":
+    case "people":
       normalizedData = normalizePersonData(item, context);
       return (
         <PeopleCard

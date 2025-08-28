@@ -32,21 +32,21 @@ export function normalizeJobData(
     title: jobData.title || item.title || "Untitled Position",
     company: jobData.company || item.company || "Unknown Company",
     location: jobData.location || item.location || "Remote",
-    salary: jobData.salary || item.salary,
+    salary: (jobData as any)?.salary || (item as any)?.salary,
     employmentType: jobData.employmentType || item.employmentType || "Full-time",
-    experienceLevel: jobData.experienceLevel || item.experienceLevel || "Not specified",
-    status: jobData.status || item.status || "active",
-    privacy: jobData.privacy || item.privacy || "public",
-    summary: jobData.summary || item.summary || "",
-    createdAt: jobData.createdAt || jobData.postedDate || item.createdAt || new Date().toISOString(),
+    experienceLevel: (jobData as any)?.experienceLevel || (item as any)?.experienceLevel || "Not specified",
+    status: (jobData as any)?.status || (item as any)?.status || "active",
+    privacy: (jobData as any)?.privacy || (item as any)?.privacy || "public",
+    summary: (jobData as any)?.summary || (item as any)?.summary || "",
+    createdAt: (jobData as any)?.createdAt || (jobData as any)?.postedDate || (item as any)?.createdAt || new Date().toISOString(),
     views: jobData.views || item.views || 0,
-    applications: jobData.applications || item.applications || 0,
-    ownership: determineOwnership(item, context),
+    applications: (jobData as any)?.applications || (item as any)?.applications || 0,
+    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
-    userId: jobData.userId || item.userId,
-    companyId: jobData.companyId || item.companyId,
-    expiresAt: jobData.expiresAt || item.expiresAt,
-    slug: jobData.slug || item.slug
+    userId: (jobData as any)?.userId || (item as any)?.userId,
+    companyId: (jobData as any)?.companyId || (item as any)?.companyId,
+    expiresAt: (jobData as any)?.expiresAt || (item as any)?.expiresAt,
+    slug: (jobData as any)?.slug || (item as any)?.slug
   };
 }
 
@@ -73,7 +73,7 @@ export function normalizeCompanyData(
     followers: item.followers || 0,
     jobCount: item.jobCount || 0,
     activeJobCount: item.activeJobCount || 0,
-    ownership: determineOwnership(item, context),
+    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
     userId: item.userId,
     teamMembers: item.teamMembers || [],
@@ -119,7 +119,7 @@ export function normalizePersonData(
     experienceLevel: item.experienceLevel,
     currentPosition: item.currentPosition || item.role,
     currentCompany: item.currentCompany || item.company,
-    ownership: determineOwnership(item, context),
+    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked" | "connected",
     showOwnership: context.showOwnership || false,
     slug: item.slug
   };
@@ -163,12 +163,14 @@ export function normalizeVideoData(
     description: item.description || item.summary || "",
     thumbnail: item.thumbnail,
     duration: item.duration || "0:00",
-    videoType: item.type || "resume",
+    videoType: (item.type as "resume" | "job_description") || "resume",
     profession: item.profession,
     company: item.company,
     createdAt: item.createdAt || new Date().toISOString(),
     views: item.views || 0,
-    slug: item.slug
+    slug: item.slug,
+    ownership: determineOwnership(item, context),
+    showOwnership: context.showOwnership || false
   };
 }
 
@@ -201,11 +203,11 @@ function normalizeResumePrivacy(
 ): "public" | "recruiter_only" | "private" | "draft" {
   // Handle the inconsistency between "Latest Resumes" and "All" sections
   if (context.section === "latest") {
-    return item.privacy || "public";
+    return (item.privacy as "public" | "private" | "draft" | "recruiter_only") || "public";
   }
-  
+
   // For "All" section, don't override with hardcoded "public"
-  return item.privacy || "draft";
+  return (item.privacy as "public" | "private" | "draft" | "recruiter_only") || "draft";
 }
 
 /**
@@ -234,7 +236,7 @@ export function getCardType(item: RawApiItem): CardType {
 
   // Person detection
   if (item.firstName || item.lastName || item.role) {
-    return "person";
+    return "people";
   }
 
   // Resume detection

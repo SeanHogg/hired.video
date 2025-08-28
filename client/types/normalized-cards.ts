@@ -13,7 +13,6 @@ export interface BaseCardData {
   createdAt: string;
   updatedAt?: string;
   views?: number;
-  ownership: "owned" | "tracked" | "none";
   showOwnership: boolean;
 }
 
@@ -38,8 +37,8 @@ export interface ItemOwnership {
 }
 
 export interface CardInteractions {
-  onView?: () => void;
-  onActions?: () => void;
+  onView?: (item: NormalizedCardData) => void;
+  onActions?: (item: NormalizedCardData) => void;
   // eslint-disable-next-line no-unused-vars
   onTrack?: (id: string) => void;
   // eslint-disable-next-line no-unused-vars
@@ -73,6 +72,7 @@ export interface NormalizedJobData extends BaseCardData {
   expiresAt?: string;
   userId?: string;
   companyId?: string;
+  ownership: "owned" | "tracked";
 }
 
 // Company Card Data
@@ -91,6 +91,7 @@ export interface NormalizedCompanyData extends BaseCardData {
   userId?: string;
   teamMembers?: string[];
   onboardingProgress?: number;
+  ownership: "owned" | "tracked";
 }
 
 // People Card Data
@@ -116,6 +117,8 @@ export interface NormalizedPersonData extends BaseCardData {
   experienceLevel?: "entry" | "mid" | "senior" | "executive";
   currentPosition?: string;
   currentCompany?: string;
+  ownership: "owned" | "tracked" | "connected";
+  userId?: string;
 }
 
 // Resume Card Data
@@ -127,6 +130,8 @@ export interface NormalizedResumeData extends BaseCardData {
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string | null;
+  ownership: "owned" | "tracked";
+  userId?: string;
 }
 
 // Video Card Data
@@ -138,6 +143,7 @@ export interface NormalizedVideoData extends BaseCardData {
   videoType: "resume" | "job_description";
   profession?: string;
   company?: string;
+  ownership: "owned" | "tracked";
 }
 
 // Union type for all normalized card data
@@ -149,7 +155,7 @@ export type NormalizedCardData =
   | NormalizedVideoData;
 
 // Card type discriminator
-export type CardType = "job" | "company" | "person" | "resume" | "video";
+export type CardType = "job" | "company" | "people" | "resume" | "video";
 
 // Card rendering context
 export interface CardContext {
