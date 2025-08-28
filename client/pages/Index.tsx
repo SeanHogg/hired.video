@@ -651,127 +651,18 @@ export default function Index() {
                 {viewMode === "grid" ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {paginatedItems.map((item) => {
-                      if (item.type === "job_listing" && "jobData" in item) {
-                        const jobMetadata = {
-                          id: item.jobData.id,
-                          slug: item.id, // Use item id as slug fallback
-                          title: item.jobData.title,
-                          company: item.jobData.company,
-                          location: item.jobData.location,
-                          salary: undefined, // TODO: Add salary to job API
-                          employmentType: item.jobData.employmentType,
-                          experienceLevel: "Mid-level", // TODO: Add to job API
-                          status: "active" as const,
-                          privacy: "public" as const,
-                          createdAt: item.jobData.postedDate,
-                          updatedAt: item.jobData.postedDate,
-                          expiresAt: undefined, // TODO: Add to job API
-                          views: item.jobData.views || 0,
-                          applications: 0, // TODO: Add to job API
-                          summary: `${item.jobData.title} at ${item.jobData.company}`,
-                          userId: "unknown", // TODO: Add to job API
-                          companyId: "unknown", // TODO: Add to job API
-                          ownership: "tracked" as const,
-                        };
+                      // Use the unified card factory for consistent rendering
+                      const cardRenderer = useCardRenderer({
+                        section: "all",
+                        userContext,
+                        showOwnership: false,
+                        interactions: {
+                          onView: () => handleView(item),
+                          onActions: () => handleOpenActions(item)
+                        }
+                      });
 
-                        return (
-                          <JobCard
-                            key={item.id}
-                            job={jobMetadata}
-                            onView={() => handleView(item)}
-                            onActions={() => handleOpenActions(item)}
-                          />
-                        );
-                      } else if (item.type === "people") {
-                        const personData = {
-                          id: item.id,
-                          slug: `${item.name.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
-                          firstName: item.name.split(" ")[0],
-                          lastName: item.name.split(" ")[1] || "",
-                          fullName: item.name,
-                          avatar: item.avatar,
-                          headline: item.title,
-                          location: item.location,
-                          role: item.role,
-                          visibility: "public" as const,
-                          status: "active" as const,
-                          companyId: undefined,
-                          companyName: item.company,
-                          createdAt: item.createdAt,
-                          updatedAt: item.createdAt,
-                          lastActiveAt: item.createdAt,
-                          profileViews: item.views,
-                          connectionCount: 0,
-                          followerCount: 0,
-                          isVerified: item.isVerified,
-                          isPremium: item.isPremium,
-                          openToWork: true,
-                          experienceLevel: "mid",
-                          currentPosition: item.profession,
-                          currentCompany: item.company,
-                        };
-                        return (
-                          <PeopleCard
-                            key={item.id}
-                            person={personData}
-                            onConnect={() => navigate(`/people/${item.id}`)}
-                            onView={() => handleView(item)}
-                            onActions={() => handleOpenActions(item)}
-                          />
-                        );
-                      } else if (item.type === "companies") {
-                        const companyName =
-                          (item.name ?? item.title ?? "Company");
-                        const companyData = {
-                          id: item.id,
-                          slug: `${companyName.toLowerCase().replace(/\s+/g, "-")}-${item.id.slice(-4)}`,
-                          name: companyName,
-                          logo: item.logo || "",
-                          tagline: (item as any).tagline || item.summary || "",
-                          industry: (item as any).industry || "Technology",
-                          size: item.size || "Unknown",
-                          location: item.location || "Unknown location",
-                          status: "active" as const,
-                          visibility: "public" as const,
-                          createdAt: item.createdAt || new Date().toISOString(),
-                          updatedAt: item.createdAt || new Date().toISOString(),
-                          views: item.views || 0,
-                          followers: 0,
-                          jobCount: 0,
-                          activeJobCount: 0,
-                          userId: "system",
-                          teamMembers: [],
-                          onboardingProgress: 100,
-                        };
-                        return (
-                          <CompanyCard
-                            key={item.id}
-                            company={companyData}
-                            onView={() => handleView(item)}
-                            onActions={() => handleOpenActions(item)}
-                          />
-                        );
-                      } else if (item.type === "resume") {
-                        return (
-                          <ResumeCard
-                            key={item.id}
-                            id={item.id}
-                            name={item.name}
-                            title={item.title}
-                            summary={item.summary}
-                            createdAt={item.createdAt}
-                            views={item.views}
-                            privacy="public"
-                            isMaster
-                            isActive
-                            parentId={null}
-                            ownership="tracked"
-                            onView={() => navigate(`/resumes/${item.id}`)}
-                            onActions={() => handleOpenActions(item)}
-                          />
-                        );
-                      }
-                      return null;
+                      return cardRenderer.renderCard(item, 0);
                     })}
                   </div>
                 ) : (
