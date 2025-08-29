@@ -9,10 +9,10 @@
 export interface BaseCardData {
   id: string;
   type: CardType;
-  slug?: string;
+  slug: string;
   createdAt: string;
-  updatedAt?: string;
-  views?: number;
+  updatedAt: string;
+  views: number;
   showOwnership: boolean;
 }
 
@@ -68,9 +68,9 @@ export interface NormalizedJobData extends BaseCardData {
   status: "active" | "paused" | "closed" | "draft";
   privacy: "public" | "private";
   summary: string;
-  applications?: number;
+  applications: number;
   expiresAt?: string;
-  userId?: string;
+  userId: string;
   companyId?: string;
   ownership: "owned" | "tracked";
 }
@@ -85,9 +85,9 @@ export interface NormalizedCompanyData extends BaseCardData {
   location: string;
   status: "active" | "onboarding" | "draft" | "paused" | "inactive";
   visibility: "public" | "private";
-  followers?: number;
-  jobCount?: number;
-  activeJobCount?: number;
+  followers: number;
+  jobCount: number;
+  activeJobCount: number;
   userId?: string;
   teamMembers?: string[];
   onboardingProgress?: number;
@@ -100,15 +100,15 @@ export interface NormalizedPersonData extends BaseCardData {
   lastName: string;
   fullName: string;
   avatar?: string;
-  headline?: string;
-  location?: string;
-  role?: string;
+  headline: string;
+  location: string;
+  role: string;
   visibility: "public" | "private";
   status: "active" | "inactive";
   companyId?: string;
   companyName?: string;
-  lastActiveAt?: string;
-  profileViews?: number;
+  lastActiveAt: string;
+  profileViews: number;
   connectionCount?: number;
   followerCount?: number;
   isVerified?: boolean;

@@ -39,14 +39,15 @@ export function normalizeJobData(
     privacy: (jobData as any)?.privacy || (item as any)?.privacy || "public",
     summary: (jobData as any)?.summary || (item as any)?.summary || "",
     createdAt: (jobData as any)?.createdAt || (jobData as any)?.postedDate || (item as any)?.createdAt || new Date().toISOString(),
+    updatedAt: (jobData as any)?.updatedAt || (item as any)?.updatedAt || new Date().toISOString(),
     views: jobData.views || item.views || 0,
     applications: (jobData as any)?.applications || (item as any)?.applications || 0,
     ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
-    userId: (jobData as any)?.userId || (item as any)?.userId,
+    userId: (jobData as any)?.userId || (item as any)?.userId || "unknown",
     companyId: (jobData as any)?.companyId || (item as any)?.companyId,
     expiresAt: (jobData as any)?.expiresAt || (item as any)?.expiresAt,
-    slug: (jobData as any)?.slug || (item as any)?.slug
+    slug: (jobData as any)?.slug || (item as any)?.slug || `job-${item.id}`
   };
 }
 
@@ -69,16 +70,18 @@ export function normalizeCompanyData(
     status: item.status || "active",
     visibility: item.visibility || item.privacy || "public",
     createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
     followers: item.followers || 0,
     jobCount: item.jobCount || 0,
+    activeJobCount: item.activeJobCount || 0,
     activeJobCount: item.activeJobCount || 0,
     ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
     userId: item.userId,
     teamMembers: item.teamMembers || [],
     onboardingProgress: item.onboardingProgress,
-    slug: item.slug
+    slug: item.slug || `company-${item.id}`
   };
 }
 
@@ -100,16 +103,17 @@ export function normalizePersonData(
     lastName,
     fullName,
     avatar: item.avatar || item.logo,
-    headline: item.headline || item.tagline || item.summary,
-    location: item.location,
-    role: item.role || item.profession,
+    headline: item.headline || item.tagline || item.summary || "Professional",
+    location: item.location || "Location not specified",
+    role: item.role || item.profession || "Professional",
     visibility: item.visibility || item.privacy || "public",
     status: item.status || "active",
     createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || item.profileViews || 0,
     companyId: item.companyId,
     companyName: item.companyName || item.company,
-    lastActiveAt: item.lastActiveAt,
+    lastActiveAt: item.lastActiveAt || new Date().toISOString(),
     profileViews: item.profileViews || item.views || 0,
     connectionCount: item.connectionCount || 0,
     followerCount: item.followerCount || 0,
@@ -121,7 +125,7 @@ export function normalizePersonData(
     currentCompany: item.currentCompany || item.company,
     ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked" | "connected",
     showOwnership: context.showOwnership || false,
-    slug: item.slug
+    slug: item.slug || `person-${item.id}`
   };
 }
 
@@ -140,13 +144,14 @@ export function normalizeResumeData(
     summary: item.summary || "",
     privacy: normalizeResumePrivacy(item, context),
     createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
     isMaster: item.isMaster,
     isActive: item.isActive,
     parentId: item.parentId,
-    ownership: determineOwnership(item, context),
+    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
-    slug: item.slug
+    slug: item.slug || `resume-${item.id}`
   };
 }
 
@@ -154,7 +159,8 @@ export function normalizeResumeData(
  * Normalize video data from various API formats
  */
 export function normalizeVideoData(
-  item: RawApiItem
+  item: RawApiItem,
+  context: CardContext
 ): NormalizedVideoData {
   return {
     id: item.id,
@@ -167,9 +173,10 @@ export function normalizeVideoData(
     profession: item.profession,
     company: item.company,
     createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
-    slug: item.slug,
-    ownership: determineOwnership(item, context),
+    slug: item.slug || `video-${item.id}`,
+    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false
   };
 }
