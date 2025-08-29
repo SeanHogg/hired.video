@@ -461,25 +461,27 @@ export default function Index() {
       switch (sortBy) {
         case "recent":
           // Sort by creation date (newest first)
-          const aDate = new Date(a.createdAt || a.postedDate || 0);
-          const bDate = new Date(b.createdAt || b.postedDate || 0);
+          const aDate = new Date((a as any).createdAt || (a as any).postedDate || 0);
+          const bDate = new Date((b as any).createdAt || (b as any).postedDate || 0);
           return bDate.getTime() - aDate.getTime();
 
         case "featured":
           // Sort by featured status first, then by views
-          if (a.isFeatured !== b.isFeatured) {
-            return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+          const aFeatured = (a as any).isFeatured || false;
+          const bFeatured = (b as any).isFeatured || false;
+          if (aFeatured !== bFeatured) {
+            return (bFeatured ? 1 : 0) - (aFeatured ? 1 : 0);
           }
-          return (b.views || 0) - (a.views || 0);
+          return ((b as any).views || 0) - ((a as any).views || 0);
 
         case "top":
           // Sort by views/popularity (highest first)
-          return (b.views || 0) - (a.views || 0);
+          return ((b as any).views || 0) - ((a as any).views || 0);
 
         case "latest":
           // Sort by latest activity/updates (newest first)
-          const aUpdate = new Date(a.updatedAt || a.createdAt || a.postedDate || 0);
-          const bUpdate = new Date(b.updatedAt || b.createdAt || b.postedDate || 0);
+          const aUpdate = new Date((a as any).updatedAt || (a as any).createdAt || (a as any).postedDate || 0);
+          const bUpdate = new Date((b as any).updatedAt || (b as any).createdAt || (b as any).postedDate || 0);
           return bUpdate.getTime() - aUpdate.getTime();
 
         default:
