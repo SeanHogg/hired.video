@@ -198,7 +198,7 @@ export default function ResumeCard({
         subtitle={title}
         avatar={{
           src: undefined, // Resumes don't typically have avatars
-          fallback: <FileText className="w-6 h-6" />,
+          fallback: "R",
           size: "md"
         }}
         badges={badges}

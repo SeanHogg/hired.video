@@ -122,9 +122,9 @@ export function CardHeaderWithAvatar({
                       className={cn("text-xs flex-shrink-0", badge.className)}
                     >
                       {badge.icon && (
-                        typeof badge.icon === 'function'
-                          ? badge.icon()
-                          : React.createElement(badge.icon, { className: "h-3 w-3 mr-1" })
+                        React.isValidElement(badge.icon)
+                          ? badge.icon
+                          : React.createElement(badge.icon as React.ComponentType<{ className?: string }>, { className: "h-3 w-3 mr-1" })
                       )}
                       {badge.text}
                     </Badge>

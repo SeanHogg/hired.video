@@ -154,7 +154,16 @@ export function useCardRenderer({
         return (
           <VideoCard
             key={normalizedData.id}
-            video={normalizedData}
+            id={normalizedData.id}
+            title={normalizedData.title}
+            description={normalizedData.description}
+            thumbnail={normalizedData.thumbnail || ""}
+            duration={normalizedData.duration}
+            views={normalizedData.views}
+            type={normalizedData.videoType}
+            profession={normalizedData.profession}
+            company={normalizedData.company}
+            createdAt={normalizedData.createdAt}
             onView={() => interactions.onView?.(normalizedData)}
             onActions={() => interactions.onActions?.(normalizedData)}
           />
@@ -242,7 +251,16 @@ export function renderCardItem(
       return (
         <VideoCard
           key={normalizedData.id}
-          video={normalizedData}
+          id={normalizedData.id}
+          title={normalizedData.title}
+          description={normalizedData.description}
+          thumbnail={normalizedData.thumbnail || ""}
+          duration={normalizedData.duration}
+          views={normalizedData.views}
+          type={normalizedData.videoType}
+          profession={normalizedData.profession}
+          company={normalizedData.company}
+          createdAt={normalizedData.createdAt}
           onView={() => interactions.onView?.(normalizedData)}
           onActions={() => interactions.onActions?.(normalizedData)}
         />

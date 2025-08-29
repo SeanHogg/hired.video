@@ -75,12 +75,11 @@ export function normalizeCompanyData(
     followers: item.followers || 0,
     jobCount: item.jobCount || 0,
     activeJobCount: item.activeJobCount || 0,
-    activeJobCount: item.activeJobCount || 0,
     ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
     showOwnership: context.showOwnership || false,
-    userId: item.userId,
+    userId: item.userId || "unknown",
     teamMembers: item.teamMembers || [],
-    onboardingProgress: item.onboardingProgress,
+    onboardingProgress: item.onboardingProgress || 0,
     slug: item.slug || `company-${item.id}`
   };
 }
@@ -143,6 +142,7 @@ export function normalizeResumeData(
     title: item.title,
     summary: item.summary || "",
     privacy: normalizeResumePrivacy(item, context),
+    status: (item.status as "active" | "draft" | "archived") || "active",
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
@@ -177,7 +177,9 @@ export function normalizeVideoData(
     views: item.views || 0,
     slug: item.slug || `video-${item.id}`,
     ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
-    showOwnership: context.showOwnership || false
+    showOwnership: context.showOwnership || false,
+    userId: item.userId,
+    status: (item.status as "active" | "draft" | "archived") || "active"
   };
 }
 

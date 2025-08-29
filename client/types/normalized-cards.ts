@@ -88,9 +88,9 @@ export interface NormalizedCompanyData extends BaseCardData {
   followers: number;
   jobCount: number;
   activeJobCount: number;
-  userId?: string;
+  userId: string;
   teamMembers?: string[];
-  onboardingProgress?: number;
+  onboardingProgress: number;
   ownership: "owned" | "tracked";
 }
 
@@ -109,11 +109,11 @@ export interface NormalizedPersonData extends BaseCardData {
   companyName?: string;
   lastActiveAt: string;
   profileViews: number;
-  connectionCount?: number;
-  followerCount?: number;
-  isVerified?: boolean;
-  isPremium?: boolean;
-  openToWork?: boolean;
+  connectionCount: number;
+  followerCount: number;
+  isVerified: boolean;
+  isPremium: boolean;
+  openToWork: boolean;
   experienceLevel?: "entry" | "mid" | "senior" | "executive";
   currentPosition?: string;
   currentCompany?: string;
@@ -127,6 +127,7 @@ export interface NormalizedResumeData extends BaseCardData {
   title?: string;
   summary: string;
   privacy: "public" | "recruiter_only" | "private" | "draft";
+  status?: "active" | "draft" | "archived";
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string | null;
@@ -144,6 +145,8 @@ export interface NormalizedVideoData extends BaseCardData {
   profession?: string;
   company?: string;
   ownership: "owned" | "tracked";
+  userId?: string;
+  status?: "active" | "draft" | "archived";
 }
 
 // Union type for all normalized card data

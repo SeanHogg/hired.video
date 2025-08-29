@@ -285,7 +285,7 @@ export default function Index() {
               };
             case "resume":
               // Filter out DRAFT resumes - they should not be visible
-              if (item.privacy === "draft") {
+              if ((item as any).privacy === "draft") {
                 return null;
               }
               return {
@@ -301,7 +301,7 @@ export default function Index() {
                 company: "Independent", // TODO: Get from resume data
                 createdAt: item.createdAt || new Date().toISOString(),
                 ownerId: item.id, // TODO: Get actual owner ID
-                privacy: item.privacy || "public"
+                privacy: (item as any).privacy || "public"
               };
             case "job":
               return {
@@ -310,7 +310,7 @@ export default function Index() {
                 name: item.title,
                 summary: `${item.title} at ${item.company || "Unknown Company"}`,
                 views: item.views || 0,
-                applications: item.applications || 0,
+                applications: (item as any).applications || 0,
                 type: "job" as const,
                 contentType: "job" as const,
                 profession: item.title,
@@ -345,8 +345,8 @@ export default function Index() {
   const userContext = user ? createUserContext({
     userId: user.id,
     role: user.role || "regular_user",
-    accountId: user.accountId,
-    permissions: user.permissions || []
+    accountId: (user as any).accountId,
+    permissions: (user as any).permissions || []
   }) : getDefaultUserContext();
 
   // Create card renderers for different sections with user context
@@ -435,9 +435,9 @@ export default function Index() {
     const searchQuery = searchFilters.search || "";
     const matchesCategory =
       selectedCategory === "all" ||
-      (selectedCategory === "job_description" && item.type === "job_listing") ||
+      (selectedCategory === "job_description" && item.type === "job") ||
       (selectedCategory === "people" && item.type === "resume") ||
-      (selectedCategory === "companies" && item.type === "companies") || // Fixed company filtering
+      (selectedCategory === "companies" && item.type === "company") || // Fixed company filtering
       item.type === selectedCategory;
     const matchesSearch =
       searchQuery === "" ||
@@ -688,15 +688,15 @@ export default function Index() {
                                 className="w-12 h-12 rounded-full object-cover"
                               />
                             )}
-                            {item.type === "companies" && item.logo && (
+                            {item.type === "company" && (item as any).logo && (
                               <img
-                                src={item.logo}
-                                alt={item.name}
+                                src={(item as any).logo}
+                                alt={(item as any).name}
                                 className="w-12 h-12 rounded-lg object-cover"
                               />
                             )}
                             {(item.type === "resume" ||
-                              item.type === "job_listing") && (
+                              item.type === "job") && (
                               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                                 {item.type === "resume" ? (
                                   <User className="w-6 h-6 text-primary" />
@@ -725,12 +725,12 @@ export default function Index() {
                                 onClick={() => {
                                   if (item.type === "people")
                                     navigate(`/people/${item.id}`);
-                                  else if (item.type === "companies")
-                                    navigate(`/companies/view/${item.id}`);
+                                  else if (item.type === "company")
+                                    navigate(`/companies/view/${(item as any).id}`);
                                   else if (item.type === "resume")
                                     navigate(`/resumes/${item.id}`);
-                                  else if (item.type === "job_listing")
-                                    navigate(`/jobs/${item.id}`);
+                                  else if (item.type === "job")
+                                    navigate(`/jobs/${(item as any).id}`);
                                 }}
                               >
                                 View
