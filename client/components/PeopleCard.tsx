@@ -26,17 +26,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
 import type {
   UserMetadata,
   UserWithOwnership,
   ConnectionStatus,
 } from "@/types/people";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 
 interface PeopleCardProps {
   person: UserMetadata | UserWithOwnership;
   connectionStatus?: ConnectionStatus;
   showOwnership?: boolean;
+  actions?: DynamicCardAction[];
+  userContext?: UserContext;
+  itemOwnership?: ItemOwnership;
   onTrack?: (_personId: string) => void;
   onUntrack?: (_personId: string) => void;
   onConnect?: (_personId: string) => void;
@@ -51,6 +57,9 @@ export default function PeopleCard({
   person,
   connectionStatus = "none",
   showOwnership = false,
+  actions,
+  userContext: _userContext, // eslint-disable-line no-unused-vars
+  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
   onTrack,
   onUntrack,
   onConnect,
@@ -125,6 +134,36 @@ export default function PeopleCard({
   const lastInitial = ((person.lastName?.[0]) ?? displayFullName?.trim()?.split(" ").slice(-1)[0]?.[0] ?? "")
     .toString()
     .toUpperCase();
+
+  // Use passed actions or fallback to default actions
+  const cardActions = actions && actions.length > 0 ? actions : [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline" as const,
+      icon: UserCheck,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/people/${person.id}`;
+        }
+      }
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      variant: "default" as const,
+      icon: MessageCircle,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          console.log("Actions clicked for person:", person.id);
+        }
+      }
+    }
+  ];
 
   return (
     <Card className="hover:shadow-lg transition-shadow relative">
@@ -265,39 +304,7 @@ export default function PeopleCard({
             </div>
           </div>
 
-          {/* View and Actions Buttons */}
-          <div className="flex items-center gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onView) {
-                  onView();
-                } else {
-                  // Fallback to direct navigation
-                  window.location.href = `/people/${person.id}`;
-                }
-              }}
-            >
-              View
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onActions) {
-                  onActions();
-                } else {
-                  // Fallback behavior - could show a simple menu or navigate to profile
-                  console.log("Actions clicked for person:", person.id);
-                }
-              }}
-            >
-              Actions
-            </Button>
-          </div>
+
 
           {/* Connection Actions (Secondary Row) */}
           {user && person.id !== user.id && (
@@ -389,6 +396,8 @@ export default function PeopleCard({
           )}
         </div>
       </CardContent>
+
+      <CardActions actions={cardActions} />
     </Card>
   );
 }

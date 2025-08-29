@@ -36,9 +36,21 @@ export function CardActions({
   layout = "space-between",
   gap = "md"
 }: CardActionsProps) {
-  if (actions.length === 0) {
-    return null;
-  }
+  // Always show action buttons - if no actions provided, show default actions
+  const defaultActions = [
+    {
+      label: "View",
+      variant: "outline" as const,
+      onClick: () => console.log("View clicked")
+    },
+    {
+      label: "Actions",
+      variant: "default" as const,
+      onClick: () => console.log("Actions clicked")
+    }
+  ];
+
+  const finalActions = actions.length > 0 ? actions : defaultActions;
 
   const layoutStyles = {
     horizontal: "flex items-center",
@@ -60,7 +72,7 @@ export function CardActions({
       gapStyles[gap],
       className
     )}>
-      {actions.map((action, index) => (
+      {finalActions.map((action, index) => (
         <Button
           key={index}
           variant={action.variant || "outline"}

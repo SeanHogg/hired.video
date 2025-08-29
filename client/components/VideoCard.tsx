@@ -2,6 +2,9 @@ import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CardActions } from "@/components/ui/CardActions";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 
 interface VideoCardProps {
   id: string;
@@ -14,6 +17,9 @@ interface VideoCardProps {
   profession?: string;
   company?: string;
   createdAt: string;
+  actions?: DynamicCardAction[];
+  userContext?: UserContext;
+  itemOwnership?: ItemOwnership;
   onView?: () => void;
   onActions?: () => void;
 }
@@ -28,6 +34,9 @@ export default function VideoCard({
   profession,
   company,
   createdAt,
+  actions,
+  userContext: _userContext, // eslint-disable-line no-unused-vars
+  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
   onView,
   onActions,
 }: VideoCardProps) {
@@ -50,6 +59,36 @@ export default function VideoCard({
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     return `${Math.floor(diffDays / 30)} months ago`;
   };
+
+  // Use passed actions or fallback to default actions
+  const cardActions = actions && actions.length > 0 ? actions : [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline" as const,
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          console.log("View video:", title);
+        }
+      }
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      variant: "default" as const,
+      icon: Play,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          console.log("Actions clicked for video:", title);
+        }
+      }
+    }
+  ];
 
   return (
     <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300 border-0 bg-card overflow-hidden">
@@ -141,33 +180,9 @@ export default function VideoCard({
           </div>
         </div>
 
-        {/* Actions Footer */}
-        <div className="p-4 flex items-center justify-between bg-background border-t border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onView?.();
-            }}
-            className="gap-2"
-          >
-            <Eye className="w-4 h-4" />
-            View
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onActions?.();
-            }}
-          >
-            Actions
-          </Button>
-        </div>
       </CardContent>
+
+      <CardActions actions={cardActions} />
     </Card>
   );
 }

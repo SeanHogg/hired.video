@@ -6,6 +6,7 @@
  */
 
 import * as React from "react";
+import { Eye } from "lucide-react";
 import JobCard from "@/components/JobCard";
 import CompanyCard from "@/components/CompanyCard";
 import PeopleCard from "@/components/PeopleCard";
@@ -116,10 +117,32 @@ export function useCardRenderer({
 
       case "people":
         normalizedData = normalizePersonData(item, context);
+        const peopleOwnership = determineItemOwnership(normalizedData, effectiveUserContext);
+        const peopleActions = [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => interactions.onView?.(normalizedData),
+            priority: 1
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            variant: "default" as const,
+            onClick: () => interactions.onActions?.(normalizedData),
+            priority: 2
+          }
+        ];
+
         return (
           <PeopleCard
             key={normalizedData.id}
             person={normalizedData}
+            actions={peopleActions}
+            userContext={effectiveUserContext}
+            itemOwnership={peopleOwnership}
             onView={() => interactions.onView?.(normalizedData)}
             onActions={() => interactions.onActions?.(normalizedData)}
             onTrack={interactions.onTrack}
@@ -151,6 +174,25 @@ export function useCardRenderer({
 
       case "video":
         normalizedData = normalizeVideoData(item, context);
+        const videoOwnership = determineItemOwnership(normalizedData, effectiveUserContext);
+        const videoActions = [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => interactions.onView?.(normalizedData),
+            priority: 1
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            variant: "default" as const,
+            onClick: () => interactions.onActions?.(normalizedData),
+            priority: 2
+          }
+        ];
+
         return (
           <VideoCard
             key={normalizedData.id}
@@ -164,6 +206,9 @@ export function useCardRenderer({
             profession={normalizedData.profession}
             company={normalizedData.company}
             createdAt={normalizedData.createdAt}
+            actions={videoActions}
+            userContext={effectiveUserContext}
+            itemOwnership={videoOwnership}
             onView={() => interactions.onView?.(normalizedData)}
             onActions={() => interactions.onActions?.(normalizedData)}
           />
