@@ -35,6 +35,8 @@ export const SearchResultItemSchema = z.object({
   size: z.string().optional(),
   isPublic: z.boolean().optional(),
   templateName: z.string().optional(),
+  updatedAt: z.string().optional(),
+  isFeatured: z.boolean().default(false).optional(),
 });
 
 export const SearchResponseSchema = z.object({
@@ -57,6 +59,9 @@ export const SearchFiltersSchema = z.object({
   experienceLevel: z.string().optional(),
   employmentType: z.string().optional(),
   datePosted: z.string().optional(),
+  sortBy: z
+    .enum(["recent", "featured", "top", "latest"])
+    .optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(20),
 });

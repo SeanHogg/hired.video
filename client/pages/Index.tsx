@@ -94,6 +94,7 @@ export default function Index() {
     limit: 20,
     experienceLevel: "all",
     datePosted: "all",
+    sortBy: "recent",
   });
   const {
     sidebarOpen,
@@ -428,30 +429,63 @@ export default function Index() {
       limit: 20,
       experienceLevel: "all",
       datePosted: "all",
+      sortBy: "recent",
     });
   };
 
-  const filteredItems = allContentItems.filter((item) => {
-    const searchQuery = searchFilters.search || "";
-    const matchesCategory =
-      selectedCategory === "all" ||
-      (selectedCategory === "job_description" && item.type === "job") ||
-      (selectedCategory === "people" && item.type === "resume") ||
-      (selectedCategory === "companies" && item.type === "company") || // Fixed company filtering
-      item.type === selectedCategory;
-    const matchesSearch =
-      searchQuery === "" ||
-      (item.title &&
-        item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.name &&
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.profession &&
-        item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.company &&
-        item.company.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredItems = allContentItems
+    .filter((item) => {
+      const searchQuery = searchFilters.search || "";
+      const matchesCategory =
+        selectedCategory === "all" ||
+        (selectedCategory === "job_description" && item.type === "job") ||
+        (selectedCategory === "people" && item.type === "resume") ||
+        (selectedCategory === "companies" && item.type === "company") || // Fixed company filtering
+        item.type === selectedCategory;
+      const matchesSearch =
+        searchQuery === "" ||
+        (item.title &&
+          item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.name &&
+          item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.profession &&
+          item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.company &&
+          item.company.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchesCategory && matchesSearch;
-  });
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      const sortBy = searchFilters.sortBy || "recent";
+
+      switch (sortBy) {
+        case "recent":
+          // Sort by creation date (newest first)
+          const aDate = new Date(a.createdAt || a.postedDate || 0);
+          const bDate = new Date(b.createdAt || b.postedDate || 0);
+          return bDate.getTime() - aDate.getTime();
+
+        case "featured":
+          // Sort by featured status first, then by views
+          if (a.isFeatured !== b.isFeatured) {
+            return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+          }
+          return (b.views || 0) - (a.views || 0);
+
+        case "top":
+          // Sort by views/popularity (highest first)
+          return (b.views || 0) - (a.views || 0);
+
+        case "latest":
+          // Sort by latest activity/updates (newest first)
+          const aUpdate = new Date(a.updatedAt || a.createdAt || a.postedDate || 0);
+          const bUpdate = new Date(b.updatedAt || b.createdAt || b.postedDate || 0);
+          return bUpdate.getTime() - aUpdate.getTime();
+
+        default:
+          return 0;
+      }
+    });
 
   // Pagination logic
   const {
@@ -561,58 +595,35 @@ export default function Index() {
                   </Button>
                 ))}
               </div>
+
+              {/* Sort Filters */}
+              <div className="flex gap-2 justify-center md:justify-start flex-wrap">
+                <span className="text-sm text-muted-foreground self-center mr-2">Sort by:</span>
+                {[
+                  { id: "recent", label: "Recent", icon: Clock },
+                  { id: "featured", label: "Featured", icon: Sparkles },
+                  { id: "top", label: "Top", icon: TrendingUp },
+                  { id: "latest", label: "Latest", icon: Clock },
+                ].map((sortOption) => (
+                  <Button
+                    key={sortOption.id}
+                    variant={
+                      searchFilters.sortBy === sortOption.id ? "default" : "outline"
+                    }
+                    size="sm"
+                    onClick={() => setSearchFilters(prev => ({ ...prev, sortBy: sortOption.id as "recent" | "featured" | "top" | "latest" }))}
+                    className="gap-2"
+                  >
+                    <sortOption.icon className="w-4 h-4" />
+                    {sortOption.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Content Sections with Progressive Loading */}
-        <section className="py-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto space-y-12">
-            {/* Recent Jobs Section */}
-            <ContentSection
-              title="Recent Jobs"
-              items={searchResults?.items.filter((item) => item.type === "job") || []}
-              renderItem={recentSectionRenderer}
-              isLoading={isLoadingContent}
-              error={contentError}
-              emptyMessage="No jobs found"
-              onRetry={loadContent}
-            />
 
-            {/* Featured Companies Section */}
-            <ContentSection
-              title="Featured Companies"
-              items={searchResults?.items.filter((item) => item.type === "company") || []}
-              renderItem={featuredSectionRenderer}
-              isLoading={isLoadingContent}
-              error={contentError}
-              emptyMessage="No companies found"
-              onRetry={loadContent}
-            />
-
-            {/* Top People Section */}
-            <ContentSection
-              title="Top People"
-              items={searchResults?.items.filter((item) => item.type === "people") || []}
-              renderItem={topSectionRenderer}
-              isLoading={isLoadingContent}
-              error={contentError}
-              emptyMessage="No people found"
-              onRetry={loadContent}
-            />
-
-            {/* Latest Resumes Section */}
-            <ContentSection
-              title="Latest Resumes"
-              items={searchResults?.items.filter((item) => item.type === "resume") || []}
-              renderItem={latestSectionRenderer}
-              isLoading={isLoadingContent}
-              error={contentError}
-              emptyMessage="No resumes found"
-              onRetry={loadContent}
-            />
-          </div>
-        </section>
 
         {/* Video Grid */}
         <section className="py-8 px-4 sm:px-6 lg:px-8">
@@ -622,8 +633,12 @@ export default function Index() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-foreground mb-2">
+                    {searchFilters.sortBy === "recent" && "Recent "}
+                    {searchFilters.sortBy === "featured" && "Featured "}
+                    {searchFilters.sortBy === "top" && "Top "}
+                    {searchFilters.sortBy === "latest" && "Latest "}
                     {selectedCategory === "all"
-                      ? "All"
+                      ? "Content"
                       : selectedCategory === "people"
                         ? "People"
                         : selectedCategory === "companies"
@@ -635,6 +650,7 @@ export default function Index() {
                   <p className="text-muted-foreground">
                     {filteredItems.length} items found
                     {searchFilters.search && ` for "${searchFilters.search}"`}
+                    {searchFilters.sortBy && ` sorted by ${searchFilters.sortBy}`}
                     {filteredItems.length > itemsPerPage &&
                       ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`}
                   </p>
