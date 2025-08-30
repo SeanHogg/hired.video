@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
-import { 
-  Building2, 
-  Users, 
-  Heart, 
-  Zap, 
-  Globe, 
+import {
+  Building2,
+  Users,
+  Heart,
+  Zap,
+  Globe,
   Award,
   Coffee,
   Gamepad2,
   GraduationCap,
-  Plane
+  Plane,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,134 @@ export default function Careers() {
     if (metaDescription) {
       metaDescription.setAttribute('content', 'Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.');
     }
+
+    // Add additional SEO meta tags
+    const addMetaTag = (name: string, content: string, property = false) => {
+      const attribute = property ? 'property' : 'name';
+      let meta = document.querySelector(`meta[${attribute}="${name}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute(attribute, name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
+
+    // Open Graph tags
+    addMetaTag('og:title', 'Careers - Join Our Team | MyVideoResu.me', true);
+    addMetaTag('og:description', 'Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.', true);
+    addMetaTag('og:url', 'https://myvideoresume.com/careers', true);
+    addMetaTag('og:type', 'website', true);
+    addMetaTag('og:image', 'https://myvideoresume.com/og-careers.jpg', true);
+
+    // Twitter Card tags
+    addMetaTag('twitter:card', 'summary_large_image');
+    addMetaTag('twitter:title', 'Careers - Join Our Team | MyVideoResu.me');
+    addMetaTag('twitter:description', 'Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions.');
+    addMetaTag('twitter:image', 'https://myvideoresume.com/og-careers.jpg');
+
+    // Additional SEO tags
+    addMetaTag('keywords', 'careers, jobs, MyVideoResu.me, software engineer, product designer, devops, remote work, tech jobs');
+    addMetaTag('robots', 'index, follow');
+    addMetaTag('canonical', 'https://myvideoresume.com/careers');
+
+    // Add structured data for Organization and FAQ
+    const structuredData = [
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "MyVideoResu.me",
+        "url": "https://myvideoresume.com",
+        "logo": "https://myvideoresume.com/favicon.svg",
+        "description": "Revolutionary video resume platform helping job seekers showcase their talents",
+        "foundingDate": "2024",
+        "numberOfEmployees": "50+",
+        "industry": "Technology",
+        "address": {
+          "@type": "PostalAddress",
+          "addressCountry": "US"
+        },
+        "sameAs": [
+          "https://linkedin.com/company/myvideoresume",
+          "https://twitter.com/myvideoresume"
+        ],
+        "jobPosting": {
+          "@type": "JobPosting",
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": "MyVideoResu.me"
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "addressCountry": "US"
+            }
+          },
+          "employmentType": "FULL_TIME",
+          "workHours": "Flexible",
+          "benefits": "Health insurance, equity, unlimited PTO, remote work"
+        }
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Is MyVideoResu.me fully remote?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What benefits do you offer?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "We offer comprehensive health insurance, equity packages, unlimited PTO, learning budgets, wellness stipends, and flexible working hours."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How long is the hiring process?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Our hiring process typically takes 2-3 weeks from application to offer. We believe in being efficient while ensuring a great fit for both sides."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do you sponsor work visas?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, we sponsor work visas for exceptional candidates. We're committed to building a diverse, global team and will work with you on visa requirements."
+            }
+          }
+        ]
+      }
+    ];
+
+    // Remove existing structured data
+    const existingScript = document.querySelector('script[type="application/ld+json"]');
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    // Add new structured data
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify(structuredData);
+    document.head.appendChild(script);
+
+    // Cleanup on unmount
+    return () => {
+      const scriptToRemove = document.querySelector('script[type="application/ld+json"]');
+      if (scriptToRemove) {
+        scriptToRemove.remove();
+      }
+    };
   }, []);
 
   return (
@@ -36,14 +165,29 @@ export default function Careers() {
         <Navigation />
         
         <main className="container mx-auto px-4 py-8">
+          {/* Breadcrumb Navigation */}
+          <nav aria-label="Breadcrumb" className="mb-6">
+            <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <li>
+                <a href="/" className="hover:text-foreground transition-colors">Home</a>
+              </li>
+              <li>
+                <ChevronRight className="h-4 w-4" />
+              </li>
+              <li className="text-foreground font-medium" aria-current="page">
+                Careers
+              </li>
+            </ol>
+          </nav>
+
           {/* Hero Section */}
-          <div className="text-center mb-12">
+          <section className="text-center mb-12" aria-labelledby="hero-heading">
             <div className="inline-flex items-center gap-2 bg-brand-purple/10 text-brand-purple px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Building2 className="h-4 w-4" />
               We're Hiring!
             </div>
             
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
+            <h1 id="hero-heading" className="text-4xl md:text-5xl font-bold mb-6">
               Join Our Mission to{' '}
               <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
                 Revolutionize Careers
@@ -63,13 +207,13 @@ export default function Careers() {
                 <a href="#company-culture">Learn About Our Culture</a>
               </Button>
             </div>
-          </div>
+          </section>
 
           {/* Company Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12" aria-labelledby="company-stats">
             <Card className="text-center">
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-brand-purple mb-2">50+</div>
+                <div className="text-3xl font-bold text-brand-purple mb-2" aria-label="50 plus team members">50+</div>
                 <div className="text-sm text-muted-foreground">Team Members</div>
               </CardContent>
             </Card>
@@ -301,13 +445,69 @@ export default function Careers() {
             </Card>
           </section>
 
+          {/* FAQ Section */}
+          <section className="mb-12">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
+              <p className="text-lg text-muted-foreground">
+                Get answers to common questions about working at MyVideoResu.me.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Is MyVideoResu.me fully remote?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">What benefits do you offer?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    We offer comprehensive health insurance, equity packages, unlimited PTO, learning budgets, wellness stipends, and flexible working hours.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">How long is the hiring process?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Our hiring process typically takes 2-3 weeks from application to offer. We believe in being efficient while ensuring a great fit for both sides.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Do you sponsor work visas?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Yes, we sponsor work visas for exceptional candidates. We're committed to building a diverse, global team and will work with you on visa requirements.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
           {/* Call to Action */}
           <section className="text-center">
             <Card className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border-brand-purple/20">
               <CardContent className="pt-8 pb-8">
                 <h2 className="text-2xl font-bold mb-4">Don't See the Perfect Role?</h2>
                 <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                  We're always looking for talented individuals who share our passion for innovation. 
+                  We're always looking for talented individuals who share our passion for innovation.
                   Send us your resume and let us know how you'd like to contribute to our mission.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
