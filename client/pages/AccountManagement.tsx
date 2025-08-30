@@ -528,10 +528,10 @@ export default function AccountManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
-                  Team Management
+                  Account Management
                 </h1>
                 <p className="text-gray-600 mt-2">
-                  Manage your team members, invitations, and analytics
+                  Manage your team members, invitations, and account analytics
                 </p>
               </div>
               {canManage && activeTab === "users" && (

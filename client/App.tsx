@@ -16,6 +16,7 @@ import { performanceMonitor } from "@/lib/performance";
 import AIChatPanel from "./components/AIChatPanel";
 import FloatingAIButton from "./components/FloatingAIButton";
 import About from "./pages/About";
+import Careers from "./pages/Careers";
 import Checkout from "./pages/Checkout";
 import Companies from "./pages/Companies";
 import CompanyCreatePage from "./pages/CompanyCreatePage";
@@ -161,6 +162,7 @@ const App = () => (
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/for-recruiters" element={<ForRecruiters />} />
                   <Route path="/about" element={<About />} />
+                  <Route path="/careers" element={<Careers />} />
                   <Route path="/resumes" element={<Resumes />} />
                   <Route
                     path="/resumes/upload"

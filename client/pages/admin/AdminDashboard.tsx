@@ -15,7 +15,7 @@ import {
   Calendar,
   AlertCircle
 } from 'lucide-react';
-import { TeamManagement } from '@/components/team/TeamManagement';
+
 import { BillingManagement } from '@/components/billing/BillingManagement';
 import { BillingAnalytics } from '@/components/billing/BillingAnalytics';
 import { usePermissions, PermissionGate, RoleGate } from '@/hooks/use-permissions';
@@ -276,7 +276,19 @@ export default function AdminDashboard() {
 
         <PermissionGate resource="team_members" action="read">
           <TabsContent value="team">
-            <TeamManagement />
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Team management features have been moved to the dedicated Account Management page.
+                </p>
+                <Button asChild>
+                  <a href="/account">Go to Account Management</a>
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </PermissionGate>
 
