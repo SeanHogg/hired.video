@@ -18,8 +18,7 @@ import {
   Download,
   Share,
   ExternalLink,
-  Trash2,
-  AlertTriangle,
+
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -49,15 +48,6 @@ import {
 } from "@/components/ui/select";
 
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -72,9 +62,6 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
   const { user, isAuthenticated, refreshUser, logout } = useAuth();
 
   // Ensure we have fresh user data only on /profile
@@ -177,39 +164,7 @@ export default function Profile() {
     setIsEditing(false);
   };
 
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== "DELETE") {
-      return;
-    }
 
-    try {
-      setIsDeleting(true);
-      const response = await fetch("/api/account", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.ok) {
-        // Account deleted successfully - logout and redirect
-        await logout();
-        window.location.href = "/login?message=account-deleted";
-      } else {
-        const error = await response.json();
-        console.error("Failed to delete account:", error);
-        alert("Failed to delete account. Please try again or contact support.");
-      }
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      alert("An error occurred while deleting your account. Please try again.");
-    } finally {
-      setIsDeleting(false);
-      setDeleteDialogOpen(false);
-      setDeleteConfirmText("");
-    }
-  };
 
   // If user is not authenticated, redirect to login
   if (!isAuthenticated || !user) {
@@ -692,105 +647,8 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* Account Deletion Section */}
-            <Card className="border-destructive/20">
-              <CardHeader>
-                <CardTitle className="text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Delete Account
-                </CardTitle>
-                <CardDescription>
-                  Permanently delete your account and all associated data. This
-                  action cannot be undone.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                  <h4 className="font-medium text-destructive mb-2">
-                    Before you delete your account:
-                  </h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Download your resume and any important documents</li>
-                    <li>• This action is permanent and cannot be reversed</li>
-                    <li>• Your profile and all content will be removed</li>
-                    <li>• You will be immediately logged out</li>
-                  </ul>
-                </div>
 
-                <Dialog
-                  open={deleteDialogOpen}
-                  onOpenChange={setDeleteDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" className="w-full">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete My Account
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="text-destructive">
-                        Delete Account
-                      </DialogTitle>
-                      <DialogDescription>
-                        This action is permanent and cannot be undone. Your
-                        account and all associated data will be permanently
-                        deleted.
-                      </DialogDescription>
-                    </DialogHeader>
 
-                    <div className="space-y-4">
-                      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                        <p className="text-sm font-medium text-destructive mb-2">
-                          What happens when you delete your account:
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>• Your profile will be permanently removed</li>
-                          <li>
-                            • All your resumes and documents will be deleted
-                          </li>
-                          <li>• You will lose access to all your data</li>
-                          <li>• This action cannot be reversed</li>
-                        </ul>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="delete-confirm">
-                          Type <strong>DELETE</strong> to confirm:
-                        </Label>
-                        <Input
-                          id="delete-confirm"
-                          value={deleteConfirmText}
-                          onChange={(e) => setDeleteConfirmText(e.target.value)}
-                          placeholder="Type DELETE to confirm"
-                          className="mt-2"
-                        />
-                      </div>
-                    </div>
-
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setDeleteDialogOpen(false);
-                          setDeleteConfirmText("");
-                        }}
-                        disabled={isDeleting}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDeleteAccount}
-                        disabled={deleteConfirmText !== "DELETE" || isDeleting}
-                      >
-                        {isDeleting ? "Deleting..." : "Delete Account"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </CardContent>
-            </Card>
 
             <ShareModal
               open={shareOpen}

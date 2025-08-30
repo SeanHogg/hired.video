@@ -10,6 +10,10 @@ import {
   AccountSwitchContext,
   AccountOption,
   MyVideoResumeRole,
+  BulkInviteUsersRequest,
+  BulkInviteUsersResponse,
+  InvitationDetailsResponse,
+  AcceptInvitationResponse,
 } from "@/types/account";
 import { apiClient } from "@/lib/api-client";
 
@@ -69,17 +73,7 @@ class AccountService {
     }
   }
 
-  /**
-   * Resend invitation to a user
-   */
-  async resendInvitation(userId: string): Promise<void> {
-    try {
-      await apiClient.post("/api/account/invite/resend", { userId });
-    } catch (error) {
-      console.error("Error resending invitation:", error);
-      throw error;
-    }
-  }
+
 
   /**
    * Get available accounts for the current user (for account switching)
@@ -134,25 +128,31 @@ class AccountService {
   }
 
   /**
-   * Accept an invitation to join an account
+   * Get invitation details
    */
-  async acceptInvitation(inviteId: string): Promise<void> {
+  async getInvitationDetails(invitationId: string): Promise<InvitationDetailsResponse> {
     try {
-      await apiClient.post("/api/account/invite/accept", { inviteId });
+      const response = await apiClient.get<InvitationDetailsResponse>(
+        `/api/account/invitation/${invitationId}`,
+      );
+      return response.data;
     } catch (error) {
-      console.error("Error accepting invitation:", error);
+      console.error("Error fetching invitation details:", error);
       throw error;
     }
   }
 
   /**
-   * Reject an invitation to join an account
+   * Accept an invitation to join an account
    */
-  async rejectInvitation(inviteId: string): Promise<void> {
+  async acceptInvitation(invitationId: string): Promise<AcceptInvitationResponse> {
     try {
-      await apiClient.post("/api/account/invite/reject", { inviteId });
+      const response = await apiClient.post<AcceptInvitationResponse>(
+        `/api/account/accept-invitation/${invitationId}`,
+      );
+      return response.data;
     } catch (error) {
-      console.error("Error rejecting invitation:", error);
+      console.error("Error accepting invitation:", error);
       throw error;
     }
   }
@@ -207,6 +207,59 @@ class AccountService {
       return response.data;
     } catch (error) {
       console.error("Error fetching account analytics:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send bulk invitations to multiple users
+   */
+  async bulkInviteUsers(request: BulkInviteUsersRequest): Promise<BulkInviteUsersResponse> {
+    try {
+      const response = await apiClient.post<BulkInviteUsersResponse>(
+        "/api/account/bulk-invite",
+        request,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error sending bulk invitations:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resend an invitation
+   */
+  async resendInvitation(invitationId: string): Promise<void> {
+    try {
+      await apiClient.post(`/api/account/invitation/${invitationId}/resend`);
+    } catch (error) {
+      console.error("Error resending invitation:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel an invitation
+   */
+  async cancelInvitation(invitationId: string): Promise<void> {
+    try {
+      await apiClient.post(`/api/account/invitation/${invitationId}/cancel`);
+    } catch (error) {
+      console.error("Error canceling invitation:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get invitation analytics
+   */
+  async getInvitationAnalytics(): Promise<any> {
+    try {
+      const response = await apiClient.get("/api/account/invitation-analytics");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching invitation analytics:", error);
       throw error;
     }
   }

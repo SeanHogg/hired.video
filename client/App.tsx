@@ -65,6 +65,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import SignupSuccess from "./pages/SignupSuccess";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import EmbeddedResume from "./pages/EmbeddedResume";
 
 // Create a client with production-ready configuration
@@ -145,6 +146,7 @@ const App = () => (
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/confirm-email" element={<ConfirmEmail />} />
+                  <Route path="/accept-invitation" element={<AcceptInvitation />} />
                   <Route
                     path="/persona-selection"
                     element={<PersonaSelection />}

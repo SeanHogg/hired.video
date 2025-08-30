@@ -105,6 +105,58 @@ export interface InviteUserResponse {
   inviteId?: string;
 }
 
+export interface AcceptInvitationResponse {
+  success: boolean;
+  message: string;
+  companyName: string;
+  assignedRoles: MyVideoResumeRole[];
+  requiredRegistration: boolean;
+  redirectUrl?: string;
+}
+
+export interface InvitationDetailsResponse {
+  invitationId: string;
+  companyName: string;
+  companyDescription?: string;
+  companyLogoUrl?: string;
+  inviterName: string;
+  invitedEmail: string;
+  rolesToAssign: MyVideoResumeRole[];
+  invitedAt: string;
+  userExists: boolean;
+  personalMessage?: string;
+}
+
+export interface BulkInviteUsersRequest {
+  users: BulkInviteUserItem[];
+  defaultRoles: MyVideoResumeRole[];
+  defaultMessage?: string;
+}
+
+export interface BulkInviteUserItem {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  roles?: MyVideoResumeRole[];
+  message?: string;
+}
+
+export interface BulkInviteUsersResponse {
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  successfulInvitations: BulkInviteResult[];
+  failedInvitations: BulkInviteResult[];
+  message: string;
+}
+
+export interface BulkInviteResult {
+  email: string;
+  success: boolean;
+  message: string;
+  invitationId?: string;
+}
+
 export interface UpdateUserRolesRequest {
   userId: string;
   roles: MyVideoResumeRole[];

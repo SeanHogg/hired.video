@@ -30,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -53,8 +54,10 @@ import {
   canEditRoles,
 } from "@/types/account";
 import { InviteUserModal } from "@/components/account/InviteUserModal";
+import { BulkInviteModal } from "@/components/account/BulkInviteModal";
+import { InvitationManagement } from "@/components/account/InvitationManagement";
+import { InvitationAnalytics } from "@/components/account/InvitationAnalytics";
 import { EditRolesModal } from "@/components/account/EditRolesModal";
-import { AccountSettings } from "@/components/account/AccountSettings";
 import { AccountAnalytics } from "@/components/account/AccountAnalytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -64,8 +67,8 @@ export default function AccountManagement() {
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AccountUser | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [bulkInviteModalOpen, setBulkInviteModalOpen] = useState(false);
   const [editRolesModalOpen, setEditRolesModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("users");
   const { toast } = useToast();
   const {
     sidebarOpen,
@@ -76,6 +79,10 @@ export default function AccountManagement() {
   } = useSidebar();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
+  // Check if user is a job seeker (should see personal account page instead of team management)
+  const isJobSeeker = user?.role === "job_seeker";
+  const [activeTab, setActiveTab] = useState("users");
+
   // Mock current user roles for demo - in real app this would come from auth context
   const currentUserRoles = [MyVideoResumeRole.AccountOwner];
 
@@ -84,6 +91,8 @@ export default function AccountManagement() {
       loadAccountUsers();
     }
   }, [isAuthenticated, authLoading]);
+
+
 
   const loadAccountUsers = async () => {
     try {
@@ -122,6 +131,28 @@ export default function AccountManagement() {
         description: errorMessage,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleBulkInvite = async (bulkData: any) => {
+    try {
+      const result = await accountService.bulkInviteUsers(bulkData);
+      toast({
+        title: "Bulk Invitation Complete",
+        description: `${result.successCount} successful, ${result.failureCount} failed out of ${result.totalProcessed} total`,
+      });
+      setBulkInviteModalOpen(false);
+      loadAccountUsers(); // Refresh the list
+      return result;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to send bulk invitations";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw err;
     }
   };
 
@@ -210,17 +241,7 @@ export default function AccountManagement() {
     }
   };
 
-  const handleSaveSettings = async (settings: any) => {
-    try {
-      await accountService.updateAccountSettings(settings);
-      toast({
-        title: "Settings saved",
-        description: "Account settings have been updated successfully.",
-      });
-    } catch (error) {
-      throw new Error("Failed to save settings");
-    }
-  };
+
 
   const handleExportAnalytics = (format: "csv" | "pdf") => {
     // In a real app, this would generate and download the export
@@ -263,6 +284,14 @@ export default function AccountManagement() {
         </div>
       </div>
     );
+  }
+
+
+
+  // Redirect job seekers to settings page instead of showing account management
+  if (isAuthenticated && user && isJobSeeker) {
+    window.location.href = '/settings';
+    return null;
   }
 
   // If user is not authenticated, show marketing page
@@ -499,10 +528,10 @@ export default function AccountManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
-                  Account Management
+                  Team Management
                 </h1>
                 <p className="text-gray-600 mt-2">
-                  Manage your team members and account settings
+                  Manage your team members, invitations, and analytics
                 </p>
               </div>
               {canManage && activeTab === "users" && (
@@ -520,7 +549,7 @@ export default function AccountManagement() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList>
                 <TabsTrigger value="users">Team Members</TabsTrigger>
-                <TabsTrigger value="settings">Account Settings</TabsTrigger>
+                <TabsTrigger value="invitations">Invitation Analytics</TabsTrigger>
                 <TabsTrigger value="analytics">Analytics</TabsTrigger>
               </TabsList>
 
@@ -537,147 +566,18 @@ export default function AccountManagement() {
                   </Card>
                 )}
 
-                {/* Users List */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Team Members ({users.length})
-                    </CardTitle>
-                    <CardDescription>
-                      Manage your account users, their roles, and permissions
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {users.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No team members found</p>
-                        {canManage && (
-                          <Button
-                            variant="outline"
-                            className="mt-4"
-                            onClick={() => setInviteModalOpen(true)}
-                          >
-                            Invite your first team member
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {users.map((user) => (
-                          <div
-                            key={user.id}
-                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                          >
-                            <div className="flex items-center gap-4">
-                              <Avatar>
-                                <AvatarImage
-                                  src={user.userProfile?.avatarUrl}
-                                />
-                                <AvatarFallback>
-                                  {user.userProfile?.firstName?.[0]}
-                                  {user.userProfile?.lastName?.[0]}
-                                </AvatarFallback>
-                              </Avatar>
+                {/* Invitation Management */}
+                <InvitationManagement
+                  users={users}
+                  onRefresh={loadAccountUsers}
+                  onInviteUser={() => setInviteModalOpen(true)}
+                  onBulkInvite={() => setBulkInviteModalOpen(true)}
+                />
 
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-medium">
-                                    {user.userProfile?.firstName}{" "}
-                                    {user.userProfile?.lastName}
-                                  </h3>
-                                  <Badge
-                                    variant="secondary"
-                                    className={getInviteStatusColor(
-                                      user.inviteStatus,
-                                    )}
-                                  >
-                                    {getStatusIcon(user.inviteStatus)}
-                                    <span className="ml-1">
-                                      {getInviteStatusDisplayName(
-                                        user.inviteStatus,
-                                      )}
-                                    </span>
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-gray-600">
-                                  {user.userProfile?.email}
-                                </p>
-                                <div className="flex gap-1 mt-1">
-                                  {user.rolesAssigned?.map((role) => (
-                                    <Badge
-                                      key={role}
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {getRoleDisplayName(role)}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            {canManage &&
-                              user.inviteStatus !== InviteStatus.Owner && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    {canEditRoles(
-                                      currentUserRoles,
-                                      user.rolesAssigned || [],
-                                    ) && (
-                                      <DropdownMenuItem
-                                        onClick={() => {
-                                          setSelectedUser(user);
-                                          setEditRolesModalOpen(true);
-                                        }}
-                                      >
-                                        <Shield className="h-4 w-4 mr-2" />
-                                        Edit Roles
-                                      </DropdownMenuItem>
-                                    )}
-                                    {user.inviteStatus ===
-                                      InviteStatus.Invited && (
-                                      <DropdownMenuItem
-                                        onClick={() =>
-                                          handleResendInvitation(user.userId)
-                                        }
-                                      >
-                                        <Mail className="h-4 w-4 mr-2" />
-                                        Resend Invitation
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        handleRemoveUser(user.userId)
-                                      }
-                                      className="text-red-600"
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Remove User
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </TabsContent>
 
-              <TabsContent value="settings">
-                <AccountSettings
-                  onSave={handleSaveSettings}
-                  loading={loading}
-                  onLoadSettings={accountService.getAccountSettings}
-                />
+              <TabsContent value="invitations" className="space-y-6">
+                <InvitationAnalytics />
               </TabsContent>
 
               <TabsContent value="analytics">
@@ -694,6 +594,13 @@ export default function AccountManagement() {
               open={inviteModalOpen}
               onOpenChange={setInviteModalOpen}
               onInvite={handleInviteUser}
+              currentUserRoles={currentUserRoles}
+            />
+
+            <BulkInviteModal
+              open={bulkInviteModalOpen}
+              onOpenChange={setBulkInviteModalOpen}
+              onBulkInvite={handleBulkInvite}
               currentUserRoles={currentUserRoles}
             />
 

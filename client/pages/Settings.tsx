@@ -625,7 +625,16 @@ export default function Settings() {
                         Permanently delete your account and all associated data.
                         This action cannot be undone.
                       </p>
-                      <Button variant="destructive" className="gap-2">
+                      <Button
+                        variant="destructive"
+                        className="gap-2"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                            // TODO: Implement account deletion
+                            alert('Account deletion functionality will be implemented');
+                          }
+                        }}
+                      >
                         <Trash2 className="h-4 w-4" />
                         Delete Account
                       </Button>
