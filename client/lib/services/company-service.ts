@@ -243,6 +243,18 @@ export class CompanyService {
       limit,
     });
   }
+
+  /**
+   * Get company by slug (for SEO-friendly URLs)
+   */
+  async getCompanyBySlug(slug: string): Promise<Company> {
+    const response = await apiClient.get<Company>(
+      `/api/Companies/slug/${slug}`,
+      CompanyMetadataSchema,
+    );
+
+    return response.data;
+  }
 }
 
 // ============================================================================

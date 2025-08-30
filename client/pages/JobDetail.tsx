@@ -174,7 +174,7 @@ function mapApiJobToUI(apiJob: any): UIJob {
 }
 
 export default function JobDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id: slug } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const {
@@ -202,11 +202,11 @@ export default function JobDetail() {
   useEffect(() => {
     let isMounted = true;
     const run = async () => {
-      if (!id) return;
+      if (!slug) return;
       try {
         setLoading(true);
         setError(null);
-        const apiJob = await jobService.getJobById(id);
+        const apiJob = await jobService.getJobBySlug(slug);
         if (!isMounted) return;
         setJob(mapApiJobToUI(apiJob as any));
       } catch (e) {
@@ -221,7 +221,7 @@ export default function JobDetail() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [slug]);
 
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);

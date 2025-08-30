@@ -3,6 +3,7 @@ import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,61 +14,76 @@ import { CartProvider } from "@/lib/cart-context";
 import { isProduction } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
+
+// Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
 import FloatingAIButton from "./components/FloatingAIButton";
-import About from "./pages/About";
-import Careers from "./pages/Careers";
-import Checkout from "./pages/Checkout";
-import Companies from "./pages/Companies";
-import CompanyCreatePage from "./pages/CompanyCreatePage";
-import CompanyDetail from "./pages/CompanyDetail";
-import CompanyEditPage from "./pages/CompanyEditPage";
-import CookiePolicy from "./pages/CookiePolicy";
-import Dashboard from "./pages/Dashboard";
 
-import ForRecruiters from "./pages/ForRecruiters";
+// Critical pages (loaded immediately)
 import Index from "./pages/Index";
-import Onboarding from "./pages/Onboarding";
-import People from "./pages/People";
 import PersonaSelection from "./pages/PersonaSelection";
-import Pricing from "./pages/Pricing";
-import Resumes from "./pages/Resumes";
-import Jobs from "./pages/Jobs";
-import Settings from "./pages/Settings";
-import Tasks from "./pages/Tasks";
-import TermsOfService from "./pages/TermsOfService";
-import Tools from "./pages/Tools";
-import SentimentAnalysis from "./pages/tools/SentimentAnalysis";
-import JobResumeMatch from "./pages/tools/JobResumeMatch";
-import SummarizeResume from "./pages/tools/SummarizeResume";
-import PdfToJson from "./pages/tools/PdfToJson";
-import ResumeOptimizer from "./pages/tools/ResumeOptimizer";
-import SalaryCalculator from "./pages/tools/SalaryCalculator";
-import AIResumeScorer from "./pages/tools/AIResumeScorer";
-import ValueProposition from "./pages/tools/ValueProposition";
-import Outreach from "./pages/Outreach";
-import Help from "./pages/Help";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import NotFound from "./pages/NotFound";
+
+// Lazy load non-critical pages
+const About = lazy(() => import("./pages/About"));
+const Careers = lazy(() => import("./pages/Careers"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const Companies = lazy(() => import("./pages/Companies"));
+const CompanyCreatePage = lazy(() => import("./pages/CompanyCreatePage"));
+const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
+const CompanyEditPage = lazy(() => import("./pages/CompanyEditPage"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const People = lazy(() => import("./pages/People"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Resumes = lazy(() => import("./pages/Resumes"));
+const Jobs = lazy(() => import("./pages/Jobs"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Tasks = lazy(() => import("./pages/Tasks"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const Tools = lazy(() => import("./pages/Tools"));
+const SentimentAnalysis = lazy(() => import("./pages/tools/SentimentAnalysis"));
+const JobResumeMatch = lazy(() => import("./pages/tools/JobResumeMatch"));
+const SummarizeResume = lazy(() => import("./pages/tools/SummarizeResume"));
+const PdfToJson = lazy(() => import("./pages/tools/PdfToJson"));
+const ResumeOptimizer = lazy(() => import("./pages/tools/ResumeOptimizer"));
+const SalaryCalculator = lazy(() => import("./pages/tools/SalaryCalculator"));
+const AIResumeScorer = lazy(() => import("./pages/tools/AIResumeScorer"));
+const ValueProposition = lazy(() => import("./pages/tools/ValueProposition"));
+const Outreach = lazy(() => import("./pages/Outreach"));
+const Help = lazy(() => import("./pages/Help"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+// Auth pages (keep immediate for better UX)
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import Profile from "./pages/Profile";
-import ResumeDetail from "./pages/ResumeDetail";
-import ResumeUploadPage from "./pages/ResumeUploadPage";
-import ResumeCreatePage from "./pages/ResumeCreatePage";
-import ResumeEditPage from "./pages/ResumeEditPage";
-import JobDetail from "./pages/JobDetail";
-import JobUploadPage from "./pages/JobUploadPage";
-import JobCreatePage from "./pages/JobCreatePage";
-import JobEditPage from "./pages/JobEditPage";
-import PeopleDetail from "./pages/PeopleDetail";
-import AccountManagement from "./pages/AccountManagement";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
-import EmbeddedResume from "./pages/EmbeddedResume";
+
+// Other pages (lazy loaded)
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Profile = lazy(() => import("./pages/Profile"));
+const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
+const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
+const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
+const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
+const JobDetail = lazy(() => import("./pages/JobDetail"));
+const JobUploadPage = lazy(() => import("./pages/JobUploadPage"));
+const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
+const JobEditPage = lazy(() => import("./pages/JobEditPage"));
+const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
+const AccountManagement = lazy(() => import("./pages/AccountManagement"));
+const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
+
+// Loading component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 // Create a client with production-ready configuration
 const queryClient = new QueryClient({
@@ -139,7 +155,8 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
-                <Routes>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
@@ -252,7 +269,8 @@ const App = () => (
 
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
-                </Routes>
+                  </Routes>
+                </Suspense>
 
                 {/* Global AI Components - Available on all pages */}
                 <FloatingAIButton />

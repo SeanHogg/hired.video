@@ -289,6 +289,18 @@ export class JobService {
   }
 
   /**
+   * Get job by slug (for SEO-friendly URLs)
+   */
+  async getJobBySlug(slug: string): Promise<Job> {
+    const response = await apiClient.get<Job>(
+      `/api/Job/slug/${slug}`,
+      JobSchema,
+    );
+
+    return response.data;
+  }
+
+  /**
    * Search jobs with filters
    */
   async searchJobs(filters: JobFilters): Promise<PaginatedJobs> {

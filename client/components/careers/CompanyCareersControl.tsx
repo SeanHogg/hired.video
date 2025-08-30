@@ -126,34 +126,49 @@ export function CompanyCareersControl({
       setLoading(true);
       setError(null);
 
-      // Load company data if companyId is provided
+      // Load company data
       let companyData: CompanyInfo | null = null;
 
       if (companyId) {
         try {
           const companyResponse = await companyService.getCompanyById(companyId);
           companyData = {
-            id: companyResponse.id,
-            name: companyResponse.data.name,
-            logo: companyResponse.data.logo,
-            tagline: companyResponse.data.tagline,
-            description: companyResponse.data.description,
-            website: companyResponse.data.website,
-            industry: companyResponse.data.industry,
-            size: companyResponse.data.size,
-            location: companyResponse.data.headquarters?.city ?
-              `${companyResponse.data.headquarters.city}, ${companyResponse.data.headquarters.state}, ${companyResponse.data.headquarters.country}` :
-              undefined
+            id: companyResponse.id || companyId,
+            name: companyResponse.name || 'Company',
+            logo: companyResponse.logo || '/logo.png',
+            tagline: companyResponse.tagline || '',
+            description: (companyResponse as any).description || '',
+            website: (companyResponse as any).website || '',
+            industry: companyResponse.industry || '',
+            size: companyResponse.size || '',
+            location: companyResponse.location || ''
           };
         } catch (err) {
-          console.warn('Failed to load company data, using fallback');
+          console.warn('Failed to load company data:', err);
+        }
+      } else if (companySlug) {
+        try {
+          const companyResponse = await companyService.getCompanyBySlug(companySlug);
+          companyData = {
+            id: companyResponse.id || 'company',
+            name: companyResponse.name || 'Company',
+            logo: companyResponse.logo || '/logo.png',
+            tagline: companyResponse.tagline || '',
+            description: (companyResponse as any).description || '',
+            website: (companyResponse as any).website || '',
+            industry: companyResponse.industry || '',
+            size: companyResponse.size || '',
+            location: companyResponse.location || ''
+          };
+        } catch (err) {
+          console.warn('Failed to load company data by slug:', err);
         }
       }
 
-      // Fallback to MyVideoResu.me company data
+      // Fallback to MyVideoResu.me if no company data loaded
       if (!companyData) {
         companyData = {
-          id: companyId || 'myvideoresume-company',
+          id: companyId || companySlug || 'myvideoresume-company',
           name: 'MyVideoResu.me',
           logo: '/logo.png',
           tagline: 'Revolutionizing the way people find and showcase their talents',
@@ -165,40 +180,40 @@ export function CompanyCareersControl({
         };
       }
 
-      // Load jobs data
+      // Load jobs data from API
       let jobsData: CompanyJob[] = [];
 
       try {
         const jobsResponse = await jobService.getPublicJobs({
-          company: companyData.name,
+          companyId: companyData.id,
           limit: maxJobs || 50
         });
 
         jobsData = jobsResponse.items.map(job => ({
           id: job.id,
           title: job.title,
-          description: job.description,
-          summary: job.summary,
-          responsibilities: job.responsibilities,
-          requirements: job.requirements,
+          description: (job as any).description || '',
+          summary: (job as any).description || '', // Use description as summary if no summary field
+          responsibilities: (job as any).requirements || [], // Map requirements to responsibilities if needed
+          requirements: (job as any).requirements || [],
           employmentType: job.employmentType,
-          experienceLevel: job.experienceLevel,
+          experienceLevel: (job as any).experienceLevel || 'mid',
           location: job.location,
           salaryMin: job.salaryMin,
           salaryMax: job.salaryMax,
-          currency: job.currency || 'USD',
-          workSetting: job.workSetting,
-          status: job.status,
-          createdAt: job.creationDateTimeFormatted || job.createdAt,
-          applications: job.applications,
-          views: job.views,
-          slug: job.slug,
-          atsApplyUrl: job.atsApplyUrl
+          currency: (job as any).currency || 'USD',
+          workSetting: job.isRemote ? 'Remote' : 'Onsite',
+          status: 'Open', // Default status
+          createdAt: job.postedDate,
+          applications: (job as any).applicationCount || 0,
+          views: (job as any).viewCount || 0,
+          slug: job.id, // Use ID as slug for now, backend should provide proper slug
+          atsApplyUrl: undefined
         }));
       } catch (err) {
-        console.warn('Failed to load jobs from API, using fallback data');
+        console.warn('Failed to load jobs from API, using fallback data:', err);
 
-        // Fallback mock jobs for MyVideoResu.me
+        // Fallback mock jobs for demonstration
         jobsData = [
           {
             id: '1',
@@ -385,11 +400,11 @@ export function CompanyCareersControl({
       <div className={`space-y-6 ${className}`}>
         <div className="animate-pulse">
           {showCompanyHeader && (
-            <div className="h-32 bg-gray-200 rounded-lg mb-6"></div>
+            <div className="h-32 bg-gray-200 rounded-lg mb-6" />
           )}
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+              <div key={i} className="h-24 bg-gray-200 rounded-lg" />
             ))}
           </div>
         </div>
