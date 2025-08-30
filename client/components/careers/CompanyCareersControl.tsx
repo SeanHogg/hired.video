@@ -173,7 +173,7 @@ export function CompanyCareersControl({
           logo: '/logo.png',
           tagline: 'Revolutionizing the way people find and showcase their talents',
           description: 'MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.',
-          website: 'https://myvideoresume.com',
+          website: 'https://myvideoresu.me',
           industry: 'Technology',
           size: '11-50',
           location: 'San Francisco, CA'

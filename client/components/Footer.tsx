@@ -1,5 +1,7 @@
 import { Video, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import Copyright from "./Copyright";
+import LegalLinks from "./LegalLinks";
 
 export default function Footer() {
   return (
@@ -118,29 +120,10 @@ export default function Footer() {
 
         {/* Bottom Section */}
         <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <div className="text-sm text-muted-foreground mb-4 md:mb-0">
-            © 2024 MyVideoResu.ME. All rights reserved.
+          <div className="mb-4 md:mb-0">
+            <Copyright />
           </div>
-          <div className="flex space-x-6 text-sm">
-            <Link
-              to="/privacy-policy"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              to="/terms-of-service"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Terms of Service
-            </Link>
-            <Link
-              to="/cookies"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cookie Policy
-            </Link>
-          </div>
+          <LegalLinks />
         </div>
       </div>
     </footer>

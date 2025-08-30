@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Building2,
   Users,
@@ -14,12 +15,28 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { CompanyCareersControl } from '@/components/careers/CompanyCareersControl';
 import Navigation from '@/components/Navigation';
+import Sidebar from '@/components/Sidebar';
 import Footer from '@/components/Footer';
+import { useSidebar } from '@/hooks/use-sidebar';
+import { useAuth } from '@/lib/auth';
+import { useSEO } from '@/lib/seo';
 
 export default function Careers() {
+  const location = useLocation();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
+
+  // SEO for careers page
+  useSEO(location.pathname);
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
     document.title = 'Careers - Join Our Team | MyVideoResu.me';
 
@@ -159,12 +176,22 @@ export default function Careers() {
   }, []);
 
   return (
-    <>
+    <div className="min-h-screen bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
 
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        
-        <main className="container mx-auto px-4 py-8">
+        <div className="pt-16">
+
+        <main className="max-w-6xl mx-auto px-6 py-8">
           {/* Breadcrumb Navigation */}
           <nav aria-label="Breadcrumb" className="mb-6">
             <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -524,7 +551,8 @@ export default function Careers() {
         </main>
 
         <Footer />
+        </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import Copyright from "@/components/Copyright";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -70,7 +71,7 @@ export default function TermsOfService() {
                 These Legal Terms constitute a legally binding agreement made between you and MyVideoResu.ME, concerning your access to and use of the Services.
               </p>
               <p className="text-sm text-muted-foreground mt-4">
-                Last updated: March 30, 2025
+                Last updated: March 30, {new Date().getFullYear()}
               </p>
             </div>
 
