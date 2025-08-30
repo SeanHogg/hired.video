@@ -235,7 +235,7 @@ export default function Careers() {
                 <div className="text-sm text-muted-foreground">Employee Satisfaction</div>
               </CardContent>
             </Card>
-          </div>
+          </section>
 
           {/* Why Work With Us */}
           <section id="company-culture" className="mb-12">
