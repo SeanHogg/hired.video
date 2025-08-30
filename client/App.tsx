@@ -54,6 +54,7 @@ const ValueProposition = lazy(() => import("./pages/tools/ValueProposition"));
 const Outreach = lazy(() => import("./pages/Outreach"));
 const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const Contact = lazy(() => import("./pages/Contact"));
 // Auth pages (keep immediate for better UX)
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -240,6 +241,7 @@ const App = () => (
 
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/help" element={<Help />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/insights/privacy-policy" element={<PrivacyPolicy />} />

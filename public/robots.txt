@@ -20,7 +20,7 @@ Allow: /
 Crawl-delay: 2
 
 # Sitemap
-Sitemap: https://myvideoresume.com/sitemap.xml
+Sitemap: https://myvideoresu.me/sitemap.xml
 
 # Priority pages for crawling
 # Careers page - high priority

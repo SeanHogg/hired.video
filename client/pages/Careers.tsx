@@ -44,20 +44,20 @@ export default function Careers() {
     // Open Graph tags
     addMetaTag('og:title', 'Careers - Join Our Team | MyVideoResu.me', true);
     addMetaTag('og:description', 'Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.', true);
-    addMetaTag('og:url', 'https://myvideoresume.com/careers', true);
+    addMetaTag('og:url', 'https://myvideoresu.me/careers', true);
     addMetaTag('og:type', 'website', true);
-    addMetaTag('og:image', 'https://myvideoresume.com/og-careers.jpg', true);
+    addMetaTag('og:image', 'https://myvideoresu.me/og-careers.jpg', true);
 
     // Twitter Card tags
     addMetaTag('twitter:card', 'summary_large_image');
     addMetaTag('twitter:title', 'Careers - Join Our Team | MyVideoResu.me');
     addMetaTag('twitter:description', 'Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions.');
-    addMetaTag('twitter:image', 'https://myvideoresume.com/og-careers.jpg');
+    addMetaTag('twitter:image', 'https://myvideoresu.me/og-careers.jpg');
 
     // Additional SEO tags
     addMetaTag('keywords', 'careers, jobs, MyVideoResu.me, software engineer, product designer, devops, remote work, tech jobs');
     addMetaTag('robots', 'index, follow');
-    addMetaTag('canonical', 'https://myvideoresume.com/careers');
+    addMetaTag('canonical', 'https://myvideoresu.me/careers');
 
     // Add structured data for Organization and FAQ
     const structuredData = [
@@ -65,8 +65,8 @@ export default function Careers() {
         "@context": "https://schema.org",
         "@type": "Organization",
         "name": "MyVideoResu.me",
-        "url": "https://myvideoresume.com",
-        "logo": "https://myvideoresume.com/favicon.svg",
+        "url": "https://myvideoresu.me",
+        "logo": "https://myvideoresu.me/favicon.svg",
         "description": "Revolutionary video resume platform helping job seekers showcase their talents",
         "foundingDate": "2024",
         "numberOfEmployees": "50+",
@@ -512,7 +512,7 @@ export default function Careers() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button size="lg" asChild>
-                    <a href="mailto:careers@myvideoresume.com">Send Us Your Resume</a>
+                    <a href="mailto:careers@myvideoresu.me">Send Us Your Resume</a>
                   </Button>
                   <Button size="lg" variant="outline" asChild>
                     <a href="/contact">Get in Touch</a>

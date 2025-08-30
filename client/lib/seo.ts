@@ -147,6 +147,30 @@ export const PAGE_SEO: Record<string, SEOData> = {
     description: 'Find the perfect match between jobs and resumes using our advanced AI matching algorithm.',
     keywords: 'job matching, resume matching, AI matching, career fit analysis',
   },
+  '/contact': {
+    title: 'Contact Us - MyVideoResu.me',
+    description: 'Get in touch with MyVideoResu.me support team. We\'re here to help you succeed in your career journey with video resumes and AI-powered job matching.',
+    keywords: 'contact us, customer support, help, video resume support, career assistance, MyVideoResu.me contact',
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@type': 'ContactPage',
+      name: 'Contact MyVideoResu.me',
+      description: 'Contact page for MyVideoResu.me - AI-powered video resume platform',
+      url: 'https://myvideoresu.me/contact',
+      mainEntity: {
+        '@type': 'Organization',
+        name: 'MyVideoResu.me',
+        email: 'info@myvideoresu.me',
+        url: 'https://myvideoresu.me',
+        contactPoint: {
+          '@type': 'ContactPoint',
+          contactType: 'customer service',
+          email: 'info@myvideoresu.me',
+          availableLanguage: 'English'
+        }
+      }
+    },
+  },
 };
 
 /**
