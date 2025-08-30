@@ -267,9 +267,11 @@ export default function Pricing() {
                   Save 20%
                 </Badge>
               </Label>
+            </div>
 
-              {/* Personas Segmented Control under hero */}
-              <div className="text-center mb-10">
+            {/* Personas Segmented Control - New Row with Center Alignment */}
+            <div className="w-full flex justify-center mb-10">
+              <div className="text-center">
                 <div className="flex items-center justify-center mb-2">
                   <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue">
                     <div className="bg-background rounded-full p-1">
