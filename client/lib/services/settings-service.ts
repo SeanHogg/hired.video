@@ -278,8 +278,8 @@ export class SettingsService {
   /**
    * Delete user account
    */
-  async deleteAccount(password: string): Promise<void> {
-    await apiClient.post("/Settings/account/delete", { password });
+  async deleteAccount(): Promise<void> {
+    await apiClient.delete("/api/account/deleteaccount");
   }
 
   /**

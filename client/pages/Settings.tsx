@@ -48,6 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 
 export default function Settings() {
   const {
@@ -70,6 +71,7 @@ export default function Settings() {
     showPhone: false,
     indexable: true,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -628,12 +630,7 @@ export default function Settings() {
                       <Button
                         variant="destructive"
                         className="gap-2"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                            // TODO: Implement account deletion
-                            alert('Account deletion functionality will be implemented');
-                          }
-                        }}
+                        onClick={() => setDeleteDialogOpen(true)}
                       >
                         <Trash2 className="h-4 w-4" />
                         Delete Account
@@ -647,6 +644,12 @@ export default function Settings() {
         </div>
         <Footer />
       </div>
+
+      {/* Delete Account Dialog */}
+      <DeleteAccountDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </div>
   );
 }
