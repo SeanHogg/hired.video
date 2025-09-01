@@ -6,7 +6,7 @@
 import { UserProfile } from "@/lib/services/user-service";
 
 // Backend enums - must match exactly
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 /* eslint-disable no-unused-vars */
 export enum ConversationType {
   Direct = 0,

@@ -489,8 +489,8 @@ export default function Tasks() {
   const getTasksForDate = (date: Date) => {
     const cellKey = toLocalYmd(date);
     return filteredTasks.filter((task) => {
-      const start = fromYmdLocal(task.startDate) || fromYmdLocal(task.dueDate)!;
-      const due = fromYmdLocal(task.dueDate)!;
+      const start = fromYmdLocal(task.startDate) || fromYmdLocal(task.dueDate);
+      const due = fromYmdLocal(task.dueDate);
       const startKey = toLocalYmd(start);
       const dueKey = toLocalYmd(due);
       return cellKey >= startKey && cellKey <= dueKey;

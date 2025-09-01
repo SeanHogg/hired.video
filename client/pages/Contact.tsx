@@ -77,7 +77,7 @@ export default function Contact() {
   }, []);
 
   const createForm = () => {
-    if (window.hbspt && window.hbspt.forms) {
+    if (window.hbspt?.forms) {
       window.hbspt.forms.create({
         portalId: "242403512",
         formId: "59fc922d-e44c-410a-8579-76ccd3a1fe33",
@@ -222,7 +222,7 @@ export default function Contact() {
                   <div id="hubspot-form" className="min-h-[400px] flex items-center justify-center">
                     {!hubspotLoaded && (
                       <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
                         <p className="text-muted-foreground">Loading contact form...</p>
                       </div>
                     )}

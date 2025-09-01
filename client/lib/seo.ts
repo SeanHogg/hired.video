@@ -185,7 +185,7 @@ export function updateMetaTags(seoData: SEOData): void {
   // Helper function to update or create meta tag
   const updateMetaTag = (name: string, content: string, property = false) => {
     const attribute = property ? 'property' : 'name';
-    let meta = document.querySelector(`meta[${attribute}="${name}"]`) as HTMLMetaElement;
+    let meta = document.querySelector(`meta[${attribute}="${name}"]`);
     
     if (!meta) {
       meta = document.createElement('meta');
@@ -217,7 +217,7 @@ export function updateMetaTags(seoData: SEOData): void {
 
   // Update canonical URL
   if (seoData.canonical) {
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');
       canonical.setAttribute('rel', 'canonical');

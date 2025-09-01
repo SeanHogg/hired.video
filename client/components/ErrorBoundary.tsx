@@ -15,8 +15,8 @@ import { logger } from "@/lib/logger";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: (_error: AppError, _retry: () => void) => ReactNode;
-  onError?: (_error: AppError, _errorInfo: ErrorInfo) => void;
+  fallback?: (error: AppError, retry: () => void) => ReactNode;
+  onError?: (error: AppError, errorInfo: ErrorInfo) => void;
   level?: "page" | "component" | "critical";
 }
 

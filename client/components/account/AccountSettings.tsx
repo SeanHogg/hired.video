@@ -142,11 +142,11 @@ export function AccountSettings({
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4" />
           <div className="space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4" />
+            <div className="h-4 bg-gray-200 rounded w-1/2" />
+            <div className="h-4 bg-gray-200 rounded w-2/3" />
           </div>
         </div>
       </div>
@@ -454,7 +454,7 @@ export function AccountSettings({
         <Button onClick={handleSave} disabled={saving} className="min-w-32">
           {saving ? (
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               Saving...
             </div>
           ) : (

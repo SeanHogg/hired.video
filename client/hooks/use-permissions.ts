@@ -17,6 +17,36 @@ export interface RolePermissions {
 // Define role hierarchy and permissions
 const ROLE_PERMISSIONS: RolePermissions[] = [
   {
+    role: MyVideoResumeRole.SuperAdmin,
+    hierarchy: 1000,
+    description: 'System administrator with access to product dashboard and all platform features',
+    permissions: [
+      // System administration
+      { resource: 'product_dashboard', action: 'read' },
+      { resource: 'product_dashboard', action: 'manage' },
+      { resource: 'system_health', action: 'read' },
+      { resource: 'analytics', action: 'read' },
+      { resource: 'analytics', action: 'manage' },
+      { resource: 'user_management', action: 'manage' },
+      { resource: 'platform_settings', action: 'manage' },
+
+      // All other permissions (SuperAdmin has access to everything)
+      { resource: 'account', action: 'manage' },
+      { resource: 'billing', action: 'manage' },
+      { resource: 'subscription', action: 'manage' },
+      { resource: 'team', action: 'manage' },
+      { resource: 'team_members', action: 'create' },
+      { resource: 'team_members', action: 'read' },
+      { resource: 'team_members', action: 'update' },
+      { resource: 'team_members', action: 'delete' },
+      { resource: 'roles', action: 'manage' },
+      { resource: 'jobs', action: 'manage' },
+      { resource: 'resumes', action: 'manage' },
+      { resource: 'companies', action: 'manage' },
+      { resource: 'profiles', action: 'manage' },
+    ]
+  },
+  {
     role: MyVideoResumeRole.AccountOwner,
     hierarchy: 100,
     description: 'Full access to all features and settings',
@@ -25,7 +55,7 @@ const ROLE_PERMISSIONS: RolePermissions[] = [
       { resource: 'account', action: 'manage' },
       { resource: 'billing', action: 'manage' },
       { resource: 'subscription', action: 'manage' },
-      
+
       // Team management
       { resource: 'team', action: 'manage' },
       { resource: 'team_members', action: 'create' },

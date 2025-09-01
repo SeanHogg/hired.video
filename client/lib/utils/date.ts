@@ -29,7 +29,7 @@ export const formatCopyrightYear = (startYear: number, endYear?: number): string
  * @param startYear - The starting year (defaults to 2024)
  * @returns Full copyright string
  */
-export const getCopyrightString = (companyName: string, startYear: number = 2024): string => {
+export const getCopyrightString = (companyName: string, startYear = 2024): string => {
   const yearRange = formatCopyrightYear(startYear);
   return `© ${yearRange} ${companyName}. All rights reserved.`;
 };

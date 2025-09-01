@@ -520,7 +520,7 @@ export default function Index() {
   };
 
   // Helper function to render skeleton loaders
-  const renderSkeletonLoader = (count: number, className: string = "h-32") => (
+  const renderSkeletonLoader = (count: number, className = "h-32") => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
         <div

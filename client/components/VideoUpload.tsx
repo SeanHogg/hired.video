@@ -70,8 +70,8 @@ export function VideoUpload({
 
   const generateThumbnail = (video: HTMLVideoElement): Promise<string> => {
     return new Promise((resolve) => {
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext('2d')!;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
       
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;

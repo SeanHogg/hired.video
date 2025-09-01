@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart-context";
+import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { isProduction } from "@/lib/config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
@@ -22,6 +23,14 @@ import FloatingAIButton from "./components/FloatingAIButton";
 // Critical pages (loaded immediately)
 import Index from "./pages/Index";
 import PersonaSelection from "./pages/PersonaSelection";
+// Auth pages (keep immediate for better UX)
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import ConfirmEmail from "./pages/ConfirmEmail";
+import SignupSuccess from "./pages/SignupSuccess";
+import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
 const About = lazy(() => import("./pages/About"));
@@ -55,14 +64,6 @@ const Outreach = lazy(() => import("./pages/Outreach"));
 const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
-// Auth pages (keep immediate for better UX)
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ConfirmEmail from "./pages/ConfirmEmail";
-import SignupSuccess from "./pages/SignupSuccess";
-import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Other pages (lazy loaded)
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -78,11 +79,12 @@ const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const AccountManagement = lazy(() => import("./pages/AccountManagement"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
+const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 
 // Loading component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
   </div>
 );
 
@@ -150,9 +152,10 @@ const App = () => (
   >
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CartProvider>
-          <AIProvider>
-            <TooltipProvider>
+        <PasswordRequirementsProvider>
+          <CartProvider>
+            <AIProvider>
+              <TooltipProvider>
               <Toaster />
               <Sonner />
               <BrowserRouter>
@@ -238,6 +241,7 @@ const App = () => (
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/outreach" element={<Outreach />} />
                   <Route path="/account" element={<AccountManagement />} />
+                  <Route path="/admin/product-dashboard" element={<ProductDashboard />} />
 
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/help" element={<Help />} />
@@ -278,9 +282,10 @@ const App = () => (
                 <FloatingAIButton />
                 <AIChatPanel />
               </BrowserRouter>
-            </TooltipProvider>
-          </AIProvider>
-        </CartProvider>
+              </TooltipProvider>
+            </AIProvider>
+          </CartProvider>
+        </PasswordRequirementsProvider>
       </AuthProvider>
     </QueryClientProvider>
   </ErrorBoundary>

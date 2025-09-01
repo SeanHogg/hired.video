@@ -299,7 +299,7 @@ export class ResumeService {
       PaginatedResumesSchema,
     );
 
-    const dto = response.data as any;
+    const dto = response.data;
     const rawItems = (dto.items || dto.Items || []) as unknown[];
     const total = (dto.total ??
       dto.Total ??

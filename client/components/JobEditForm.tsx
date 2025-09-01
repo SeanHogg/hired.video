@@ -44,7 +44,7 @@ interface JobFormData {
 }
 
 interface JobEditFormProps {
-  job?: any;
+  job?: JobFormData;
   onSave: (jobData: JobFormData) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
@@ -130,7 +130,7 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
     }
   }, [job]);
 
-  const handleInputChange = (field: keyof JobFormData, value: any) => {
+  const handleInputChange = (field: keyof JobFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,

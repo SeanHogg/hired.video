@@ -260,7 +260,7 @@ export class ApiClient {
       );
     }
 
-    const apiResponse = validationResult.data as ApiResponse;
+    const apiResponse = validationResult.data;
 
     // Handle API-level errors
     if (!apiResponse.success) {
@@ -426,7 +426,7 @@ export class ApiClient {
       const preprocessed = nullToUndefined
         ? nullToUndefined(responseData)
         : responseData;
-      const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
+      const validation = (schema).safeParse(preprocessed);
       if (!validation.success) {
         throw new ValidationError(
           `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
@@ -469,7 +469,7 @@ export class ApiClient {
       const preprocessed = nullToUndefined
         ? nullToUndefined(responseData)
         : responseData;
-      const validation = (schema as z.ZodSchema<T>).safeParse(preprocessed);
+      const validation = (schema).safeParse(preprocessed);
       if (!validation.success) {
         throw new ValidationError(
           `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,

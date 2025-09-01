@@ -55,15 +55,24 @@ const getNotificationBgColor = (type: string, isRead: boolean) => {
 interface NotificationItemProps {
   notification: Notification;
   onMarkAsRead: (id: string) => void;
+  onDismiss?: (id: string) => void;
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onMarkAsRead,
+  onDismiss,
 }) => {
   const handleClick = () => {
     if (!notification.isRead) {
       onMarkAsRead(notification.id);
+    }
+  };
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDismiss) {
+      onDismiss(notification.id);
     }
   };
 
@@ -86,9 +95,20 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
             >
               {notification.title}
             </p>
-            {!notification.isRead && (
-              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-            )}
+            <div className="flex items-center space-x-2">
+              {!notification.isRead && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
+              )}
+              {onDismiss && (
+                <button
+                  onClick={handleDismiss}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           <p
             className={`text-sm ${notification.isRead ? "text-gray-500" : "text-gray-700"} mt-1`}
@@ -116,7 +136,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected }) => {
       <div className="flex items-center space-x-2">
         <div
           className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
-        ></div>
+         />
         <span className="text-xs text-gray-600">
           {isConnected ? "Connected" : "Disconnected"}
         </span>

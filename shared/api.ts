@@ -333,7 +333,7 @@ export function validateApiResponse<T>(
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const issues = (error as z.ZodError).issues ?? [];
+      const issues = (error).issues ?? [];
       const details = issues.length
         ? issues.map((i) => i.message).join(", ")
         : (error as Error).message || "Invalid data";

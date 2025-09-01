@@ -14,6 +14,7 @@ import {
   LogOut,
   UserCog,
   X,
+  BarChart3,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -36,6 +37,9 @@ export default function Sidebar({
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
 
+  // Check if user is SuperAdmin
+  const isSuperAdmin = user?.role === 'SuperAdmin' || user?.roles?.includes('SuperAdmin');
+
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },
     {
@@ -57,6 +61,15 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
+    // SuperAdmin only navigation
+    ...(isSuperAdmin ? [
+      {
+        name: "Product Dashboard",
+        href: "/admin/product-dashboard",
+        icon: BarChart3,
+        exactMatch: false
+      }
+    ] : []),
   ];
 
   // Helper function to determine if a menu item is active

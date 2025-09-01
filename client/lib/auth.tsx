@@ -51,6 +51,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   refreshUser: () => Promise<void>;
+  apiCall: (url: string, options?: RequestInit) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,7 +112,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         }
       } catch (error) {
         console.error("Failed to initialize auth:", error);
-        logger.error("AuthProvider: initialization failed", error as any);
+        logger.error("AuthProvider: initialization failed", error);
         // Clear invalid auth data
         await authService.logout();
       } finally {
@@ -229,6 +230,42 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
+  const apiCall = async (url: string, options: RequestInit = {}): Promise<any> => {
+    const token = authService.getToken();
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      // Handle password change required error
+      if (response.status === 403 && errorData.error?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        const error = new Error('PASSWORD_CHANGE_REQUIRED');
+        (error as any).response = errorData;
+        throw error;
+      }
+
+      // Handle other authentication errors
+      if (response.status === 401) {
+        await logout();
+        throw new Error('Authentication required');
+      }
+
+      throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  };
+
   const value: AuthContextType = {
     user,
     login,
@@ -240,6 +277,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     isAuthenticated: !!user,
     isLoading,
     refreshUser,
+    apiCall,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

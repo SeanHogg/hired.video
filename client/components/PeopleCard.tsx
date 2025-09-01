@@ -43,12 +43,12 @@ interface PeopleCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
-  onTrack?: (_personId: string) => void;
-  onUntrack?: (_personId: string) => void;
-  onConnect?: (_personId: string) => void;
-  onMessage?: (_personId: string) => void;
-  onAcceptConnection?: (_personId: string) => void;
-  onRejectConnection?: (_personId: string) => void;
+  onTrack?: (personId: string) => void;
+  onUntrack?: (personId: string) => void;
+  onConnect?: (personId: string) => void;
+  onMessage?: (personId: string) => void;
+  onAcceptConnection?: (personId: string) => void;
+  onRejectConnection?: (personId: string) => void;
   onView?: () => void;
   onActions?: () => void;
 }

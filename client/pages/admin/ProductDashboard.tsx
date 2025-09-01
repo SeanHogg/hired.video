@@ -1,0 +1,779 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { 
+  Users, 
+  Briefcase, 
+  Building2, 
+  FileText, 
+  UserCheck,
+  TrendingUp,
+  TrendingDown,
+  Download,
+  RefreshCw,
+  Activity,
+  DollarSign,
+  BarChart3,
+  PieChart
+} from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { MyVideoResumeRole } from '@/types/account';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+
+interface ProductDashboardData {
+  userMetrics: {
+    totalUsers: number;
+    activeUsers: number;
+    newUsersLast30Days: number;
+    usersByRole: Record<string, number>;
+    usersByStatus: Record<string, number>;
+  };
+  jobMetrics: {
+    totalJobs: number;
+    activeJobs: number;
+    newJobsLast30Days: number;
+    jobsByStatus: Record<string, number>;
+    jobsByOrigin: Record<string, number>;
+  };
+  profileMetrics: {
+    totalProfiles: number;
+    publicProfiles: number;
+    newProfilesLast30Days: number;
+    profilesByStatus: Record<string, number>;
+    profilesByPrivacy: Record<string, number>;
+  };
+  companyMetrics: {
+    totalCompanies: number;
+    activeCompanies: number;
+    newCompaniesLast30Days: number;
+    companiesByStatus: Record<string, number>;
+    companiesBySize: Record<string, number>;
+  };
+  resumeMetrics: {
+    totalResumes: number;
+    publicResumes: number;
+    newResumesLast30Days: number;
+    resumesByType: Record<string, number>;
+    resumesByStatus: Record<string, number>;
+  };
+  saasMetrics: {
+    monthlyRecurringRevenue: number;
+    annualRecurringRevenue: number;
+    averageRevenuePerUser: number;
+    customerLifetimeValue: number;
+    customerAcquisitionCost: number;
+    churnRate: number;
+    growthRate: number;
+    conversionRate: number;
+    totalSubscriptions: number;
+    activeSubscriptions: number;
+    subscriptionsByTier: Record<string, number>;
+    revenueByTier: Record<string, number>;
+  };
+  userGrowthLast90Days: Array<{ date: string; count: number }>;
+  jobGrowthLast90Days: Array<{ date: string; count: number }>;
+  profileGrowthLast90Days: Array<{ date: string; count: number }>;
+  companyGrowthLast90Days: Array<{ date: string; count: number }>;
+  resumeGrowthLast90Days: Array<{ date: string; count: number }>;
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  change?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  icon: React.ReactNode;
+  description?: string;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, trend, icon, description }) => {
+  const getTrendIcon = () => {
+    if (trend === 'up') return <TrendingUp className="h-4 w-4 text-green-500" />;
+    if (trend === 'down') return <TrendingDown className="h-4 w-4 text-red-500" />;
+    return null;
+  };
+
+  const getTrendColor = () => {
+    if (trend === 'up') return 'text-green-600';
+    if (trend === 'down') return 'text-red-600';
+    return 'text-muted-foreground';
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</div>
+        {change && (
+          <div className={`flex items-center text-xs ${getTrendColor()}`}>
+            {getTrendIcon()}
+            <span className="ml-1">{change}</span>
+          </div>
+        )}
+        {description && (
+          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
+export default function ProductDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [dashboardData, setDashboardData] = useState<ProductDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  // Check if user is SuperAdmin
+  const isSuperAdmin = user?.role === 'SuperAdmin' || user?.roles?.includes('SuperAdmin');
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      loadDashboardData();
+    }
+  }, [isSuperAdmin]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/ProductDashboard', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load dashboard data');
+      }
+
+      const result = await response.json();
+      setDashboardData(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportData = async (format: 'csv') => {
+    try {
+      const response = await fetch(`/api/ProductDashboard/export/${format}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `product-dashboard-${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">
+              You need SuperAdmin privileges to access the Product Dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="h-6 w-6 animate-spin" />
+          <span>Loading dashboard data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <h2 className="text-xl font-semibold mb-2 text-red-600">Error</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={loadDashboardData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Product Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            System-wide analytics and metrics for platform administration
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Badge variant="default" className="bg-purple-600">
+            Super Admin
+          </Badge>
+          <Button variant="outline" onClick={() => exportData('csv')}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={loadDashboardData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs</TabsTrigger>
+          <TabsTrigger value="companies">Companies</TabsTrigger>
+          <TabsTrigger value="resumes">Resumes</TabsTrigger>
+          <TabsTrigger value="saas">SaaS Metrics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="Total Users"
+              value={dashboardData.userMetrics.totalUsers}
+              change={`+${dashboardData.userMetrics.newUsersLast30Days} this month`}
+              trend="up"
+              icon={<Users className="h-4 w-4" />}
+              description="All registered users"
+            />
+            <MetricCard
+              title="Active Jobs"
+              value={dashboardData.jobMetrics.activeJobs}
+              change={`+${dashboardData.jobMetrics.newJobsLast30Days} this month`}
+              trend="up"
+              icon={<Briefcase className="h-4 w-4" />}
+              description="Currently open positions"
+            />
+            <MetricCard
+              title="Companies"
+              value={dashboardData.companyMetrics.totalCompanies}
+              change={`+${dashboardData.companyMetrics.newCompaniesLast30Days} this month`}
+              trend="up"
+              icon={<Building2 className="h-4 w-4" />}
+              description="Registered companies"
+            />
+            <MetricCard
+              title="Resumes"
+              value={dashboardData.resumeMetrics.totalResumes}
+              change={`+${dashboardData.resumeMetrics.newResumesLast30Days} this month`}
+              trend="up"
+              icon={<FileText className="h-4 w-4" />}
+              description="Total resumes created"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Growth (Last 90 Days)</CardTitle>
+                <CardDescription>Daily user registrations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.userGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Growth (Last 90 Days)</CardTitle>
+                <CardDescription>Daily job postings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.jobGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#82ca9d" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="users">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Total Users"
+              value={dashboardData.userMetrics.totalUsers}
+              icon={<Users className="h-4 w-4" />}
+              description="All registered users"
+            />
+            <MetricCard
+              title="Active Users"
+              value={dashboardData.userMetrics.activeUsers}
+              icon={<UserCheck className="h-4 w-4" />}
+              description="Users active in last 30 days"
+            />
+            <MetricCard
+              title="New Users"
+              value={dashboardData.userMetrics.newUsersLast30Days}
+              icon={<TrendingUp className="h-4 w-4" />}
+              description="Registered in last 30 days"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Types Distribution</CardTitle>
+                <CardDescription>Distribution of paid and free accounts by role</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => ({
+                          name: role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                          value: count,
+                          isPaid: role === 'business' || role === 'recruiter' // Assume business and recruiter are paid
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {Object.entries(dashboardData.userMetrics.usersByRole).map((entry, index) => {
+                          const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, name) => [value, name]}
+                        labelFormatter={(label) => `Account Type: ${label}`}
+                      />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm font-medium">Account Status Summary:</div>
+                  {Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => {
+                    const isPaid = role === 'business' || role === 'recruiter';
+                    return (
+                      <div key={role} className="flex justify-between items-center text-sm">
+                        <span className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${isPaid ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          {role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          <span className={`px-2 py-1 rounded-full text-xs ${isPaid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {isPaid ? 'Paid' : 'Free'}
+                          </span>
+                        </span>
+                        <span className="font-medium">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>User Growth Trend</CardTitle>
+                <CardDescription>90-day user registration trend</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.userGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="jobs">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Total Jobs"
+              value={dashboardData.jobMetrics.totalJobs}
+              icon={<Briefcase className="h-4 w-4" />}
+              description="All job postings"
+            />
+            <MetricCard
+              title="Active Jobs"
+              value={dashboardData.jobMetrics.activeJobs}
+              icon={<Activity className="h-4 w-4" />}
+              description="Currently open positions"
+            />
+            <MetricCard
+              title="New Jobs"
+              value={dashboardData.jobMetrics.newJobsLast30Days}
+              icon={<TrendingUp className="h-4 w-4" />}
+              description="Posted in last 30 days"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Jobs by Status</CardTitle>
+                <CardDescription>Current job status distribution</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(([status, count]) => (
+                    <div key={status} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{status}</span>
+                      <Badge variant="secondary">{count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Growth Trend</CardTitle>
+                <CardDescription>90-day job posting trend</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.jobGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#82ca9d" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="companies">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Total Companies"
+              value={dashboardData.companyMetrics.totalCompanies}
+              icon={<Building2 className="h-4 w-4" />}
+              description="All registered companies"
+            />
+            <MetricCard
+              title="Active Companies"
+              value={dashboardData.companyMetrics.activeCompanies}
+              icon={<Activity className="h-4 w-4" />}
+              description="Currently active companies"
+            />
+            <MetricCard
+              title="New Companies"
+              value={dashboardData.companyMetrics.newCompaniesLast30Days}
+              icon={<TrendingUp className="h-4 w-4" />}
+              description="Registered in last 30 days"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Companies by Size</CardTitle>
+                <CardDescription>Company size distribution</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(dashboardData.companyMetrics.companiesBySize).map(([size, count]) => (
+                    <div key={size} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{size}</span>
+                      <Badge variant="secondary">{count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Company Growth Trend</CardTitle>
+                <CardDescription>90-day company registration trend</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.companyGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#ffc658" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="resumes">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Total Resumes"
+              value={dashboardData.resumeMetrics.totalResumes}
+              icon={<FileText className="h-4 w-4" />}
+              description="All created resumes"
+            />
+            <MetricCard
+              title="Public Resumes"
+              value={dashboardData.resumeMetrics.publicResumes}
+              icon={<Activity className="h-4 w-4" />}
+              description="Publicly visible resumes"
+            />
+            <MetricCard
+              title="New Resumes"
+              value={dashboardData.resumeMetrics.newResumesLast30Days}
+              icon={<TrendingUp className="h-4 w-4" />}
+              description="Created in last 30 days"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Resumes by Type</CardTitle>
+                <CardDescription>Resume format distribution</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(dashboardData.resumeMetrics.resumesByType).map(([type, count]) => (
+                    <div key={type} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{type}</span>
+                      <Badge variant="secondary">{count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Resume Growth Trend</CardTitle>
+                <CardDescription>90-day resume creation trend</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={dashboardData.resumeGrowthLast90Days}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="count" stroke="#ff7300" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="saas">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="MRR"
+              value={`$${dashboardData.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`}
+              change={`${dashboardData.saasMetrics.growthRate > 0 ? '+' : ''}${dashboardData.saasMetrics.growthRate.toFixed(1)}%`}
+              trend={dashboardData.saasMetrics.growthRate > 0 ? 'up' : 'down'}
+              icon={<DollarSign className="h-4 w-4" />}
+              description="Monthly Recurring Revenue"
+            />
+            <MetricCard
+              title="ARR"
+              value={`$${dashboardData.saasMetrics.annualRecurringRevenue.toLocaleString()}`}
+              icon={<BarChart3 className="h-4 w-4" />}
+              description="Annual Recurring Revenue"
+            />
+            <MetricCard
+              title="ARPU"
+              value={`$${dashboardData.saasMetrics.averageRevenuePerUser.toFixed(2)}`}
+              icon={<Users className="h-4 w-4" />}
+              description="Average Revenue Per User"
+            />
+            <MetricCard
+              title="Churn Rate"
+              value={`${dashboardData.saasMetrics.churnRate.toFixed(1)}%`}
+              trend={dashboardData.saasMetrics.churnRate < 5 ? 'up' : 'down'}
+              icon={<TrendingDown className="h-4 w-4" />}
+              description="Monthly churn rate"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
+            <MetricCard
+              title="LTV"
+              value={`$${dashboardData.saasMetrics.customerLifetimeValue.toLocaleString()}`}
+              icon={<Activity className="h-4 w-4" />}
+              description="Customer Lifetime Value"
+            />
+            <MetricCard
+              title="CAC"
+              value={`$${dashboardData.saasMetrics.customerAcquisitionCost.toFixed(2)}`}
+              icon={<TrendingUp className="h-4 w-4" />}
+              description="Customer Acquisition Cost"
+            />
+            <MetricCard
+              title="Conversion Rate"
+              value={`${dashboardData.saasMetrics.conversionRate.toFixed(1)}%`}
+              icon={<PieChart className="h-4 w-4" />}
+              description="Trial to paid conversion"
+            />
+            <MetricCard
+              title="Active Subscriptions"
+              value={dashboardData.saasMetrics.activeSubscriptions}
+              icon={<UserCheck className="h-4 w-4" />}
+              description="Currently active subscriptions"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue by Tier</CardTitle>
+                <CardDescription>Monthly revenue breakdown by subscription tier</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(dashboardData.saasMetrics.revenueByTier).map(([tier, revenue]) => (
+                    <div key={tier} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{tier}</span>
+                      <Badge variant="secondary">${revenue.toLocaleString()}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Distribution by Account Type</CardTitle>
+                <CardDescription>Financial breakdown of paid accounts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={Object.entries(dashboardData.saasMetrics.revenueByTier).map(([tier, revenue]) => ({
+                          name: tier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                          value: revenue,
+                          subscriptions: dashboardData.saasMetrics.subscriptionsByTier[tier] || 0
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value, percent }) => `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(1)}%)`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {Object.entries(dashboardData.saasMetrics.revenueByTier).map((entry, index) => {
+                          const colors = ['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#8884D8'];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, name, props) => [
+                          `$${value.toLocaleString()}`,
+                          `${name} (${props.payload.subscriptions} accounts)`
+                        ]}
+                        labelFormatter={(label) => `Revenue from ${label}`}
+                      />
+                      <Legend />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="text-sm font-medium">Subscription Tiers:</div>
+                  {Object.entries(dashboardData.saasMetrics.subscriptionsByTier).map(([tier, count]) => {
+                    const revenue = dashboardData.saasMetrics.revenueByTier[tier] || 0;
+                    const avgRevenue = count > 0 ? revenue / count : 0;
+                    return (
+                      <div key={tier} className="flex justify-between items-center text-sm">
+                        <span className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-blue-500" />
+                          {tier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <div className="text-right">
+                          <div className="font-medium">{count} accounts</div>
+                          <div className="text-xs text-muted-foreground">
+                            ${revenue.toLocaleString()} total (${avgRevenue.toFixed(0)}/avg)
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

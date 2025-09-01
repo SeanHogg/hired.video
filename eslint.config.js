@@ -166,6 +166,7 @@ export default [
       "no-unreachable": "error",
       "no-unused-expressions": "warn",
       "no-unused-labels": "warn",
+      "no-unused-vars": "off", // Disable in favor of @typescript-eslint/no-unused-vars
       "no-undef": "off", // TypeScript handles this
       "no-redeclare": "off", // TypeScript handles this
       "no-dupe-class-members": "off", // TypeScript handles this

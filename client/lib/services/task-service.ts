@@ -168,7 +168,7 @@ export class TaskService {
       const task = await this.getTaskById(request.taskId);
 
       const updateRequest: UpdateTaskRequest = {
-        id: task.id!,
+        id: task.id,
         text: task.text,
         description: task.description,
         start: task.start,
@@ -325,7 +325,7 @@ export class TaskService {
       const task = await this.getTaskById(taskId);
 
       const updateRequest: UpdateTaskRequest = {
-        id: task.id!,
+        id: task.id,
         text: task.text,
         description: task.description,
         start: task.start,

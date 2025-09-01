@@ -146,7 +146,7 @@ export class JobService {
     const endpoint = `/api/Job${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<any>(endpoint, PaginatedJobsSchema);
 
-    const dto = response.data as any;
+    const dto = response.data;
     const items = (dto.items || dto.Items || []) as unknown[];
     const total = (dto.total ??
       dto.Total ??

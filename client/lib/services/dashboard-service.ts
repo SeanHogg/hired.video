@@ -188,8 +188,8 @@ export class DashboardService {
    */
   async searchContent(
     query: string,
-    category: string = "all",
-    limit: number = 20,
+    category = "all",
+    limit = 20,
   ): Promise<SearchResponse> {
     return searchService.searchPublicContent({
       page: 1,

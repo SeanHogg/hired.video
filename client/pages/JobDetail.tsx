@@ -87,7 +87,7 @@ type UIJob = {
 function mapApiJobToUI(apiJob: any): UIJob {
   // If server returns envelope { success, data }, unwrap
   const j =
-    apiJob && apiJob.data && apiJob.success !== undefined
+    apiJob?.data && apiJob.success !== undefined
       ? apiJob.data
       : apiJob;
   // Some jobs store serialized JSON in jobSerialized
@@ -124,11 +124,11 @@ function mapApiJobToUI(apiJob: any): UIJob {
       description: j.description || parsed.description || "",
       company: {
         name:
-          (j.company && j.company.name) ||
+          (j.company?.name) ||
           j.company ||
           parsed.company ||
           "Unknown Company",
-        logo: j.companyLogo || (j.company && j.company.logoUrl) || "",
+        logo: j.companyLogo || (j.company?.logoUrl) || "",
         website: j.companyWebsite,
         description: j.companyDescription,
         industry:
@@ -137,8 +137,8 @@ function mapApiJobToUI(apiJob: any): UIJob {
       },
       location: {
         remote: j.isRemote ?? false,
-        city: j.city || (j.address && j.address.city) || undefined,
-        state: j.state || (j.address && j.address.stateProvince) || undefined,
+        city: j.city || (j.address?.city) || undefined,
+        state: j.state || (j.address?.stateProvince) || undefined,
       },
       responsibilities: Array.isArray(j.responsibilities)
         ? j.responsibilities

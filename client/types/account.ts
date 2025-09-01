@@ -67,6 +67,7 @@ export enum InviteStatus {
 }
 
 export enum MyVideoResumeRole {
+  SuperAdmin = -1,
   Admin = 0,
   AccountOwner = 10,
   AccountAdmin = 11,
@@ -208,6 +209,8 @@ export interface RoleEditFormData {
 // Utility functions for role management
 export const getRoleDisplayName = (role: MyVideoResumeRole): string => {
   switch (role) {
+    case MyVideoResumeRole.SuperAdmin:
+      return "Super Admin";
     case MyVideoResumeRole.Admin:
       return "Admin";
     case MyVideoResumeRole.AccountOwner:

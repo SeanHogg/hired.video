@@ -8,6 +8,12 @@ import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 
 // ============================================================================
+// REACT HOOK FOR FEATURE FLAGS
+// ============================================================================
+
+import { useState, useEffect } from "react";
+
+// ============================================================================
 // SCHEMAS
 // ============================================================================
 
@@ -40,7 +46,7 @@ export type FeatureFlagsResponse = z.infer<typeof FeatureFlagsResponseSchema>;
 
 export class FeatureFlagService {
   private flagsCache: Map<string, boolean> = new Map();
-  private cacheExpiry: number = 0;
+  private cacheExpiry = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   /**
@@ -149,12 +155,6 @@ export class FeatureFlagService {
     return Date.now() < this.cacheExpiry;
   }
 }
-
-// ============================================================================
-// REACT HOOK FOR FEATURE FLAGS
-// ============================================================================
-
-import { useState, useEffect } from "react";
 
 /**
  * React hook for using feature flags

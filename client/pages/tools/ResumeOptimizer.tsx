@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, FileText, Loader2, Upload, Zap, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Zap, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -46,7 +46,7 @@ export default function ResumeOptimizer() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // SEO for resume optimizer page
   useSEO(location.pathname);

@@ -246,7 +246,7 @@ export function EditRolesModal({
             className="flex items-center gap-2"
           >
             {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             ) : (
               <Save className="h-4 w-4" />
             )}

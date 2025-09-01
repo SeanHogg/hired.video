@@ -311,7 +311,7 @@ export function InviteUserModal({
             className="flex items-center gap-2"
           >
             {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             ) : (
               <Mail className="h-4 w-4" />
             )}

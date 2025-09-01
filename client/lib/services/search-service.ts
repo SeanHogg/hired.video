@@ -116,7 +116,7 @@ export class SearchService {
   /**
    * Get homepage content with unified search
    */
-  async getHomepageContent(limit: number = 4): Promise<SearchResponse> {
+  async getHomepageContent(limit = 4): Promise<SearchResponse> {
     return this.searchPublicContent({
       page: 1,
       limit: limit * 4, // Get more items to distribute across categories
@@ -128,8 +128,8 @@ export class SearchService {
    */
   async getContentByCategory(
     category: "jobs" | "resumes" | "people" | "companies",
-    page: number = 1,
-    limit: number = 20,
+    page = 1,
+    limit = 20,
   ): Promise<SearchResponse> {
     return this.searchPublicContent({
       category,

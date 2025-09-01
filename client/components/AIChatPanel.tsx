@@ -8,7 +8,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button , Button as UiButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAI } from "@/lib/ai-context";
 import {
@@ -19,7 +19,6 @@ import {
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
 import { useAuth } from "@/lib/auth";
-import { Button as UiButton } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
 interface Message {
