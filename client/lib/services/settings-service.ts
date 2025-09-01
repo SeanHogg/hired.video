@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { ApiSuccessResponse } from "@shared/api";
+
 
 // ============================================================================
 // SCHEMAS
@@ -279,7 +279,7 @@ export class SettingsService {
    * Delete user account
    */
   async deleteAccount(): Promise<void> {
-    await apiClient.delete("/api/account/deleteaccount");
+    await apiClient.post("/api/account/deleteaccount");
   }
 
   /**
