@@ -2,14 +2,24 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { usePasswordRequirements } from '@/hooks/usePasswordRequirements';
 import { ForcePasswordChangeModal } from './ForcePasswordChangeModal';
 
+interface PasswordRequirements {
+  requiresPasswordChange: boolean;
+  isTemporaryPassword: boolean;
+  passwordSetDate?: string;
+  passwordExpiryDate?: string;
+  daysUntilExpiry: number;
+  reason?: string;
+  canSkip: boolean;
+}
+
 interface PasswordRequirementsContextType {
-  requirements: {
-    requiresPasswordChange: boolean;
-    changePassword: (newPassword: string) => Promise<{ success: boolean; error?: { message: string } }>;
-  } | null;
+  requirements: PasswordRequirements | null;
   isLoading: boolean;
   error: string | null;
   checkRequirements: () => Promise<void>;
+  showModal: boolean;
+  setShowModal: (show: boolean) => void;
+  handlePasswordChanged: () => void;
 }
 
 const PasswordRequirementsContext = createContext<PasswordRequirementsContextType | undefined>(undefined);
@@ -33,7 +43,10 @@ export const PasswordRequirementsProvider: React.FC<PasswordRequirementsProvider
     requirements,
     isLoading,
     error,
-    checkRequirements
+    checkRequirements,
+    showModal,
+    setShowModal,
+    handlePasswordChanged
   };
 
   return (

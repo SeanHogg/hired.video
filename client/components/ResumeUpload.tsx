@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { resumeService } from "@/lib/services/resume-service";
+import { resumeService, type Resume } from "@/lib/services/resume-service";
 import type {
   ResumePrivacy,
   UploadResumeRequest,
@@ -22,59 +22,36 @@ import type {
   ResumeData,
 } from "@/types/resume";
 
-interface MetaResume {
-  basics?: {
-    name?: string;
-    label?: string;
-    image?: string;
-    email?: string;
-    phone?: string;
-    url?: string;
-    summary?: string;
-    location?: {
-      address?: string;
-      postalCode?: string;
-      city?: string;
-      countryCode?: string;
-      region?: string;
-    } | null;
-    profiles?: Array<{
-      network?: string;
-      username?: string;
-      url?: string;
-    }>;
-  };
-  work?: Array<{
-    name?: string;
-    position?: string;
-    url?: string;
-    startDate?: string;
-    endDate?: string;
-    summary?: string;
-    highlights?: string[];
-  }>;
-  education?: Array<{
-    institution?: string;
-    url?: string;
-    area?: string;
-    studyType?: string;
-    startDate?: string;
-    endDate?: string;
-    score?: string;
-    courses?: string[];
-  }>;
-  skills?: Array<{
-    name?: string;
-    level?: string;
-    keywords?: string[];
-  }>;
-  [key: string]: unknown;
-}
 
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;
   onCancel: () => void;
 }
+
+// Helper function to create empty resume data
+const getEmptyResumeData = (): ResumeData => ({
+  Basics: {
+    Name: "",
+    Label: "",
+    Image: "",
+    Email: "",
+    Phone: "",
+    Url: "",
+    Summary: "",
+    Location: null,
+  },
+  Work: [],
+  Volunteer: [],
+  Education: [],
+  Awards: [],
+  Certificates: [],
+  Publications: [],
+  Skills: [],
+  Languages: [],
+  Interests: [],
+  References: [],
+  Projects: [],
+});
 
 export default function ResumeUpload({
   onUploadSuccess,
@@ -143,7 +120,7 @@ export default function ResumeUpload({
   };
 
   // Convert API MetaResume (camelCase) to UI ResumeData (PascalCase keys)
-  const mapMetaResumeToResumeData = (meta: MetaResume): ResumeData => {
+  const mapMetaResumeToResumeData = (meta: NonNullable<Resume['metaResume']>): ResumeData => {
     const basics = meta?.basics || {};
     const location = basics?.location || null;
     return {
@@ -193,54 +170,19 @@ export default function ResumeUpload({
         Courses: Array.isArray(e.courses) ? e.courses : null,
         Url: e.url || "",
       })),
-      Awards: (meta?.awards || []).map((a) => ({
-        Title: a.title || "",
-        Date: a.date || "",
-        Awarder: a.awarder || "",
-        Summary: a.summary || "",
-      })),
-      Certificates: (meta?.certificates || []).map((c) => ({
-        Name: c.name || "",
-        Date: c.date || "",
-        Issuer: c.issuer || "",
-        Url: c.url || "",
-      })),
-      Publications: (meta?.publications || []).map((p) => ({
-        Name: p.name || "",
-        Publisher: p.publisher || "",
-        ReleaseDate: p.releaseDate || "",
-        Url: p.url || "",
-        Summary: p.summary || "",
-      })),
+      Awards: [], // Not available in current schema
+      Certificates: [], // Not available in current schema
+      Publications: [], // Not available in current schema
       Skills: (meta?.skills || []).map((s) => ({
         Name: s.name || "",
         Level: s.level || "",
         Keywords: Array.isArray(s.keywords) ? s.keywords : [],
       })),
-      Languages: (meta?.languages || []).map((l) => ({
-        Language: l.language || "",
-        Fluency: l.fluency || "",
-      })),
-      Interests: (meta?.interests || []).map((i) => ({
-        Name: i.name || "",
-        Keywords: Array.isArray(i.keywords) ? i.keywords : [],
-      })),
-      References: (meta?.references || []).map((r) => ({
-        Name: r.name || "",
-        Reference: r.reference || "",
-      })),
-      Projects: (meta?.projects || []).map((p) => ({
-        Name: p.name || "",
-        Description: p.description || "",
-        Highlights: Array.isArray(p.highlights) ? p.highlights : [],
-        Keywords: Array.isArray(p.keywords) ? p.keywords : [],
-        StartDate: p.startDate || "",
-        EndDate: p.endDate || "",
-        Url: p.url || "",
-        Roles: Array.isArray(p.roles) ? p.roles : [],
-        Entity: p.entity || "",
-        Type: p.type || "",
-      })),
+      Languages: [], // Not available in current schema
+      Interests: [], // Not available in current schema
+      References: [], // Not available in current schema
+      Projects: [], // Not available in current schema
+
       Meta: undefined,
     };
   };
@@ -265,7 +207,9 @@ export default function ResumeUpload({
       const created = await resumeService.createResumeFromFile(uploadRequest.file);
 
       // Map API entity to ResumeData for the builder
-      const uploadedData = mapMetaResumeToResumeData(created.metaResume);
+      const uploadedData = created.metaResume
+        ? mapMetaResumeToResumeData(created.metaResume)
+        : getEmptyResumeData();
 
       const response: ResumeUploadResponse = {
         id: created.id || `resume_${Date.now()}`,

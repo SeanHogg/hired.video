@@ -19,7 +19,7 @@ import {
   PieChart
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { MyVideoResumeRole } from '@/types/account';
+
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 interface ProductDashboardData {
@@ -123,7 +123,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, trend, ic
   );
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
 
 export default function ProductDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -133,13 +133,13 @@ export default function ProductDashboard() {
   const { user } = useAuth();
 
   // Check if user is SuperAdmin
-  const isSuperAdmin = user?.role === 'SuperAdmin' || user?.roles?.includes('SuperAdmin');
+  const isAdmin = user?.role === 'business'; // Business users have admin-like capabilities
 
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (isAdmin) {
       loadDashboardData();
     }
-  }, [isSuperAdmin]);
+  }, [isAdmin]);
 
   const loadDashboardData = async () => {
     try {
@@ -189,7 +189,7 @@ export default function ProductDashboard() {
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">

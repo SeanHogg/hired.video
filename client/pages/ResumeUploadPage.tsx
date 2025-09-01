@@ -5,7 +5,7 @@ import Navigation from "@/components/Navigation";
 import ResumeUpload from "@/components/ResumeUpload";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import { resumeService } from "@/lib/services/resume-service";
+
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { generateResumeId } from "@/lib/utils";

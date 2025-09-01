@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, Play, Pause, RotateCcw, Check, X, Video, FileVideo } from 'lucide-react';
+import { Upload, Play, Pause, RotateCcw, X, Video, FileVideo } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VideoUploadProps {

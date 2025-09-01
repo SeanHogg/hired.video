@@ -3,8 +3,6 @@ import { logger } from "./logger";
 import {
   authService,
   type UserProfile,
-  type LoginRequest,
-  type RegisterRequest,
 } from "./services/auth-service";
 
 export type UserRole = "job_seeker" | "recruiter" | "business";

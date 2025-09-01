@@ -22,7 +22,7 @@ interface UsePasswordRequirementsReturn {
 }
 
 export const usePasswordRequirements = (): UsePasswordRequirementsReturn => {
-  const { user, apiCall, logout } = useAuth();
+  const { user, apiCall } = useAuth();
   const [requirements, setRequirements] = useState<PasswordRequirements | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +51,13 @@ export const usePasswordRequirements = (): UsePasswordRequirementsReturn => {
       } else {
         setError(response.error?.message || 'Failed to check password requirements');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle the specific case where the API returns PASSWORD_CHANGE_REQUIRED
-      if (error.message === 'PASSWORD_CHANGE_REQUIRED' || 
-          (error.response && error.response.error?.code === 'PASSWORD_CHANGE_REQUIRED')) {
-        
-        const errorDetails = error.response?.error?.details;
+      const errorObj = error as { message?: string; response?: { error?: { code?: string; message?: string; details?: any } } };
+      if (errorObj.message === 'PASSWORD_CHANGE_REQUIRED' ||
+          (errorObj.response && errorObj.response.error?.code === 'PASSWORD_CHANGE_REQUIRED')) {
+
+        const errorDetails = errorObj.response?.error?.details;
         if (errorDetails) {
           const reqs: PasswordRequirements = {
             requiresPasswordChange: errorDetails.requiresPasswordChange || true,
@@ -64,7 +65,7 @@ export const usePasswordRequirements = (): UsePasswordRequirementsReturn => {
             passwordSetDate: errorDetails.passwordSetDate,
             passwordExpiryDate: errorDetails.passwordExpiryDate,
             daysUntilExpiry: errorDetails.daysUntilExpiry || 0,
-            reason: error.response.error.message,
+            reason: errorObj.response?.error?.message || 'Password change required',
             canSkip: errorDetails.canSkip || false
           };
           
@@ -72,7 +73,7 @@ export const usePasswordRequirements = (): UsePasswordRequirementsReturn => {
           setShowModal(true);
         }
       } else {
-        setError(error.message || 'An error occurred while checking password requirements');
+        setError(errorObj.message || 'An error occurred while checking password requirements');
       }
     } finally {
       setIsLoading(false);
