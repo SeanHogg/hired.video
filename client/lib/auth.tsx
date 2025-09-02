@@ -6,15 +6,7 @@ import {
 } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
-export const USER_ROLES = {
-  JOB_SEEKER: "JobSeeker",
-  RECRUITER: "Recruiter",
-  EMPLOYER: "Employer",
-  BUSINESS: "Business",
-  ADMIN: "Admin"
-} as const;
-
-export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+export { USER_ROLES, type UserRole } from "./user-roles";
 
 export interface User {
   id: string;

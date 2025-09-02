@@ -10,7 +10,7 @@ import {
   LoginResponseSchema as SharedLoginResponseSchema,
   type LoginResponse as SharedLoginResponse,
 } from "@shared/api";
-import { USER_ROLES } from "../auth";
+import { USER_ROLES } from "../user-roles";
 
 // ============================================================================
 // SCHEMAS
