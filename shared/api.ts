@@ -102,7 +102,8 @@ export const LoginResponseSchema = z.object({
     id: z.string().uuid(),
     email: z.string().email(),
     name: z.string(),
-    role: z.enum(["job_seeker", "recruiter", "business"]),
+    // Accept any backend role string; client maps/normalizes later
+    role: z.string(),
   }),
   token: z.string(),
   // Accept any RFC3339/ISO8601-like string that Date.parse can read (some backends send >3 fractional seconds)
