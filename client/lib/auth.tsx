@@ -6,7 +6,8 @@ import {
 } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
-export { USER_ROLES, type UserRole } from "./user-roles";
+import { USER_ROLES, type UserRole } from "./user-roles";
+export { USER_ROLES, type UserRole };
 
 export interface User {
   id: string;
