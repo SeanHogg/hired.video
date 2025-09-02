@@ -17,7 +17,7 @@ interface TrendLineChartProps {
   color?: string;
   height?: number;
   showLegend?: boolean;
-  formatTooltip?: (value: any, name: string) => [string, string];
+  formatTooltip?: (value: number, name: string) => [string, string];
   formatXAxisLabel?: (value: string) => string;
   formatYAxisLabel?: (value: number) => string;
 }
@@ -57,7 +57,7 @@ const TrendLineChart: React.FC<TrendLineChartProps> = ({
     return value.toLocaleString();
   };
 
-  const customTooltip = ({ active, payload, label }: any) => {
+  const customTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string }>; label?: string }) => {
     if (active && payload?.length) {
       const value = payload[0].value;
       const formattedValue = formatTooltip 

@@ -109,7 +109,7 @@ export function CompanyCareersControl({
   const [experienceLevelFilter, setExperienceLevelFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   
-  const { user: _user, isAuthenticated: _isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
     loadCompanyAndJobs();
@@ -131,8 +131,8 @@ export function CompanyCareersControl({
             name: companyResponse.name || 'Company',
             logo: companyResponse.logo || '/logo.png',
             tagline: companyResponse.tagline || '',
-            description: (companyResponse as any).description || '',
-            website: (companyResponse as any).website || '',
+            description: companyResponse.description ?? '',
+            website: companyResponse.website ?? '',
             industry: companyResponse.industry || '',
             size: companyResponse.size || '',
             location: companyResponse.location || ''
@@ -148,8 +148,8 @@ export function CompanyCareersControl({
             name: companyResponse.name || 'Company',
             logo: companyResponse.logo || '/logo.png',
             tagline: companyResponse.tagline || '',
-            description: (companyResponse as { description?: string }).description || '',
-            website: (companyResponse as { website?: string }).website || '',
+            description: companyResponse.description ?? '',
+            website: companyResponse.website ?? '',
             industry: companyResponse.industry || '',
             size: companyResponse.size || '',
             location: companyResponse.location || ''
@@ -183,26 +183,26 @@ export function CompanyCareersControl({
           limit: maxJobs || 50
         });
 
-        jobsData = jobsResponse.items.map(job => ({
+        jobsData = (jobsResponse.items ?? []).map((job) => ({
           id: job.id,
           title: job.title,
-          description: (job as any).description || '',
-          summary: (job as any).description || '', // Use description as summary if no summary field
-          responsibilities: (job as any).requirements || [], // Map requirements to responsibilities if needed
-          requirements: (job as any).requirements || [],
+          description: job.title, // no description on JobSummary; use title as placeholder
+          summary: job.title,
+          responsibilities: [],
+          requirements: [],
           employmentType: job.employmentType,
-          experienceLevel: (job as any).experienceLevel || 'mid',
+          experienceLevel: 'mid',
           location: job.location,
           salaryMin: job.salaryMin,
           salaryMax: job.salaryMax,
-          currency: (job as any).currency || 'USD',
+          currency: 'USD',
           workSetting: job.isRemote ? 'Remote' : 'Onsite',
-          status: 'Open', // Default status
-          createdAt: job.postedDate,
-          applications: (job as any).applicationCount || 0,
-          views: (job as any).viewCount || 0,
-          slug: job.id, // Use ID as slug for now, backend should provide proper slug
-          atsApplyUrl: undefined
+          status: 'Open',
+          createdAt: job.postedDate ?? new Date().toISOString(),
+          applications: 0,
+          views: 0,
+          slug: job.id,
+          atsApplyUrl: undefined,
         }));
       } catch (err) {
         console.warn('Failed to load jobs from API, using fallback data:', err);

@@ -41,7 +41,7 @@ const MetricsPieChart: React.FC<MetricsPieChartProps> = ({
     color: item.color || colors[index % colors.length],
   }));
 
-  const customTooltip = ({ active, payload }: any) => {
+  const customTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: PieDataPoint }> }) => {
     if (active && payload?.length) {
       const data = payload[0].payload;
       const value = payload[0].value;
@@ -63,7 +63,7 @@ const MetricsPieChart: React.FC<MetricsPieChartProps> = ({
     return null;
   };
 
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number }) => {
     if (percent < 0.05) return null; // Don't show labels for slices smaller than 5%
     
     const RADIAN = Math.PI / 180;
@@ -114,7 +114,7 @@ const MetricsPieChart: React.FC<MetricsPieChartProps> = ({
               <Legend 
                 verticalAlign="bottom" 
                 height={36}
-                formatter={(value, entry: any) => (
+                formatter={(value: string | number, entry: { color?: string }) => (
                   <span style={{ color: entry.color }}>{value}</span>
                 )}
               />

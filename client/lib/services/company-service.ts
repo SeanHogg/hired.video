@@ -19,6 +19,8 @@ export const CompanyMetadataSchema = z.object({
   name: nullableString(),
   logo: nullableString(),
   tagline: nullableString(),
+  description: nullableString(),
+  website: nullableString(),
   industry: nullableString(),
   size: nullableString(),
   location: nullableString(),
