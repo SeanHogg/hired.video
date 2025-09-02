@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { USER_ROLES } from "@/lib/auth";
+import { USER_ROLES } from "./user-roles";
 
 // ============================================================================
 // VALIDATION SCHEMAS
