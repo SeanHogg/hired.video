@@ -160,22 +160,8 @@ export class AuthService {
    * Register new user
    */
   async register(userData: RegisterRequest): Promise<LoginResponse> {
-    // Backend expects alphanumeric UserName; derive from first/last/email
-    const deriveUserName = (): string => {
-      const fromNames = `${userData.firstName}${userData.lastName}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
-      if (fromNames && fromNames.length >= 3) return fromNames.slice(0, 32);
-      const fromEmail =
-        (userData as any).email
-          ?.split("@")[0]
-          ?.toLowerCase()
-          ?.replace(/[^a-z0-9]/g, "") || "";
-      if (fromEmail && fromEmail.length >= 3) return fromEmail.slice(0, 32);
-      return `user${Date.now()}`;
-    };
-
-    const payload = { ...userData, userName: deriveUserName() } as any;
+    // Server uses email as username; no need to derive or send userName
+    const payload = { ...userData } as const;
 
     const response = await apiClient.post<LoginResponse>(
       "/api/Auth/register",
