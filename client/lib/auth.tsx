@@ -5,7 +5,7 @@ import {
   type UserProfile,
 } from "./services/auth-service";
 
-export type UserRole = "job_seeker" | "recruiter" | "business";
+export type UserRole = "JobSeeker" | "Recruiter" | "Employer";
 
 export interface User {
   id: string;
@@ -150,7 +150,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     password: string,
     firstName: string,
     lastName: string,
-    role: UserRole = "job_seeker",
+    role: UserRole = "JobSeeker",
   ): Promise<boolean> => {
     try {
       setIsLoading(true);

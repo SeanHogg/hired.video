@@ -114,7 +114,7 @@ export const SignupRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
-  role: z.enum(["job_seeker", "recruiter", "business"]).optional(),
+  role: z.enum(["JobSeeker", "Recruiter", "Employer"]).optional(),
 });
 
 /**
@@ -131,7 +131,7 @@ export const UserProfileResponseSchema = z.object({
     summary: z.string(),
     // Add more fields as needed
   }),
-  role: z.enum(["job_seeker", "recruiter", "business"]),
+  role: z.enum(["JobSeeker", "Recruiter", "Employer"]),
   isVerified: z.boolean(),
   isPremium: z.boolean(),
   createdAt: z.iso.datetime(),

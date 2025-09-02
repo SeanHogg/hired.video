@@ -36,7 +36,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("job_seeker");
+  const [role, setRole] = useState<UserRole>("JobSeeker");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -183,19 +183,19 @@ export default function Signup() {
                           onValueChange={(v) => v && setRole(v as UserRole)}
                         >
                           <ToggleGroupItem
-                            value="job_seeker"
+                            value="JobSeeker"
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Users className="h-4 w-4 mr-2" /> Job Seeker
                           </ToggleGroupItem>
                           <ToggleGroupItem
-                            value="recruiter"
+                            value="Recruiter"
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
                           <ToggleGroupItem
-                            value="business"
+                            value="Employer"
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Building2 className="h-4 w-4 mr-2" /> Business

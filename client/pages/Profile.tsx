@@ -429,13 +429,13 @@ export default function Profile() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="job_seeker">
+                              <SelectItem value="JobSeeker">
                                 Job Seeker
                               </SelectItem>
-                              <SelectItem value="recruiter">
+                              <SelectItem value="Recruiter">
                                 Recruiter
                               </SelectItem>
-                              <SelectItem value="business">Business</SelectItem>
+                              <SelectItem value="Employer">Business</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
