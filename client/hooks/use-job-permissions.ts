@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 
 interface JobPermissions {
   canEdit: boolean;
@@ -56,8 +56,8 @@ export function useJobPermissions(job: Job | null): JobPermissions {
     // 2. Company associations
     // 3. Account ownership
     
-    const isRecruiter = user.role === "recruiter" || user.role === "business";
-    const isJobSeeker = user.role === "job_seeker";
+    const isRecruiter = user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
+    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
 
     let canEdit = false;
     let canDelete = false;
@@ -98,8 +98,8 @@ export function useCanCreateJobs(): boolean {
   if (!user) return false;
   
   // Only recruiters and employers can create jobs, not job seekers
-  const isRecruiter = user.role === "recruiter" || user.role === "business";
-  const isJobSeeker = user.role === "job_seeker";
+  const isRecruiter = user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
+  const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
   
   return isRecruiter && !isJobSeeker;
 }

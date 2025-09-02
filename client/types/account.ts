@@ -9,7 +9,7 @@ export interface AccountUser {
   inviteStatus: InviteStatus;
   inviteStatusStartDateTime?: string;
   inviteStatusEndDateTime?: string;
-  rolesAssigned: MyVideoResumeRole[];
+  rolesAssigned: string[];
   termsOfUseAgreementAcceptedDateTime?: string;
   termsOfUserAgreementVersion?: string;
   isPaidAccount: boolean;
@@ -66,18 +66,7 @@ export enum InviteStatus {
   Owner = 5,
 }
 
-export enum MyVideoResumeRole {
-  SuperAdmin = -1,
-  Admin = 0,
-  AccountOwner = 10,
-  AccountAdmin = 11,
-  Employer = 20,
-  EmployerManager = 21,
-  EmployerEmployee = 22,
-  EmployerExecutive = 23,
-  JobSeeker = 30,
-  Recruiter = 40,
-}
+
 
 export enum AccountUsageType {
   Individual = 0,
@@ -96,7 +85,7 @@ export interface InviteUserRequest {
   email: string;
   firstName?: string;
   lastName?: string;
-  roles: MyVideoResumeRole[];
+  roles: string[];
   message?: string;
 }
 
@@ -110,7 +99,7 @@ export interface AcceptInvitationResponse {
   success: boolean;
   message: string;
   companyName: string;
-  assignedRoles: MyVideoResumeRole[];
+  assignedRoles: string[];
   requiredRegistration: boolean;
   redirectUrl?: string;
 }
@@ -122,7 +111,7 @@ export interface InvitationDetailsResponse {
   companyLogoUrl?: string;
   inviterName: string;
   invitedEmail: string;
-  rolesToAssign: MyVideoResumeRole[];
+  rolesToAssign: string[];
   invitedAt: string;
   userExists: boolean;
   personalMessage?: string;
@@ -130,7 +119,7 @@ export interface InvitationDetailsResponse {
 
 export interface BulkInviteUsersRequest {
   users: BulkInviteUserItem[];
-  defaultRoles: MyVideoResumeRole[];
+  defaultRoles: string[];
   defaultMessage?: string;
 }
 
@@ -138,7 +127,7 @@ export interface BulkInviteUserItem {
   email: string;
   firstName?: string;
   lastName?: string;
-  roles?: MyVideoResumeRole[];
+  roles?: string[];
   message?: string;
 }
 
@@ -160,7 +149,7 @@ export interface BulkInviteResult {
 
 export interface UpdateUserRolesRequest {
   userId: string;
-  roles: MyVideoResumeRole[];
+  roles: string[];
 }
 
 export interface AccountUsersResponse {
@@ -177,7 +166,7 @@ export interface AccountSwitchContext {
 export interface AccountOption {
   id: string;
   name: string;
-  role: MyVideoResumeRole;
+  role: string;
   logoUrl?: string;
   isOwner: boolean;
   isAdmin: boolean;
@@ -197,40 +186,29 @@ export interface InviteFormData {
   email: string;
   firstName: string;
   lastName: string;
-  roles: MyVideoResumeRole[];
+  roles: string[];
   message: string;
 }
 
 export interface RoleEditFormData {
   userId: string;
-  roles: MyVideoResumeRole[];
+  roles: string[];
 }
 
 // Utility functions for role management
-export const getRoleDisplayName = (role: MyVideoResumeRole): string => {
+export const getRoleDisplayName = (role: string): string => {
   switch (role) {
-    case MyVideoResumeRole.SuperAdmin:
-      return "Super Admin";
-    case MyVideoResumeRole.Admin:
+    case "Admin":
       return "Admin";
-    case MyVideoResumeRole.AccountOwner:
-      return "Account Owner";
-    case MyVideoResumeRole.AccountAdmin:
-      return "Account Admin";
-    case MyVideoResumeRole.Employer:
-      return "Employer";
-    case MyVideoResumeRole.EmployerManager:
-      return "Employer Manager";
-    case MyVideoResumeRole.EmployerEmployee:
-      return "Employer Employee";
-    case MyVideoResumeRole.EmployerExecutive:
-      return "Employer Executive";
-    case MyVideoResumeRole.JobSeeker:
+    case "JobSeeker":
       return "Job Seeker";
-    case MyVideoResumeRole.Recruiter:
+    case "Recruiter":
       return "Recruiter";
+    case "Business":
+    case "Employer":
+      return "Business";
     default:
-      return "Unknown";
+      return role || "Unknown";
   }
 };
 
@@ -272,35 +250,33 @@ export const getInviteStatusColor = (status: InviteStatus): string => {
   }
 };
 
-export const canManageUsers = (userRoles: MyVideoResumeRole[]): boolean => {
+export const canManageUsers = (userRoles: string[]): boolean => {
   return userRoles.some(
     (role) =>
-      role === MyVideoResumeRole.AccountOwner ||
-      role === MyVideoResumeRole.AccountAdmin ||
-      role === MyVideoResumeRole.Admin,
+      role === "Admin" ||
+      role === "Business" ||
+      role === "Employer",
   );
 };
 
-export const canInviteUsers = (userRoles: MyVideoResumeRole[]): boolean => {
+export const canInviteUsers = (userRoles: string[]): boolean => {
   return canManageUsers(userRoles);
 };
 
 export const canEditRoles = (
-  userRoles: MyVideoResumeRole[],
-  targetUserRoles: MyVideoResumeRole[],
+  userRoles: string[],
+  targetUserRoles: string[],
 ): boolean => {
-  // Account owners can edit anyone except other owners
-  if (userRoles.includes(MyVideoResumeRole.AccountOwner)) {
-    return !targetUserRoles.includes(MyVideoResumeRole.AccountOwner);
+  // Admins can edit anyone except other admins
+  if (userRoles.includes("Admin")) {
+    return !targetUserRoles.includes("Admin");
   }
 
-  // Account admins can edit non-admin roles
-  if (userRoles.includes(MyVideoResumeRole.AccountAdmin)) {
+  // Business users can edit non-admin roles
+  if (userRoles.includes("Business") || userRoles.includes("Employer")) {
     return !targetUserRoles.some(
       (role) =>
-        role === MyVideoResumeRole.AccountOwner ||
-        role === MyVideoResumeRole.AccountAdmin ||
-        role === MyVideoResumeRole.Admin,
+        role === "Admin",
     );
   }
 
@@ -308,23 +284,20 @@ export const canEditRoles = (
 };
 
 export const getAvailableRolesForInvite = (
-  userRoles: MyVideoResumeRole[],
-): MyVideoResumeRole[] => {
-  if (userRoles.includes(MyVideoResumeRole.AccountOwner)) {
+  userRoles: string[],
+): string[] => {
+  if (userRoles.includes("Admin")) {
     return [
-      MyVideoResumeRole.AccountAdmin,
-      MyVideoResumeRole.Recruiter,
-      MyVideoResumeRole.Employer,
-      MyVideoResumeRole.EmployerManager,
-      MyVideoResumeRole.EmployerEmployee,
+      "Recruiter",
+      "Business",
+      "JobSeeker",
     ];
   }
 
-  if (userRoles.includes(MyVideoResumeRole.AccountAdmin)) {
+  if (userRoles.includes("Business") || userRoles.includes("Employer")) {
     return [
-      MyVideoResumeRole.Recruiter,
-      MyVideoResumeRole.Employer,
-      MyVideoResumeRole.EmployerEmployee,
+      "Recruiter",
+      "JobSeeker",
     ];
   }
 

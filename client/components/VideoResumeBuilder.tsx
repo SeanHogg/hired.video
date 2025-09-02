@@ -7,14 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Video, 
-  Upload, 
-  Wand2, 
-  Play, 
-  Save, 
-  Eye, 
-  Settings,
+import {
+  Video,
+  Wand2,
+  Save,
+  Eye,
   Plus,
   X,
   Info

@@ -13,11 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { UserRole } from "@/lib/auth";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 
 const personas = [
   {
-    id: "job_seeker" as UserRole,
+    id: USER_ROLES.JOB_SEEKER,
     title: "Job Seeker",
     description: "Looking for your next career opportunity",
     icon: Users,
@@ -32,7 +32,7 @@ const personas = [
     iconColor: "text-green-600",
   },
   {
-    id: "recruiter" as UserRole,
+    id: USER_ROLES.RECRUITER,
     title: "Recruiter",
     description: "Finding the perfect candidates for your roles",
     icon: Briefcase,
@@ -47,7 +47,7 @@ const personas = [
     iconColor: "text-blue-600",
   },
   {
-    id: "business" as UserRole,
+    id: USER_ROLES.BUSINESS,
     title: "Business",
     description: "Managing your company's hiring operations",
     icon: Building2,

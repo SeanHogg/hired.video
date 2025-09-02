@@ -49,7 +49,7 @@ import {
 
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 
 export default function Profile() {
   const {
@@ -429,13 +429,13 @@ export default function Profile() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="JobSeeker">
+                              <SelectItem value={USER_ROLES.JOB_SEEKER}>
                                 Job Seeker
                               </SelectItem>
-                              <SelectItem value="Recruiter">
+                              <SelectItem value={USER_ROLES.RECRUITER}>
                                 Recruiter
                               </SelectItem>
-                              <SelectItem value="Employer">Business</SelectItem>
+                              <SelectItem value={USER_ROLES.EMPLOYER}>Business</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

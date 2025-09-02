@@ -300,7 +300,7 @@ export default function Tasks() {
             </div>
 
             {/* Task Assignment - only show for business/recruiter roles */}
-            {(user?.role === "business" || user?.role === "recruiter") &&
+            {(user?.role === "Employer" || user?.role === "Recruiter") &&
               assignableUsers.length > 0 && (
                 <div>
                   <Label htmlFor="edit-assigned">Assign To</Label>

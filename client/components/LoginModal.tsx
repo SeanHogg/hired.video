@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -334,7 +335,7 @@ export default function LoginModal({
                     >
                       <option value="JobSeeker">Job Seeker</option>
                       <option value="Recruiter">Recruiter</option>
-                      <option value="Employer">Business Owner</option>
+                      <option value="Business">Business Owner</option>
                     </select>
                   </div>
 

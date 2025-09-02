@@ -127,7 +127,7 @@ export default function PeopleCard({
   // Derive safe display name and initials
   const displayFullName = (person.fullName && person.fullName.trim().length > 0)
     ? person.fullName
-    : (person as any)?.name?.toString()?.trim?.() || `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "User";
+    : (person as { name?: string })?.name?.toString()?.trim?.() || `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "User";
   const firstInitial = ((person.firstName?.[0]) ?? displayFullName?.trim()?.[0] ?? "?")
     .toString()
     .toUpperCase();

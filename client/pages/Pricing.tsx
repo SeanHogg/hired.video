@@ -54,7 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useSidebar } from "@/hooks/use-sidebar";
 import type { UserRole } from "@/lib/auth";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 
 export default function Pricing() {
@@ -75,7 +75,7 @@ export default function Pricing() {
   // Pricing state
   const [isAnnual, setIsAnnual] = useState(false);
   // Persona state
-  const [persona, setPersona] = useState<UserRole>("job_seeker");
+  const [persona, setPersona] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
 
   const personaCopy: Record<
     UserRole,
@@ -89,7 +89,7 @@ export default function Pricing() {
       userCountLabel: string; // label for the user count selector
     }
   > = {
-    job_seeker: {
+    [USER_ROLES.JOB_SEEKER]: {
       label: "Job Seeker",
       freeDescription:
         "Get started with tools to build and share your video resume.",
@@ -114,7 +114,7 @@ export default function Pricing() {
       unitLabel: "per month",
       userCountLabel: "",
     },
-    recruiter: {
+    [USER_ROLES.RECRUITER]: {
       label: "Recruiter",
       freeDescription:
         "Essential ATS and CRM to start sourcing and tracking candidates.",
@@ -141,7 +141,7 @@ export default function Pricing() {
       unitLabel: "per seat / month",
       userCountLabel: "Seats",
     },
-    business: {
+    [USER_ROLES.EMPLOYER]: {
       label: "Business",
       freeDescription:
         "Core HR tools to start hiring and organizing candidates.",
@@ -166,6 +166,53 @@ export default function Pricing() {
       unitLabel: "per user / month",
       userCountLabel: "Users",
     },
+    [USER_ROLES.BUSINESS]: {
+      label: "Business",
+      freeDescription:
+        "Core HR tools to start hiring and organizing candidates.",
+      premiumDescription:
+        "All-in-one HR suite with engagement and advanced analytics.",
+      freeFeatures: [
+        "ATS + Job postings",
+        "Recruiting & Sales CRM",
+        "1 admin user",
+        "Up to 2 employees",
+        "Basic scheduling",
+        "AI assistance (10/mo)",
+      ],
+      premiumFeatures: [
+        "Employee community (Engage/Inform/Inspire)",
+        "Hiring & Onboarding (Offers)",
+        "Performance management",
+        "Calendar & notifications",
+        "Advanced analytics & API",
+        "Unlimited users",
+      ],
+      unitLabel: "per user / month",
+      userCountLabel: "Users",
+    },
+    [USER_ROLES.ADMIN]: {
+      label: "Admin",
+      freeDescription:
+        "Administrative access to manage the platform.",
+      premiumDescription:
+        "Full administrative control with advanced management features.",
+      freeFeatures: [
+        "User management",
+        "Basic analytics",
+        "System configuration",
+        "Support access",
+      ],
+      premiumFeatures: [
+        "Advanced user management",
+        "Full system analytics",
+        "API access",
+        "Priority support",
+        "Custom integrations",
+      ],
+      unitLabel: "per admin / month",
+      userCountLabel: "Admins",
+    },
   };
 
   const [selectedUsers, setSelectedUsers] = useState(1);
@@ -176,9 +223,9 @@ export default function Pricing() {
       try {
         const u = JSON.parse(stored);
         if (
-          u?.role === "job_seeker" ||
-          u?.role === "recruiter" ||
-          u?.role === "business"
+          u?.role === USER_ROLES.JOB_SEEKER ||
+          u?.role === USER_ROLES.RECRUITER ||
+          u?.role === USER_ROLES.EMPLOYER
         ) {
           setPersona(u.role as UserRole);
         }
@@ -392,7 +439,7 @@ export default function Pricing() {
                     </div>
 
                     {/* Seats selector only for recruiter/business */}
-                    {persona !== "job_seeker" && (
+                    {persona !== USER_ROLES.JOB_SEEKER && (
                       <div className="flex items-center justify-center gap-4">
                         <Label htmlFor="user-select">
                           {personaCopy[persona].userCountLabel ||
@@ -557,12 +604,12 @@ export default function Pricing() {
                           Job Postings
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker" ? "—" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER ? "—" : "Unlimited"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "recruiter"
+                          {persona === USER_ROLES.RECRUITER
                             ? "Unlimited + Exclusive"
-                            : persona === "business"
+                            : persona === USER_ROLES.EMPLOYER
                               ? "Unlimited"
                               : "—"}
                         </td>
@@ -573,14 +620,14 @@ export default function Pricing() {
                           Team Size
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker"
+                          {persona === USER_ROLES.JOB_SEEKER
                             ? "1"
-                            : persona === "recruiter"
+                            : persona === USER_ROLES.RECRUITER
                               ? "Up to 2"
                               : "Up to 2"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker" ? "1" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "Unlimited"}
                         </td>
                       </tr>
                       <tr>
@@ -589,10 +636,10 @@ export default function Pricing() {
                           Admin Users
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker" ? "1" : "1"}
+                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "1"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === "job_seeker" ? "1" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "Unlimited"}
                         </td>
                       </tr>
                       <tr>
@@ -751,14 +798,14 @@ export default function Pricing() {
                           Recruiting & Sales CRM
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? (
+                          {persona === USER_ROLES.JOB_SEEKER ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? (
+                          {persona === USER_ROLES.JOB_SEEKER ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
@@ -771,14 +818,14 @@ export default function Pricing() {
                           Hiring & Onboarding
                         </td>
                         <td className="text-center p-4">
-                          {persona === "job_seeker" ? (
+                          {persona === "JobSeeker" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? (
+                          {persona === "Employer" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -825,14 +872,14 @@ export default function Pricing() {
                           Smart Outreach Campaigns
                         </td>
                         <td className="text-center p-4">
-                          {persona === "recruiter" ? (
+                          {persona === "Recruiter" ? (
                             <span className="text-muted-foreground">Basic</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "recruiter" ? (
+                          {persona === "Recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -869,14 +916,14 @@ export default function Pricing() {
                           Employee Community
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? (
+                          {persona === "Employer" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" ? (
+                          {persona === "Employer" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -923,14 +970,14 @@ export default function Pricing() {
                           Hiring Success Metrics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? (
+                          {persona === "Employer" || persona === "Recruiter" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? (
+                          {persona === "Employer" || persona === "Recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -943,14 +990,14 @@ export default function Pricing() {
                           Time-to-hire Analytics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? (
+                          {persona === "Employer" || persona === "Recruiter" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "business" || persona === "recruiter" ? (
+                          {persona === "Employer" || persona === "Recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>

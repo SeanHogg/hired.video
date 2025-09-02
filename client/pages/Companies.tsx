@@ -31,7 +31,7 @@ import {
   type Company,
 } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { CompanyWithOwnership } from "@/types/company";
 
 export default function Companies() {
@@ -171,9 +171,9 @@ export default function Companies() {
   // If user is authenticated, show the actual companies page
   if (isAuthenticated && user) {
     const companiesData = getCompaniesForUser();
-    const isJobSeeker = user.role === "job_seeker";
+    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrBusiness =
-      user.role === "recruiter" || user.role === "business";
+      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
     return (
       <div className="min-h-screen bg-background">

@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
 import {
   MapPin,
-  Clock,
   DollarSign,
   Users,
   Briefcase,
   ExternalLink,
   Search,
-  Filter,
-  Calendar,
   Building2,
-  ChevronRight,
-  Star,
-  Heart,
-  Share2
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,7 +109,7 @@ export function CompanyCareersControl({
   const [experienceLevelFilter, setExperienceLevelFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   
-  const { user, isAuthenticated } = useAuth();
+  const { user: _user, isAuthenticated: _isAuthenticated } = useAuth();
 
   useEffect(() => {
     loadCompanyAndJobs();
@@ -154,8 +148,8 @@ export function CompanyCareersControl({
             name: companyResponse.name || 'Company',
             logo: companyResponse.logo || '/logo.png',
             tagline: companyResponse.tagline || '',
-            description: (companyResponse as any).description || '',
-            website: (companyResponse as any).website || '',
+            description: (companyResponse as { description?: string }).description || '',
+            website: (companyResponse as { website?: string }).website || '',
             industry: companyResponse.industry || '',
             size: companyResponse.size || '',
             location: companyResponse.location || ''

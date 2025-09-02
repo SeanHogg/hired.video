@@ -9,7 +9,6 @@ import {
   UpdateUserRolesRequest,
   AccountSwitchContext,
   AccountOption,
-  MyVideoResumeRole,
   BulkInviteUsersRequest,
   BulkInviteUsersResponse,
   InvitationDetailsResponse,
@@ -88,8 +87,8 @@ class AccountService {
         name: account.name,
         role: account.role,
         logoUrl: account.logoUrl ?? undefined,
-        isOwner: account.role === MyVideoResumeRole.AccountOwner,
-        isAdmin: account.role === MyVideoResumeRole.AccountAdmin,
+        isOwner: account.role === "Admin",
+        isAdmin: account.role === "Admin" || account.role === "Business",
       }));
     } catch (error) {
       console.error("Error fetching available accounts:", error);

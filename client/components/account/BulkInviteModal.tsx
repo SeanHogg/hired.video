@@ -22,7 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  MyVideoResumeRole,
   BulkInviteUsersRequest,
   BulkInviteUserItem,
   BulkInviteUsersResponse,
@@ -34,7 +33,7 @@ interface BulkInviteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onBulkInvite: (data: BulkInviteUsersRequest) => Promise<BulkInviteUsersResponse>;
-  currentUserRoles: MyVideoResumeRole[];
+  currentUserRoles: string[];
 }
 
 export function BulkInviteModal({
@@ -44,7 +43,7 @@ export function BulkInviteModal({
   currentUserRoles,
 }: BulkInviteModalProps) {
   const [users, setUsers] = useState<BulkInviteUserItem[]>([]);
-  const [defaultRoles, setDefaultRoles] = useState<MyVideoResumeRole[]>([]);
+  const [defaultRoles, setDefaultRoles] = useState<string[]>([]);
   const [defaultMessage, setDefaultMessage] = useState("");
   const [csvInput, setCsvInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,7 +66,7 @@ export function BulkInviteModal({
     setUsers(updatedUsers);
   };
 
-  const handleRoleToggle = (role: MyVideoResumeRole) => {
+  const handleRoleToggle = (role: string) => {
     setDefaultRoles(prev => 
       prev.includes(role) 
         ? prev.filter(r => r !== role)
@@ -155,7 +154,7 @@ export function BulkInviteModal({
           handleClose();
         }, 2000);
       }
-    } catch (error) {
+    } catch {
       setErrors(["Failed to send bulk invitations. Please try again."]);
     } finally {
       setLoading(false);

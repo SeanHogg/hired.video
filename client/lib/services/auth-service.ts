@@ -10,6 +10,7 @@ import {
   LoginResponseSchema as SharedLoginResponseSchema,
   type LoginResponse as SharedLoginResponse,
 } from "@shared/api";
+import { USER_ROLES } from "../auth";
 
 // ============================================================================
 // SCHEMAS
@@ -27,7 +28,7 @@ export const RegisterRequestSchema = z.object({
   confirmPassword: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z.enum(["JobSeeker", "Employer", "Recruiter"]).optional(),
+  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.BUSINESS, USER_ROLES.ADMIN]).optional(),
 });
 
 // Use the shared login response schema from @shared/api

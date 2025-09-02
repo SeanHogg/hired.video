@@ -63,7 +63,7 @@ import ContentSection from "@/components/ui/ContentSection";
 import { useCardRenderer } from "@/lib/card-factory";
 import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { companyService } from "@/lib/services/company-service";
 import {
   dashboardService,
@@ -809,13 +809,9 @@ export default function Index() {
           user
             ? {
                 ...user,
-                isAuthenticated,
-                role: (user.role === "business"
-                  ? "recruiter"
-                  : user.role || "job_seeker") as
-                  | "job_seeker"
-                  | "recruiter"
-                  | "business",
+                role: (user.role === USER_ROLES.EMPLOYER
+                  ? USER_ROLES.RECRUITER
+                  : user.role || USER_ROLES.JOB_SEEKER),
               }
             : null
         }

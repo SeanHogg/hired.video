@@ -49,7 +49,14 @@ export function VideoUpload({
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [videoMetadata, setVideoMetadata] = useState<any>(null);
+  const [videoMetadata, setVideoMetadata] = useState<{
+    duration?: number;
+    width?: number;
+    height?: number;
+    size?: number;
+    format?: string;
+    resolution?: string;
+  } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,15 +88,21 @@ export function VideoUpload({
     });
   };
 
-  const extractVideoMetadata = (video: HTMLVideoElement, file: File): any => {
+  const extractVideoMetadata = (video: HTMLVideoElement, file: File): {
+    duration: number;
+    width: number;
+    height: number;
+    size: number;
+    format: string;
+    resolution: string;
+  } => {
     return {
       duration: video.duration,
       width: video.videoWidth,
       height: video.videoHeight,
       size: file.size,
       format: file.type,
-      resolution: `${video.videoWidth}x${video.videoHeight}`,
-      aspectRatio: video.videoWidth / video.videoHeight
+      resolution: `${video.videoWidth}x${video.videoHeight}`
     };
   };
 

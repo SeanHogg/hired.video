@@ -19,7 +19,7 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 
@@ -38,7 +38,7 @@ export default function Sidebar({
   const location = useLocation();
 
   // Check if user is Admin (using the actual role values)
-  const isAdmin = user?.role === 'business'; // Business users have admin-like capabilities
+  const isAdmin = user?.role === USER_ROLES.EMPLOYER; // Business users have admin-like capabilities
 
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },

@@ -15,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { accountService } from "@/lib/services/account-service";
 import {
   AccountOption,
-  MyVideoResumeRole,
   getRoleDisplayName,
 } from "@/types/account";
 
@@ -78,24 +77,26 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
     return accounts.find((account) => account.id === currentAccountId) || null;
   };
 
-  const getRoleIcon = (role: MyVideoResumeRole) => {
+  const getRoleIcon = (role: string) => {
     switch (role) {
-      case MyVideoResumeRole.AccountOwner:
+      case "Admin":
         return <Crown className="h-3 w-3" />;
-      case MyVideoResumeRole.AccountAdmin:
+      case "Business":
+      case "Employer":
         return <Shield className="h-3 w-3" />;
       default:
         return null;
     }
   };
 
-  const getRoleBadgeColor = (role: MyVideoResumeRole): string => {
+  const getRoleBadgeColor = (role: string): string => {
     switch (role) {
-      case MyVideoResumeRole.AccountOwner:
+      case "Admin":
         return "bg-purple-100 text-purple-800";
-      case MyVideoResumeRole.AccountAdmin:
+      case "Business":
+      case "Employer":
         return "bg-blue-100 text-blue-800";
-      case MyVideoResumeRole.Recruiter:
+      case "Recruiter":
         return "bg-green-100 text-green-800";
       default:
         return "bg-gray-100 text-gray-800";

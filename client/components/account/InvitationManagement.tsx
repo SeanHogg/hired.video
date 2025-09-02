@@ -67,18 +67,24 @@ export function InvitationManagement({
   const [loading, setLoading] = useState(false);
 
   // Filter users based on search and filters
-  const filteredUsers = users.filter(user => {
-    const userWithDetails = user as any; // Type assertion for missing properties
+  const filteredUsers = users.filter((user) => {
+    const firstName = user.userProfile?.firstName?.toLowerCase() ?? "";
+    const lastName = user.userProfile?.lastName?.toLowerCase() ?? "";
+    const email = user.userProfile?.email?.toLowerCase() ?? "";
+
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      (userWithDetails.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (userWithDetails.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (userWithDetails.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+      firstName.includes(term) ||
+      lastName.includes(term) ||
+      email.includes(term);
 
-    const matchesStatus = statusFilter === "all" ||
-      getInviteStatusDisplayName(userWithDetails.inviteStatus).toLowerCase() === statusFilter.toLowerCase();
+    const matchesStatus =
+      statusFilter === "all" ||
+      getInviteStatusDisplayName(user.inviteStatus).toLowerCase() === statusFilter.toLowerCase();
 
-    const matchesRole = roleFilter === "all" ||
-      (userWithDetails.roles?.some((role: any) => getRoleDisplayName(role).toLowerCase() === roleFilter.toLowerCase()) || false);
+    const matchesRole =
+      roleFilter === "all" ||
+      (user.rolesAssigned?.some((role) => getRoleDisplayName(role).toLowerCase() === roleFilter.toLowerCase()) ?? false);
 
     return matchesSearch && matchesStatus && matchesRole;
   });
@@ -110,7 +116,7 @@ export function InvitationManagement({
         description: "Invitation resent successfully",
       });
       onRefresh();
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to resend invitation",
@@ -130,7 +136,7 @@ export function InvitationManagement({
         description: "Invitation canceled successfully",
       });
       onRefresh();
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to cancel invitation",
@@ -344,12 +350,12 @@ export function InvitationManagement({
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-sm font-medium text-blue-600">
-                              {(user as any).firstName?.charAt(0) || 'U'}{(user as any).lastName?.charAt(0) || 'U'}
+                              {user.userProfile?.firstName?.charAt(0) || 'U'}{user.userProfile?.lastName?.charAt(0) || 'U'}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium">{(user as any).firstName || 'Unknown'} {(user as any).lastName || 'User'}</p>
-                            <p className="text-sm text-gray-500">{(user as any).email || 'No email'}</p>
+                            <p className="font-medium">{user.userProfile?.firstName || 'Unknown'} {user.userProfile?.lastName || 'User'}</p>
+                            <p className="text-sm text-gray-500">{user.userProfile?.email || 'No email'}</p>
                           </div>
                         </div>
                       </TableCell>
@@ -364,7 +370,7 @@ export function InvitationManagement({
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {((user as any).roles || []).map((role: any) => (
+                          {(user.rolesAssigned || []).map((role) => (
                             <Badge key={role} variant="outline" className="text-xs">
                               {getRoleDisplayName(role)}
                             </Badge>
@@ -373,7 +379,7 @@ export function InvitationManagement({
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-500">
-                          {(user as any).joinedAt ? new Date((user as any).joinedAt).toLocaleDateString() : 'Pending'}
+                          {user.inviteStatusStartDateTime ? new Date(user.inviteStatusStartDateTime).toLocaleDateString() : 'Pending'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">

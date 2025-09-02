@@ -13,28 +13,18 @@ import {
   Pie,
   Cell
 } from "recharts";
-import { 
-  TrendingUp, 
-  Users, 
-  UserCheck, 
-  Clock, 
-  XCircle, 
+import {
+  TrendingUp,
+  Users,
   AlertTriangle,
   Download,
   RefreshCw,
-  Calendar,
-  Target
+  Target,
+  Clock,
+  Calendar
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { accountService } from "@/lib/services/account-service";
 import { toast } from "@/hooks/use-toast";
 
@@ -62,13 +52,10 @@ interface InvitationAnalyticsProps {
   onExport?: () => void;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
 export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
   const [data, setData] = useState<InvitationAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState("12months");
 
   useEffect(() => {
     loadAnalytics();

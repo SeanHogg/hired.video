@@ -40,12 +40,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
+
 import { accountService } from "@/lib/services/account-service";
 import {
   AccountUser,
   InviteStatus,
-  MyVideoResumeRole,
+
   getRoleDisplayName,
   getInviteStatusDisplayName,
   getInviteStatusColor,
@@ -79,11 +80,11 @@ export default function AccountManagement() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Check if user is a job seeker (should see personal account page instead of team management)
-  const isJobSeeker = user?.role === "job_seeker";
+  const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
   const [activeTab, setActiveTab] = useState("users");
 
   // Mock current user roles for demo - in real app this would come from auth context
-  const currentUserRoles = [MyVideoResumeRole.AccountOwner];
+  const currentUserRoles = ["Admin"];
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
@@ -157,7 +158,7 @@ export default function AccountManagement() {
 
   const handleUpdateRoles = async (
     userId: string,
-    roles: MyVideoResumeRole[],
+    roles: string[],
   ) => {
     try {
       await accountService.updateUserRoles({ userId, roles });

@@ -50,7 +50,7 @@ interface AccountSettingsProps {
   onSave: (settings: AccountSettingsData) => Promise<void>;
   initialData?: Partial<AccountSettingsData>;
   loading?: boolean;
-  onLoadSettings?: () => Promise<any>;
+  onLoadSettings?: () => Promise<AccountSettingsData>;
 }
 
 export function AccountSettings({
@@ -97,7 +97,7 @@ export function AccountSettings({
             email: data.email || "",
             // Map other fields from API response
           }));
-        } catch (error) {
+        } catch {
           toast({
             title: "Error loading settings",
             description: "Failed to load account settings.",
@@ -127,7 +127,7 @@ export function AccountSettings({
         title: "Settings saved",
         description: "Your account settings have been updated successfully.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error saving settings",
         description: "Failed to save account settings. Please try again.",

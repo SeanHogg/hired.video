@@ -47,7 +47,7 @@ import {
 } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
 
 export default function Jobs() {
@@ -221,9 +221,9 @@ export default function Jobs() {
 
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    const isJobSeeker = user.role === "job_seeker";
+    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrBusiness =
-      user.role === "recruiter" || user.role === "business";
+      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
     return (
       <div className="min-h-screen bg-background">

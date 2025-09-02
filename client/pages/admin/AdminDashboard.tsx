@@ -18,8 +18,7 @@ import {
 
 import { BillingManagement } from '@/components/billing/BillingManagement';
 import { BillingAnalytics } from '@/components/billing/BillingAnalytics';
-import { usePermissions, PermissionGate, RoleGate } from '@/hooks/use-permissions';
-import { MyVideoResumeRole } from '@/types/account';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useAuth } from '@/lib/auth';
 
 interface QuickStat {
@@ -33,7 +32,8 @@ interface QuickStat {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const { user } = useAuth();
-  const { permissions, isOwner, isAdmin } = usePermissions();
+  const { isAdmin } = usePermissions();
+  const isOwner = isAdmin; // For now, treat admin as owner
 
   const quickStats: QuickStat[] = [
     {
@@ -128,17 +128,9 @@ export default function AdminDashboard() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           
-          <PermissionGate resource="team_members" action="read">
-            <TabsTrigger value="team">Team</TabsTrigger>
-          </PermissionGate>
-          
-          <PermissionGate resource="billing" action="read">
-            <TabsTrigger value="billing">Billing</TabsTrigger>
-          </PermissionGate>
-          
-          <PermissionGate resource="analytics" action="read">
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </PermissionGate>
+          {isAdmin && <TabsTrigger value="team">Team</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="billing">Billing</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
           
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -171,7 +163,7 @@ export default function AdminDashboard() {
 
           {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <PermissionGate resource="team_members" action="create">
+            {isAdmin && (
               <Card className="cursor-pointer hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
@@ -187,9 +179,9 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </PermissionGate>
+            )}
 
-            <PermissionGate resource="billing" action="manage">
+            {isAdmin && (
               <Card className="cursor-pointer hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
@@ -205,7 +197,7 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </PermissionGate>
+            )}
 
             <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
@@ -274,7 +266,7 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
 
-        <PermissionGate resource="team_members" action="read">
+        {isAdmin && (
           <TabsContent value="team">
             <Card>
               <CardHeader>
@@ -290,19 +282,19 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-        </PermissionGate>
+        )}
 
-        <PermissionGate resource="billing" action="read">
+        {isAdmin && (
           <TabsContent value="billing">
             <BillingManagement />
           </TabsContent>
-        </PermissionGate>
+        )}
 
-        <PermissionGate resource="analytics" action="read">
+        {isAdmin && (
           <TabsContent value="analytics">
             <BillingAnalytics />
           </TabsContent>
-        </PermissionGate>
+        )}
 
         <TabsContent value="settings" className="space-y-4">
           <Card>
@@ -341,7 +333,7 @@ export default function AdminDashboard() {
                   <Button variant="outline">Manage</Button>
                 </div>
 
-                <RoleGate roles={[MyVideoResumeRole.AccountOwner]}>
+                {isOwner && (
                   <div className="flex items-center justify-between p-4 border rounded-lg border-red-200">
                     <div>
                       <h3 className="font-semibold text-red-600">Danger Zone</h3>
@@ -353,7 +345,7 @@ export default function AdminDashboard() {
                       Delete Organization
                     </Button>
                   </div>
-                </RoleGate>
+                )}
               </div>
             </CardContent>
           </Card>

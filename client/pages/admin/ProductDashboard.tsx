@@ -133,7 +133,7 @@ export default function ProductDashboard() {
   const { user } = useAuth();
 
   // Check if user is SuperAdmin
-  const isAdmin = user?.role === 'business'; // Business users have admin-like capabilities
+  const isAdmin = user?.role === 'Employer'; // Business users have admin-like capabilities
 
   useEffect(() => {
     if (isAdmin) {

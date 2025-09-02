@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 
 // Content item types
 interface VideoItem {
@@ -419,7 +419,7 @@ export default function Dashboard() {
   // Persona-specific metrics
   const getMetricsForPersona = () => {
     switch (user.role) {
-      case "job_seeker":
+      case USER_ROLES.JOB_SEEKER:
         return {
           title: "Job Seeker Dashboard",
           description: "Track your job search progress and opportunities",
@@ -471,7 +471,7 @@ export default function Dashboard() {
             },
           ],
         };
-      case "recruiter":
+      case USER_ROLES.RECRUITER:
         return {
           title: "Recruiter Dashboard",
           description: "Manage candidates and track recruitment metrics",
@@ -523,7 +523,7 @@ export default function Dashboard() {
             },
           ],
         };
-      case "business":
+      case USER_ROLES.EMPLOYER:
         return {
           title: "Business Dashboard",
           description: "Overview of hiring operations and team metrics",
@@ -591,7 +591,7 @@ export default function Dashboard() {
     ];
 
     switch (user.role) {
-      case "job_seeker":
+      case USER_ROLES.JOB_SEEKER:
         return [
           ...baseTasks,
           { id: "resume", title: "Upload your resume", completed: true },
@@ -607,7 +607,7 @@ export default function Dashboard() {
             completed: true,
           },
         ];
-      case "recruiter":
+      case USER_ROLES.RECRUITER:
         return [
           ...baseTasks,
           { id: "company", title: "Set up company profile", completed: true },
@@ -619,7 +619,7 @@ export default function Dashboard() {
             completed: false,
           },
         ];
-      case "business":
+      case USER_ROLES.EMPLOYER:
         return [
           ...baseTasks,
           {
@@ -1015,7 +1015,7 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {user.role === "job_seeker" && (
+                  {user.role === USER_ROLES.JOB_SEEKER && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -1040,7 +1040,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === "recruiter" && (
+                  {user.role === USER_ROLES.RECRUITER && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -1065,7 +1065,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === "business" && (
+                  {user.role === USER_ROLES.EMPLOYER && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"

@@ -933,7 +933,7 @@ export default function Resumes() {
                           Active: {getActiveResume()?.name}
                         </Badge>
                       )}
-                      {!getActiveResume() && user?.role === "job_seeker" && (
+                      {!getActiveResume() && user?.role === "JobSeeker" && (
                         <Badge
                           variant="outline"
                           className="text-orange-600 border-orange-200"
@@ -941,13 +941,13 @@ export default function Resumes() {
                           No active resume
                         </Badge>
                       )}
-                      {(user?.role === "recruiter" ||
-                        user?.role === "business") && (
+                      {(user?.role === "Recruiter" ||
+                        user?.role === "Employer") && (
                         <Badge
                           variant="outline"
                           className="text-blue-600 border-blue-200"
                         >
-                          {user.role === "recruiter" ? "Recruiter" : "Business"}{" "}
+                          {user.role === "Recruiter" ? "Recruiter" : "Business"}{" "}
                           • Tracking{" "}
                           {
                             resumes.filter((r) => r.ownership === "tracked")
@@ -958,7 +958,7 @@ export default function Resumes() {
                       )}
                     </div>
                   </div>
-                  {user?.role === "job_seeker" && (
+                  {user?.role === "JobSeeker" && (
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={() => navigate("/resumes/upload")}
@@ -1369,7 +1369,7 @@ export default function Resumes() {
                           : "Create your first resume to get started"}
                       </p>
                       <div className="flex gap-2 justify-center">
-                        {user?.role === "job_seeker" && (
+                        {user?.role === "JobSeeker" && (
                           <>
                             <Button
                               onClick={() => navigate("/resumes/upload")}
@@ -1389,8 +1389,8 @@ export default function Resumes() {
                             </Button>
                           </>
                         )}
-                        {(user?.role === "recruiter" ||
-                          user?.role === "business") && (
+                        {(user?.role === "Recruiter" ||
+                          user?.role === "Employer") && (
                           <p className="text-sm text-muted-foreground">
                             Browse and track candidate resumes from the home
                             page search.
@@ -1415,9 +1415,8 @@ export default function Resumes() {
         user={
           user
             ? {
-                id: user.id,
-                isAuthenticated: true,
-                role: user.role || "job_seeker",
+                ...user,
+                role: user.role || "JobSeeker",
               }
             : null
         }

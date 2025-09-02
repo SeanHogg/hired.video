@@ -5,7 +5,16 @@ import {
   type UserProfile,
 } from "./services/auth-service";
 
-export type UserRole = "JobSeeker" | "Recruiter" | "Employer";
+// Role constants to avoid hardcoded strings
+export const USER_ROLES = {
+  JOB_SEEKER: "JobSeeker",
+  RECRUITER: "Recruiter",
+  EMPLOYER: "Employer",
+  BUSINESS: "Business",
+  ADMIN: "Admin"
+} as const;
+
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 
 export interface User {
   id: string;
@@ -150,7 +159,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     password: string,
     firstName: string,
     lastName: string,
-    role: UserRole = "JobSeeker",
+    role: UserRole = USER_ROLES.JOB_SEEKER,
   ): Promise<boolean> => {
     try {
       setIsLoading(true);

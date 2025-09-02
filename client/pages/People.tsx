@@ -45,7 +45,7 @@ import {
   type PublicUser,
 } from "@/lib/services/user-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import type {
   UserWithOwnership,
   UserProfile,
@@ -324,9 +324,9 @@ export default function People() {
   // If user is authenticated, show the actual people page
   if (isAuthenticated && user) {
     const peopleData: PeopleData = getPeopleForUser() as PeopleData;
-    const isJobSeeker = user.role === "job_seeker";
+    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrBusiness =
-      user.role === "recruiter" || user.role === "business";
+      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
     return (
       <div className="min-h-screen bg-background">

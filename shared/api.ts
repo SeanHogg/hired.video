@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { USER_ROLES } from "@/lib/auth";
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -114,7 +115,7 @@ export const SignupRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
-  role: z.enum(["JobSeeker", "Recruiter", "Employer"]).optional(),
+  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.BUSINESS, USER_ROLES.ADMIN]).optional(),
 });
 
 /**
@@ -131,7 +132,7 @@ export const UserProfileResponseSchema = z.object({
     summary: z.string(),
     // Add more fields as needed
   }),
-  role: z.enum(["JobSeeker", "Recruiter", "Employer"]),
+  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.BUSINESS, USER_ROLES.ADMIN]),
   isVerified: z.boolean(),
   isPremium: z.boolean(),
   createdAt: z.iso.datetime(),

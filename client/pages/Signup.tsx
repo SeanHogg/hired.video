@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth, type UserRole } from "@/lib/auth";
+import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
 
 export default function Signup() {
   const location = useLocation();
@@ -36,7 +36,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("JobSeeker");
+  const [role, setRole] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -183,19 +183,19 @@ export default function Signup() {
                           onValueChange={(v) => v && setRole(v as UserRole)}
                         >
                           <ToggleGroupItem
-                            value="JobSeeker"
+                            value={USER_ROLES.JOB_SEEKER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Users className="h-4 w-4 mr-2" /> Job Seeker
                           </ToggleGroupItem>
                           <ToggleGroupItem
-                            value="Recruiter"
+                            value={USER_ROLES.RECRUITER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
                           <ToggleGroupItem
-                            value="Employer"
+                            value={USER_ROLES.EMPLOYER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
                             <Building2 className="h-4 w-4 mr-2" /> Business

@@ -5,27 +5,19 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { 
-  CreditCard, 
-  Download, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
-  Users, 
-  FileText, 
+import {
+  CreditCard,
+  Download,
+  TrendingUp,
+  FileText,
   Settings,
-  Plus,
-  Edit,
-  Trash2,
   CheckCircle,
-  AlertCircle,
-  Clock
+  AlertCircle
 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -213,7 +205,7 @@ export function BillingManagement() {
     }
   };
 
-  const handleCancelSubscription = async () => {
+  const _handleCancelSubscription = async () => {
     try {
       // TODO: Implement subscription cancellation
       console.log('Canceling subscription');
@@ -507,21 +499,56 @@ export function BillingManagement() {
         </TabsContent>
 
         <TabsContent value="payment-methods" className="space-y-4">
-          <Alert>
-            <CreditCard className="h-4 w-4" />
-            <AlertDescription>
-              Payment method management will be implemented in the next phase.
-            </AlertDescription>
-          </Alert>
+          {paymentMethods.length === 0 ? (
+            <Alert>
+              <CreditCard className="h-4 w-4" />
+              <AlertDescription>No payment methods on file.</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-3">
+              {paymentMethods.map((pm) => (
+                <Card key={pm.id}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      <div>
+                        <div className="font-medium uppercase">{pm.brand} •••• {pm.last4}</div>
+                        <div className="text-sm text-muted-foreground">Expires {pm.expiryMonth}/{pm.expiryYear}</div>
+                      </div>
+                    </div>
+                    {pm.isDefault && <Badge variant="secondary">Default</Badge>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-4">
-          <Alert>
-            <FileText className="h-4 w-4" />
-            <AlertDescription>
-              Invoice management will be implemented in the next phase.
-            </AlertDescription>
-          </Alert>
+          {invoices.length === 0 ? (
+            <Alert>
+              <FileText className="h-4 w-4" />
+              <AlertDescription>No invoices found.</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-3">
+              {invoices.map((inv) => (
+                <Card key={inv.id}>
+                  <CardContent className="flex items-center justify-between p-4">
+                    <div>
+                      <div className="font-medium">{inv.number}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {inv.date.toLocaleDateString()} • {inv.currency} {inv.amount.toFixed(2)}
+                      </div>
+                    </div>
+                    <Button asChild variant="outline" size="sm">
+                      <a href={inv.downloadUrl}>Download</a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

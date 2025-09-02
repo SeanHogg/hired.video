@@ -358,11 +358,11 @@ export default function PeopleDetail() {
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case "job_seeker":
+      case "JobSeeker":
         return "Job Seeker";
-      case "recruiter":
+      case "Recruiter":
         return "Recruiter";
-      case "business":
+      case "Business":
         return "Business Leader";
       default:
         return role;

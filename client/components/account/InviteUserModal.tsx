@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  MyVideoResumeRole,
   InviteUserRequest,
   getRoleDisplayName,
   getAvailableRolesForInvite,
@@ -31,7 +30,7 @@ interface InviteUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInvite: (data: InviteUserRequest) => Promise<void>;
-  currentUserRoles: MyVideoResumeRole[];
+  currentUserRoles: string[];
 }
 
 export function InviteUserModal({
@@ -46,7 +45,7 @@ export function InviteUserModal({
     lastName: "",
     message: "",
   });
-  const [selectedRoles, setSelectedRoles] = useState<MyVideoResumeRole[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -98,14 +97,14 @@ export function InviteUserModal({
       setFormData({ email: "", firstName: "", lastName: "", message: "" });
       setSelectedRoles([]);
       setErrors({});
-    } catch (error) {
+    } catch {
       // Error handling is done in parent component
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRoleToggle = (role: MyVideoResumeRole) => {
+  const handleRoleToggle = (role: string) => {
     setSelectedRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
@@ -115,18 +114,17 @@ export function InviteUserModal({
     }
   };
 
-  const getRoleDescription = (role: MyVideoResumeRole): string => {
+  const getRoleDescription = (role: string): string => {
     switch (role) {
-      case MyVideoResumeRole.AccountAdmin:
+      case "Admin":
         return "Can manage users, settings, and account configuration";
-      case MyVideoResumeRole.Recruiter:
+      case "Recruiter":
         return "Can post jobs, manage candidates, and access recruitment tools";
-      case MyVideoResumeRole.Employer:
+      case "Business":
+      case "Employer":
         return "Can post jobs and manage hiring processes";
-      case MyVideoResumeRole.EmployerManager:
-        return "Can manage team members and oversee hiring processes";
-      case MyVideoResumeRole.EmployerEmployee:
-        return "Basic access to company features and job postings";
+      case "JobSeeker":
+        return "Can create resumes and apply to jobs";
       default:
         return "Standard user access";
     }
