@@ -62,39 +62,7 @@ export const UserProfileDTOSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
-// Map backend role (string or number) to client role keys
-function mapServerRole(role: string | number | undefined): string {
-  if (role === undefined || role === null) return "job_seeker";
-  if (typeof role === "string") {
-    // Normalize known variants
-    const r = role.toLowerCase();
-    if (
-      r === "jobseeker" ||
-      r === "job_seeker" ||
-      r === "jobseeker" ||
-      r === "jobseeker"
-    )
-      return "job_seeker";
-    if (r === "recruiter") return "recruiter";
-    if (r === "business" || r === "employer" || r === "company")
-      return "business";
-    // If it's numeric-like string ("0"), map below
-    const num = Number(r);
-    if (!Number.isNaN(num)) return mapServerRole(num);
-    return r;
-  }
-  // Numeric enum mapping fallback
-  switch (role) {
-    case 0:
-      return "job_seeker";
-    case 1:
-      return "recruiter";
-    case 2:
-      return "business";
-    default:
-      return "job_seeker";
-  }
-}
+
 
 // ============================================================================
 // TYPES
@@ -139,20 +107,28 @@ export class AuthService {
    * Login user with email and password
    */
   async login(credentials: LoginRequest): Promise<LoginResponse> {
+    console.log("AuthService.login: Starting login process");
+
     const response = await apiClient.post<LoginResponse>(
       "/api/Auth/login",
       credentials,
       LoginResponseSchema, // shared + optional refreshToken
     );
 
+    console.log("AuthService.login: API response received", response);
+
     // Store authentication data then fetch full profile to normalize user fields
     this.storeAuthData(response.data);
+    console.log("AuthService.login: Auth data stored");
+
     try {
       await this.getCurrentUser();
+      console.log("AuthService.login: Current user fetched successfully");
     } catch (e) {
       console.warn("Failed to load full profile after login", e);
     }
 
+    console.log("AuthService.login: Login completed successfully");
     return response.data;
   }
 
@@ -196,6 +172,16 @@ export class AuthService {
     this.clearAuthData();
   }
 
+
+
+  /**
+   * Logout user locally only (for cases where backend has already signed out the user)
+   * Used after account deletion where the backend automatically signs out the user
+   */
+  logoutLocalOnly(): void {
+    this.clearAuthData();
+  }
+
   /**
    * Get current user profile
    */
@@ -213,7 +199,7 @@ export class AuthService {
       email: dto.email,
       firstName: dto.data.firstName ?? "",
       lastName: dto.data.lastName ?? "",
-      role: mapServerRole(dto.role),
+      role: String(dto.role || "JobSeeker"),
       profilePicture: dto.data.avatar,
       bio: dto.data.summary,
       location: dto.data.location,
@@ -272,7 +258,7 @@ export class AuthService {
       email: dto.email,
       firstName: dto.data.firstName ?? "",
       lastName: dto.data.lastName ?? "",
-      role: mapServerRole(dto.role),
+      role: String(dto.role || "JobSeeker"),
       profilePicture: dto.data.avatar,
       bio: dto.data.summary,
       location: dto.data.location,
@@ -370,8 +356,9 @@ export class AuthService {
 
   /**
    * Clear all authentication data
+   * Can be used when the backend has already signed out the user (e.g., after account deletion)
    */
-  private clearAuthData(): void {
+  clearAuthData(): void {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.refreshTokenKey);
     localStorage.removeItem(this.userKey);

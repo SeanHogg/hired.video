@@ -42,17 +42,24 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Login.handleSubmit: Form submitted");
     setIsLoading(true);
     setError("");
 
     try {
+      console.log("Login.handleSubmit: Calling login with", { email });
       const success = await login(email, password);
+      console.log("Login.handleSubmit: Login result:", success);
+
       if (success) {
+        console.log("Login.handleSubmit: Login successful, navigating to dashboard");
         navigate("/dashboard");
       } else {
+        console.log("Login.handleSubmit: Login failed, setting error");
         setError("Invalid email or password. Please try again.");
       }
     } catch (err) {
+      console.error("Login.handleSubmit: Exception caught:", err);
       setError("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);

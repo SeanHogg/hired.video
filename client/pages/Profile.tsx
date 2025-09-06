@@ -67,9 +67,11 @@ export default function Profile() {
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
     if (isAuthenticated) {
-      refreshUser().catch((e) =>
-        console.warn("Profile: refreshUser failed", e),
-      );
+      refreshUser().catch((e) => {
+        console.warn("Profile: refreshUser failed", e);
+        // API client handles 401 errors automatically with logout + redirect
+        // If we get here, the error was already processed
+      });
     }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps

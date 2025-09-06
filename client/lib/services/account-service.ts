@@ -262,6 +262,20 @@ class AccountService {
       throw error;
     }
   }
+
+  /**
+   * Delete the current user's account
+   * Note: The backend automatically signs out the user, so no separate logout call is needed
+   */
+  async deleteAccount(): Promise<void> {
+    try {
+      await apiClient.post("/api/account/deleteaccount");
+      // Backend automatically signs out the user, so we don't need to call logout
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

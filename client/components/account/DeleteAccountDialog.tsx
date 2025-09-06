@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { settingsService } from "@/lib/services/settings-service";
+import { accountService } from "@/lib/services/account-service";
 import { useAuth } from "@/lib/auth";
 
 interface DeleteAccountDialogProps {
@@ -43,22 +43,23 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
 
     setIsDeleting(true);
     try {
-      await settingsService.deleteAccount();
-      
+      // Call the delete account API (backend automatically signs out the user)
+      await accountService.deleteAccount();
+
       toast({
         title: "Account Deleted",
         description: "Your account has been successfully deleted. You will be redirected to the home page.",
       });
 
-      // Close dialog and logout user
+      // Close dialog
       onOpenChange(false);
-      
-      // Delay logout slightly to show the toast
-      setTimeout(() => {
-        logout();
-        window.location.href = "/";
-      }, 2000);
-      
+
+      // Use the auth context logout method to properly clear both local storage and React state
+      await logout();
+
+      // Force a complete page reload to ensure all state is cleared
+      window.location.replace("/");
+
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error deleting account:", error);

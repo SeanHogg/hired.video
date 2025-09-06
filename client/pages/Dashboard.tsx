@@ -418,8 +418,11 @@ export default function Dashboard() {
 
   // Persona-specific metrics
   const getMetricsForPersona = () => {
-    switch (user.role) {
-      case USER_ROLES.JOB_SEEKER:
+    // Normalize role for comparison (handle both "JobSeeker" and "job_seeker")
+    const normalizedRole = user.role?.toLowerCase().replace('_', '');
+
+    switch (normalizedRole) {
+      case 'jobseeker':
         return {
           title: "Job Seeker Dashboard",
           description: "Track your job search progress and opportunities",
@@ -471,7 +474,7 @@ export default function Dashboard() {
             },
           ],
         };
-      case USER_ROLES.RECRUITER:
+      case 'recruiter':
         return {
           title: "Recruiter Dashboard",
           description: "Manage candidates and track recruitment metrics",
@@ -523,7 +526,7 @@ export default function Dashboard() {
             },
           ],
         };
-      case USER_ROLES.EMPLOYER:
+      case 'employer':
         return {
           title: "Business Dashboard",
           description: "Overview of hiring operations and team metrics",
@@ -576,7 +579,27 @@ export default function Dashboard() {
           ],
         };
       default:
-        return getMetricsForPersona();
+        // Default fallback for unknown roles - don't recurse!
+        return {
+          title: "Dashboard",
+          description: "Welcome to your dashboard",
+          metrics: [
+            {
+              title: "Profile Views",
+              value: "0",
+              change: "+0%",
+              trend: "up" as const,
+            },
+          ],
+          recentActivity: [
+            {
+              type: "profile",
+              title: "Welcome to MyVideoResume",
+              description: "Complete your profile to get started",
+              time: "now",
+            },
+          ],
+        };
     }
   };
 
@@ -590,8 +613,11 @@ export default function Dashboard() {
       { id: "verification", title: "Verify your email", completed: true },
     ];
 
-    switch (user.role) {
-      case USER_ROLES.JOB_SEEKER:
+    // Use same normalization as getMetricsForPersona
+    const normalizedRole = user.role?.toLowerCase().replace('_', '');
+
+    switch (normalizedRole) {
+      case 'jobseeker':
         return [
           ...baseTasks,
           { id: "resume", title: "Upload your resume", completed: true },
@@ -607,7 +633,7 @@ export default function Dashboard() {
             completed: true,
           },
         ];
-      case USER_ROLES.RECRUITER:
+      case 'recruiter':
         return [
           ...baseTasks,
           { id: "company", title: "Set up company profile", completed: true },
@@ -619,7 +645,7 @@ export default function Dashboard() {
             completed: false,
           },
         ];
-      case USER_ROLES.EMPLOYER:
+      case 'employer':
         return [
           ...baseTasks,
           {
@@ -1015,7 +1041,7 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {user.role === USER_ROLES.JOB_SEEKER && (
+                  {user.role === "JobSeeker" && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -1040,7 +1066,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === USER_ROLES.RECRUITER && (
+                  {user.role === "Recruiter" && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -1065,7 +1091,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === USER_ROLES.EMPLOYER && (
+                  {user.role === "Employer" && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"

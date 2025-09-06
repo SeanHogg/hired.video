@@ -88,6 +88,14 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser || null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Check auth consistency on every render - if we have a user but no auth token, clear the user
+  useEffect(() => {
+    if (user && !authService.isAuthenticated()) {
+      console.log("Auth Context: User exists but no auth token found, clearing user state");
+      setUser(null);
+    }
+  }, [user]);
+
   useEffect(() => {
     // Check for stored user and token on mount
     const initializeAuth = async () => {
@@ -120,12 +128,36 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       }
     };
 
+    // Listen for logout events from API client (401 errors, auth failures, etc.)
+    const handleAuthLogout = () => {
+      console.log("Auth Context: Auth logout event received, clearing user state");
+      setUser(null);
+    };
+
+    // Also check localStorage periodically to detect if auth data was cleared externally
+    const checkAuthConsistency = () => {
+      if (user && !authService.isAuthenticated()) {
+        console.log("Auth Context: Detected auth data cleared externally, clearing user state");
+        setUser(null);
+      }
+    };
+
+    window.addEventListener('auth-logout', handleAuthLogout);
+
+    // Check auth consistency every 1 second
+    const authCheckInterval = setInterval(checkAuthConsistency, 1000);
+
     // Only initialize if no initial user is provided (for testing)
     if (initialUser === undefined) {
       initializeAuth();
     } else {
       setIsLoading(false);
     }
+
+    return () => {
+      window.removeEventListener('auth-logout', handleAuthLogout);
+      clearInterval(authCheckInterval);
+    };
   }, [initialUser]);
 
   const login = async (
@@ -134,13 +166,25 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     rememberMe = false,
   ): Promise<boolean> => {
     try {
+      console.log("AuthContext.login: Starting login process");
       setIsLoading(true);
-      await authService.login({ email, password, rememberMe });
+
+      const result = await authService.login({ email, password, rememberMe });
+      console.log("AuthContext.login: AuthService.login completed", result);
+
       const profile = authService.getStoredUser();
-      if (profile) setUser(userProfileToUser(profile));
+      console.log("AuthContext.login: Retrieved stored user profile", profile);
+
+      if (profile) {
+        const user = userProfileToUser(profile);
+        console.log("AuthContext.login: Converted profile to user", user);
+        setUser(user);
+      }
+
+      console.log("AuthContext.login: Login successful, returning true");
       return true;
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("AuthContext.login: Login failed:", error);
       return false;
     } finally {
       setIsLoading(false);
