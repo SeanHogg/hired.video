@@ -65,6 +65,39 @@ export const UserProfileDTOSchema = z.object({
 
 
 // ============================================================================
+// Role normalization
+// ============================================================================
+
+// Map backend role (string or number) to client role keys used by the UI
+// - Server may return enum number (0=JobSeeker, 1=Recruiter, 2=Employer)
+// - Or PascalCase strings (JobSeeker/Recruiter/Employer/Business)
+// - Our UI expects: "job_seeker" | "recruiter" | "business"
+function mapServerRole(role: string | number | undefined | null): "job_seeker" | "recruiter" | "business" {
+  if (role === undefined || role === null) return "job_seeker";
+  if (typeof role === "number") {
+    switch (role) {
+      case 0:
+        return "job_seeker";
+      case 1:
+        return "recruiter";
+      case 2:
+        return "business"; // Employer/Business
+      default:
+        return "job_seeker";
+    }
+  }
+  // string input
+  const r = String(role).trim().toLowerCase();
+  if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return "job_seeker";
+  if (r === "recruiter") return "recruiter";
+  if (r === "employer" || r === "business" || r === "company") return "business";
+  // If it's numeric-like string, coerce to number mapping
+  const num = Number(r);
+  if (!Number.isNaN(num)) return mapServerRole(num);
+  return "job_seeker";
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -199,7 +232,7 @@ export class AuthService {
       email: dto.email,
       firstName: dto.data.firstName ?? "",
       lastName: dto.data.lastName ?? "",
-      role: String(dto.role || "JobSeeker"),
+      role: mapServerRole(dto.role),
       profilePicture: dto.data.avatar,
       bio: dto.data.summary,
       location: dto.data.location,
@@ -258,7 +291,7 @@ export class AuthService {
       email: dto.email,
       firstName: dto.data.firstName ?? "",
       lastName: dto.data.lastName ?? "",
-      role: String(dto.role || "JobSeeker"),
+      role: mapServerRole(dto.role),
       profilePicture: dto.data.avatar,
       bio: dto.data.summary,
       location: dto.data.location,
