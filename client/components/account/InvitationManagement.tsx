@@ -11,7 +11,8 @@ import {
   Clock,
   XCircle,
   AlertCircle,
-  Crown
+  Crown,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,9 +69,9 @@ export function InvitationManagement({
 
   // Filter users based on search and filters
   const filteredUsers = users.filter((user) => {
-    const firstName = user.userProfile?.firstName?.toLowerCase() ?? "";
-    const lastName = user.userProfile?.lastName?.toLowerCase() ?? "";
-    const email = user.userProfile?.email?.toLowerCase() ?? "";
+    const firstName = user.firstName?.toLowerCase() ?? "";
+    const lastName = user.lastName?.toLowerCase() ?? "";
+    const email = user.email?.toLowerCase() ?? "";
 
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -155,11 +156,12 @@ export function InvitationManagement({
 
   const getActionMenuItems = (user: AccountUser) => {
     const items = [];
-    
-    if (canManageInvitation(user.inviteStatus)) {
+
+    // Only show actions for users that can be managed (not owners)
+    if (user.canDelete && canManageInvitation(user.inviteStatus)) {
       items.push(
-        <DropdownMenuItem 
-          key="resend" 
+        <DropdownMenuItem
+          key="resend"
           onClick={() => handleResendInvitation(user.id)}
           disabled={loading}
         >
@@ -167,16 +169,30 @@ export function InvitationManagement({
           Resend Invitation
         </DropdownMenuItem>
       );
-      
+
       items.push(
-        <DropdownMenuItem 
-          key="cancel" 
+        <DropdownMenuItem
+          key="cancel"
           onClick={() => handleCancelInvitation(user.id)}
           disabled={loading}
           className="text-red-600"
         >
           <X className="h-4 w-4 mr-2" />
           Cancel Invitation
+        </DropdownMenuItem>
+      );
+    }
+
+    // Show role editing for users that can have roles edited
+    if (user.canEditRoles) {
+      items.push(
+        <DropdownMenuItem
+          key="edit-roles"
+          onClick={() => {/* TODO: Implement role editing */}}
+          disabled={loading}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Edit Roles
         </DropdownMenuItem>
       );
     }
@@ -350,12 +366,12 @@ export function InvitationManagement({
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-sm font-medium text-blue-600">
-                              {user.userProfile?.firstName?.charAt(0) || 'U'}{user.userProfile?.lastName?.charAt(0) || 'U'}
+                              {user.firstName?.charAt(0) || 'U'}{user.lastName?.charAt(0) || 'U'}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium">{user.userProfile?.firstName || 'Unknown'} {user.userProfile?.lastName || 'User'}</p>
-                            <p className="text-sm text-gray-500">{user.userProfile?.email || 'No email'}</p>
+                            <p className="font-medium">{user.firstName || 'Unknown'} {user.lastName || 'User'}</p>
+                            <p className="text-sm text-gray-500">{user.email || 'No email'}</p>
                           </div>
                         </div>
                       </TableCell>

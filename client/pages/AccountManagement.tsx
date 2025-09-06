@@ -59,6 +59,7 @@ import { InvitationManagement } from "@/components/account/InvitationManagement"
 import { InvitationAnalytics } from "@/components/account/InvitationAnalytics";
 import { EditRolesModal } from "@/components/account/EditRolesModal";
 import { AccountAnalytics } from "@/components/account/AccountAnalytics";
+import { AccountManagementSkeleton } from "@/components/account/AccountManagementSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AccountManagement() {
@@ -69,6 +70,14 @@ export default function AccountManagement() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkInviteModalOpen, setBulkInviteModalOpen] = useState(false);
   const [editRolesModalOpen, setEditRolesModalOpen] = useState(false);
+
+  // Tab-specific loading states
+  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({
+    users: false,
+    invitations: false,
+    analytics: false,
+  });
+
   const { toast } = useToast();
   const {
     sidebarOpen,
@@ -92,7 +101,17 @@ export default function AccountManagement() {
     }
   }, [isAuthenticated, authLoading]);
 
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
 
+    // Set loading state for the new tab briefly to show transition
+    setTabLoading(prev => ({ ...prev, [value]: true }));
+
+    // Clear loading state after a brief delay to allow content to render
+    setTimeout(() => {
+      setTabLoading(prev => ({ ...prev, [value]: false }));
+    }, 300);
+  };
 
   const loadAccountUsers = async () => {
     try {
@@ -271,12 +290,7 @@ export default function AccountManagement() {
 
           <div className="pt-16">
             <div className="container mx-auto py-8">
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center space-y-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-                  <p className="text-muted-foreground">Loading...</p>
-                </div>
-              </div>
+              <AccountManagementSkeleton />
             </div>
           </div>
 
@@ -479,34 +493,8 @@ export default function AccountManagement() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
-            <div className="container mx-auto py-8">
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <Footer />
-        </div>
-      </div>
-    );
-  }
+  // Show skeleton while initial data is loading, but keep page structure visible
+  const showInitialSkeleton = loading && users.length === 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -546,7 +534,7 @@ export default function AccountManagement() {
             </div>
 
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsList>
                 <TabsTrigger value="users">Team Members</TabsTrigger>
                 <TabsTrigger value="invitations">Invitation Analytics</TabsTrigger>
@@ -554,38 +542,51 @@ export default function AccountManagement() {
               </TabsList>
 
               <TabsContent value="users" className="space-y-6">
-                {/* Error State */}
-                {error && (
-                  <Card className="border-red-200 bg-red-50">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-2 text-red-600">
-                        <AlertCircle className="h-5 w-5" />
-                        <span>{error}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                {showInitialSkeleton ? (
+                  <AccountManagementSkeleton showTabs={false} />
+                ) : (
+                  <>
+                    {/* Error State */}
+                    {error && (
+                      <Card className="border-red-200 bg-red-50">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center gap-2 text-red-600">
+                            <AlertCircle className="h-5 w-5" />
+                            <span>{error}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Invitation Management */}
+                    <InvitationManagement
+                      users={users}
+                      onRefresh={loadAccountUsers}
+                      onInviteUser={() => setInviteModalOpen(true)}
+                      onBulkInvite={() => setBulkInviteModalOpen(true)}
+                    />
+                  </>
                 )}
-
-                {/* Invitation Management */}
-                <InvitationManagement
-                  users={users}
-                  onRefresh={loadAccountUsers}
-                  onInviteUser={() => setInviteModalOpen(true)}
-                  onBulkInvite={() => setBulkInviteModalOpen(true)}
-                />
-
               </TabsContent>
 
               <TabsContent value="invitations" className="space-y-6">
-                <InvitationAnalytics />
+                {tabLoading.invitations ? (
+                  <AccountManagementSkeleton showTabs={false} />
+                ) : (
+                  <InvitationAnalytics />
+                )}
               </TabsContent>
 
               <TabsContent value="analytics">
-                <AccountAnalytics
-                  loading={loading}
-                  onExport={handleExportAnalytics}
-                  onLoadAnalytics={accountService.getAccountAnalytics}
-                />
+                {tabLoading.analytics ? (
+                  <AccountManagementSkeleton showTabs={false} />
+                ) : (
+                  <AccountAnalytics
+                    loading={loading}
+                    onExport={handleExportAnalytics}
+                    onLoadAnalytics={accountService.getAccountAnalytics}
+                  />
+                )}
               </TabsContent>
             </Tabs>
 

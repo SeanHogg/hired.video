@@ -4,22 +4,29 @@
 export interface AccountUser {
   id: string;
   userId: string;
-  userProfile: UserProfile;
-  companyProfile: CompanyProfile;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  avatarUrl?: string;
+  headline?: string;
+  currentRole?: string;
+  currentCompany?: string;
+  location?: string;
   inviteStatus: InviteStatus;
   inviteStatusStartDateTime?: string;
   inviteStatusEndDateTime?: string;
-  rolesAssigned: string[];
-  termsOfUseAgreementAcceptedDateTime?: string;
-  termsOfUserAgreementVersion?: string;
+  rolesAssigned: MyVideoResumeRole[];
   isPaidAccount: boolean;
   isPaidAccountDateTime?: string;
-  paidPurchasePrice?: number;
-  paidPurchaseDateTime?: string;
   accountUsageType?: AccountUsageType;
   creationDateTime?: string;
   updateDateTime?: string;
-  deletedDateTime?: string;
+  lastLoginAt?: string;
+  isOwner: boolean;
+  canDelete: boolean;
+  canEditRoles: boolean;
+  isActive: boolean;
 }
 
 export interface UserProfile {

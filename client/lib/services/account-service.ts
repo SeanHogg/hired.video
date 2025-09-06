@@ -3,7 +3,6 @@
 
 import {
   AccountUser,
-  AccountUsersResponse,
   InviteUserRequest,
   InviteUserResponse,
   UpdateUserRolesRequest,
@@ -21,6 +20,7 @@ class AccountService {
 
   /**
    * Get all users associated with the current account
+   * Returns a flattened list of account users with user profile data
    */
   async getAccountUsers(): Promise<AccountUser[]> {
     try {
