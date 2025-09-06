@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 8080,
+      hmr: {
+        overlay: true,
+      },
+      watch: {
+        usePolling: false,
+        interval: 100,
+      },
       fs: {
         allow: ["./client", "./shared"],
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**"],
@@ -60,6 +67,20 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./client"),
         "@shared": path.resolve(__dirname, "./shared"),
       },
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@tanstack/react-query',
+        'lucide-react',
+        'clsx',
+        'tailwind-merge',
+        'date-fns',
+        'framer-motion',
+      ],
+      exclude: ['@vitejs/plugin-react-swc'],
     },
   };
 });
