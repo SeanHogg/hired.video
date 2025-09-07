@@ -53,7 +53,8 @@ import { useAuth } from "@/lib/auth";
 import {
   roleToSelectValue,
   formatRoleForDisplay,
-  getAvailableRoles
+  getAvailableRoles,
+  createRolePermissions
 } from "@/lib/role-utils";
 
 export default function Profile() {
@@ -309,8 +310,8 @@ export default function Profile() {
                     </div>
 
                     <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="outline" className="capitalize">
-                        {formData.role.replace("_", " ")}
+                      <Badge variant="outline">
+                        {formatRoleForDisplay(formData.role)}
                       </Badge>
                       {user?.subscription && user.subscription !== "free" && (
                         <Badge variant="secondary" className="capitalize">
@@ -521,8 +522,8 @@ export default function Profile() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Role-based quick actions */}
                   {(() => {
-                    const role = user?.role || "job_seeker";
-                    if (role === "job_seeker") {
+                    const rolePermissions = createRolePermissions(user?.role);
+                    if (rolePermissions.isJobSeeker) {
                       return (
                         <>
                           <Button
