@@ -441,10 +441,18 @@ export class DashboardService {
   async getJobSeekerDashboard(): Promise<DashboardResponse<JobSeekerDashboard>> {
     try {
       const response = await apiClient.get("/api/userdashboard/jobseeker") as { data: { data: any } };
+      console.log("JobSeeker Dashboard API Response:", response);
+      console.log("Response data:", response.data);
+      console.log("Response data.data:", response.data.data);
+      console.log("Type of response.data.data:", typeof response.data.data);
+
       const dashboard = JobSeekerDashboardSchema.parse(response.data.data);
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error fetching job seeker dashboard:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.issues);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch job seeker dashboard data"
@@ -458,10 +466,17 @@ export class DashboardService {
   async getRecruiterDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
       const response = await apiClient.get("/api/userdashboard/recruiter") as { data: { data: any } };
+      console.log("Recruiter Dashboard API Response:", response);
+      console.log("Response data.data:", response.data.data);
+      console.log("Type of response.data.data:", typeof response.data.data);
+
       const dashboard = BaseDashboardSchema.parse(response.data.data);
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error fetching recruiter dashboard:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", error.issues);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch recruiter dashboard data"
