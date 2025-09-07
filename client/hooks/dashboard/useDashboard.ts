@@ -36,7 +36,7 @@ export function useDashboard(): UseDashboardReturn {
 
     try {
       // Use centralized role-based dashboard fetching
-      const response: DashboardResponse<any> = await dashboardService.getDashboardForRole(user.role);
+      const response: DashboardResponse<DashboardData> = await dashboardService.getDashboardForRole(user.role);
 
       if (response.success && response.data) {
         setDashboardData(response.data);
@@ -46,8 +46,9 @@ export function useDashboard(): UseDashboardReturn {
         setError(errorMsg);
       }
     } catch (error) {
-      console.error('Dashboard loading error:', error);
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      // Log error for debugging
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

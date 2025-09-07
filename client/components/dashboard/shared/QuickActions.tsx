@@ -106,8 +106,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           icon: Download,
           label: "Export Reports",
           onClick: () => {
-            // Handle export functionality
-            console.log("Export reports clicked");
+            // TODO: Handle export functionality
           },
         }
       );
@@ -134,8 +133,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           icon: Download,
           label: "Export Data",
           onClick: () => {
-            // Handle export functionality
-            console.log("Export data clicked");
+            // TODO: Handle export functionality
           },
         }
       );

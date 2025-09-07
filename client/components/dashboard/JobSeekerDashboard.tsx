@@ -28,10 +28,10 @@ interface JobSeekerDashboardProps {
   onRefresh?: () => void;
 }
 
-export function JobSeekerDashboard({ 
-  dashboardData, 
+export function JobSeekerDashboard({
+  dashboardData,
   loading = false,
-  onRefresh 
+  onRefresh: _onRefresh
 }: JobSeekerDashboardProps) {
   if (loading) {
     return (
@@ -368,7 +368,7 @@ export function JobSeekerDashboard({
         <ActivityFeed
           activities={dashboardData.recentActivity || []}
           loading={loading}
-          onViewAll={() => console.log("View all activity")}
+          onViewAll={() => {/* TODO: Implement view all activity */}}
         />
 
         {/* Quick Actions */}

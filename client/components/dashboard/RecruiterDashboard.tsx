@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Users,
   Briefcase,
   Target,
   Calendar,
@@ -76,10 +75,10 @@ interface RecruiterDashboardProps {
   onRefresh?: () => void;
 }
 
-export function RecruiterDashboard({ 
-  dashboardData, 
+export function RecruiterDashboard({
+  dashboardData,
   loading = false,
-  onRefresh 
+  onRefresh: _onRefresh
 }: RecruiterDashboardProps) {
   if (loading) {
     return (
@@ -343,7 +342,7 @@ export function RecruiterDashboard({
         <ActivityFeed
           activities={dashboardData.recentActivity || []}
           loading={loading}
-          onViewAll={() => console.log("View all activity")}
+          onViewAll={() => {/* TODO: Implement view all activity */}}
         />
 
         {/* Quick Actions */}

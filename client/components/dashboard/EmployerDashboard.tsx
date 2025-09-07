@@ -30,10 +30,10 @@ interface EmployerDashboardProps {
   onRefresh?: () => void;
 }
 
-export function EmployerDashboard({ 
-  dashboardData, 
+export function EmployerDashboard({
+  dashboardData,
   loading = false,
-  onRefresh 
+  onRefresh: _onRefresh
 }: EmployerDashboardProps) {
   if (loading) {
     return (
@@ -458,7 +458,7 @@ export function EmployerDashboard({
         <ActivityFeed
           activities={dashboardData.recentActivity || []}
           loading={loading}
-          onViewAll={() => console.log("View all activity")}
+          onViewAll={() => {/* TODO: Implement view all activity */}}
         />
 
         {/* Quick Actions */}

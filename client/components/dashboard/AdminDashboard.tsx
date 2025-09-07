@@ -1,9 +1,7 @@
 import React from "react";
 import {
   BarChart3,
-  TrendingUp,
   Users,
-  AlertCircle,
   DollarSign,
   Activity,
   Shield,
@@ -65,10 +63,10 @@ interface AdminDashboardProps {
   onRefresh?: () => void;
 }
 
-export function AdminDashboard({ 
-  dashboardData, 
+export function AdminDashboard({
+  dashboardData,
   loading = false,
-  onRefresh 
+  onRefresh: _onRefresh
 }: AdminDashboardProps) {
   if (loading) {
     return (
@@ -391,7 +389,7 @@ export function AdminDashboard({
         <ActivityFeed
           activities={dashboardData.recentActivity || []}
           loading={loading}
-          onViewAll={() => console.log("View all activity")}
+          onViewAll={() => {/* TODO: Implement view all activity */}}
           title="System Activity"
         />
 
