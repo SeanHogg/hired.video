@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
+import { formatRoleForDisplay } from "@/lib/role-utils";
 import type {
   UserMetadata,
   UserWithOwnership,
@@ -111,18 +112,7 @@ export default function PeopleCard({
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "job_seeker":
-        return "Job Seeker";
-      case "recruiter":
-        return "Recruiter";
-      case "business":
-        return "Business";
-      default:
-        return role;
-    }
-  };
+
 
   // Derive safe display name and initials
   const displayFullName = (person.fullName && person.fullName.trim().length > 0)
@@ -218,7 +208,7 @@ export default function PeopleCard({
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   {getRoleIcon(person.role)}
-                  <span>{getRoleLabel(person.role)}</span>
+                  <span>{formatRoleForDisplay(person.role)}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
