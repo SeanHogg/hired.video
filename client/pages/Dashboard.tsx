@@ -16,16 +16,10 @@ import {
   Video,
   Sparkles,
   Star,
-  Filter,
-  Grid,
-  List,
-  Play,
-  MoreHorizontal,
-  User,
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -40,164 +34,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import {
   dashboardService,
-  type BaseDashboard,
-  type DashboardMetric,
-  type ActivityItem,
-  type JobSeekerDashboard
+  type BaseDashboard
 } from "@/lib/services/dashboard-service";
 
-// Content item types
-interface VideoItem {
-  id: string;
-  title: string;
-  thumbnail: string;
-  duration: string;
-  views: number;
-}
 
-interface ResumeItem {
-  id: string;
-  title: string;
-  type: string;
-  size: string;
-  lastModified: string;
-}
 
-interface JobItem {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  posted: string;
-}
 
-interface CompanyItem {
-  id: string;
-  name: string;
-  industry: string;
-  employees: string;
-}
 
-interface ProfileItem {
-  id: string;
-  name: string;
-  role: string;
-  location: string;
-}
 
-type ContentItem = VideoItem | ResumeItem | JobItem | CompanyItem | ProfileItem;
 
-// Content data for the activity section
-const contentTypes = [
-  { id: "videos", label: "Videos", icon: Video },
-  { id: "resumes", label: "Resumes", icon: FileText },
-  { id: "jobs", label: "Job Postings", icon: Briefcase },
-  { id: "companies", label: "Companies", icon: Building2 },
-  { id: "profiles", label: "Profiles", icon: User },
-];
 
-const filterTypes = [
-  { id: "my-content", label: "My Content", icon: User },
-  { id: "watch-later", label: "Watch Later", icon: Clock },
-  { id: "favorites", label: "Favorites", icon: Star },
-  { id: "recent", label: "Recently Viewed", icon: Eye },
-];
-
-// Mock data for activity content
-const mockContent = {
-  videos: [
-    {
-      id: 1,
-      title: "React Best Practices",
-      duration: "15:30",
-      views: 1200,
-      thumbnail: "/placeholder.svg",
-    },
-    {
-      id: 2,
-      title: "TypeScript Advanced Tips",
-      duration: "22:45",
-      views: 850,
-      thumbnail: "/placeholder.svg",
-    },
-  ],
-  resumes: [
-    {
-      id: 1,
-      title: "John Doe - Software Engineer",
-      type: "PDF",
-      size: "2.3 MB",
-      lastModified: "2 days ago",
-    },
-    {
-      id: 2,
-      title: "Jane Smith - Product Manager",
-      type: "PDF",
-      size: "1.8 MB",
-      lastModified: "1 week ago",
-    },
-  ],
-  jobs: [
-    {
-      id: 1,
-      title: "Senior Frontend Developer",
-      company: "TechCorp",
-      location: "Remote",
-      posted: "3 days ago",
-    },
-    {
-      id: 2,
-      title: "Product Designer",
-      company: "StartupXYZ",
-      location: "San Francisco",
-      posted: "1 week ago",
-    },
-  ],
-  companies: [
-    {
-      id: 1,
-      name: "TechCorp",
-      industry: "Technology",
-      employees: "1000+",
-      logo: "/placeholder.svg",
-    },
-    {
-      id: 2,
-      name: "StartupXYZ",
-      industry: "SaaS",
-      employees: "50-100",
-      logo: "/placeholder.svg",
-    },
-  ],
-  profiles: [
-    {
-      id: 1,
-      name: "John Doe",
-      role: "Software Engineer",
-      location: "New York",
-      avatar: "/placeholder.svg",
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      role: "Product Manager",
-      location: "San Francisco",
-      avatar: "/placeholder.svg",
-    },
-  ],
-};
 
 export default function Dashboard() {
   const {
@@ -209,10 +60,7 @@ export default function Dashboard() {
   } = useSidebar();
   const { user, isAuthenticated } = useAuth();
 
-  // Activity content state
-  const [selectedContentType, setSelectedContentType] = useState("videos");
-  const [selectedFilter, setSelectedFilter] = useState("my-content");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
 
   // Dashboard data state
   const [realDashboardData, setRealDashboardData] = useState<BaseDashboard | null>(null);
@@ -228,7 +76,7 @@ export default function Dashboard() {
     setDashboardError(null);
 
     try {
-      let response;
+      let response: any;
       const userRole = user.role?.toLowerCase().replace('_', '');
 
       switch (userRole) {
@@ -491,574 +339,20 @@ export default function Dashboard() {
     );
   }
 
-  // Persona-specific metrics
-  const getMetricsForPersona = () => {
-    // Normalize role for comparison (handle both "JobSeeker" and "job_seeker")
-    const normalizedRole = user.role?.toLowerCase().replace('_', '');
 
-    switch (normalizedRole) {
-      case 'jobseeker':
-        return {
-          title: "Job Seeker Dashboard",
-          description: "Track your job search progress and opportunities",
-          metrics: [
-            {
-              title: "Resume Views",
-              value: "2,847",
-              change: "+12%",
-              icon: Eye,
-              trend: "up",
-            },
-            {
-              title: "Applications Sent",
-              value: "45",
-              change: "+8",
-              icon: FileText,
-              trend: "up",
-            },
-            {
-              title: "Interview Requests",
-              value: "12",
-              change: "+3",
-              icon: Calendar,
-              trend: "up",
-            },
-            {
-              title: "Profile Matches",
-              value: "89%",
-              change: "+5%",
-              icon: Target,
-              trend: "up",
-            },
-          ],
-          recentActivity: [
-            {
-              type: "view",
-              content: "Your resume was viewed by Google",
-              time: "2 hours ago",
-            },
-            {
-              type: "match",
-              content: "New job match: Senior Developer at Meta",
-              time: "5 hours ago",
-            },
-            {
-              type: "application",
-              content: "Application submitted to Stripe",
-              time: "1 day ago",
-            },
-          ],
-        };
-      case 'recruiter':
-        return {
-          title: "Recruiter Dashboard",
-          description: "Manage candidates and track recruitment metrics",
-          metrics: [
-            {
-              title: "Active Candidates",
-              value: "1,247",
-              change: "+18%",
-              icon: Users,
-              trend: "up",
-            },
-            {
-              title: "Open Positions",
-              value: "34",
-              change: "+5",
-              icon: Briefcase,
-              trend: "up",
-            },
-            {
-              title: "Interviews Scheduled",
-              value: "28",
-              change: "+12",
-              icon: Calendar,
-              trend: "up",
-            },
-            {
-              title: "Placement Rate",
-              value: "76%",
-              change: "+3%",
-              icon: TrendingUp,
-              trend: "up",
-            },
-          ],
-          recentActivity: [
-            {
-              type: "candidate",
-              content: "New candidate: John Smith applied for Senior Dev role",
-              time: "1 hour ago",
-            },
-            {
-              type: "interview",
-              content: "Interview scheduled with candidate for PM role",
-              time: "3 hours ago",
-            },
-            {
-              type: "placement",
-              content: "Successful placement: Sarah Chen at Design Corp",
-              time: "1 day ago",
-            },
-          ],
-        };
-      case 'employer':
-        return {
-          title: "Business Dashboard",
-          description: "Overview of hiring operations and team metrics",
-          metrics: [
-            {
-              title: "Total Employees",
-              value: "485",
-              change: "+12",
-              icon: Building2,
-              trend: "up",
-            },
-            {
-              title: "Open Positions",
-              value: "23",
-              change: "-2",
-              icon: Briefcase,
-              trend: "down",
-            },
-            {
-              title: "Time to Hire",
-              value: "18 days",
-              change: "-3 days",
-              icon: Clock,
-              trend: "up",
-            },
-            {
-              title: "Hiring Success Rate",
-              value: "82%",
-              change: "+7%",
-              icon: Target,
-              trend: "up",
-            },
-          ],
-          recentActivity: [
-            {
-              type: "hire",
-              content: "New hire: Marcus Rodriguez joined as Data Scientist",
-              time: "2 hours ago",
-            },
-            {
-              type: "posting",
-              content: "New job posting created: UX Designer",
-              time: "4 hours ago",
-            },
-            {
-              type: "team",
-              content: "Engineering team reached 50 members milestone",
-              time: "2 days ago",
-            },
-          ],
-        };
-      case 'business':
-        return {
-          title: "Business Dashboard",
-          description: "Manage your organization and hiring operations",
-          metrics: [
-            {
-              title: "Team Members",
-              value: "127",
-              change: "+8",
-              icon: Users,
-              trend: "up",
-            },
-            {
-              title: "Active Jobs",
-              value: "15",
-              change: "+3",
-              icon: Briefcase,
-              trend: "up",
-            },
-            {
-              title: "Applications",
-              value: "342",
-              change: "+24",
-              icon: FileText,
-              trend: "up",
-            },
-            {
-              title: "Success Rate",
-              value: "78%",
-              change: "+5%",
-              icon: TrendingUp,
-              trend: "up",
-            },
-          ],
-          recentActivity: [
-            {
-              type: "application",
-              content: "New application received for Senior Developer role",
-              time: "1 hour ago",
-            },
-            {
-              type: "job",
-              content: "Job posting published: Product Manager",
-              time: "3 hours ago",
-            },
-            {
-              type: "team",
-              content: "Team member invited: alex@company.com",
-              time: "1 day ago",
-            },
-          ],
-        };
-      case 'admin':
-        return {
-          title: "Admin Dashboard",
-          description: "System administration and platform oversight",
-          metrics: [
-            {
-              title: "Total Users",
-              value: "12,847",
-              change: "+156",
-              icon: Users,
-              trend: "up",
-            },
-            {
-              title: "Active Companies",
-              value: "1,234",
-              change: "+23",
-              icon: Building2,
-              trend: "up",
-            },
-            {
-              title: "System Health",
-              value: "99.8%",
-              change: "+0.1%",
-              icon: TrendingUp,
-              trend: "up",
-            },
-            {
-              title: "Support Tickets",
-              value: "42",
-              change: "-8",
-              icon: Target,
-              trend: "up",
-            },
-          ],
-          recentActivity: [
-            {
-              type: "system",
-              content: "System maintenance completed successfully",
-              time: "2 hours ago",
-            },
-            {
-              type: "user",
-              content: "New company registration: TechCorp Inc.",
-              time: "4 hours ago",
-            },
-            {
-              type: "alert",
-              content: "Performance optimization deployed",
-              time: "1 day ago",
-            },
-          ],
-        };
-      default:
-        // Default fallback for unknown roles - don't recurse!
-        return {
-          title: "Dashboard",
-          description: "Welcome to your dashboard",
-          metrics: [
-            {
-              title: "Profile Views",
-              value: "0",
-              change: "+0%",
-              trend: "up" as const,
-            },
-          ],
-          recentActivity: [
-            {
-              type: "profile",
-              title: "Welcome to MyVideoResume",
-              description: "Complete your profile to get started",
-              time: "now",
-            },
-          ],
-        };
-    }
-  };
+  // Only use real dashboard data - never show fake/mock data
+  const dashboardData = realDashboardData;
 
-  // Use real dashboard data if available, otherwise fall back to static data
-  const dashboardData = realDashboardData || getMetricsForPersona();
 
-  // Onboarding tasks based on persona
-  const getOnboardingTasks = () => {
-    const baseTasks = [
-      { id: "profile", title: "Complete your profile", completed: true },
-      { id: "preferences", title: "Set your preferences", completed: true },
-      { id: "verification", title: "Verify your email", completed: true },
-    ];
 
-    // Use same normalization as getMetricsForPersona
-    const normalizedRole = user.role?.toLowerCase().replace('_', '');
-
-    switch (normalizedRole) {
-      case 'jobseeker':
-        return [
-          ...baseTasks,
-          { id: "resume", title: "Upload your resume", completed: true },
-          { id: "video", title: "Create your video resume", completed: false },
-          {
-            id: "skills",
-            title: "Add your skills and experience",
-            completed: true,
-          },
-          {
-            id: "preferences",
-            title: "Set job search preferences",
-            completed: true,
-          },
-        ];
-      case 'recruiter':
-        return [
-          ...baseTasks,
-          { id: "company", title: "Set up company profile", completed: true },
-          { id: "team", title: "Invite team members", completed: false },
-          { id: "jobs", title: "Post your first job", completed: true },
-          {
-            id: "sourcing",
-            title: "Set up candidate sourcing",
-            completed: false,
-          },
-        ];
-      case 'employer':
-        return [
-          ...baseTasks,
-          {
-            id: "company",
-            title: "Complete company information",
-            completed: true,
-          },
-          {
-            id: "billing",
-            title: "Set up billing information",
-            completed: true,
-          },
-          { id: "team", title: "Add team members", completed: false },
-          {
-            id: "integration",
-            title: "Configure integrations",
-            completed: false,
-          },
-        ];
-      case 'business':
-        return [
-          ...baseTasks,
-          {
-            id: "organization",
-            title: "Set up organization details",
-            completed: true,
-          },
-          {
-            id: "subscription",
-            title: "Choose subscription plan",
-            completed: true,
-          },
-          { id: "team", title: "Invite team members", completed: false },
-          {
-            id: "branding",
-            title: "Customize company branding",
-            completed: false,
-          },
-        ];
-      case 'admin':
-        return [
-          ...baseTasks,
-          {
-            id: "system",
-            title: "Review system configuration",
-            completed: true,
-          },
-          {
-            id: "monitoring",
-            title: "Set up monitoring alerts",
-            completed: true,
-          },
-          {
-            id: "backup",
-            title: "Configure backup settings",
-            completed: true,
-          },
-          {
-            id: "security",
-            title: "Review security policies",
-            completed: false,
-          },
-        ];
-      default:
-        return baseTasks;
-    }
-  };
-
-  const onboardingTasks = getOnboardingTasks();
+  // Use real onboarding tasks from API data, fallback to empty array if not available
+  const onboardingTasks = dashboardData?.onboardingTasks || [];
   const completedTasksCount = onboardingTasks.filter(
     (task) => task.completed,
   ).length;
-  const progressPercentage = Math.round(
+  const progressPercentage = onboardingTasks.length > 0 ? Math.round(
     (completedTasksCount / onboardingTasks.length) * 100,
-  );
-
-  // Helper function to render content items
-  const renderContentItem = (item: ContentItem, type: string) => {
-    switch (type) {
-      case "videos":
-        const videoItem = item as VideoItem;
-        return (
-          <Card
-            key={videoItem.id}
-            className="group cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-4">
-              <div className="relative mb-3">
-                <img
-                  src={videoItem.thumbnail}
-                  alt={videoItem.title}
-                  className="w-full h-32 object-cover rounded-md bg-muted"
-                />
-                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md">
-                  <Play className="h-8 w-8 text-white" />
-                </div>
-                <Badge className="absolute bottom-2 right-2 bg-black/70 text-white">
-                  {videoItem.duration}
-                </Badge>
-              </div>
-              <h3 className="font-medium text-sm mb-1 line-clamp-2">
-                {videoItem.title}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {videoItem.views} views
-              </p>
-            </CardContent>
-          </Card>
-        );
-      case "resumes":
-        const resumeItem = item as ResumeItem;
-        return (
-          <Card
-            key={resumeItem.id}
-            className="group cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-md flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-5 w-5 text-red-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
-                    {resumeItem.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {resumeItem.type} • {resumeItem.size}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {resumeItem.lastModified}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="opacity-0 group-hover:opacity-100"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      case "jobs":
-        const jobItem = item as JobItem;
-        return (
-          <Card
-            key={jobItem.id}
-            className="group cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="h-5 w-5 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
-                    {jobItem.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {jobItem.company}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {jobItem.location} • {jobItem.posted}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      case "companies":
-        const companyItem = item as CompanyItem;
-        return (
-          <Card
-            key={companyItem.id}
-            className="group cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
-                    {companyItem.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {companyItem.industry}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {companyItem.employees} employees
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      case "profiles":
-        const profileItem = item as ProfileItem;
-        return (
-          <Card
-            key={profileItem.id}
-            className="group cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-md flex items-center justify-center flex-shrink-0">
-                  <User className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm mb-1 line-clamp-1">
-                    {profileItem.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {profileItem.role}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {profileItem.location}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const currentFilter = filterTypes.find((f) => f.id === selectedFilter);
-  const currentContentType = contentTypes.find(
-    (c) => c.id === selectedContentType,
-  );
+  ) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -1206,73 +500,45 @@ export default function Dashboard() {
                     </CardContent>
                   </Card>
                 ))
-              ) : (
+              ) : dashboardData && dashboardData.metrics ? (
                 dashboardData.metrics.map((metric, index) => (
                 <Card key={index}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
                       {metric.title}
                     </CardTitle>
-                    <metric.icon className="h-4 w-4 text-muted-foreground" />
+                    {metric.icon && React.createElement(metric.icon, { className: "h-4 w-4 text-muted-foreground" })}
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{metric.value}</div>
-                    <div
-                      className={`text-xs flex items-center gap-1 ${
-                        metric.trend === "up"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      <TrendingUp
-                        className={`h-3 w-3 ${metric.trend === "down" ? "rotate-180" : ""}`}
-                      />
-                      {metric.change} from last month
-                    </div>
+                    {metric.change && (
+                      <div
+                        className={`text-xs flex items-center gap-1 ${
+                          metric.trend === "up"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        <TrendingUp
+                          className={`h-3 w-3 ${metric.trend === "down" ? "rotate-180" : ""}`}
+                        />
+                        {metric.change} from last month
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))
-              )}
+              ) : !dashboardError ? (
+                // No data state (when API succeeds but returns no metrics)
+                <div className="col-span-full text-center py-8">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No metrics available</h3>
+                  <p className="text-muted-foreground">Dashboard metrics will appear here once data is available.</p>
+                </div>
+              ) : null}
             </div>
 
-            {/* Profile Stats (moved from Profile page) */}
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Eye className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <div className="text-2xl font-bold">2,847</div>
-                  <div className="text-sm text-muted-foreground">
-                    Profile Views
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Star className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
-                  <div className="text-2xl font-bold">4.9</div>
-                  <div className="text-sm text-muted-foreground">Rating</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                  <div className="text-2xl font-bold">+12%</div>
-                  <div className="text-sm text-muted-foreground">Growth</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Clock className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                  <div className="text-2xl font-bold">24h</div>
-                  <div className="text-sm text-muted-foreground">
-                    Response Time
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1285,25 +551,34 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {dashboardData.recentActivity.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
-                    >
-                      <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {activity.content}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.time}
-                        </p>
-                      </div>
+                  {dashboardData && dashboardData.recentActivity && dashboardData.recentActivity.length > 0 ? (
+                    <>
+                      {dashboardData.recentActivity.map((activity, index) => (
+                        <div
+                          key={activity.id || index}
+                          className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
+                        >
+                          <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">
+                              {activity.content}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {activity.time}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <Button variant="outline" className="w-full">
+                        View All Activity
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No recent activity</p>
                     </div>
-                  ))}
-                  <Button variant="outline" className="w-full">
-                    View All Activity
-                  </Button>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1395,118 +670,7 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Your Content Library Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {currentFilter?.icon && (
-                      <currentFilter.icon className="h-5 w-5" />
-                    )}
-                    <CardTitle>Your Content Library</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4" />
-                      <Select
-                        value={selectedFilter}
-                        onValueChange={setSelectedFilter}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filterTypes.map((filter) => (
-                            <SelectItem key={filter.id} value={filter.id}>
-                              <div className="flex items-center gap-2">
-                                <filter.icon className="h-4 w-4" />
-                                {filter.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-1 border rounded-md">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <CardDescription>
-                  Manage your saved content across all categories
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs
-                  value={selectedContentType}
-                  onValueChange={setSelectedContentType}
-                >
-                  <TabsList className="grid w-full grid-cols-5">
-                    {contentTypes.map((type) => (
-                      <TabsTrigger
-                        key={type.id}
-                        value={type.id}
-                        className="flex items-center gap-2"
-                      >
-                        <type.icon className="h-4 w-4" />
-                        <span className="hidden sm:inline">{type.label}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
 
-                  {contentTypes.map((type) => (
-                    <TabsContent key={type.id} value={type.id} className="mt-6">
-                      <div
-                        className={
-                          viewMode === "grid"
-                            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                            : "space-y-2"
-                        }
-                      >
-                        {mockContent[type.id as keyof typeof mockContent]?.map(
-                          (item) => renderContentItem(item, type.id),
-                        )}
-                      </div>
-
-                      {mockContent[type.id as keyof typeof mockContent]
-                        ?.length === 0 && (
-                        <div className="text-center py-12">
-                          <type.icon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">
-                            No {type.label.toLowerCase()} found
-                          </h3>
-                          <p className="text-muted-foreground">
-                            {selectedFilter === "my-content" &&
-                              `You haven't created any ${type.label.toLowerCase()} yet.`}
-                            {selectedFilter === "watch-later" &&
-                              `You haven't saved any ${type.label.toLowerCase()} to watch later.`}
-                            {selectedFilter === "favorites" &&
-                              `You haven't favorited any ${type.label.toLowerCase()} yet.`}
-                            {selectedFilter === "recent" &&
-                              `You haven't viewed any ${type.label.toLowerCase()} recently.`}
-                          </p>
-                        </div>
-                      )}
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </CardContent>
-            </Card>
           </div>
         </div>
         <Footer />
