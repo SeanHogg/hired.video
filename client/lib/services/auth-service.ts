@@ -71,30 +71,37 @@ export const UserProfileDTOSchema = z.object({
 // Map backend role (string or number) to client role keys used by the UI
 // - Server may return enum number (0=JobSeeker, 1=Recruiter, 2=Employer)
 // - Or PascalCase strings (JobSeeker/Recruiter/Employer/Business)
-// - Our UI expects: "job_seeker" | "recruiter" | "business"
-function mapServerRole(role: string | number | undefined | null): "job_seeker" | "recruiter" | "business" {
-  if (role === undefined || role === null) return "job_seeker";
+// - Our UI expects USER_ROLES constants: "JobSeeker" | "Recruiter" | "Employer" | "Business"
+function mapServerRole(role: string | number | undefined | null): string {
+  console.log("Auth Service - Mapping server role:", role, "Type:", typeof role);
+
+  if (role === undefined || role === null) return USER_ROLES.JOB_SEEKER;
   if (typeof role === "number") {
     switch (role) {
       case 0:
-        return "job_seeker";
+        return USER_ROLES.JOB_SEEKER;
       case 1:
-        return "recruiter";
+        return USER_ROLES.RECRUITER;
       case 2:
-        return "business"; // Employer/Business
+        return USER_ROLES.BUSINESS; // Employer/Business
       default:
-        return "job_seeker";
+        return USER_ROLES.JOB_SEEKER;
     }
   }
   // string input
   const r = String(role).trim().toLowerCase();
-  if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return "job_seeker";
-  if (r === "recruiter") return "recruiter";
-  if (r === "employer" || r === "business" || r === "company") return "business";
+  console.log("Auth Service - Normalized role string:", r);
+
+  if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return USER_ROLES.JOB_SEEKER;
+  if (r === "recruiter") return USER_ROLES.RECRUITER;
+  if (r === "employer" || r === "business" || r === "company") return USER_ROLES.BUSINESS;
   // If it's numeric-like string, coerce to number mapping
   const num = Number(r);
   if (!Number.isNaN(num)) return mapServerRole(num);
-  return "job_seeker";
+
+  const mappedRole = USER_ROLES.JOB_SEEKER;
+  console.log("Auth Service - Final mapped role:", mappedRole);
+  return mappedRole;
 }
 
 // ============================================================================
