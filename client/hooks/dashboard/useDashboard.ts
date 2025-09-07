@@ -61,7 +61,7 @@ export function useDashboard(): UseDashboardReturn {
   // Load data on component mount and user change
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, [user, loadDashboardData]);
 
   // Record page view for analytics
   useEffect(() => {
