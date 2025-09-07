@@ -423,11 +423,13 @@ export class DashboardService {
    */
   async getDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard") as { data: { data: any } };
-      const dashboard = BaseDashboardSchema.parse(response.data.data);
+      const response = await apiClient.get("/api/userdashboard") as { data: any };
+      const dashboard = BaseDashboardSchema.parse(response.data);
+
+
       return { success: true, data: dashboard };
     } catch (error) {
-      console.error("Error fetching dashboard:", error);
+      console.error("Error creating default dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch dashboard data"
@@ -441,26 +443,11 @@ export class DashboardService {
   async getJobSeekerDashboard(): Promise<DashboardResponse<JobSeekerDashboard>> {
     try {
       const response = await apiClient.get("/api/userdashboard/jobseeker") as { data: any };
-      console.log("JobSeeker Dashboard API Response:", response);
-      console.log("Response data:", response.data);
-      console.log("Type of response.data:", typeof response.data);
+      const dashboard = JobSeekerDashboardSchema.parse(response.data);
 
-      // Try to get the data from the response - handle both nested and direct structures
-      let dashboardData = response.data;
-      if (response.data && response.data.data) {
-        dashboardData = response.data.data;
-        console.log("Using nested data structure:", dashboardData);
-      } else {
-        console.log("Using direct data structure:", dashboardData);
-      }
-
-      const dashboard = JobSeekerDashboardSchema.parse(dashboardData);
       return { success: true, data: dashboard };
     } catch (error) {
-      console.error("Error fetching job seeker dashboard:", error);
-      if (error instanceof z.ZodError) {
-        console.error("Zod validation errors:", error.issues);
-      }
+      console.error("Error creating job seeker dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch job seeker dashboard data"
@@ -474,26 +461,12 @@ export class DashboardService {
   async getRecruiterDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
       const response = await apiClient.get("/api/userdashboard/recruiter") as { data: any };
-      console.log("Recruiter Dashboard API Response:", response);
-      console.log("Response data:", response.data);
-      console.log("Type of response.data:", typeof response.data);
+      const dashboard = BaseDashboardSchema.parse(response.data);
 
-      // Try to get the data from the response - handle both nested and direct structures
-      let dashboardData = response.data;
-      if (response.data && response.data.data) {
-        dashboardData = response.data.data;
-        console.log("Using nested data structure:", dashboardData);
-      } else {
-        console.log("Using direct data structure:", dashboardData);
-      }
 
-      const dashboard = BaseDashboardSchema.parse(dashboardData);
       return { success: true, data: dashboard };
     } catch (error) {
-      console.error("Error fetching recruiter dashboard:", error);
-      if (error instanceof z.ZodError) {
-        console.error("Zod validation errors:", error.issues);
-      }
+      console.error("Error creating recruiter dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch recruiter dashboard data"
@@ -506,11 +479,14 @@ export class DashboardService {
    */
   async getEmployerDashboard(): Promise<DashboardResponse<EmployerDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/employer") as { data: { data: any } };
-      const dashboard = EmployerDashboardSchema.parse(response.data.data);
+      const response = await apiClient.get("/api/userdashboard/employer") as { data: any };
+      const dashboard = EmployerDashboardSchema.parse(response.data);
+
+
+
       return { success: true, data: dashboard };
     } catch (error) {
-      console.error("Error fetching employer dashboard:", error);
+      console.error("Error creating employer dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch employer dashboard data"
@@ -523,11 +499,13 @@ export class DashboardService {
    */
   async getAdminDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/admin") as { data: { data: any } };
-      const dashboard = BaseDashboardSchema.parse(response.data.data);
+      const response = await apiClient.get("/api/userdashboard/admin") as { data: any };
+      const dashboard = BaseDashboardSchema.parse(response.data);
+
+
       return { success: true, data: dashboard };
     } catch (error) {
-      console.error("Error fetching admin dashboard:", error);
+      console.error("Error creating admin dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch admin dashboard data"
