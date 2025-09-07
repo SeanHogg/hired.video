@@ -58,7 +58,7 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
 
 
@@ -70,55 +70,41 @@ export default function Dashboard() {
 
   // Load dashboard data based on user role
   const loadDashboardData = async () => {
-    console.log('loadDashboardData called, user:', user);
-
     if (!user) {
-      console.log('No user found, skipping dashboard load');
       return;
     }
 
-    console.log('Loading dashboard data for user role:', user.role);
     setDashboardLoading(true);
     setDashboardError(null);
 
     try {
       let response: any;
       const userRole = user.role?.toLowerCase().replace('_', '');
-      console.log('Normalized user role:', userRole);
 
       switch (userRole) {
         case 'jobseeker':
-          console.log('Calling getJobSeekerDashboard');
           response = await dashboardService.getJobSeekerDashboard();
           break;
         case 'recruiter':
-          console.log('Calling getRecruiterDashboard');
           response = await dashboardService.getRecruiterDashboard();
           break;
         case 'employer':
         case 'business':
-          console.log('Calling getEmployerDashboard');
           response = await dashboardService.getEmployerDashboard();
           break;
         case 'admin':
-          console.log('Calling getAdminDashboard');
           response = await dashboardService.getAdminDashboard();
           break;
         default:
-          console.log('Calling getDashboard (default)');
           response = await dashboardService.getDashboard();
       }
-
-      console.log('Dashboard API response:', response);
 
       if (response.success && response.data) {
         setRealDashboardData(response.data);
         setLastRefresh(new Date());
-        console.log('Dashboard data loaded successfully');
       } else {
         const errorMsg = response.error || 'Failed to load dashboard data';
         setDashboardError(errorMsg);
-        console.error('Dashboard API returned error:', errorMsg);
       }
     } catch (error) {
       console.error('Dashboard loading error:', error);
@@ -144,6 +130,35 @@ export default function Dashboard() {
       });
     }
   }, [user]);
+
+  // Show loading state while authentication is being determined
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16">
+            <div className="max-w-7xl mx-auto px-4 py-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading dashboard...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   // If user is not authenticated, show CTA
   if (!isAuthenticated || !user) {
