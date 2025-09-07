@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   dashboardService,
   type BaseDashboard,
@@ -25,7 +25,7 @@ export function useDashboard(): UseDashboardReturn {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
@@ -52,7 +52,7 @@ export function useDashboard(): UseDashboardReturn {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const refreshDashboard = async () => {
     await loadDashboardData();
