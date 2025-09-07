@@ -578,6 +578,110 @@ export default function Dashboard() {
             },
           ],
         };
+      case 'business':
+        return {
+          title: "Business Dashboard",
+          description: "Manage your organization and hiring operations",
+          metrics: [
+            {
+              title: "Team Members",
+              value: "127",
+              change: "+8",
+              icon: Users,
+              trend: "up",
+            },
+            {
+              title: "Active Jobs",
+              value: "15",
+              change: "+3",
+              icon: Briefcase,
+              trend: "up",
+            },
+            {
+              title: "Applications",
+              value: "342",
+              change: "+24",
+              icon: FileText,
+              trend: "up",
+            },
+            {
+              title: "Success Rate",
+              value: "78%",
+              change: "+5%",
+              icon: TrendingUp,
+              trend: "up",
+            },
+          ],
+          recentActivity: [
+            {
+              type: "application",
+              content: "New application received for Senior Developer role",
+              time: "1 hour ago",
+            },
+            {
+              type: "job",
+              content: "Job posting published: Product Manager",
+              time: "3 hours ago",
+            },
+            {
+              type: "team",
+              content: "Team member invited: alex@company.com",
+              time: "1 day ago",
+            },
+          ],
+        };
+      case 'admin':
+        return {
+          title: "Admin Dashboard",
+          description: "System administration and platform oversight",
+          metrics: [
+            {
+              title: "Total Users",
+              value: "12,847",
+              change: "+156",
+              icon: Users,
+              trend: "up",
+            },
+            {
+              title: "Active Companies",
+              value: "1,234",
+              change: "+23",
+              icon: Building2,
+              trend: "up",
+            },
+            {
+              title: "System Health",
+              value: "99.8%",
+              change: "+0.1%",
+              icon: TrendingUp,
+              trend: "up",
+            },
+            {
+              title: "Support Tickets",
+              value: "42",
+              change: "-8",
+              icon: Target,
+              trend: "up",
+            },
+          ],
+          recentActivity: [
+            {
+              type: "system",
+              content: "System maintenance completed successfully",
+              time: "2 hours ago",
+            },
+            {
+              type: "user",
+              content: "New company registration: TechCorp Inc.",
+              time: "4 hours ago",
+            },
+            {
+              type: "alert",
+              content: "Performance optimization deployed",
+              time: "1 day ago",
+            },
+          ],
+        };
       default:
         // Default fallback for unknown roles - don't recurse!
         return {
@@ -662,6 +766,50 @@ export default function Dashboard() {
           {
             id: "integration",
             title: "Configure integrations",
+            completed: false,
+          },
+        ];
+      case 'business':
+        return [
+          ...baseTasks,
+          {
+            id: "organization",
+            title: "Set up organization details",
+            completed: true,
+          },
+          {
+            id: "subscription",
+            title: "Choose subscription plan",
+            completed: true,
+          },
+          { id: "team", title: "Invite team members", completed: false },
+          {
+            id: "branding",
+            title: "Customize company branding",
+            completed: false,
+          },
+        ];
+      case 'admin':
+        return [
+          ...baseTasks,
+          {
+            id: "system",
+            title: "Review system configuration",
+            completed: true,
+          },
+          {
+            id: "monitoring",
+            title: "Set up monitoring alerts",
+            completed: true,
+          },
+          {
+            id: "backup",
+            title: "Configure backup settings",
+            completed: true,
+          },
+          {
+            id: "security",
+            title: "Review security policies",
             completed: false,
           },
         ];
