@@ -22,8 +22,10 @@ import {
   Play,
   MoreHorizontal,
   User,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -48,6 +50,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import {
+  dashboardService,
+  type BaseDashboard,
+  type DashboardMetric,
+  type ActivityItem,
+  type JobSeekerDashboard
+} from "@/lib/services/dashboard-service";
 
 // Content item types
 interface VideoItem {
@@ -204,6 +213,72 @@ export default function Dashboard() {
   const [selectedContentType, setSelectedContentType] = useState("videos");
   const [selectedFilter, setSelectedFilter] = useState("my-content");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Dashboard data state
+  const [realDashboardData, setRealDashboardData] = useState<BaseDashboard | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Load dashboard data based on user role
+  const loadDashboardData = async () => {
+    if (!user) return;
+
+    setDashboardLoading(true);
+    setDashboardError(null);
+
+    try {
+      let response;
+      const userRole = user.role?.toLowerCase().replace('_', '');
+
+      switch (userRole) {
+        case 'jobseeker':
+          response = await dashboardService.getJobSeekerDashboard();
+          break;
+        case 'recruiter':
+          response = await dashboardService.getRecruiterDashboard();
+          break;
+        case 'employer':
+        case 'business':
+          response = await dashboardService.getEmployerDashboard();
+          break;
+        case 'admin':
+          response = await dashboardService.getAdminDashboard();
+          break;
+        default:
+          response = await dashboardService.getDashboard();
+      }
+
+      if (response.success && response.data) {
+        setRealDashboardData(response.data);
+        setLastRefresh(new Date());
+      } else {
+        setDashboardError(response.error || 'Failed to load dashboard data');
+      }
+    } catch (error) {
+      console.error('Dashboard loading error:', error);
+      setDashboardError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  // Load data on component mount and user change
+  useEffect(() => {
+    loadDashboardData();
+  }, [user]);
+
+  // Record page view for analytics
+  useEffect(() => {
+    if (user) {
+      dashboardService.recordActivity({
+        activityType: 'page_view',
+        description: 'Viewed dashboard',
+        entityType: 'page',
+        priority: 1,
+      });
+    }
+  }, [user]);
 
   // If user is not authenticated, show CTA
   if (!isAuthenticated || !user) {
@@ -707,7 +782,8 @@ export default function Dashboard() {
     }
   };
 
-  const dashboardData = getMetricsForPersona();
+  // Use real dashboard data if available, otherwise fall back to static data
+  const dashboardData = realDashboardData || getMetricsForPersona();
 
   // Onboarding tasks based on persona
   const getOnboardingTasks = () => {
@@ -1010,9 +1086,25 @@ export default function Dashboard() {
                   {dashboardData.description}
                 </p>
               </div>
-              <Badge variant="secondary" className="capitalize">
-                {user.role?.replace("_", " ")}
-              </Badge>
+              <div className="flex items-center gap-3">
+                {lastRefresh && (
+                  <span className="text-sm text-muted-foreground">
+                    Last updated: {lastRefresh.toLocaleTimeString()}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadDashboardData}
+                  disabled={dashboardLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${dashboardLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Badge variant="secondary" className="capitalize">
+                  {user.role?.replace("_", " ")}
+                </Badge>
+              </div>
             </div>
 
             {/* Onboarding Progress */}
@@ -1079,9 +1171,43 @@ export default function Dashboard() {
               </Card>
             )}
 
+            {/* Dashboard Error State */}
+            {dashboardError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-800">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="font-medium">Dashboard Error</span>
+                </div>
+                <p className="text-red-700 mt-1">{dashboardError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={loadDashboardData}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
             {/* Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {dashboardData.metrics.map((metric, index) => (
+              {dashboardLoading ? (
+                // Loading skeletons
+                Array.from({ length: 4 }).map((_, index) => (
+                  <Card key={index}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 w-4 bg-gray-200 rounded animate-pulse" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mb-2" />
+                      <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                dashboardData.metrics.map((metric, index) => (
                 <Card key={index}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -1105,7 +1231,8 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              ))
+              )}
             </div>
 
             {/* Profile Stats (moved from Profile page) */}
