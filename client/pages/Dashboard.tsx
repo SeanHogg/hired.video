@@ -43,6 +43,8 @@ import {
   type JobSeekerDashboard,
   type EmployerDashboard
 } from "@/lib/services/dashboard-service";
+import MetricsPieChart from "@/components/charts/MetricsPieChart";
+import TrendLineChart from "@/components/charts/TrendLineChart";
 
 
 
@@ -675,21 +677,35 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === "Employer" && (
+                  {(user.role === "Employer" || user.role === "Business") && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
                         variant="outline"
                       >
-                        <Building2 className="h-4 w-4" />
-                        View Team Analytics
+                        <Briefcase className="h-4 w-4" />
+                        Post New Job
                       </Button>
                       <Button
                         className="w-full justify-start gap-3"
                         variant="outline"
                       >
-                        <UserPlus className="h-4 w-4" />
-                        Invite Team Members
+                        <Users className="h-4 w-4" />
+                        Review Candidates
+                      </Button>
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
+                        <Calendar className="h-4 w-4" />
+                        Schedule Interviews
+                      </Button>
+                      <Button
+                        className="w-full justify-start gap-3"
+                        variant="outline"
+                      >
+                        <Building2 className="h-4 w-4" />
+                        Team Analytics
                       </Button>
                       <Button
                         className="w-full justify-start gap-3"
@@ -1046,6 +1062,111 @@ export default function Dashboard() {
                     </Card>
                   )}
                 </div>
+
+                {/* Performance Summary */}
+                {'recruitmentMetrics' in dashboardData && dashboardData.recruitmentMetrics && (
+                  <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-blue-600" />
+                        Performance Summary
+                      </CardTitle>
+                      <CardDescription>
+                        Key performance indicators for your recruitment operations
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">Success Rate</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {dashboardData.recruitmentMetrics.averageTimeToHire}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Days to Hire</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {dashboardData.recruitmentMetrics.placementsMade}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Placements</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            ${(dashboardData.recruitmentMetrics.costPerHire / 1000).toFixed(1)}k
+                          </div>
+                          <div className="text-xs text-muted-foreground">Cost per Hire</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Charts Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Candidate Pipeline Chart */}
+                  {'candidateStats' in dashboardData && dashboardData.candidateStats && (
+                    <MetricsPieChart
+                      title="Candidate Pipeline"
+                      description="Distribution of candidates by stage"
+                      data={[
+                        { name: 'New', value: dashboardData.candidateStats.newCandidates, color: '#10b981' },
+                        { name: 'Qualified', value: dashboardData.candidateStats.qualifiedCandidates, color: '#3b82f6' },
+                        { name: 'Interviewed', value: dashboardData.candidateStats.interviewedCandidates, color: '#8b5cf6' },
+                        { name: 'Other', value: Math.max(0, dashboardData.candidateStats.totalCandidates - dashboardData.candidateStats.newCandidates - dashboardData.candidateStats.qualifiedCandidates - dashboardData.candidateStats.interviewedCandidates), color: '#6b7280' }
+                      ].filter(item => item.value > 0)}
+                      height={300}
+                      innerRadius={40}
+                      outerRadius={100}
+                    />
+                  )}
+
+                  {/* Budget Utilization Chart */}
+                  {'budgetStats' in dashboardData && dashboardData.budgetStats && dashboardData.budgetStats.totalBudget > 0 && (
+                    <MetricsPieChart
+                      title="Budget Utilization"
+                      description="Current budget allocation and spending"
+                      data={[
+                        { name: 'Spent', value: dashboardData.budgetStats.spentAmount, color: '#ef4444' },
+                        { name: 'Remaining', value: dashboardData.budgetStats.remainingBudget, color: '#10b981' }
+                      ].filter(item => item.value > 0)}
+                      height={300}
+                      innerRadius={40}
+                      outerRadius={100}
+                      formatTooltip={(value, name) => [`$${value.toLocaleString()}`, name]}
+                    />
+                  )}
+                </div>
+
+                {/* Hiring Trends Chart */}
+                {'companyStats' in dashboardData && dashboardData.companyStats && (
+                  <div className="grid grid-cols-1 gap-6">
+                    <TrendLineChart
+                      title="Hiring Trends"
+                      description="New hires and hiring velocity over time"
+                      data={[
+                        { date: '2024-01', count: Math.max(0, dashboardData.companyStats.newHires - 5) },
+                        { date: '2024-02', count: Math.max(0, dashboardData.companyStats.newHires - 3) },
+                        { date: '2024-03', count: Math.max(0, dashboardData.companyStats.newHires - 1) },
+                        { date: '2024-04', count: dashboardData.companyStats.newHires },
+                        { date: '2024-05', count: Math.max(0, dashboardData.companyStats.newHires + 2) }
+                      ]}
+                      dataKey="count"
+                      color="#3b82f6"
+                      height={300}
+                      formatTooltip={(value) => [`${value} hires`, 'New Hires']}
+                      formatXAxisLabel={(value) => {
+                        const [, month] = value.split('-');
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return monthNames[parseInt(month) - 1] || value;
+                      }}
+                    />
+                  </div>
+                )}
               </>
             )}
 
