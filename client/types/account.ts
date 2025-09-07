@@ -16,7 +16,7 @@ export interface AccountUser {
   inviteStatus: InviteStatus;
   inviteStatusStartDateTime?: string;
   inviteStatusEndDateTime?: string;
-  rolesAssigned: MyVideoResumeRole[];
+  rolesAssigned: string[];
   isPaidAccount: boolean;
   isPaidAccountDateTime?: string;
   accountUsageType?: AccountUsageType;
@@ -71,6 +71,14 @@ export enum InviteStatus {
   Resent = 3,
   Expired = 4,
   Owner = 5,
+}
+
+export enum MyVideoResumeRole {
+  Admin = "Admin",
+  JobSeeker = "JobSeeker",
+  Recruiter = "Recruiter",
+  Business = "Business",
+  Employer = "Employer"
 }
 
 

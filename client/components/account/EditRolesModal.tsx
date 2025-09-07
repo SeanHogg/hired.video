@@ -121,17 +121,17 @@ export function EditRolesModal({
             <CardContent>
               <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={user.userProfile?.avatarUrl} />
+                  <AvatarImage src={user.avatarUrl} />
                   <AvatarFallback>
-                    {user.userProfile?.firstName?.[0]}
-                    {user.userProfile?.lastName?.[0]}
+                    {user.firstName?.[0]}
+                    {user.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-medium text-lg">
-                    {user.userProfile?.firstName} {user.userProfile?.lastName}
+                    {user.firstName} {user.lastName}
                   </h3>
-                  <p className="text-gray-600">{user.userProfile?.email}</p>
+                  <p className="text-gray-600">{user.email}</p>
                   <div className="flex gap-1 mt-2">
                     <span className="text-sm text-gray-500">
                       Current roles:
