@@ -37,6 +37,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
 import {
   dashboardService,
   type BaseDashboard,
@@ -82,26 +83,8 @@ export default function Dashboard() {
     setDashboardError(null);
 
     try {
-      let response: any;
-      const userRole = user.role?.toLowerCase().replace('_', '');
-
-      switch (userRole) {
-        case 'jobseeker':
-          response = await dashboardService.getJobSeekerDashboard();
-          break;
-        case 'recruiter':
-          response = await dashboardService.getRecruiterDashboard();
-          break;
-        case 'employer':
-        case 'business':
-          response = await dashboardService.getEmployerDashboard();
-          break;
-        case 'admin':
-          response = await dashboardService.getAdminDashboard();
-          break;
-        default:
-          response = await dashboardService.getDashboard();
-      }
+      // Use centralized role-based dashboard fetching
+      const response = await dashboardService.getDashboardForRole(user.role);
 
       if (response.success && response.data) {
         setRealDashboardData(response.data);
@@ -431,8 +414,8 @@ export default function Dashboard() {
                   <RefreshCw className={`h-4 w-4 mr-2 ${dashboardLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                <Badge variant="secondary" className="capitalize">
-                  {user.role?.replace("_", " ")}
+                <Badge variant="secondary">
+                  {getRoleDisplayLabel(user.role)}
                 </Badge>
               </div>
             </div>
@@ -627,7 +610,7 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {user.role === "JobSeeker" && (
+                  {createRolePermissions(user.role).isJobSeeker && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -652,7 +635,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {user.role === "Recruiter" && (
+                  {createRolePermissions(user.role).isRecruiter && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -677,7 +660,7 @@ export default function Dashboard() {
                       </Button>
                     </>
                   )}
-                  {(user.role === "Employer" || user.role === "Business") && (
+                  {createRolePermissions(user.role).isEmployer && (
                     <>
                       <Button
                         className="w-full justify-start gap-3"
@@ -721,7 +704,7 @@ export default function Dashboard() {
             </div>
 
             {/* Additional Dashboard Sections for Employer/Business Role */}
-            {(user.role === "Employer" || user.role === "Business") && dashboardData && (
+            {createRolePermissions(user.role).isEmployer && dashboardData && (
               <>
                 {/* Team & Budget Metrics Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

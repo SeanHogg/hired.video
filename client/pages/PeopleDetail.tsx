@@ -58,6 +58,7 @@ import { userService, type UserProfile } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 export default function PeopleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -356,18 +357,7 @@ export default function PeopleDetail() {
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "JobSeeker":
-        return "Job Seeker";
-      case "Recruiter":
-        return "Recruiter";
-      case "Business":
-        return "Business Leader";
-      default:
-        return role;
-    }
-  };
+
 
   const currentPosition = person.data.experience.find((exp) => exp.isCurrent);
 
@@ -442,7 +432,7 @@ export default function PeopleDetail() {
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
                               <span>
-                                {getRoleLabel((person as any).role || "0")}
+                                {getRoleDisplayLabel((person as any).role || (person as any).roleSelected || "JobSeeker")}
                               </span>
                             </div>
                             <div className="flex items-center gap-1">

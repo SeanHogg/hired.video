@@ -49,7 +49,12 @@ import {
 
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import {
+  roleToSelectValue,
+  formatRoleForDisplay,
+  getAvailableRoles
+} from "@/lib/role-utils";
 
 export default function Profile() {
   const {
@@ -83,9 +88,9 @@ export default function Profile() {
     lastName: user?.lastName || "",
     email: user?.email || "",
     phone: "",
-    role: user?.role || "job_seeker",
+    role: roleToSelectValue(user?.role),
     location: user?.location || "",
-    bio: `Passionate ${(user?.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+    bio: `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
     company: "",
     title: "",
     website: user?.website || "",
@@ -108,9 +113,9 @@ export default function Profile() {
       lastName: user.lastName || "",
       email: user.email || "",
       phone: user.phone || "",
-      role: user.role || "job_seeker",
+      role: roleToSelectValue(user.role),
       location: user.location || "",
-      bio: `Passionate ${(user.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+      bio: `Passionate ${formatRoleForDisplay(user.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
       company: "",
       title: "",
       website: user.website || "",
@@ -156,9 +161,9 @@ export default function Profile() {
       lastName: user?.lastName || "",
       email: user?.email || "",
       phone: "",
-      role: user?.role || "job_seeker",
+      role: roleToSelectValue(user?.role),
       location: user?.location || "",
-      bio: `Passionate ${(user?.role || "professional").replace("_", " ")} focused on building meaningful connections and driving career growth through innovative technology.`,
+      bio: `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
       company: "",
       title: "",
       website: user?.website || "",
@@ -431,13 +436,11 @@ export default function Profile() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={USER_ROLES.JOB_SEEKER}>
-                                Job Seeker
-                              </SelectItem>
-                              <SelectItem value={USER_ROLES.RECRUITER}>
-                                Recruiter
-                              </SelectItem>
-                              <SelectItem value={USER_ROLES.EMPLOYER}>Business</SelectItem>
+                              {getAvailableRoles().map((roleOption) => (
+                                <SelectItem key={roleOption.value} value={roleOption.value}>
+                                  {roleOption.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { createRolePermissions } from "@/lib/role-utils";
 
 interface JobPermissions {
   canEdit: boolean;
@@ -47,17 +48,11 @@ export function useJobPermissions(job: Job | null): JobPermissions {
       return;
     }
 
+    // Use centralized role permissions
+    const rolePermissions = createRolePermissions(user.role);
+
     // Check if user is the job creator
     const isJobCreator = job.userId === user.id || job.createdByUser?.userId === user.id;
-
-    // For now, implement basic permission logic
-    // In a full implementation, you would check:
-    // 1. User roles (JobSeeker, Recruiter, etc.)
-    // 2. Company associations
-    // 3. Account ownership
-    
-    const isRecruiter = user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
-    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
 
     let canEdit = false;
     let canDelete = false;
@@ -66,16 +61,14 @@ export function useJobPermissions(job: Job | null): JobPermissions {
       // Job creator can always edit and delete their own jobs
       canEdit = true;
       canDelete = true;
-    } else if (isRecruiter && !isJobSeeker) {
-      // Recruiters might be able to edit jobs in their company
-      // This would require additional API calls to check company associations
-      // For now, we'll be conservative and not allow editing
-      canEdit = false;
-      canDelete = false;
+    } else {
+      // Use role-based permissions for non-creators
+      canEdit = rolePermissions.canEditJobs;
+      canDelete = rolePermissions.canDeleteJobs;
     }
 
-    // Job seekers should never be able to edit jobs
-    if (isJobSeeker && !isRecruiter) {
+    // Job seekers should never be able to edit jobs (unless they created them)
+    if (rolePermissions.isJobSeeker && !isJobCreator) {
       canEdit = false;
       canDelete = false;
     }
@@ -94,14 +87,12 @@ export function useJobPermissions(job: Job | null): JobPermissions {
 // Hook for checking if user can create jobs
 export function useCanCreateJobs(): boolean {
   const { user } = useAuth();
-  
+
   if (!user) return false;
-  
-  // Only recruiters and employers can create jobs, not job seekers
-  const isRecruiter = user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
-  const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
-  
-  return isRecruiter && !isJobSeeker;
+
+  // Use centralized role permissions
+  const rolePermissions = createRolePermissions(user.role);
+  return rolePermissions.canPostJobs;
 }
 
 // Enhanced hook that could make API calls to check permissions

@@ -1,31 +1,56 @@
 import { useMemo } from 'react';
-import { useAuth, USER_ROLES } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
+import { createRolePermissions, normalizeRole, getRoleDisplayLabel } from '@/lib/role-utils';
 
+/**
+ * Enhanced permissions hook using centralized role utilities
+ * Provides consistent role checking and permissions across the application
+ */
 export function usePermissions() {
   const { user } = useAuth();
-  const userRole = user?.role;
 
-  // Simple role checks
-  const isAdmin = useMemo(() => userRole === USER_ROLES.ADMIN, [userRole]);
-  const isBusiness = useMemo(() => userRole === USER_ROLES.BUSINESS, [userRole]);
-  const isRecruiter = useMemo(() => userRole === USER_ROLES.RECRUITER, [userRole]);
-  const isJobSeeker = useMemo(() => userRole === USER_ROLES.JOB_SEEKER, [userRole]);
+  // Create permissions instance with memoization for performance
+  const permissions = useMemo(() => {
+    return createRolePermissions(user?.role);
+  }, [user?.role]);
 
-  // Permission checks
-  const canManageAccount = useMemo(() => isAdmin || isBusiness, [isAdmin, isBusiness]);
-  const canManageJobs = useMemo(() => isAdmin || isBusiness || isRecruiter, [isAdmin, isBusiness, isRecruiter]);
-  const canViewResumes = useMemo(() => isAdmin || isBusiness || isRecruiter, [isAdmin, isBusiness, isRecruiter]);
-  const canCreateResume = useMemo(() => isJobSeeker, [isJobSeeker]);
+  // Normalized role value
+  const normalizedRole = useMemo(() => {
+    return normalizeRole(user?.role);
+  }, [user?.role]);
+
+  // Role display label
+  const roleDisplayLabel = useMemo(() => {
+    return getRoleDisplayLabel(user?.role);
+  }, [user?.role]);
 
   return {
-    userRole,
-    isAdmin,
-    isBusiness,
-    isRecruiter,
-    isJobSeeker,
-    canManageAccount,
-    canManageJobs,
-    canViewResumes,
-    canCreateResume,
+    // Raw role data
+    userRole: normalizedRole,
+    roleDisplayLabel,
+
+    // Role type checks
+    isAdmin: permissions.isAdmin,
+    isBusiness: permissions.isBusiness,
+    isEmployer: permissions.isEmployer,
+    isRecruiter: permissions.isRecruiter,
+    isJobSeeker: permissions.isJobSeeker,
+
+    // Permission checks
+    canManageAccount: permissions.canManageAccount,
+    canManageJobs: permissions.canManageJobs,
+    canViewResumes: permissions.canViewResumes,
+    canCreateResume: permissions.canCreateResume,
+    canManageTeam: permissions.canManageTeam,
+    canAccessAnalytics: permissions.canAccessAnalytics,
+    canPostJobs: permissions.canPostJobs,
+    canEditJobs: permissions.canEditJobs,
+    canDeleteJobs: permissions.canDeleteJobs,
+
+    // Dashboard type
+    dashboardType: permissions.dashboardType,
+
+    // Full permissions object for advanced use cases
+    permissions,
   };
 }

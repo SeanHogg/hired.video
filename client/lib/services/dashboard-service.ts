@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { createRolePermissions, DASHBOARD_TYPES, type DashboardType } from "../role-utils";
 import {
   searchService,
   type SearchResponse,
@@ -430,6 +431,36 @@ export class DashboardService {
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error creating default dashboard:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to fetch dashboard data"
+      };
+    }
+  }
+
+  /**
+   * Get dashboard data based on user role - centralized role logic
+   */
+  async getDashboardForRole(userRole: string | number | undefined | null): Promise<DashboardResponse<any>> {
+    const rolePermissions = createRolePermissions(userRole);
+    const dashboardType = rolePermissions.dashboardType;
+
+    try {
+      switch (dashboardType) {
+        case DASHBOARD_TYPES.JOB_SEEKER:
+          return await this.getJobSeekerDashboard();
+        case DASHBOARD_TYPES.RECRUITER:
+          return await this.getRecruiterDashboard();
+        case DASHBOARD_TYPES.EMPLOYER:
+          return await this.getEmployerDashboard();
+        case DASHBOARD_TYPES.ADMIN:
+          return await this.getAdminDashboard();
+        case DASHBOARD_TYPES.DEFAULT:
+        default:
+          return await this.getDashboard();
+      }
+    } catch (error) {
+      console.error("Error fetching role-based dashboard:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to fetch dashboard data"
