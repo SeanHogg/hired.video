@@ -595,7 +595,7 @@ export default function Profile() {
                           className="h-auto p-4 flex flex-col gap-2"
                           asChild
                         >
-                          <Link to="/jobs/new">
+                          <Link to="/jobs/create">
                             <Briefcase className="h-6 w-6" />
                             <span className="font-medium">Post a Job</span>
                             <span className="text-xs text-muted-foreground">
@@ -609,7 +609,7 @@ export default function Profile() {
                           className="h-auto p-4 flex flex-col gap-2"
                           asChild
                         >
-                          <Link to="/candidates">
+                          <Link to="/people">
                             <Eye className="h-6 w-6" />
                             <span className="font-medium">
                               Browse Candidates

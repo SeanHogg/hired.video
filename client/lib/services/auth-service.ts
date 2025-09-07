@@ -73,8 +73,6 @@ export const UserProfileDTOSchema = z.object({
 // - Or PascalCase strings (JobSeeker/Recruiter/Employer/Business)
 // - Our UI expects USER_ROLES constants: "JobSeeker" | "Recruiter" | "Employer" | "Business"
 function mapServerRole(role: string | number | undefined | null): string {
-  console.log("Auth Service - Mapping server role:", role, "Type:", typeof role);
-
   if (role === undefined || role === null) return USER_ROLES.JOB_SEEKER;
   if (typeof role === "number") {
     switch (role) {
@@ -90,7 +88,6 @@ function mapServerRole(role: string | number | undefined | null): string {
   }
   // string input
   const r = String(role).trim().toLowerCase();
-  console.log("Auth Service - Normalized role string:", r);
 
   if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return USER_ROLES.JOB_SEEKER;
   if (r === "recruiter") return USER_ROLES.RECRUITER;
@@ -99,9 +96,7 @@ function mapServerRole(role: string | number | undefined | null): string {
   const num = Number(r);
   if (!Number.isNaN(num)) return mapServerRole(num);
 
-  const mappedRole = USER_ROLES.JOB_SEEKER;
-  console.log("Auth Service - Final mapped role:", mappedRole);
-  return mappedRole;
+  return USER_ROLES.JOB_SEEKER;
 }
 
 // ============================================================================

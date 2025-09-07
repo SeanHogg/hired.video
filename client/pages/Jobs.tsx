@@ -224,17 +224,11 @@ export default function Jobs() {
 
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    // Debug logging to help identify role issues
-    console.log("Jobs page - User role:", user.role, "Type:", typeof user.role);
-    console.log("Jobs page - USER_ROLES:", USER_ROLES);
-
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrBusiness =
       user.role === USER_ROLES.RECRUITER ||
       user.role === USER_ROLES.EMPLOYER ||
       user.role === USER_ROLES.BUSINESS;
-
-    console.log("Jobs page - isJobSeeker:", isJobSeeker, "isRecruiterOrBusiness:", isRecruiterOrBusiness);
 
     return (
       <div className="min-h-screen bg-background">
