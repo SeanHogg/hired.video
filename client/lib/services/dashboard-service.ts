@@ -126,6 +126,69 @@ export const JobSeekerDashboardSchema = BaseDashboardSchema.extend({
   }),
 });
 
+// Employer dashboard specific schemas
+export const TeamMetricsSchema = z.object({
+  totalTeamMembers: z.number(),
+  activeRecruiters: z.number(),
+  openPositions: z.number(),
+  teamPerformanceScore: z.number(),
+});
+
+export const BudgetStatsSchema = z.object({
+  totalBudget: z.number(),
+  spentAmount: z.number(),
+  remainingBudget: z.number(),
+  costPerHire: z.number(),
+});
+
+export const CompanyStatsSchema = z.object({
+  totalEmployees: z.number(),
+  newHires: z.number(),
+  hiringVelocity: z.number(),
+  employeeRetentionRate: z.number(),
+});
+
+export const CandidateStatsSchema = z.object({
+  totalCandidates: z.number(),
+  newCandidates: z.number(),
+  qualifiedCandidates: z.number(),
+  interviewedCandidates: z.number(),
+});
+
+export const JobPostingStatsSchema = z.object({
+  activeJobs: z.number(),
+  totalApplications: z.number(),
+  filledPositions: z.number(),
+  averageTimeToFill: z.number(),
+});
+
+export const RecruitmentMetricsSchema = z.object({
+  placementsMade: z.number(),
+  placementRate: z.number(),
+  averageTimeToHire: z.number(),
+  costPerHire: z.number(),
+});
+
+export const MessageStatsSchema = z.object({
+  unreadCount: z.number(),
+  totalConversations: z.number(),
+  recentMessages: z.array(z.any()),
+});
+
+// Employer dashboard schema
+export const EmployerDashboardSchema = BaseDashboardSchema.extend({
+  teamMetrics: TeamMetricsSchema,
+  budgetStats: BudgetStatsSchema,
+  recruiterPerformance: z.array(z.any()),
+  companyStats: CompanyStatsSchema,
+  candidateStats: CandidateStatsSchema,
+  jobPostingStats: JobPostingStatsSchema,
+  recruitmentMetrics: RecruitmentMetricsSchema,
+  newCandidates: z.array(z.any()),
+  scheduledInterviews: z.array(z.any()),
+  messageStats: MessageStatsSchema,
+});
+
 // Legacy dashboard stats schema (for backward compatibility)
 export const DashboardStatsSchema = z.object({
   totalJobs: z.number(),
@@ -206,6 +269,7 @@ export type BaseDashboard = z.infer<typeof BaseDashboardSchema>;
 export type ProfileStats = z.infer<typeof ProfileStatsSchema>;
 export type ApplicationStats = z.infer<typeof ApplicationStatsSchema>;
 export type JobSeekerDashboard = z.infer<typeof JobSeekerDashboardSchema>;
+export type EmployerDashboard = z.infer<typeof EmployerDashboardSchema>;
 
 // Dashboard service response wrapper
 export interface DashboardResponse<T> {
@@ -408,10 +472,10 @@ export class DashboardService {
   /**
    * Get employer specific dashboard data
    */
-  async getEmployerDashboard(): Promise<DashboardResponse<BaseDashboard>> {
+  async getEmployerDashboard(): Promise<DashboardResponse<EmployerDashboard>> {
     try {
       const response = await apiClient.get("/api/userdashboard/employer") as { data: { data: any } };
-      const dashboard = BaseDashboardSchema.parse(response.data.data);
+      const dashboard = EmployerDashboardSchema.parse(response.data.data);
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error fetching employer dashboard:", error);
