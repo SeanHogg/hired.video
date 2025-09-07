@@ -58,7 +58,8 @@ export default function Dashboard() {
   // Role-to-component mapping
   const getDashboardComponent = () => {
     const commonProps = {
-      dashboardData: dashboardData as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dashboardData: dashboardData as any, // Type assertion needed for role-specific dashboard data
       loading: dashboardLoading,
       onRefresh: refreshDashboard,
     };
@@ -73,7 +74,7 @@ export default function Dashboard() {
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Welcome to MyVideoResume</h1>
         <p className="text-muted-foreground">
-          Your role ({user?.role}) doesn't have a specific dashboard yet.
+          Your role ({user?.role}) doesn&apos;t have a specific dashboard yet.
         </p>
       </div>
     );
@@ -85,7 +86,7 @@ export default function Dashboard() {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-muted-foreground">Loading dashboard...</p>
           </div>
         </div>
@@ -124,7 +125,11 @@ export default function Dashboard() {
       );
     }
 
-    return <DashboardWrapper>{getDashboardComponent()}</DashboardWrapper>;
+    return (
+      <DashboardWrapper>
+        {getDashboardComponent()}
+      </DashboardWrapper>
+    );
   };
 
   // Shared layout component
@@ -155,7 +160,7 @@ export default function Dashboard() {
       <PageLayout>
         <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-muted-foreground">Loading dashboard...</p>
           </div>
         </div>
@@ -183,5 +188,9 @@ export default function Dashboard() {
   }
 
   // Main dashboard render
-  return <PageLayout>{renderDashboardContent()}</PageLayout>;
+  return (
+    <PageLayout>
+      {renderDashboardContent()}
+    </PageLayout>
+  );
 }
