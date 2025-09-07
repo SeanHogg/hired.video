@@ -223,7 +223,9 @@ export default function Jobs() {
   if (isAuthenticated && user) {
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrBusiness =
-      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
+      user.role === USER_ROLES.RECRUITER ||
+      user.role === USER_ROLES.EMPLOYER ||
+      user.role === USER_ROLES.BUSINESS;
 
     return (
       <div className="min-h-screen bg-background">
@@ -469,8 +471,16 @@ export default function Jobs() {
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline" className="text-lg px-8">
-                  <Play className="mr-2 h-5 w-5" />
+                <Link to="/signup?role=recruiter">
+                  <Button size="lg" variant="outline" className="text-lg px-8">
+                    <Plus className="mr-2 h-5 w-5" />
+                    Post a Job
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-4 text-center">
+                <Button size="sm" variant="ghost" className="text-muted-foreground">
+                  <Play className="mr-2 h-4 w-4" />
                   See How It Works
                 </Button>
               </div>
@@ -587,6 +597,37 @@ export default function Jobs() {
                     </CardDescription>
                   </CardHeader>
                 </Card>
+              </div>
+            </div>
+
+            {/* Employer CTA */}
+            <div className="mb-16">
+              <div className="text-center bg-gradient-to-r from-green-50 to-blue-50 p-8 rounded-2xl border border-green-200/50">
+                <Building2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                <h3 className="text-2xl font-bold mb-4">
+                  Hiring? Find Top Talent Fast
+                </h3>
+                <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
+                  Post your job openings and connect with qualified candidates who match your requirements.
+                  Our AI-powered platform helps you find the right talent quickly.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link to="/signup?role=recruiter">
+                    <Button
+                      size="lg"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Plus className="mr-2 h-5 w-5" />
+                      Post Your First Job Free
+                    </Button>
+                  </Link>
+                  <Link to="/for-recruiters">
+                    <Button size="lg" variant="outline">
+                      Learn More About Hiring
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </div>
 

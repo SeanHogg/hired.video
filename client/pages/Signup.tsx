@@ -8,7 +8,7 @@ import {
   Briefcase,
   Building2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -41,6 +41,17 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Handle URL parameters for role pre-selection
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const roleParam = searchParams.get('role');
+    if (roleParam === 'recruiter') {
+      setRole(USER_ROLES.RECRUITER);
+    } else if (roleParam === 'employer' || roleParam === 'business') {
+      setRole(USER_ROLES.EMPLOYER);
+    }
+  }, [location.search]);
 
   // SEO for signup page
   useSEO(location.pathname);
