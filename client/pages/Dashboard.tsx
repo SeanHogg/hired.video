@@ -70,38 +70,55 @@ export default function Dashboard() {
 
   // Load dashboard data based on user role
   const loadDashboardData = async () => {
-    if (!user) return;
+    console.log('loadDashboardData called, user:', user);
 
+    if (!user) {
+      console.log('No user found, skipping dashboard load');
+      return;
+    }
+
+    console.log('Loading dashboard data for user role:', user.role);
     setDashboardLoading(true);
     setDashboardError(null);
 
     try {
       let response: any;
       const userRole = user.role?.toLowerCase().replace('_', '');
+      console.log('Normalized user role:', userRole);
 
       switch (userRole) {
         case 'jobseeker':
+          console.log('Calling getJobSeekerDashboard');
           response = await dashboardService.getJobSeekerDashboard();
           break;
         case 'recruiter':
+          console.log('Calling getRecruiterDashboard');
           response = await dashboardService.getRecruiterDashboard();
           break;
         case 'employer':
         case 'business':
+          console.log('Calling getEmployerDashboard');
           response = await dashboardService.getEmployerDashboard();
           break;
         case 'admin':
+          console.log('Calling getAdminDashboard');
           response = await dashboardService.getAdminDashboard();
           break;
         default:
+          console.log('Calling getDashboard (default)');
           response = await dashboardService.getDashboard();
       }
+
+      console.log('Dashboard API response:', response);
 
       if (response.success && response.data) {
         setRealDashboardData(response.data);
         setLastRefresh(new Date());
+        console.log('Dashboard data loaded successfully');
       } else {
-        setDashboardError(response.error || 'Failed to load dashboard data');
+        const errorMsg = response.error || 'Failed to load dashboard data';
+        setDashboardError(errorMsg);
+        console.error('Dashboard API returned error:', errorMsg);
       }
     } catch (error) {
       console.error('Dashboard loading error:', error);
@@ -374,10 +391,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground">
-                  {dashboardData.title}
+                  {dashboardData?.title || "Dashboard"}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  {dashboardData.description}
+                  {dashboardData?.description || "Welcome to your dashboard"}
                 </p>
               </div>
               <div className="flex items-center gap-3">
