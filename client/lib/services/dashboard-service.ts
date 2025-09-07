@@ -440,13 +440,21 @@ export class DashboardService {
    */
   async getJobSeekerDashboard(): Promise<DashboardResponse<JobSeekerDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/jobseeker") as { data: { data: any } };
+      const response = await apiClient.get("/api/userdashboard/jobseeker") as { data: any };
       console.log("JobSeeker Dashboard API Response:", response);
       console.log("Response data:", response.data);
-      console.log("Response data.data:", response.data.data);
-      console.log("Type of response.data.data:", typeof response.data.data);
+      console.log("Type of response.data:", typeof response.data);
 
-      const dashboard = JobSeekerDashboardSchema.parse(response.data.data);
+      // Try to get the data from the response - handle both nested and direct structures
+      let dashboardData = response.data;
+      if (response.data && response.data.data) {
+        dashboardData = response.data.data;
+        console.log("Using nested data structure:", dashboardData);
+      } else {
+        console.log("Using direct data structure:", dashboardData);
+      }
+
+      const dashboard = JobSeekerDashboardSchema.parse(dashboardData);
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error fetching job seeker dashboard:", error);
@@ -465,12 +473,21 @@ export class DashboardService {
    */
   async getRecruiterDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/recruiter") as { data: { data: any } };
+      const response = await apiClient.get("/api/userdashboard/recruiter") as { data: any };
       console.log("Recruiter Dashboard API Response:", response);
-      console.log("Response data.data:", response.data.data);
-      console.log("Type of response.data.data:", typeof response.data.data);
+      console.log("Response data:", response.data);
+      console.log("Type of response.data:", typeof response.data);
 
-      const dashboard = BaseDashboardSchema.parse(response.data.data);
+      // Try to get the data from the response - handle both nested and direct structures
+      let dashboardData = response.data;
+      if (response.data && response.data.data) {
+        dashboardData = response.data.data;
+        console.log("Using nested data structure:", dashboardData);
+      } else {
+        console.log("Using direct data structure:", dashboardData);
+      }
+
+      const dashboard = BaseDashboardSchema.parse(dashboardData);
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error fetching recruiter dashboard:", error);
