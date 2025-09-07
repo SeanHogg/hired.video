@@ -117,7 +117,7 @@ export default function JobCreatePage() {
       try {
         // For now, we'll use a default company name from user profile
         // In the future, this could load from a companies service
-        setCompanies([{ id: "default", name: user.companyName || "My Company" }]);
+        setCompanies([{ id: "default", name: "My Company" }]);
       } catch (error) {
         console.error("Failed to load companies:", error);
       }
@@ -624,3 +624,146 @@ export default function JobCreatePage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Compensation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Compensation (Optional)
+                  </CardTitle>
+                  <CardDescription>
+                    Specify salary range to attract qualified candidates
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Minimum Salary */}
+                    <div className="space-y-2">
+                      <Label htmlFor="salaryMin">Minimum Salary</Label>
+                      <Input
+                        id="salaryMin"
+                        type="number"
+                        placeholder="50000"
+                        {...register("salaryMin", { valueAsNumber: true })}
+                        className={errors.salaryMin ? "border-red-500" : ""}
+                      />
+                      {errors.salaryMin && (
+                        <p className="text-sm text-red-600">{errors.salaryMin.message}</p>
+                      )}
+                    </div>
+
+                    {/* Maximum Salary */}
+                    <div className="space-y-2">
+                      <Label htmlFor="salaryMax">Maximum Salary</Label>
+                      <Input
+                        id="salaryMax"
+                        type="number"
+                        placeholder="80000"
+                        {...register("salaryMax", { valueAsNumber: true })}
+                        className={errors.salaryMax ? "border-red-500" : ""}
+                      />
+                      {errors.salaryMax && (
+                        <p className="text-sm text-red-600">{errors.salaryMax.message}</p>
+                      )}
+                    </div>
+
+                    {/* Currency */}
+                    <div className="space-y-2">
+                      <Label htmlFor="currency">Currency</Label>
+                      <Select
+                        value={watchedValues.currency}
+                        onValueChange={(value) => setValue("currency", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD ($)</SelectItem>
+                          <SelectItem value="EUR">EUR (€)</SelectItem>
+                          <SelectItem value="GBP">GBP (£)</SelectItem>
+                          <SelectItem value="CAD">CAD (C$)</SelectItem>
+                          <SelectItem value="AUD">AUD (A$)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Job Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure visibility and expiration settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Public Visibility */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isPublic"
+                      checked={watchedValues.isPublic}
+                      onCheckedChange={(checked) => setValue("isPublic", !!checked)}
+                    />
+                    <Label htmlFor="isPublic" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Make this job posting public (visible to all job seekers)
+                    </Label>
+                  </div>
+
+                  {/* Expiry Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="expiryDate">Expiry Date (Optional)</Label>
+                    <Input
+                      id="expiryDate"
+                      type="date"
+                      {...register("expiryDate")}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Leave empty for no expiration date
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Submit Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/jobs")}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="min-w-[120px]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Post Job
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    </div>
+  );
+}
