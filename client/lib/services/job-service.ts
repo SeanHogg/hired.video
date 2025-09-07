@@ -56,26 +56,29 @@ export const JobSummarySchema = z.object({
 
 export const CreateJobSchema = z.object({
   title: z.string().min(1),
-  company: z.string().min(1),
-  companyId: z.string().optional(),
-  location: z.string().min(1),
   description: z.string().min(1),
+  responsibilities: z.array(z.string()).optional(),
   requirements: z.array(z.string()).optional(),
-  skills: z.array(z.string()).optional(),
-  employmentType: z.enum([
-    "full_time",
-    "part_time",
-    "contract",
-    "internship",
-    "remote",
-  ]),
-  experienceLevel: z.enum(["entry", "mid", "senior", "executive"]),
-  salaryMin: z.number().optional(),
-  salaryMax: z.number().optional(),
-  currency: z.string().optional(),
-  isRemote: z.boolean().optional(),
-  isPublic: z.boolean().optional(),
-  expiryDate: z.string().optional(),
+  employmentType: z.array(z.enum([
+    "FullTime",
+    "PartTime",
+    "Freelance",
+    "Contractor",
+    "ContractToHire",
+    "Temporary",
+    "Internship",
+  ])).optional(),
+  seniority: z.array(z.enum([
+    "Entry",
+    "Junior",
+    "Mid",
+    "Senior",
+    "LeadExecutive",
+    "None",
+  ])).optional(),
+  workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).optional(),
+  expirationDate: z.string().optional(),
+  status: z.enum(["Draft", "Open", "Closed", "Hired"]).optional(),
 });
 
 export const JobFiltersSchema = z.object({

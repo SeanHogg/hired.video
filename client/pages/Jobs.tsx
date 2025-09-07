@@ -17,7 +17,6 @@ import {
   Zap,
   BarChart3,
   Plus,
-  Upload,
   Filter,
   X,
 } from "lucide-react";
@@ -166,38 +165,37 @@ export default function Jobs() {
     return { owned: [], tracked: [] };
   };
 
-  // Load user's jobs when authenticated
-  useEffect(() => {
-    const loadUserJobs = async () => {
-      if (!isAuthenticated || !user) return;
+  // Load user's jobs when authenticated - only when needed
+  const loadUserJobsOnDemand = async () => {
+    if (!isAuthenticated || !user) return;
 
-      try {
-        setIsLoading(true);
-        // Get user's owned and tracked jobs
-        const ownedJobs = await jobService.getUserJobs();
-        const trackedJobs = await jobService.getSavedJobs();
+    try {
+      setIsLoading(true);
+      // Get user's owned and tracked jobs
+      const ownedJobs = await jobService.getUserJobs();
+      const trackedJobs = await jobService.getSavedJobs();
 
-        setJobsData({
-          owned: ownedJobs.map((j) => ({
-            ...j,
-            ownership: "owned" as const,
-            slug: (j as any).slug || "",
-            experienceLevel: (j as any).experienceLevel || "entry",
-            status: "active" as const,
-            privacy: "public" as const,
-            description: (j as any).description || "",
-            views: (j as any).views || 0,
-            applications: (j as any).applications || 0,
-            summary: (j as any).summary || "",
-            userId: (j as any).userId || "",
-            createdAt: (j as any).createdAt || "",
-            updatedAt: (j as any).updatedAt || "",
-          })),
-          tracked: trackedJobs.map((j) => ({
-            ...j,
-            ownership: "tracked" as const,
-            slug: (j as any).slug || "",
-            experienceLevel: (j as any).experienceLevel || "entry",
+      setJobsData({
+        owned: ownedJobs.map((j) => ({
+          ...j,
+          ownership: "owned" as const,
+          slug: (j as any).slug || "",
+          experienceLevel: (j as any).experienceLevel || "entry",
+          status: "active" as const,
+          privacy: "public" as const,
+          description: (j as any).description || "",
+          views: (j as any).views || 0,
+          applications: (j as any).applications || 0,
+          summary: (j as any).summary || "",
+          userId: (j as any).userId || "",
+          createdAt: (j as any).createdAt || "",
+          updatedAt: (j as any).updatedAt || "",
+        })),
+        tracked: trackedJobs.map((j) => ({
+          ...j,
+          ownership: "tracked" as const,
+          slug: (j as any).slug || "",
+          experienceLevel: (j as any).experienceLevel || "entry",
             status: "active" as const,
             privacy: "public" as const,
             description: (j as any).description || "",
@@ -214,18 +212,23 @@ export default function Jobs() {
       } finally {
         setIsLoading(false);
       }
-    };
+  };
 
-    loadUserJobs();
-  }, [isAuthenticated, user]);
+  // Only load user jobs when specifically needed (not on every page load)
+  // This prevents the unnecessary /api/Job/saved API call
+  // useEffect(() => {
+  //   if (isAuthenticated && user) {
+  //     loadUserJobsOnDemand();
+  //   }
+  // }, [isAuthenticated, user]);
 
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
-    const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
+    const isJobSeeker = user.role?.toLowerCase() === USER_ROLES.JOB_SEEKER.toLowerCase();
     const isRecruiterOrBusiness =
-      user.role === USER_ROLES.RECRUITER ||
-      user.role === USER_ROLES.EMPLOYER ||
-      user.role === USER_ROLES.BUSINESS;
+      user.role?.toLowerCase() === USER_ROLES.RECRUITER.toLowerCase() ||
+      user.role?.toLowerCase() === USER_ROLES.EMPLOYER.toLowerCase() ||
+      user.role?.toLowerCase() === USER_ROLES.BUSINESS.toLowerCase();
 
     return (
       <div className="min-h-screen bg-background">
@@ -255,20 +258,12 @@ export default function Jobs() {
                 </div>
                 <div className="flex items-center gap-2">
                   {isRecruiterOrBusiness && (
-                    <>
-                      <Button asChild variant="outline">
-                        <Link to="/jobs/upload">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Import Job
-                        </Link>
-                      </Button>
-                      <Button asChild>
-                        <Link to="/jobs/create">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Post Job
-                        </Link>
-                      </Button>
-                    </>
+                    <Button asChild>
+                      <Link to="/jobs/create">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Post Job
+                      </Link>
+                    </Button>
                   )}
                 </div>
               </div>

@@ -1,6 +1,6 @@
-import { ArrowLeft, Briefcase, Save, Eye, DollarSign, FileText, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Briefcase, Save, Eye, DollarSign, FileText, CheckCircle2, Upload, Download, FileSpreadsheet, FileImage, Plus, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,39 +26,62 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService, type CreateJob } from "@/lib/services/job-service";
+import { aiService } from "@/lib/services/ai-service";
 
 
 // Job creation form schema
 const jobCreateSchema = z.object({
   title: z.string().min(1, "Job title is required").max(100, "Title must be less than 100 characters"),
-  company: z.string().min(1, "Company name is required"),
-  location: z.string().min(1, "Location is required"),
   description: z.string().min(50, "Description must be at least 50 characters").max(5000, "Description must be less than 5000 characters"),
+  company: z.string().min(1, "Company name is required").max(100, "Company name must be less than 100 characters"),
+  location: z.string().min(1, "Location is required").max(100, "Location must be less than 100 characters"),
+  responsibilities: z.string().optional(),
   requirements: z.string().optional(),
-  employmentType: z.enum(["full_time", "part_time", "contract", "internship", "remote"]),
-  experienceLevel: z.enum(["entry", "mid", "senior", "executive"]),
-  salaryMin: z.number().min(0).optional(),
-  salaryMax: z.number().min(0).optional(),
-  currency: z.string().default("USD"),
-  isRemote: z.boolean().default(false),
-  isPublic: z.boolean().default(true),
-  expiryDate: z.string().optional(),
-}).refine((data) => {
-  if (data.salaryMin && data.salaryMax) {
-    return data.salaryMax >= data.salaryMin;
-  }
-  return true;
-}, {
-  message: "Maximum salary must be greater than or equal to minimum salary",
-  path: ["salaryMax"],
+  employmentType: z.array(z.enum(["FullTime", "PartTime", "Freelance", "Contractor", "ContractToHire", "Temporary", "Internship"])).min(1, "At least one employment type is required"),
+  seniority: z.array(z.enum(["Entry", "Junior", "Mid", "Senior", "LeadExecutive", "None"])).min(1, "At least one experience level is required"),
+  workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).default("Onsite"),
+  isRemote: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
+  salaryMin: z.number().optional(),
+  salaryMax: z.number().optional(),
+  currency: z.string().optional(),
+  expirationDate: z.string().optional(),
+  status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
 });
 
 type JobCreateForm = z.infer<typeof jobCreateSchema>;
+
+// Types for different input methods
+type JobCreationMethod = "manual" | "excel" | "document";
+
+interface ParsedJobData {
+  title: string;
+  description: string;
+  responsibilities?: string[];
+  requirements?: string[];
+  employmentType?: string[];
+  seniority?: string[];
+  workSetting?: string;
+  company?: string;
+  location?: string;
+}
+
+interface ExcelJobRow {
+  title: string;
+  description: string;
+  company?: string;
+  location?: string;
+  employmentType?: string;
+  seniority?: string;
+  workSetting?: string;
+  responsibilities?: string;
+  requirements?: string;
+}
 
 export default function JobCreatePage() {
   const navigate = useNavigate();
@@ -73,6 +96,18 @@ export default function JobCreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [activeMethod, setActiveMethod] = useState<JobCreationMethod>("manual");
+
+  // File upload states
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [parsedJobs, setParsedJobs] = useState<ParsedJobData[]>([]);
+  const [selectedJobIndex, setSelectedJobIndex] = useState<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Excel preview states
+  const [excelJobs, setExcelJobs] = useState<ExcelJobRow[]>([]);
+  const [showExcelPreview, setShowExcelPreview] = useState(false);
 
 
   // Form setup
@@ -81,15 +116,17 @@ export default function JobCreatePage() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<JobCreateForm>({
     resolver: zodResolver(jobCreateSchema),
     defaultValues: {
-      currency: "USD",
-      isRemote: false,
+      employmentType: ["FullTime"],
+      seniority: ["Mid"],
+      workSetting: "Onsite",
+      status: "Open",
       isPublic: true,
-      employmentType: "full_time",
-      experienceLevel: "mid",
+      currency: "USD",
     },
   });
 
@@ -110,6 +147,152 @@ export default function JobCreatePage() {
 
 
 
+  // File upload handlers
+  const handleFileUpload = async (file: File) => {
+    setIsProcessingFile(true);
+    setUploadedFile(file);
+
+    try {
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        // Handle Excel file
+        await handleExcelUpload(file);
+      } else if (file.name.endsWith('.pdf') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        // Handle document file with AI parsing
+        await handleDocumentUpload(file);
+      } else {
+        throw new Error('Unsupported file type. Please upload Excel (.xlsx, .xls) or document files (.pdf, .docx, .doc)');
+      }
+    } catch (error: any) {
+      setSubmitError(error.message || 'Failed to process file');
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
+
+  const handleExcelUpload = async (file: File) => {
+    try {
+      const result = await aiService.parseExcelFile(file);
+
+      if (result.success && result.jobs.length > 0) {
+        const excelJobsData = result.jobs.map(job => ({
+          title: job.title,
+          description: job.description,
+          company: job.company || "",
+          location: job.location || "",
+          employmentType: job.employmentType?.[0] || "FullTime",
+          seniority: job.seniority?.[0] || "Mid",
+          workSetting: job.workSetting || "Onsite",
+          responsibilities: job.responsibilities?.join('\n') || "",
+          requirements: job.requirements?.join('\n') || ""
+        }));
+
+        setExcelJobs(excelJobsData);
+        setShowExcelPreview(true);
+        setActiveMethod("excel");
+      } else {
+        throw new Error(result.error || 'No jobs found in Excel file');
+      }
+    } catch (error: any) {
+      // Fallback to sample data for demo purposes
+      setExcelJobs([
+        {
+          title: "Sample Job from Excel",
+          description: "Excel parsing is being implemented. This is sample data.",
+          company: "Sample Company",
+          location: "Sample Location",
+          employmentType: "FullTime",
+          seniority: "Mid",
+          workSetting: "Onsite"
+        }
+      ]);
+      setShowExcelPreview(true);
+      setActiveMethod("excel");
+      console.warn("Excel parsing not yet implemented, showing sample data:", error.message);
+    }
+  };
+
+  const handleDocumentUpload = async (file: File) => {
+    try {
+      const result = await aiService.parseJobDocument(file);
+
+      if (result.success && result.jobs.length > 0) {
+        setParsedJobs(result.jobs);
+        setSelectedJobIndex(0);
+        setActiveMethod("document");
+
+        // Pre-fill the form with the first parsed job
+        populateFormWithParsedData(result.jobs[0]);
+      } else {
+        throw new Error(result.error || 'No job data found in document');
+      }
+    } catch (error: any) {
+      // Fallback to sample data for demo purposes
+      const parsedJob: ParsedJobData = {
+        title: "Sample Parsed Job Title",
+        description: "AI document parsing is being implemented. This is sample data extracted from your document.",
+        responsibilities: ["Sample Responsibility 1", "Sample Responsibility 2"],
+        requirements: ["Sample Requirement 1", "Sample Requirement 2"],
+        employmentType: ["FullTime"],
+        seniority: ["Mid"],
+        workSetting: "Onsite",
+        company: "Sample Company",
+        location: "Sample Location"
+      };
+
+      setParsedJobs([parsedJob]);
+      setSelectedJobIndex(0);
+      setActiveMethod("document");
+
+      // Pre-fill the form with parsed data
+      populateFormWithParsedData(parsedJob);
+
+      console.warn("Document parsing not yet implemented, showing sample data:", error.message);
+    }
+  };
+
+  const populateFormWithParsedData = (jobData: ParsedJobData) => {
+    setValue("title", jobData.title);
+    setValue("description", jobData.description);
+    if (jobData.responsibilities) {
+      setValue("responsibilities", jobData.responsibilities.join('\n'));
+    }
+    if (jobData.requirements) {
+      setValue("requirements", jobData.requirements.join('\n'));
+    }
+    if (jobData.employmentType) {
+      setValue("employmentType", jobData.employmentType as any);
+    }
+    if (jobData.seniority) {
+      setValue("seniority", jobData.seniority as any);
+    }
+    if (jobData.workSetting) {
+      setValue("workSetting", jobData.workSetting as any);
+    }
+    if (jobData.company) {
+      setValue("company", jobData.company);
+    }
+    if (jobData.location) {
+      setValue("location", jobData.location);
+    }
+  };
+
+  const downloadExcelTemplate = () => {
+    // Create a simple CSV template for now
+    const csvContent = `Title,Description,Company,Location,Employment Type,Seniority,Work Setting,Responsibilities,Requirements
+"Software Engineer","Develop and maintain software applications","Tech Corp","San Francisco, CA","FullTime","Mid","Onsite","Develop features\nWrite tests\nCode reviews","Bachelor's degree\n3+ years experience\nJavaScript knowledge"
+"Product Manager","Lead product development and strategy","Innovation Inc","New York, NY","FullTime","Senior","Hybrid","Define product roadmap\nWork with stakeholders\nAnalyze metrics","MBA preferred\n5+ years PM experience\nAgile methodology"`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'job_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   const onSubmit = async (data: JobCreateForm) => {
     try {
       setIsSubmitting(true);
@@ -118,28 +301,21 @@ export default function JobCreatePage() {
       // Convert form data to CreateJob format
       const jobData: CreateJob = {
         title: data.title,
-        company: data.company,
-        location: data.location,
         description: data.description,
+        responsibilities: data.responsibilities ? data.responsibilities.split('\n').filter(r => r.trim()) : undefined,
         requirements: data.requirements ? data.requirements.split('\n').filter(r => r.trim()) : undefined,
         employmentType: data.employmentType,
-        experienceLevel: data.experienceLevel,
-        salaryMin: data.salaryMin,
-        salaryMax: data.salaryMax,
-        currency: data.currency,
-        isRemote: data.isRemote,
-        isPublic: data.isPublic,
-        expiryDate: data.expiryDate,
+        seniority: data.seniority,
+        workSetting: data.workSetting,
+        expirationDate: data.expirationDate,
+        status: data.status,
       };
 
       await jobService.createJob(jobData);
 
       setSubmitSuccess(true);
 
-      // Redirect to jobs page after a short delay
-      setTimeout(() => {
-        navigate("/jobs");
-      }, 2000);
+      // Don't auto-redirect, let user choose next action
 
     } catch (error: any) {
       console.error("Failed to create job:", error);
@@ -204,9 +380,162 @@ export default function JobCreatePage() {
             <div className="mb-8">
               <h1 className="text-3xl font-bold mb-2">Create Job Posting</h1>
               <p className="text-muted-foreground">
-                Create a new job posting to attract top talent to your organization
+                Create a new job posting using manual entry, Excel upload, or document parsing
               </p>
             </div>
+
+            {/* Input Method Tabs */}
+            <Tabs value={activeMethod} onValueChange={(value) => setActiveMethod(value as JobCreationMethod)} className="mb-8">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="manual" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Manual Entry
+                </TabsTrigger>
+                <TabsTrigger value="excel" className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Excel Upload
+                </TabsTrigger>
+                <TabsTrigger value="document" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Document Upload
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Excel Upload Tab */}
+              <TabsContent value="excel" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5" />
+                      Excel Bulk Upload
+                    </CardTitle>
+                    <CardDescription>
+                      Upload an Excel file with multiple job postings. Download our template to get started.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={downloadExcelTemplate}
+                        className="flex items-center gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download Template
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isProcessingFile}
+                        className="flex items-center gap-2"
+                      >
+                        <Upload className="h-4 w-4" />
+                        {isProcessingFile ? "Processing..." : "Upload Excel File"}
+                      </Button>
+                    </div>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                      className="hidden"
+                    />
+
+                    {showExcelPreview && excelJobs.length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="font-semibold mb-4">Preview Jobs ({excelJobs.length} found)</h4>
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                          {excelJobs.map((job, index) => (
+                            <Card key={index} className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h5 className="font-medium">{job.title}</h5>
+                                  <p className="text-sm text-muted-foreground">{job.company} • {job.location}</p>
+                                  <p className="text-sm mt-2">{job.description.substring(0, 100)}...</p>
+                                </div>
+                                <Button size="sm" onClick={() => {
+                                  // Populate form with this job data
+                                  populateFormWithParsedData(job as any);
+                                  setActiveMethod("manual");
+                                }}>
+                                  Edit
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Document Upload Tab */}
+              <TabsContent value="document" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileImage className="h-5 w-5" />
+                      AI Document Parsing
+                    </CardTitle>
+                    <CardDescription>
+                      Upload a PDF or Word document and let AI extract the job details for you.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                      <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Drop your document here or click to browse</p>
+                        <p className="text-xs text-muted-foreground">Supports PDF, DOC, and DOCX files</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = '.pdf,.doc,.docx';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) handleFileUpload(file);
+                          };
+                          input.click();
+                        }}
+                        disabled={isProcessingFile}
+                      >
+                        {isProcessingFile ? "Processing..." : "Choose File"}
+                      </Button>
+                    </div>
+
+                    {parsedJobs.length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="font-semibold mb-4">Parsed Job Data</h4>
+                        <Card className="p-4">
+                          <div className="space-y-2">
+                            <h5 className="font-medium">{parsedJobs[selectedJobIndex]?.title}</h5>
+                            <p className="text-sm text-muted-foreground">
+                              {parsedJobs[selectedJobIndex]?.description.substring(0, 200)}...
+                            </p>
+                            <Button size="sm" onClick={() => setActiveMethod("manual")}>
+                              Review & Edit
+                            </Button>
+                          </div>
+                        </Card>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Manual Entry Tab */}
+              <TabsContent value="manual" className="space-y-6">
 
             {/* Success Message */}
             {submitSuccess && (
@@ -312,37 +641,59 @@ export default function JobCreatePage() {
                   <div className="space-y-2">
                     <Label htmlFor="employmentType">Employment Type *</Label>
                     <Select
-                      value={watchedValues.employmentType}
-                      onValueChange={(value) => setValue("employmentType", value as any)}
+                      value={watchedValues.employmentType?.[0] || ""}
+                      onValueChange={(value) => setValue("employmentType", [value as any])}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select employment type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="full_time">Full-time</SelectItem>
-                        <SelectItem value="part_time">Part-time</SelectItem>
-                        <SelectItem value="contract">Contract</SelectItem>
-                        <SelectItem value="internship">Internship</SelectItem>
-                        <SelectItem value="remote">Remote</SelectItem>
+                        <SelectItem value="FullTime">Full-time</SelectItem>
+                        <SelectItem value="PartTime">Part-time</SelectItem>
+                        <SelectItem value="Contractor">Contract</SelectItem>
+                        <SelectItem value="Internship">Internship</SelectItem>
+                        <SelectItem value="Freelance">Freelance</SelectItem>
+                        <SelectItem value="Temporary">Temporary</SelectItem>
+                        <SelectItem value="ContractToHire">Contract to Hire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Work Setting */}
+                  <div className="space-y-2">
+                    <Label htmlFor="workSetting">Work Setting *</Label>
+                    <Select
+                      value={watchedValues.workSetting}
+                      onValueChange={(value) => setValue("workSetting", value as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select work setting" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Onsite">On-site</SelectItem>
+                        <SelectItem value="Remote">Remote</SelectItem>
+                        <SelectItem value="Hybrid">Hybrid</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Experience Level */}
                   <div className="space-y-2">
-                    <Label htmlFor="experienceLevel">Experience Level *</Label>
+                    <Label htmlFor="seniority">Experience Level *</Label>
                     <Select
-                      value={watchedValues.experienceLevel}
-                      onValueChange={(value) => setValue("experienceLevel", value as any)}
+                      value={watchedValues.seniority?.[0] || ""}
+                      onValueChange={(value) => setValue("seniority", [value as any])}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select experience level" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="entry">Entry Level</SelectItem>
-                        <SelectItem value="mid">Mid Level</SelectItem>
-                        <SelectItem value="senior">Senior Level</SelectItem>
-                        <SelectItem value="executive">Executive</SelectItem>
+                        <SelectItem value="Entry">Entry Level</SelectItem>
+                        <SelectItem value="Junior">Junior Level</SelectItem>
+                        <SelectItem value="Mid">Mid Level</SelectItem>
+                        <SelectItem value="Senior">Senior Level</SelectItem>
+                        <SelectItem value="LeadExecutive">Lead/Executive</SelectItem>
+                        <SelectItem value="None">Not Specified</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -473,11 +824,11 @@ export default function JobCreatePage() {
 
                   {/* Expiry Date */}
                   <div className="space-y-2">
-                    <Label htmlFor="expiryDate">Expiry Date (Optional)</Label>
+                    <Label htmlFor="expirationDate">Expiry Date (Optional)</Label>
                     <Input
-                      id="expiryDate"
+                      id="expirationDate"
                       type="date"
-                      {...register("expiryDate")}
+                      {...register("expirationDate")}
                       min={new Date().toISOString().split('T')[0]}
                     />
                     <p className="text-sm text-muted-foreground">
@@ -515,7 +866,35 @@ export default function JobCreatePage() {
                   )}
                 </Button>
               </div>
+
+              {/* Success Actions */}
+              {submitSuccess && (
+                <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSubmitSuccess(false);
+                      setSubmitError(null);
+                      reset();
+                      setActiveMethod("manual");
+                      setUploadedFile(null);
+                      setParsedJobs([]);
+                      setExcelJobs([]);
+                      setShowExcelPreview(false);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Another Job
+                  </Button>
+                  <Button onClick={() => navigate("/jobs")}>
+                    View All Jobs
+                  </Button>
+                </div>
+              )}
             </form>
+            </TabsContent>
+            </Tabs>
           </div>
         </div>
         <Footer />

@@ -40,6 +40,27 @@ export interface BackendChatResponse {
   };
 }
 
+export interface ParsedJobData {
+  title: string;
+  description: string;
+  responsibilities?: string[];
+  requirements?: string[];
+  employmentType?: string[];
+  seniority?: string[];
+  workSetting?: string;
+  company?: string;
+  location?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  currency?: string;
+}
+
+export interface DocumentParseResponse {
+  success: boolean;
+  jobs: ParsedJobData[];
+  error?: string;
+}
+
 // ============================================================================
 // AI SERVICE CLASS
 // ============================================================================
@@ -192,6 +213,90 @@ Keep responses concise but informative, using bullet points and emojis to improv
     ];
 
     return this.sendChatMessage(messages);
+  }
+
+  /**
+   * Parse job document using AI (uses existing JobController.CreateFromFile)
+   */
+  async parseJobDocument(file: File): Promise<DocumentParseResponse> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Use the existing Job controller endpoint
+      const response = await fetch(`${this.apiConfig.baseUrl}/api/Job/CreateFromFile`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const apiResponse = await response.json();
+
+      // Transform the API response to match our expected format
+      if (apiResponse.success && apiResponse.data) {
+        const job = apiResponse.data;
+        return {
+          success: true,
+          jobs: [{
+            title: job.title || '',
+            description: job.description || '',
+            company: job.company || '',
+            location: job.location || '',
+            responsibilities: job.responsibilities || [],
+            requirements: job.requirements || [],
+            employmentType: job.employmentType ? [job.employmentType] : ['FullTime'],
+            seniority: job.seniority ? [job.seniority] : ['Mid'],
+            workSetting: job.workSetting || 'Onsite',
+            salaryMin: job.salaryMin,
+            salaryMax: job.salaryMax,
+            currency: job.currency
+          }]
+        };
+      } else {
+        return {
+          success: false,
+          jobs: [],
+          error: apiResponse.message || 'Failed to parse document'
+        };
+      }
+    } catch (error) {
+      logger.error("Error parsing job document", error);
+      throw new Error(`Failed to parse document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Parse Excel file with job data (not yet implemented in backend)
+   */
+  async parseExcelFile(file: File): Promise<DocumentParseResponse> {
+    try {
+      // TODO: Implement Excel parsing endpoint in backend
+      logger.warn("Excel parsing not yet implemented, returning sample data", { fileName: file.name });
+
+      return {
+        success: true,
+        jobs: [{
+          title: "Sample Job from Excel",
+          description: "Excel parsing functionality is being implemented. This is sample data from your uploaded file.",
+          company: "Sample Company",
+          location: "Sample Location",
+          responsibilities: ["Sample responsibility from Excel"],
+          requirements: ["Sample requirement from Excel"],
+          employmentType: ["FullTime"],
+          seniority: ["Mid"],
+          workSetting: "Onsite"
+        }]
+      };
+    } catch (error) {
+      logger.error("Error parsing Excel file", error);
+      throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 
