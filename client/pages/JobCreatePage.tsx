@@ -139,7 +139,7 @@ export default function JobCreatePage() {
       return;
     }
 
-    if (user && user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER) {
+    if (user && user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER && user.role !== USER_ROLES.BUSINESS) {
       navigate("/jobs");
       return;
     }
