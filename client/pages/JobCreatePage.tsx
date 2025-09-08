@@ -135,6 +135,8 @@ export default function JobCreatePage() {
   const { user, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [activeMethod, setActiveMethod] = useState<JobCreationMethod>("manual");
 
@@ -193,9 +195,14 @@ export default function JobCreatePage() {
     setIsProcessingFile(true);
     setUploadedFile(file);
 
+    // Clear all error states
+    setSubmitError(null);
+    setExcelError(null);
+    setDocumentError(null);
+
     try {
-      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-        // Handle Excel file
+      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
+        // Handle Excel/CSV file
         await handleExcelUpload(file);
       } else if (
         file.name.endsWith(".pdf") ||
@@ -206,11 +213,16 @@ export default function JobCreatePage() {
         await handleDocumentUpload(file);
       } else {
         throw new Error(
-          "Unsupported file type. Please upload Excel (.xlsx, .xls) or document files (.pdf, .docx, .doc)",
+          "Unsupported file type. Please upload Excel (.xlsx, .xls, .csv) or document files (.pdf, .docx, .doc)",
         );
       }
     } catch (error: any) {
-      setSubmitError(error.message || "Failed to process file");
+      // Set error based on file type
+      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
+        setExcelError(error.message || "Failed to process Excel/CSV file");
+      } else {
+        setDocumentError(error.message || "Failed to process document file");
+      }
     } finally {
       setIsProcessingFile(false);
     }
@@ -299,8 +311,8 @@ export default function JobCreatePage() {
     }
   };
 
-  const downloadExcelTemplate = () => {
-    // Create a simple CSV template for now
+  const downloadTemplate = () => {
+    // Create a CSV template with sample job data
     const csvContent = `Title,Description,Company,Location,Employment Type,Seniority,Work Setting,Responsibilities,Requirements
 "Software Engineer","Develop and maintain software applications","Tech Corp","San Francisco, CA","FullTime","Mid","Onsite","Develop features\nWrite tests\nCode reviews","Bachelor's degree\n3+ years experience\nJavaScript knowledge"
 "Product Manager","Lead product development and strategy","Innovation Inc","New York, NY","FullTime","Senior","Hybrid","Define product roadmap\nWork with stakeholders\nAnalyze metrics","MBA preferred\n5+ years PM experience\nAgile methodology"`;
@@ -320,6 +332,8 @@ export default function JobCreatePage() {
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      setExcelError(null);
+      setDocumentError(null);
 
       // Convert form data to CreateJob format
       const jobData: CreateJob = {
@@ -432,7 +446,7 @@ export default function JobCreatePage() {
                 </TabsTrigger>
                 <TabsTrigger value="excel" className="flex items-center gap-2">
                   <FileSpreadsheet className="h-4 w-4" />
-                  Excel Upload
+                  File Upload
                 </TabsTrigger>
                 <TabsTrigger
                   value="document"
@@ -449,11 +463,11 @@ export default function JobCreatePage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <FileSpreadsheet className="h-5 w-5" />
-                      Excel Bulk Upload
+                      File Bulk Upload
                     </CardTitle>
                     <CardDescription>
-                      Upload an Excel file with multiple job postings. Download
-                      our template to get started.
+                      Upload an Excel (.xlsx, .xls) or CSV file with multiple job postings. Download
+                      our CSV template to get started.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -461,11 +475,11 @@ export default function JobCreatePage() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={downloadExcelTemplate}
+                        onClick={downloadTemplate}
                         className="flex items-center gap-2"
                       >
                         <Download className="h-4 w-4" />
-                        Download Template
+                        Download CSV Template
                       </Button>
                       <Button
                         type="button"
@@ -476,20 +490,29 @@ export default function JobCreatePage() {
                         <Upload className="h-4 w-4" />
                         {isProcessingFile
                           ? "Processing..."
-                          : "Upload Excel File"}
+                          : "Upload File"}
                       </Button>
                     </div>
 
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".xlsx,.xls"
+                      accept=".xlsx,.xls,.csv"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleFileUpload(file);
                       }}
                       className="hidden"
                     />
+
+                    {/* Excel Upload Error Message */}
+                    {excelError && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-red-800">
+                          {excelError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     {showExcelPreview && excelJobs.length > 0 && (
                       <div className="mt-6">
@@ -573,6 +596,15 @@ export default function JobCreatePage() {
                         {isProcessingFile ? "Processing..." : "Choose File"}
                       </Button>
                     </div>
+
+                    {/* Document Upload Error Message */}
+                    {documentError && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-red-800">
+                          {documentError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     {parsedJobs.length > 0 && (
                       <div className="mt-6">
@@ -987,6 +1019,8 @@ export default function JobCreatePage() {
                         onClick={() => {
                           setSubmitSuccess(false);
                           setSubmitError(null);
+                          setExcelError(null);
+                          setDocumentError(null);
                           reset();
                           setActiveMethod("manual");
                           setUploadedFile(null);
