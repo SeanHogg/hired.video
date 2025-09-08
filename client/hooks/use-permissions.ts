@@ -1,6 +1,10 @@
-import { useMemo } from 'react';
-import { useAuth } from '@/lib/auth';
-import { createRolePermissions, normalizeRole, getRoleDisplayLabel } from '@/lib/role-utils';
+import { useMemo } from "react";
+import { useAuth } from "@/lib/auth";
+import {
+  createRolePermissions,
+  normalizeRole,
+  getRoleDisplayLabel,
+} from "@/lib/role-utils";
 
 /**
  * Enhanced permissions hook using centralized role utilities

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
 import {
   MapPin,
@@ -8,25 +8,25 @@ import {
   ExternalLink,
   Search,
   Building2,
-  Calendar
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+  Calendar,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -34,10 +34,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { useAuth } from '@/lib/auth';
-import { jobService } from '@/lib/services/job-service';
-import { companyService } from '@/lib/services/company-service';
+} from "@/components/ui/table";
+import { useAuth } from "@/lib/auth";
+import { jobService } from "@/lib/services/job-service";
+import { companyService } from "@/lib/services/company-service";
 
 // Job interface matching backend structure
 interface CompanyJob {
@@ -53,8 +53,8 @@ interface CompanyJob {
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
-  workSetting?: 'Onsite' | 'Remote' | 'Hybrid';
-  status: 'Draft' | 'Open' | 'Closed' | 'Hired';
+  workSetting?: "Onsite" | "Remote" | "Hybrid";
+  status: "Draft" | "Open" | "Closed" | "Hired";
   createdAt: string;
   expiresAt?: string;
   applications: number;
@@ -82,7 +82,7 @@ interface CompanyCareersControlProps {
   showFilters?: boolean;
   showSearch?: boolean;
   maxJobs?: number;
-  viewMode?: 'table' | 'cards';
+  viewMode?: "table" | "cards";
   onJobClick?: (job: CompanyJob) => void;
   onApplyClick?: (job: CompanyJob) => void;
   className?: string;
@@ -95,20 +95,22 @@ export function CompanyCareersControl({
   showFilters = true,
   showSearch = true,
   maxJobs,
-  viewMode = 'table',
+  viewMode = "table",
   onJobClick,
   onApplyClick,
-  className = ''
+  className = "",
 }: CompanyCareersControlProps) {
   const [jobs, setJobs] = useState<CompanyJob[]>([]);
   const [company, setCompany] = useState<CompanyInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [employmentTypeFilter, setEmploymentTypeFilter] = useState<string>('all');
-  const [experienceLevelFilter, setExperienceLevelFilter] = useState<string>('all');
-  const [locationFilter, setLocationFilter] = useState<string>('all');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [employmentTypeFilter, setEmploymentTypeFilter] =
+    useState<string>("all");
+  const [experienceLevelFilter, setExperienceLevelFilter] =
+    useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+
   const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -125,52 +127,56 @@ export function CompanyCareersControl({
 
       if (companyId) {
         try {
-          const companyResponse = await companyService.getCompanyById(companyId);
+          const companyResponse =
+            await companyService.getCompanyById(companyId);
           companyData = {
             id: companyResponse.id || companyId,
-            name: companyResponse.name || 'Company',
-            logo: companyResponse.logo || '/logo.png',
-            tagline: companyResponse.tagline || '',
-            description: companyResponse.description ?? '',
-            website: companyResponse.website ?? '',
-            industry: companyResponse.industry || '',
-            size: companyResponse.size || '',
-            location: companyResponse.location || ''
+            name: companyResponse.name || "Company",
+            logo: companyResponse.logo || "/logo.png",
+            tagline: companyResponse.tagline || "",
+            description: companyResponse.description ?? "",
+            website: companyResponse.website ?? "",
+            industry: companyResponse.industry || "",
+            size: companyResponse.size || "",
+            location: companyResponse.location || "",
           };
         } catch (err) {
-          console.warn('Failed to load company data:', err);
+          console.warn("Failed to load company data:", err);
         }
       } else if (companySlug) {
         try {
-          const companyResponse = await companyService.getCompanyBySlug(companySlug);
+          const companyResponse =
+            await companyService.getCompanyBySlug(companySlug);
           companyData = {
-            id: companyResponse.id || 'company',
-            name: companyResponse.name || 'Company',
-            logo: companyResponse.logo || '/logo.png',
-            tagline: companyResponse.tagline || '',
-            description: companyResponse.description ?? '',
-            website: companyResponse.website ?? '',
-            industry: companyResponse.industry || '',
-            size: companyResponse.size || '',
-            location: companyResponse.location || ''
+            id: companyResponse.id || "company",
+            name: companyResponse.name || "Company",
+            logo: companyResponse.logo || "/logo.png",
+            tagline: companyResponse.tagline || "",
+            description: companyResponse.description ?? "",
+            website: companyResponse.website ?? "",
+            industry: companyResponse.industry || "",
+            size: companyResponse.size || "",
+            location: companyResponse.location || "",
           };
         } catch (err) {
-          console.warn('Failed to load company data by slug:', err);
+          console.warn("Failed to load company data by slug:", err);
         }
       }
 
       // Fallback to MyVideoResu.me if no company data loaded
       if (!companyData) {
         companyData = {
-          id: companyId || companySlug || 'myvideoresume-company',
-          name: 'MyVideoResu.me',
-          logo: '/logo.png',
-          tagline: 'Revolutionizing the way people find and showcase their talents',
-          description: 'MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.',
-          website: 'https://myvideoresu.me',
-          industry: 'Technology',
-          size: '11-50',
-          location: 'San Francisco, CA'
+          id: companyId || companySlug || "myvideoresume-company",
+          name: "MyVideoResu.me",
+          logo: "/logo.png",
+          tagline:
+            "Revolutionizing the way people find and showcase their talents",
+          description:
+            "MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.",
+          website: "https://myvideoresu.me",
+          industry: "Technology",
+          size: "11-50",
+          location: "San Francisco, CA",
         };
       }
 
@@ -180,7 +186,7 @@ export function CompanyCareersControl({
       try {
         const jobsResponse = await jobService.getPublicJobs({
           companyId: companyData.id,
-          limit: maxJobs || 50
+          limit: maxJobs || 50,
         });
 
         jobsData = (jobsResponse.items ?? []).map((job) => ({
@@ -191,13 +197,13 @@ export function CompanyCareersControl({
           responsibilities: [],
           requirements: [],
           employmentType: job.employmentType,
-          experienceLevel: 'mid',
+          experienceLevel: "mid",
           location: job.location,
           salaryMin: job.salaryMin,
           salaryMax: job.salaryMax,
-          currency: 'USD',
-          workSetting: job.isRemote ? 'Remote' : 'Onsite',
-          status: 'Open',
+          currency: "USD",
+          workSetting: job.isRemote ? "Remote" : "Onsite",
+          status: "Open",
           createdAt: job.postedDate ?? new Date().toISOString(),
           applications: 0,
           views: 0,
@@ -205,130 +211,142 @@ export function CompanyCareersControl({
           atsApplyUrl: undefined,
         }));
       } catch (err) {
-        console.warn('Failed to load jobs from API, using fallback data:', err);
+        console.warn("Failed to load jobs from API, using fallback data:", err);
 
         // Fallback mock jobs for demonstration
         jobsData = [
           {
-            id: '1',
-            title: 'Senior Full Stack Developer',
-            description: 'Join our team to build the next generation of video resume technology. You\'ll work with React, Node.js, and cutting-edge AI technologies.',
-            summary: 'Build innovative video resume platform features',
+            id: "1",
+            title: "Senior Full Stack Developer",
+            description:
+              "Join our team to build the next generation of video resume technology. You'll work with React, Node.js, and cutting-edge AI technologies.",
+            summary: "Build innovative video resume platform features",
             responsibilities: [
-              'Develop and maintain frontend applications using React and TypeScript',
-              'Build scalable backend services with Node.js and C#',
-              'Collaborate with AI team to integrate machine learning features',
-              'Optimize application performance and user experience'
+              "Develop and maintain frontend applications using React and TypeScript",
+              "Build scalable backend services with Node.js and C#",
+              "Collaborate with AI team to integrate machine learning features",
+              "Optimize application performance and user experience",
             ],
             requirements: [
-              '5+ years of full-stack development experience',
-              'Expert knowledge of React, TypeScript, and Node.js',
-              'Experience with cloud platforms (Azure/AWS)',
-              'Strong problem-solving and communication skills'
+              "5+ years of full-stack development experience",
+              "Expert knowledge of React, TypeScript, and Node.js",
+              "Experience with cloud platforms (Azure/AWS)",
+              "Strong problem-solving and communication skills",
             ],
-            employmentType: 'full-time',
-            experienceLevel: 'senior',
-            location: 'San Francisco, CA',
+            employmentType: "full-time",
+            experienceLevel: "senior",
+            location: "San Francisco, CA",
             salaryMin: 120000,
             salaryMax: 180000,
-            currency: 'USD',
-            workSetting: 'Hybrid',
-            status: 'Open',
-            createdAt: '2024-01-15',
+            currency: "USD",
+            workSetting: "Hybrid",
+            status: "Open",
+            createdAt: "2024-01-15",
             applications: 23,
             views: 156,
-            slug: 'senior-full-stack-developer'
+            slug: "senior-full-stack-developer",
           },
           {
-            id: '2',
-            title: 'Product Designer',
-            description: 'Shape the user experience of our video resume platform. Create intuitive designs that help users showcase their talents effectively.',
-            summary: 'Design user-centric video resume experiences',
+            id: "2",
+            title: "Product Designer",
+            description:
+              "Shape the user experience of our video resume platform. Create intuitive designs that help users showcase their talents effectively.",
+            summary: "Design user-centric video resume experiences",
             responsibilities: [
-              'Design user interfaces for web and mobile applications',
-              'Conduct user research and usability testing',
-              'Create wireframes, prototypes, and design systems',
-              'Collaborate with engineering and product teams'
+              "Design user interfaces for web and mobile applications",
+              "Conduct user research and usability testing",
+              "Create wireframes, prototypes, and design systems",
+              "Collaborate with engineering and product teams",
             ],
             requirements: [
-              '3+ years of product design experience',
-              'Proficiency in Figma, Sketch, or similar tools',
-              'Strong portfolio demonstrating UX/UI skills',
-              'Experience with design systems and accessibility'
+              "3+ years of product design experience",
+              "Proficiency in Figma, Sketch, or similar tools",
+              "Strong portfolio demonstrating UX/UI skills",
+              "Experience with design systems and accessibility",
             ],
-            employmentType: 'full-time',
-            experienceLevel: 'mid',
-            location: 'San Francisco, CA',
+            employmentType: "full-time",
+            experienceLevel: "mid",
+            location: "San Francisco, CA",
             salaryMin: 90000,
             salaryMax: 130000,
-            currency: 'USD',
-            workSetting: 'Remote',
-            status: 'Open',
-            createdAt: '2024-01-10',
+            currency: "USD",
+            workSetting: "Remote",
+            status: "Open",
+            createdAt: "2024-01-10",
             applications: 18,
             views: 89,
-            slug: 'product-designer'
+            slug: "product-designer",
           },
           {
-            id: '3',
-            title: 'DevOps Engineer',
-            description: 'Build and maintain our cloud infrastructure. Ensure our platform scales reliably to serve millions of users worldwide.',
-            summary: 'Scale infrastructure for global video platform',
+            id: "3",
+            title: "DevOps Engineer",
+            description:
+              "Build and maintain our cloud infrastructure. Ensure our platform scales reliably to serve millions of users worldwide.",
+            summary: "Scale infrastructure for global video platform",
             responsibilities: [
-              'Manage cloud infrastructure on Azure and AWS',
-              'Implement CI/CD pipelines and automation',
-              'Monitor system performance and reliability',
-              'Ensure security and compliance standards'
+              "Manage cloud infrastructure on Azure and AWS",
+              "Implement CI/CD pipelines and automation",
+              "Monitor system performance and reliability",
+              "Ensure security and compliance standards",
             ],
             requirements: [
-              '4+ years of DevOps/Infrastructure experience',
-              'Experience with Kubernetes, Docker, and Terraform',
-              'Knowledge of monitoring tools (Prometheus, Grafana)',
-              'Strong scripting skills (Python, Bash)'
+              "4+ years of DevOps/Infrastructure experience",
+              "Experience with Kubernetes, Docker, and Terraform",
+              "Knowledge of monitoring tools (Prometheus, Grafana)",
+              "Strong scripting skills (Python, Bash)",
             ],
-            employmentType: 'full-time',
-            experienceLevel: 'senior',
-            location: 'Remote',
+            employmentType: "full-time",
+            experienceLevel: "senior",
+            location: "Remote",
             salaryMin: 110000,
             salaryMax: 160000,
-            currency: 'USD',
-            workSetting: 'Remote',
-            status: 'Open',
-            createdAt: '2024-01-08',
+            currency: "USD",
+            workSetting: "Remote",
+            status: "Open",
+            createdAt: "2024-01-08",
             applications: 31,
             views: 124,
-            slug: 'devops-engineer'
-          }
+            slug: "devops-engineer",
+          },
         ];
       }
 
       setCompany(companyData);
       setJobs(maxJobs ? jobsData.slice(0, maxJobs) : jobsData);
     } catch (err) {
-      setError('Failed to load jobs. Please try again later.');
-      console.error('Error loading company jobs:', err);
+      setError("Failed to load jobs. Please try again later.");
+      console.error("Error loading company jobs:", err);
     } finally {
       setLoading(false);
     }
   };
 
   // Filter jobs based on search and filters
-  const filteredJobs = jobs.filter(job => {
-    const matchesSearch = !searchTerm || 
+  const filteredJobs = jobs.filter((job) => {
+    const matchesSearch =
+      !searchTerm ||
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesEmploymentType = employmentTypeFilter === 'all' || 
+
+    const matchesEmploymentType =
+      employmentTypeFilter === "all" ||
       job.employmentType === employmentTypeFilter;
-    
-    const matchesExperienceLevel = experienceLevelFilter === 'all' || 
+
+    const matchesExperienceLevel =
+      experienceLevelFilter === "all" ||
       job.experienceLevel === experienceLevelFilter;
-    
-    const matchesLocation = locationFilter === 'all' || 
+
+    const matchesLocation =
+      locationFilter === "all" ||
       job.location?.toLowerCase().includes(locationFilter.toLowerCase()) ||
       job.workSetting?.toLowerCase() === locationFilter.toLowerCase();
 
-    return matchesSearch && matchesEmploymentType && matchesExperienceLevel && matchesLocation;
+    return (
+      matchesSearch &&
+      matchesEmploymentType &&
+      matchesExperienceLevel &&
+      matchesLocation
+    );
   });
 
   const handleJobClick = (job: CompanyJob) => {
@@ -336,28 +354,28 @@ export function CompanyCareersControl({
       onJobClick(job);
     } else {
       // Default behavior - navigate to job detail page
-      window.open(`/jobs/${job.slug || job.id}`, '_blank');
+      window.open(`/jobs/${job.slug || job.id}`, "_blank");
     }
   };
 
   const handleApplyClick = (job: CompanyJob, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (onApplyClick) {
       onApplyClick(job);
     } else if (job.atsApplyUrl) {
-      window.open(job.atsApplyUrl, '_blank');
+      window.open(job.atsApplyUrl, "_blank");
     } else {
       // Default behavior - navigate to application page
-      window.open(`/jobs/${job.slug || job.id}/apply`, '_blank');
+      window.open(`/jobs/${job.slug || job.id}/apply`, "_blank");
     }
   };
 
-  const formatSalary = (min?: number, max?: number, currency = 'USD') => {
+  const formatSalary = (min?: number, max?: number, currency = "USD") => {
     if (!min && !max) return null;
-    
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
+
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
@@ -371,21 +389,31 @@ export function CompanyCareersControl({
 
   const getEmploymentTypeColor = (type?: string) => {
     switch (type) {
-      case 'full-time': return 'bg-green-100 text-green-800';
-      case 'part-time': return 'bg-blue-100 text-blue-800';
-      case 'contract': return 'bg-purple-100 text-purple-800';
-      case 'internship': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "full-time":
+        return "bg-green-100 text-green-800";
+      case "part-time":
+        return "bg-blue-100 text-blue-800";
+      case "contract":
+        return "bg-purple-100 text-purple-800";
+      case "internship":
+        return "bg-orange-100 text-orange-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getExperienceLevelColor = (level?: string) => {
     switch (level) {
-      case 'entry': return 'bg-green-100 text-green-800';
-      case 'mid': return 'bg-blue-100 text-blue-800';
-      case 'senior': return 'bg-purple-100 text-purple-800';
-      case 'executive': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "entry":
+        return "bg-green-100 text-green-800";
+      case "mid":
+        return "bg-blue-100 text-blue-800";
+      case "senior":
+        return "bg-purple-100 text-purple-800";
+      case "executive":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -397,7 +425,7 @@ export function CompanyCareersControl({
             <div className="h-32 bg-gray-200 rounded-lg mb-6" />
           )}
           <div className="space-y-4">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="h-24 bg-gray-200 rounded-lg" />
             ))}
           </div>
@@ -436,14 +464,20 @@ export function CompanyCareersControl({
                   <h1 className="text-2xl font-bold">{company.name}</h1>
                   {company.website && (
                     <Button variant="ghost" size="sm" asChild>
-                      <a href={company.website} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </Button>
                   )}
                 </div>
                 {company.tagline && (
-                  <p className="text-lg text-muted-foreground mb-3">{company.tagline}</p>
+                  <p className="text-lg text-muted-foreground mb-3">
+                    {company.tagline}
+                  </p>
                 )}
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                   {company.industry && (
@@ -489,10 +523,13 @@ export function CompanyCareersControl({
                   </div>
                 </div>
               )}
-              
+
               {showFilters && (
                 <div className="flex gap-2">
-                  <Select value={employmentTypeFilter} onValueChange={setEmploymentTypeFilter}>
+                  <Select
+                    value={employmentTypeFilter}
+                    onValueChange={setEmploymentTypeFilter}
+                  >
                     <SelectTrigger className="w-[140px]">
                       <SelectValue placeholder="Job Type" />
                     </SelectTrigger>
@@ -505,7 +542,10 @@ export function CompanyCareersControl({
                     </SelectContent>
                   </Select>
 
-                  <Select value={experienceLevelFilter} onValueChange={setExperienceLevelFilter}>
+                  <Select
+                    value={experienceLevelFilter}
+                    onValueChange={setExperienceLevelFilter}
+                  >
                     <SelectTrigger className="w-[140px]">
                       <SelectValue placeholder="Experience" />
                     </SelectTrigger>
@@ -518,7 +558,10 @@ export function CompanyCareersControl({
                     </SelectContent>
                   </Select>
 
-                  <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <Select
+                    value={locationFilter}
+                    onValueChange={setLocationFilter}
+                  >
                     <SelectTrigger className="w-[140px]">
                       <SelectValue placeholder="Location" />
                     </SelectTrigger>
@@ -544,14 +587,17 @@ export function CompanyCareersControl({
               <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
               <p className="text-muted-foreground">
-                {searchTerm || employmentTypeFilter !== 'all' || experienceLevelFilter !== 'all' || locationFilter !== 'all'
-                  ? 'Try adjusting your search criteria'
-                  : 'No open positions at this time. Check back later!'}
+                {searchTerm ||
+                employmentTypeFilter !== "all" ||
+                experienceLevelFilter !== "all" ||
+                locationFilter !== "all"
+                  ? "Try adjusting your search criteria"
+                  : "No open positions at this time. Check back later!"}
               </p>
             </div>
           </CardContent>
         </Card>
-      ) : viewMode === 'table' ? (
+      ) : viewMode === "table" ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -574,8 +620,8 @@ export function CompanyCareersControl({
               </TableHeader>
               <TableBody>
                 {filteredJobs.map((job) => (
-                  <TableRow 
-                    key={job.id} 
+                  <TableRow
+                    key={job.id}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleJobClick(job)}
                   >
@@ -588,23 +634,33 @@ export function CompanyCareersControl({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getEmploymentTypeColor(job.employmentType)}>
-                        {job.employmentType?.replace('-', ' ') || 'Full-time'}
+                      <Badge
+                        className={getEmploymentTypeColor(job.employmentType)}
+                      >
+                        {job.employmentType?.replace("-", " ") || "Full-time"}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getExperienceLevelColor(job.experienceLevel)}>
-                        {job.experienceLevel || 'Mid'}
+                      <Badge
+                        className={getExperienceLevelColor(job.experienceLevel)}
+                      >
+                        {job.experienceLevel || "Mid"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
-                        {job.workSetting === 'Remote' ? 'Remote' : job.location || 'Not specified'}
+                        {job.workSetting === "Remote"
+                          ? "Remote"
+                          : job.location || "Not specified"}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {formatSalary(job.salaryMin, job.salaryMax, job.currency) || 'Competitive'}
+                      {formatSalary(
+                        job.salaryMin,
+                        job.salaryMax,
+                        job.currency,
+                      ) || "Competitive"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -613,7 +669,7 @@ export function CompanyCareersControl({
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
+                      <Button
                         size="sm"
                         onClick={(e) => handleApplyClick(job, e)}
                       >
@@ -629,8 +685,8 @@ export function CompanyCareersControl({
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredJobs.map((job) => (
-            <Card 
-              key={job.id} 
+            <Card
+              key={job.id}
               className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => handleJobClick(job)}
             >
@@ -638,8 +694,10 @@ export function CompanyCareersControl({
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{job.title}</CardTitle>
                   <div className="flex gap-1">
-                    <Badge className={getEmploymentTypeColor(job.employmentType)}>
-                      {job.employmentType?.replace('-', ' ') || 'Full-time'}
+                    <Badge
+                      className={getEmploymentTypeColor(job.employmentType)}
+                    >
+                      {job.employmentType?.replace("-", " ") || "Full-time"}
                     </Badge>
                   </div>
                 </div>
@@ -652,28 +710,29 @@ export function CompanyCareersControl({
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {job.workSetting === 'Remote' ? 'Remote' : job.location || 'Not specified'}
+                      {job.workSetting === "Remote"
+                        ? "Remote"
+                        : job.location || "Not specified"}
                     </div>
-                    <Badge className={getExperienceLevelColor(job.experienceLevel)}>
-                      {job.experienceLevel || 'Mid'}
+                    <Badge
+                      className={getExperienceLevelColor(job.experienceLevel)}
+                    >
+                      {job.experienceLevel || "Mid"}
                     </Badge>
                   </div>
-                  
+
                   {(job.salaryMin || job.salaryMax) && (
                     <div className="flex items-center gap-1 text-sm">
                       <DollarSign className="h-3 w-3" />
                       {formatSalary(job.salaryMin, job.salaryMax, job.currency)}
                     </div>
                   )}
-                  
+
                   <div className="flex items-center justify-between pt-2">
                     <div className="text-xs text-muted-foreground">
                       Posted {new Date(job.createdAt).toLocaleDateString()}
                     </div>
-                    <Button 
-                      size="sm"
-                      onClick={(e) => handleApplyClick(job, e)}
-                    >
+                    <Button size="sm" onClick={(e) => handleApplyClick(job, e)}>
                       Apply
                     </Button>
                   </div>

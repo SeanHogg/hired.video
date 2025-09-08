@@ -32,7 +32,9 @@ import {
 interface BulkInviteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onBulkInvite: (data: BulkInviteUsersRequest) => Promise<BulkInviteUsersResponse>;
+  onBulkInvite: (
+    data: BulkInviteUsersRequest,
+  ) => Promise<BulkInviteUsersResponse>;
   currentUserRoles: string[];
 }
 
@@ -60,36 +62,38 @@ export function BulkInviteModal({
     setUsers(users.filter((_, i) => i !== index));
   };
 
-  const handleUserChange = (index: number, field: keyof BulkInviteUserItem, value: string) => {
+  const handleUserChange = (
+    index: number,
+    field: keyof BulkInviteUserItem,
+    value: string,
+  ) => {
     const updatedUsers = [...users];
     updatedUsers[index] = { ...updatedUsers[index], [field]: value };
     setUsers(updatedUsers);
   };
 
   const handleRoleToggle = (role: string) => {
-    setDefaultRoles(prev => 
-      prev.includes(role) 
-        ? prev.filter(r => r !== role)
-        : [...prev, role]
+    setDefaultRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
   };
 
   const parseCsvInput = () => {
     if (!csvInput.trim()) return;
 
-    const lines = csvInput.trim().split('\n');
+    const lines = csvInput.trim().split("\n");
     const newUsers: BulkInviteUserItem[] = [];
     const parseErrors: string[] = [];
 
     lines.forEach((line, index) => {
-      const [email, firstName, lastName] = line.split(',').map(s => s.trim());
-      
+      const [email, firstName, lastName] = line.split(",").map((s) => s.trim());
+
       if (!email) {
         parseErrors.push(`Line ${index + 1}: Email is required`);
         return;
       }
 
-      if (!email.includes('@')) {
+      if (!email.includes("@")) {
         parseErrors.push(`Line ${index + 1}: Invalid email format`);
         return;
       }
@@ -125,7 +129,7 @@ export function BulkInviteModal({
     users.forEach((user, index) => {
       if (!user.email) {
         validationErrors.push(`User ${index + 1}: Email is required`);
-      } else if (!user.email.includes('@')) {
+      } else if (!user.email.includes("@")) {
         validationErrors.push(`User ${index + 1}: Invalid email format`);
       }
     });
@@ -172,12 +176,13 @@ export function BulkInviteModal({
   };
 
   const downloadTemplate = () => {
-    const csvContent = "email,firstName,lastName\nexample@company.com,John,Doe\nuser@domain.com,Jane,Smith";
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent =
+      "email,firstName,lastName\nexample@company.com,John,Doe\nuser@domain.com,Jane,Smith";
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'bulk-invite-template.csv';
+    a.download = "bulk-invite-template.csv";
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -192,24 +197,30 @@ export function BulkInviteModal({
               Bulk Invitation Results
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{result.totalProcessed}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {result.totalProcessed}
+                  </p>
                   <p className="text-sm text-gray-600">Total Processed</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-green-600">{result.successCount}</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {result.successCount}
+                  </p>
                   <p className="text-sm text-gray-600">Successful</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-red-600">{result.failureCount}</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {result.failureCount}
+                  </p>
                   <p className="text-sm text-gray-600">Failed</p>
                 </CardContent>
               </Card>
@@ -218,14 +229,21 @@ export function BulkInviteModal({
             {result.failedInvitations.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-red-600">Failed Invitations</CardTitle>
+                  <CardTitle className="text-red-600">
+                    Failed Invitations
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {result.failedInvitations.map((failure, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-red-50 rounded">
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-2 bg-red-50 rounded"
+                      >
                         <span className="font-medium">{failure.email}</span>
-                        <span className="text-sm text-red-600">{failure.message}</span>
+                        <span className="text-sm text-red-600">
+                          {failure.message}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -251,7 +269,8 @@ export function BulkInviteModal({
             Bulk Invite Users
           </DialogTitle>
           <DialogDescription>
-            Invite multiple users to your account at once. You can add users manually or import from CSV.
+            Invite multiple users to your account at once. You can add users
+            manually or import from CSV.
           </DialogDescription>
         </DialogHeader>
 
@@ -275,7 +294,8 @@ export function BulkInviteModal({
             <CardHeader>
               <CardTitle className="text-lg">Default Settings</CardTitle>
               <CardDescription>
-                These settings will apply to all users unless overridden individually.
+                These settings will apply to all users unless overridden
+                individually.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -286,7 +306,9 @@ export function BulkInviteModal({
                   {availableRoles.map((role) => (
                     <Badge
                       key={role}
-                      variant={defaultRoles.includes(role) ? "default" : "outline"}
+                      variant={
+                        defaultRoles.includes(role) ? "default" : "outline"
+                      }
                       className="cursor-pointer"
                       onClick={() => handleRoleToggle(role)}
                     >
@@ -298,7 +320,9 @@ export function BulkInviteModal({
 
               {/* Default Message */}
               <div>
-                <Label htmlFor="defaultMessage">Default Message (Optional)</Label>
+                <Label htmlFor="defaultMessage">
+                  Default Message (Optional)
+                </Label>
                 <Textarea
                   id="defaultMessage"
                   value={defaultMessage}
@@ -328,9 +352,11 @@ export function BulkInviteModal({
                   Download Template
                 </Button>
               </div>
-              
+
               <div>
-                <Label htmlFor="csvInput">CSV Data (email, firstName, lastName)</Label>
+                <Label htmlFor="csvInput">
+                  CSV Data (email, firstName, lastName)
+                </Label>
                 <Textarea
                   id="csvInput"
                   value={csvInput}
@@ -339,7 +365,7 @@ export function BulkInviteModal({
                   rows={4}
                 />
               </div>
-              
+
               <Button onClick={parseCsvInput} disabled={!csvInput.trim()}>
                 Parse CSV Data
               </Button>
@@ -360,19 +386,25 @@ export function BulkInviteModal({
             <CardContent>
               {users.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">
-                  No users added yet. Click "Add User" or import from CSV to get started.
+                  No users added yet. Click "Add User" or import from CSV to get
+                  started.
                 </p>
               ) : (
                 <div className="space-y-4">
                   {users.map((user, index) => (
-                    <div key={index} className="flex gap-4 items-end p-4 border rounded-lg">
+                    <div
+                      key={index}
+                      className="flex gap-4 items-end p-4 border rounded-lg"
+                    >
                       <div className="flex-1">
                         <Label htmlFor={`email-${index}`}>Email *</Label>
                         <Input
                           id={`email-${index}`}
                           type="email"
                           value={user.email}
-                          onChange={(e) => handleUserChange(index, 'email', e.target.value)}
+                          onChange={(e) =>
+                            handleUserChange(index, "email", e.target.value)
+                          }
                           placeholder="user@example.com"
                         />
                       </div>
@@ -381,7 +413,9 @@ export function BulkInviteModal({
                         <Input
                           id={`firstName-${index}`}
                           value={user.firstName || ""}
-                          onChange={(e) => handleUserChange(index, 'firstName', e.target.value)}
+                          onChange={(e) =>
+                            handleUserChange(index, "firstName", e.target.value)
+                          }
                           placeholder="John"
                         />
                       </div>
@@ -390,7 +424,9 @@ export function BulkInviteModal({
                         <Input
                           id={`lastName-${index}`}
                           value={user.lastName || ""}
-                          onChange={(e) => handleUserChange(index, 'lastName', e.target.value)}
+                          onChange={(e) =>
+                            handleUserChange(index, "lastName", e.target.value)
+                          }
                           placeholder="Doe"
                         />
                       </div>
@@ -414,11 +450,15 @@ export function BulkInviteModal({
           <Button onClick={handleClose} variant="outline">
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={loading || users.length === 0 || defaultRoles.length === 0}
+          <Button
+            onClick={handleSubmit}
+            disabled={
+              loading || users.length === 0 || defaultRoles.length === 0
+            }
           >
-            {loading ? "Sending..." : `Send ${users.length} Invitation${users.length !== 1 ? 's' : ''}`}
+            {loading
+              ? "Sending..."
+              : `Send ${users.length} Invitation${users.length !== 1 ? "s" : ""}`}
           </Button>
         </DialogFooter>
       </DialogContent>

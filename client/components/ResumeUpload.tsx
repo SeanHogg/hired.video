@@ -22,7 +22,6 @@ import type {
   ResumeData,
 } from "@/types/resume";
 
-
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;
   onCancel: () => void;
@@ -120,7 +119,9 @@ export default function ResumeUpload({
   };
 
   // Convert API MetaResume (camelCase) to UI ResumeData (PascalCase keys)
-  const mapMetaResumeToResumeData = (meta: NonNullable<Resume['metaResume']>): ResumeData => {
+  const mapMetaResumeToResumeData = (
+    meta: NonNullable<Resume["metaResume"]>,
+  ): ResumeData => {
     const basics = meta?.basics || {};
     const location = basics?.location || null;
     return {
@@ -187,7 +188,6 @@ export default function ResumeUpload({
     };
   };
 
-
   const handleUpload = async () => {
     if (!file || !name.trim()) return;
 
@@ -204,7 +204,9 @@ export default function ResumeUpload({
       };
 
       // Call backend to create resume from file
-      const created = await resumeService.createResumeFromFile(uploadRequest.file);
+      const created = await resumeService.createResumeFromFile(
+        uploadRequest.file,
+      );
 
       // Map API entity to ResumeData for the builder
       const uploadedData = created.metaResume

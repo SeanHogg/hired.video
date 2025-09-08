@@ -232,7 +232,7 @@ export class ApiClient {
     console.log("ApiClient.handleResponse: Processing response", {
       status: response.status,
       statusText: response.statusText,
-      url: response.url
+      url: response.url,
     });
 
     let responseData: unknown;
@@ -252,7 +252,7 @@ export class ApiClient {
     if (!response.ok) {
       console.log("ApiClient.handleResponse: Response not OK, handling error", {
         status: response.status,
-        responseData
+        responseData,
       });
       return this.handleErrorResponse(response.status, responseData);
     }
@@ -268,14 +268,20 @@ export class ApiClient {
         "error" in validationResult
           ? validationResult.error
           : "Unknown validation error";
-      console.error("ApiClient.handleResponse: API response validation failed", errorMessage);
+      console.error(
+        "ApiClient.handleResponse: API response validation failed",
+        errorMessage,
+      );
       throw new ValidationError(
         `Invalid API response structure: ${errorMessage}`,
       );
     }
 
     const apiResponse = validationResult.data;
-    console.log("ApiClient.handleResponse: API response structure valid", apiResponse);
+    console.log(
+      "ApiClient.handleResponse: API response structure valid",
+      apiResponse,
+    );
 
     // Handle API-level errors
     if (!apiResponse.success) {
@@ -292,7 +298,10 @@ export class ApiClient {
       timestamp: apiResponse.timestamp,
     };
 
-    console.log("ApiClient.handleResponse: Success response created", successResponse);
+    console.log(
+      "ApiClient.handleResponse: Success response created",
+      successResponse,
+    );
 
     if (schema) {
       console.log("ApiClient.handleResponse: Validating data against schema");
@@ -302,7 +311,11 @@ export class ApiClient {
           "error" in dataValidation
             ? dataValidation.error
             : "Unknown validation error";
-        console.error("ApiClient.handleResponse: Data validation failed", errorMessage, successResponse.data);
+        console.error(
+          "ApiClient.handleResponse: Data validation failed",
+          errorMessage,
+          successResponse.data,
+        );
         throw new ValidationError(`Invalid response data: ${errorMessage}`);
       }
       successResponse.data = dataValidation.data;
@@ -320,7 +333,9 @@ export class ApiClient {
     const errorValidation = validateApiResponse(data, ApiErrorResponseSchema);
 
     if (errorValidation.success) {
-      console.log("ApiClient.handleErrorResponse: Using structured error response");
+      console.log(
+        "ApiClient.handleErrorResponse: Using structured error response",
+      );
       throw this.createErrorFromResponse(errorValidation.data);
     }
 
@@ -330,18 +345,20 @@ export class ApiClient {
     // Fallback to HTTP status-based errors
     switch (status) {
       case 401:
-        console.log("API Client: 401 Unauthorized - clearing auth and redirecting");
+        console.log(
+          "API Client: 401 Unauthorized - clearing auth and redirecting",
+        );
         // ANY 401 should log the user out immediately
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('current_user');
-        localStorage.removeItem('refresh_token');
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("current_user");
+        localStorage.removeItem("refresh_token");
 
         // Notify auth context
-        window.dispatchEvent(new CustomEvent('auth-logout'));
+        window.dispatchEvent(new CustomEvent("auth-logout"));
 
         // Redirect to home
         setTimeout(() => {
-          window.location.replace('/');
+          window.location.replace("/");
         }, 100);
 
         throw new AuthenticationError("Authentication required");
@@ -363,18 +380,20 @@ export class ApiClient {
         return new ValidationError(error.message, undefined, error.details);
       case "AUTHENTICATION_ERROR":
       case "ACCOUNT_DELETED":
-        console.log("API Client: Authentication error - clearing auth and redirecting");
+        console.log(
+          "API Client: Authentication error - clearing auth and redirecting",
+        );
         // ANY authentication error should log the user out immediately
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('current_user');
-        localStorage.removeItem('refresh_token');
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("current_user");
+        localStorage.removeItem("refresh_token");
 
         // Notify auth context
-        window.dispatchEvent(new CustomEvent('auth-logout'));
+        window.dispatchEvent(new CustomEvent("auth-logout"));
 
         // Redirect to home
         setTimeout(() => {
-          window.location.replace('/');
+          window.location.replace("/");
         }, 100);
 
         return new AuthenticationError(error.message, error.details);
@@ -484,7 +503,7 @@ export class ApiClient {
       const preprocessed = nullToUndefined
         ? nullToUndefined(responseData)
         : responseData;
-      const validation = (schema).safeParse(preprocessed);
+      const validation = schema.safeParse(preprocessed);
       if (!validation.success) {
         throw new ValidationError(
           `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
@@ -527,7 +546,7 @@ export class ApiClient {
       const preprocessed = nullToUndefined
         ? nullToUndefined(responseData)
         : responseData;
-      const validation = (schema).safeParse(preprocessed);
+      const validation = schema.safeParse(preprocessed);
       if (!validation.success) {
         throw new ValidationError(
           `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,

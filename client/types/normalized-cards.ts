@@ -1,6 +1,6 @@
 /**
  * Normalized Card Data Interfaces
- * 
+ *
  * These interfaces define consistent data structures for all card components,
  * eliminating the architectural inconsistencies found in the current implementation.
  */
@@ -150,11 +150,11 @@ export interface NormalizedVideoData extends BaseCardData {
 }
 
 // Union type for all normalized card data
-export type NormalizedCardData = 
-  | NormalizedJobData 
-  | NormalizedCompanyData 
-  | NormalizedPersonData 
-  | NormalizedResumeData 
+export type NormalizedCardData =
+  | NormalizedJobData
+  | NormalizedCompanyData
+  | NormalizedPersonData
+  | NormalizedResumeData
   | NormalizedVideoData;
 
 // Card type discriminator

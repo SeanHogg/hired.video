@@ -12,19 +12,25 @@ import {
   XCircle,
   AlertCircle,
   Crown,
-  Settings
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
   DropdownMenu,
@@ -44,7 +50,7 @@ import {
   InviteStatus,
   getInviteStatusDisplayName,
   getInviteStatusColor,
-  getRoleDisplayName
+  getRoleDisplayName,
 } from "@/types/account";
 import { accountService } from "@/lib/services/account-service";
 import { toast } from "@/hooks/use-toast";
@@ -56,11 +62,11 @@ interface InvitationManagementProps {
   onBulkInvite: () => void;
 }
 
-export function InvitationManagement({ 
-  users, 
-  onRefresh, 
-  onInviteUser, 
-  onBulkInvite 
+export function InvitationManagement({
+  users,
+  onRefresh,
+  onInviteUser,
+  onBulkInvite,
 }: InvitationManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -81,11 +87,16 @@ export function InvitationManagement({
 
     const matchesStatus =
       statusFilter === "all" ||
-      getInviteStatusDisplayName(user.inviteStatus).toLowerCase() === statusFilter.toLowerCase();
+      getInviteStatusDisplayName(user.inviteStatus).toLowerCase() ===
+        statusFilter.toLowerCase();
 
     const matchesRole =
       roleFilter === "all" ||
-      (user.rolesAssigned?.some((role) => getRoleDisplayName(role).toLowerCase() === roleFilter.toLowerCase()) ?? false);
+      (user.rolesAssigned?.some(
+        (role) =>
+          getRoleDisplayName(role).toLowerCase() === roleFilter.toLowerCase(),
+      ) ??
+        false);
 
     return matchesSearch && matchesStatus && matchesRole;
   });
@@ -149,9 +160,11 @@ export function InvitationManagement({
   };
 
   const canManageInvitation = (status: InviteStatus) => {
-    return status === InviteStatus.Invited || 
-           status === InviteStatus.Resent || 
-           status === InviteStatus.Expired;
+    return (
+      status === InviteStatus.Invited ||
+      status === InviteStatus.Resent ||
+      status === InviteStatus.Expired
+    );
   };
 
   const getActionMenuItems = (user: AccountUser) => {
@@ -167,7 +180,7 @@ export function InvitationManagement({
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Resend Invitation
-        </DropdownMenuItem>
+        </DropdownMenuItem>,
       );
 
       items.push(
@@ -179,7 +192,7 @@ export function InvitationManagement({
         >
           <X className="h-4 w-4 mr-2" />
           Cancel Invitation
-        </DropdownMenuItem>
+        </DropdownMenuItem>,
       );
     }
 
@@ -188,12 +201,14 @@ export function InvitationManagement({
       items.push(
         <DropdownMenuItem
           key="edit-roles"
-          onClick={() => {/* TODO: Implement role editing */}}
+          onClick={() => {
+            /* TODO: Implement role editing */
+          }}
           disabled={loading}
         >
           <Settings className="h-4 w-4 mr-2" />
           Edit Roles
-        </DropdownMenuItem>
+        </DropdownMenuItem>,
       );
     }
 
@@ -203,10 +218,20 @@ export function InvitationManagement({
   const getStatusCounts = () => {
     const counts = {
       total: users.length,
-      invited: users.filter(u => u.inviteStatus === InviteStatus.Invited || u.inviteStatus === InviteStatus.Resent).length,
-      accepted: users.filter(u => u.inviteStatus === InviteStatus.Accepted || u.inviteStatus === InviteStatus.Owner).length,
-      expired: users.filter(u => u.inviteStatus === InviteStatus.Expired).length,
-      rejected: users.filter(u => u.inviteStatus === InviteStatus.Rejected).length,
+      invited: users.filter(
+        (u) =>
+          u.inviteStatus === InviteStatus.Invited ||
+          u.inviteStatus === InviteStatus.Resent,
+      ).length,
+      accepted: users.filter(
+        (u) =>
+          u.inviteStatus === InviteStatus.Accepted ||
+          u.inviteStatus === InviteStatus.Owner,
+      ).length,
+      expired: users.filter((u) => u.inviteStatus === InviteStatus.Expired)
+        .length,
+      rejected: users.filter((u) => u.inviteStatus === InviteStatus.Rejected)
+        .length,
     };
     return counts;
   };
@@ -228,37 +253,47 @@ export function InvitationManagement({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Members</p>
-                <p className="text-2xl font-bold text-green-600">{statusCounts.accepted}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Active Members
+                </p>
+                <p className="text-2xl font-bold text-green-600">
+                  {statusCounts.accepted}
+                </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending Invites</p>
-                <p className="text-2xl font-bold text-yellow-600">{statusCounts.invited}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Pending Invites
+                </p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {statusCounts.invited}
+                </p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Expired</p>
-                <p className="text-2xl font-bold text-red-600">{statusCounts.expired}</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {statusCounts.expired}
+                </p>
               </div>
               <AlertCircle className="h-8 w-8 text-red-600" />
             </div>
@@ -279,7 +314,7 @@ export function InvitationManagement({
                 Manage your team members and pending invitations
               </CardDescription>
             </div>
-            
+
             <div className="flex flex-wrap gap-2">
               <Button onClick={onInviteUser} size="sm">
                 <UserPlus className="h-4 w-4 mr-2" />
@@ -289,14 +324,21 @@ export function InvitationManagement({
                 <Upload className="h-4 w-4 mr-2" />
                 Bulk Invite
               </Button>
-              <Button onClick={onRefresh} variant="outline" size="sm" disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <Button
+                onClick={onRefresh}
+                variant="outline"
+                size="sm"
+                disabled={loading}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </Button>
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -311,7 +353,7 @@ export function InvitationManagement({
                 />
               </div>
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by status" />
@@ -325,7 +367,7 @@ export function InvitationManagement({
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
-            
+
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by role" />
@@ -355,7 +397,10 @@ export function InvitationManagement({
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-8 text-gray-500"
+                    >
                       No users found matching your criteria
                     </TableCell>
                   </TableRow>
@@ -366,18 +411,24 @@ export function InvitationManagement({
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-sm font-medium text-blue-600">
-                              {user.firstName?.charAt(0) || 'U'}{user.lastName?.charAt(0) || 'U'}
+                              {user.firstName?.charAt(0) || "U"}
+                              {user.lastName?.charAt(0) || "U"}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium">{user.firstName || 'Unknown'} {user.lastName || 'User'}</p>
-                            <p className="text-sm text-gray-500">{user.email || 'No email'}</p>
+                            <p className="font-medium">
+                              {user.firstName || "Unknown"}{" "}
+                              {user.lastName || "User"}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {user.email || "No email"}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className={`${getInviteStatusColor(user.inviteStatus)} flex items-center gap-1 w-fit`}
                         >
                           {getStatusIcon(user.inviteStatus)}
@@ -387,7 +438,11 @@ export function InvitationManagement({
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(user.rolesAssigned || []).map((role) => (
-                            <Badge key={role} variant="outline" className="text-xs">
+                            <Badge
+                              key={role}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               {getRoleDisplayName(role)}
                             </Badge>
                           ))}
@@ -395,7 +450,11 @@ export function InvitationManagement({
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-500">
-                          {user.inviteStatusStartDateTime ? new Date(user.inviteStatusStartDateTime).toLocaleDateString() : 'Pending'}
+                          {user.inviteStatusStartDateTime
+                            ? new Date(
+                                user.inviteStatusStartDateTime,
+                              ).toLocaleDateString()
+                            : "Pending"}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">

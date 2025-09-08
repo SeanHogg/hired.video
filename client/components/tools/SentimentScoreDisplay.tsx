@@ -2,16 +2,22 @@ import { CheckCircle2, AlertTriangle, XCircle, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { sentimentService, type SentimentInterpretation } from "@/lib/services/sentiment-service";
+import {
+  sentimentService,
+  type SentimentInterpretation,
+} from "@/lib/services/sentiment-service";
 
 interface SentimentScoreDisplayProps {
   score: number;
   className?: string;
 }
 
-export default function SentimentScoreDisplay({ score, className = "" }: SentimentScoreDisplayProps) {
+export default function SentimentScoreDisplay({
+  score,
+  className = "",
+}: SentimentScoreDisplayProps) {
   const interpretation = sentimentService.interpretSentiment(score);
-  
+
   const getIcon = () => {
     switch (interpretation.color) {
       case "red":
@@ -67,7 +73,7 @@ export default function SentimentScoreDisplay({ score, className = "" }: Sentime
           </div>
           <div className="relative">
             <Progress value={score} className="h-3" />
-            <div 
+            <div
               className={`absolute top-0 left-0 h-3 rounded-full transition-all duration-500 ${sentimentService.getProgressBarColor(score)}`}
               style={{ width: `${score}%` }}
             />
@@ -81,7 +87,9 @@ export default function SentimentScoreDisplay({ score, className = "" }: Sentime
         </div>
 
         {/* Interpretation */}
-        <div className={`p-4 rounded-lg border ${sentimentService.getScoreColorClass(score)}`}>
+        <div
+          className={`p-4 rounded-lg border ${sentimentService.getScoreColorClass(score)}`}
+        >
           <p className="text-sm font-medium mb-2">Analysis</p>
           <p className="text-sm">{interpretation.description}</p>
         </div>

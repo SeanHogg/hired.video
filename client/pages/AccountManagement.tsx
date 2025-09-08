@@ -46,7 +46,6 @@ import { accountService } from "@/lib/services/account-service";
 import {
   AccountUser,
   InviteStatus,
-
   getRoleDisplayName,
   getInviteStatusDisplayName,
   getInviteStatusColor,
@@ -105,11 +104,11 @@ export default function AccountManagement() {
     setActiveTab(value);
 
     // Set loading state for the new tab briefly to show transition
-    setTabLoading(prev => ({ ...prev, [value]: true }));
+    setTabLoading((prev) => ({ ...prev, [value]: true }));
 
     // Clear loading state after a brief delay to allow content to render
     setTimeout(() => {
-      setTabLoading(prev => ({ ...prev, [value]: false }));
+      setTabLoading((prev) => ({ ...prev, [value]: false }));
     }, 300);
   };
 
@@ -175,10 +174,7 @@ export default function AccountManagement() {
     }
   };
 
-  const handleUpdateRoles = async (
-    userId: string,
-    roles: string[],
-  ) => {
+  const handleUpdateRoles = async (userId: string, roles: string[]) => {
     try {
       await accountService.updateUserRoles({ userId, roles });
       toast({
@@ -260,8 +256,6 @@ export default function AccountManagement() {
     }
   };
 
-
-
   const handleExportAnalytics = (format: "csv" | "pdf") => {
     // In a real app, this would generate and download the export
     toast({
@@ -300,11 +294,9 @@ export default function AccountManagement() {
     );
   }
 
-
-
   // Redirect job seekers to settings page instead of showing account management
   if (isAuthenticated && user && isJobSeeker) {
-    window.location.href = '/settings';
+    window.location.href = "/settings";
     return null;
   }
 
@@ -537,7 +529,9 @@ export default function AccountManagement() {
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsList>
                 <TabsTrigger value="users">Team Members</TabsTrigger>
-                <TabsTrigger value="invitations">Invitation Analytics</TabsTrigger>
+                <TabsTrigger value="invitations">
+                  Invitation Analytics
+                </TabsTrigger>
                 <TabsTrigger value="analytics">Analytics</TabsTrigger>
               </TabsList>
 

@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { ArrowLeft, Loader2, Upload, Zap, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Upload,
+  Zap,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -7,7 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import Footer from "@/components/Footer";
@@ -30,8 +44,8 @@ interface OptimizationResult {
 }
 
 interface OptimizationSuggestion {
-  type: 'critical' | 'important' | 'minor';
-  category: 'ats' | 'keywords' | 'format' | 'content';
+  type: "critical" | "important" | "minor";
+  category: "ats" | "keywords" | "format" | "content";
   title: string;
   description: string;
   impact: string;
@@ -55,7 +69,8 @@ export default function ResumeOptimizer() {
   const [resumeText, setResumeText] = useState("");
   const [selectedResumeId, setSelectedResumeId] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [optimizationResult, setOptimizationResult] = useState<OptimizationResult | null>(null);
+  const [optimizationResult, setOptimizationResult] =
+    useState<OptimizationResult | null>(null);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
@@ -77,7 +92,7 @@ export default function ResumeOptimizer() {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
       ];
-      
+
       if (!allowedTypes.includes(selectedFile.type)) {
         setError("Please upload a PDF, Word document, or text file.");
         return;
@@ -99,7 +114,7 @@ export default function ResumeOptimizer() {
     const prompt = `You are an expert resume optimizer and ATS specialist. Analyze the following resume and provide optimization suggestions.
 
 Resume Content: ${content}
-${jobDescription ? `Job Description: ${jobDescription}` : ''}
+${jobDescription ? `Job Description: ${jobDescription}` : ""}
 
 Please provide a detailed analysis with:
 1. Overall optimization score (0-100)
@@ -141,7 +156,7 @@ Return the response in JSON format with the following structure:
       }
 
       const result = await response.json();
-      
+
       // Try to parse as JSON, fallback to mock data if parsing fails
       try {
         const parsedResult = JSON.parse(result.result || result);
@@ -150,40 +165,44 @@ Return the response in JSON format with the following structure:
         // Return mock optimization result
         return {
           overallScore: Math.floor(Math.random() * 30) + 60, // 60-90
-          atsScore: Math.floor(Math.random() * 25) + 70,     // 70-95
+          atsScore: Math.floor(Math.random() * 25) + 70, // 70-95
           keywordScore: Math.floor(Math.random() * 35) + 55, // 55-90
-          formatScore: Math.floor(Math.random() * 20) + 75,  // 75-95
+          formatScore: Math.floor(Math.random() * 20) + 75, // 75-95
           contentScore: Math.floor(Math.random() * 30) + 65, // 65-95
           suggestions: [
             {
               type: "critical",
               category: "ats",
               title: "Add more relevant keywords",
-              description: "Your resume lacks industry-specific keywords that ATS systems look for. Include terms from the job description.",
-              impact: "Could increase ATS pass rate by 25-40%"
+              description:
+                "Your resume lacks industry-specific keywords that ATS systems look for. Include terms from the job description.",
+              impact: "Could increase ATS pass rate by 25-40%",
             },
             {
               type: "important",
               category: "format",
               title: "Use standard section headers",
-              description: "Use conventional headers like 'Work Experience' instead of creative alternatives.",
-              impact: "Improves ATS parsing accuracy"
+              description:
+                "Use conventional headers like 'Work Experience' instead of creative alternatives.",
+              impact: "Improves ATS parsing accuracy",
             },
             {
               type: "important",
               category: "content",
               title: "Quantify achievements",
-              description: "Add specific numbers, percentages, and metrics to demonstrate impact.",
-              impact: "Makes accomplishments more compelling"
+              description:
+                "Add specific numbers, percentages, and metrics to demonstrate impact.",
+              impact: "Makes accomplishments more compelling",
             },
             {
               type: "minor",
               category: "keywords",
               title: "Include soft skills",
-              description: "Balance technical skills with relevant soft skills mentioned in job postings.",
-              impact: "Provides more comprehensive skill coverage"
-            }
-          ]
+              description:
+                "Balance technical skills with relevant soft skills mentioned in job postings.",
+              impact: "Provides more comprehensive skill coverage",
+            },
+          ],
         };
       }
     } catch (error) {
@@ -375,7 +394,7 @@ Return the response in JSON format with the following structure:
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center">
                   <Zap className="h-6 w-6 text-brand-blue" />
@@ -383,7 +402,8 @@ Return the response in JSON format with the following structure:
                 <div>
                   <h1 className="text-3xl font-bold">Resume Optimizer</h1>
                   <p className="text-muted-foreground">
-                    Optimize your resume for ATS systems and improve your job search success
+                    Optimize your resume for ATS systems and improve your job
+                    search success
                   </p>
                 </div>
               </div>
@@ -401,11 +421,17 @@ Return the response in JSON format with the following structure:
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue={isAuthenticated ? "existing" : "text"} className="w-full">
+                    <Tabs
+                      defaultValue={isAuthenticated ? "existing" : "text"}
+                      className="w-full"
+                    >
                       <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="text">Paste Text</TabsTrigger>
                         <TabsTrigger value="upload">Upload File</TabsTrigger>
-                        <TabsTrigger value="existing" disabled={!isAuthenticated}>
+                        <TabsTrigger
+                          value="existing"
+                          disabled={!isAuthenticated}
+                        >
                           My Resumes {!isAuthenticated && "(Login Required)"}
                         </TabsTrigger>
                       </TabsList>
@@ -433,7 +459,7 @@ Return the response in JSON format with the following structure:
                             className="min-h-[100px]"
                           />
                         </div>
-                        <Button 
+                        <Button
                           onClick={handleTextOptimization}
                           disabled={isOptimizing || !resumeText.trim()}
                           className="w-full"
@@ -465,7 +491,10 @@ Return the response in JSON format with the following structure:
                               className="hidden"
                               id="resume-upload"
                             />
-                            <label htmlFor="resume-upload" className="cursor-pointer">
+                            <label
+                              htmlFor="resume-upload"
+                              className="cursor-pointer"
+                            >
                               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                               <p className="text-sm text-muted-foreground">
                                 Click to upload or drag and drop
@@ -480,10 +509,18 @@ Return the response in JSON format with the following structure:
                         {file && (
                           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                             <div className="flex items-center gap-2">
-                              <span className="text-lg">{getFileIcon(file)}</span>
-                              <span className="text-sm font-medium">{file.name}</span>
+                              <span className="text-lg">
+                                {getFileIcon(file)}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {file.name}
+                              </span>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={removeFile}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={removeFile}
+                            >
                               Remove
                             </Button>
                           </div>
@@ -501,7 +538,7 @@ Return the response in JSON format with the following structure:
                           />
                         </div>
 
-                        <Button 
+                        <Button
                           onClick={handleFileOptimization}
                           disabled={isOptimizing || !file}
                           className="w-full"
@@ -525,13 +562,19 @@ Return the response in JSON format with the following structure:
                           <label className="text-sm font-medium mb-2 block">
                             Select Resume
                           </label>
-                          <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
+                          <Select
+                            value={selectedResumeId}
+                            onValueChange={setSelectedResumeId}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Choose a resume to optimize" />
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.map((resume) => (
-                                <SelectItem key={resume.id} value={resume.id || ""}>
+                                <SelectItem
+                                  key={resume.id}
+                                  value={resume.id || ""}
+                                >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
@@ -551,7 +594,7 @@ Return the response in JSON format with the following structure:
                           />
                         </div>
 
-                        <Button 
+                        <Button
                           onClick={handleResumeOptimization}
                           disabled={isOptimizing || !selectedResumeId}
                           className="w-full"
@@ -596,10 +639,14 @@ Return the response in JSON format with the following structure:
                         <div className="space-y-4">
                           {/* Overall Score */}
                           <div className="text-center p-4 bg-muted rounded-lg">
-                            <div className={`text-3xl font-bold ${getScoreColor(optimizationResult.overallScore)}`}>
+                            <div
+                              className={`text-3xl font-bold ${getScoreColor(optimizationResult.overallScore)}`}
+                            >
                               {optimizationResult.overallScore}%
                             </div>
-                            <p className="text-sm text-muted-foreground">Overall Score</p>
+                            <p className="text-sm text-muted-foreground">
+                              Overall Score
+                            </p>
                           </div>
 
                           {/* Individual Scores */}
@@ -607,12 +654,16 @@ Return the response in JSON format with the following structure:
                             <div>
                               <div className="flex justify-between text-sm mb-1">
                                 <span>ATS Compatibility</span>
-                                <span className={getScoreColor(optimizationResult.atsScore)}>
+                                <span
+                                  className={getScoreColor(
+                                    optimizationResult.atsScore,
+                                  )}
+                                >
                                   {optimizationResult.atsScore}%
                                 </span>
                               </div>
-                              <Progress 
-                                value={optimizationResult.atsScore} 
+                              <Progress
+                                value={optimizationResult.atsScore}
                                 className="h-2"
                               />
                             </div>
@@ -620,12 +671,16 @@ Return the response in JSON format with the following structure:
                             <div>
                               <div className="flex justify-between text-sm mb-1">
                                 <span>Keywords</span>
-                                <span className={getScoreColor(optimizationResult.keywordScore)}>
+                                <span
+                                  className={getScoreColor(
+                                    optimizationResult.keywordScore,
+                                  )}
+                                >
                                   {optimizationResult.keywordScore}%
                                 </span>
                               </div>
-                              <Progress 
-                                value={optimizationResult.keywordScore} 
+                              <Progress
+                                value={optimizationResult.keywordScore}
                                 className="h-2"
                               />
                             </div>
@@ -633,12 +688,16 @@ Return the response in JSON format with the following structure:
                             <div>
                               <div className="flex justify-between text-sm mb-1">
                                 <span>Format</span>
-                                <span className={getScoreColor(optimizationResult.formatScore)}>
+                                <span
+                                  className={getScoreColor(
+                                    optimizationResult.formatScore,
+                                  )}
+                                >
                                   {optimizationResult.formatScore}%
                                 </span>
                               </div>
-                              <Progress 
-                                value={optimizationResult.formatScore} 
+                              <Progress
+                                value={optimizationResult.formatScore}
                                 className="h-2"
                               />
                             </div>
@@ -646,12 +705,16 @@ Return the response in JSON format with the following structure:
                             <div>
                               <div className="flex justify-between text-sm mb-1">
                                 <span>Content Quality</span>
-                                <span className={getScoreColor(optimizationResult.contentScore)}>
+                                <span
+                                  className={getScoreColor(
+                                    optimizationResult.contentScore,
+                                  )}
+                                >
                                   {optimizationResult.contentScore}%
                                 </span>
                               </div>
-                              <Progress 
-                                value={optimizationResult.contentScore} 
+                              <Progress
+                                value={optimizationResult.contentScore}
                                 className="h-2"
                               />
                             </div>
@@ -670,39 +733,48 @@ Return the response in JSON format with the following structure:
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          {optimizationResult.suggestions.map((suggestion, index) => (
-                            <div key={index} className="border rounded-lg p-4">
-                              <div className="flex items-start gap-3">
-                                {getSuggestionIcon(suggestion.type)}
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <h4 className="font-semibold">{suggestion.title}</h4>
-                                    <Badge 
-                                      variant="secondary" 
-                                      className={getSuggestionBadgeColor(suggestion.type)}
-                                    >
-                                      {suggestion.type}
-                                    </Badge>
+                          {optimizationResult.suggestions.map(
+                            (suggestion, index) => (
+                              <div
+                                key={index}
+                                className="border rounded-lg p-4"
+                              >
+                                <div className="flex items-start gap-3">
+                                  {getSuggestionIcon(suggestion.type)}
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <h4 className="font-semibold">
+                                        {suggestion.title}
+                                      </h4>
+                                      <Badge
+                                        variant="secondary"
+                                        className={getSuggestionBadgeColor(
+                                          suggestion.type,
+                                        )}
+                                      >
+                                        {suggestion.type}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      {suggestion.description}
+                                    </p>
+                                    <p className="text-xs text-green-600 font-medium">
+                                      💡 {suggestion.impact}
+                                    </p>
                                   </div>
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    {suggestion.description}
-                                  </p>
-                                  <p className="text-xs text-green-600 font-medium">
-                                    💡 {suggestion.impact}
-                                  </p>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ),
+                          )}
                         </div>
-                        
+
                         <div className="flex gap-2 mt-6">
                           <Button variant="outline" onClick={resetOptimization}>
                             Optimize Another
                           </Button>
-                          <Button 
+                          <Button
                             onClick={() => {
-                              const report = `Resume Optimization Report\n\nOverall Score: ${optimizationResult.overallScore}%\nATS Score: ${optimizationResult.atsScore}%\nKeyword Score: ${optimizationResult.keywordScore}%\nFormat Score: ${optimizationResult.formatScore}%\nContent Score: ${optimizationResult.contentScore}%\n\nSuggestions:\n${optimizationResult.suggestions.map(s => `- ${s.title}: ${s.description}`).join('\n')}`;
+                              const report = `Resume Optimization Report\n\nOverall Score: ${optimizationResult.overallScore}%\nATS Score: ${optimizationResult.atsScore}%\nKeyword Score: ${optimizationResult.keywordScore}%\nFormat Score: ${optimizationResult.formatScore}%\nContent Score: ${optimizationResult.contentScore}%\n\nSuggestions:\n${optimizationResult.suggestions.map((s) => `- ${s.title}: ${s.description}`).join("\n")}`;
                               navigator.clipboard.writeText(report);
                             }}
                             variant="outline"
@@ -721,9 +793,10 @@ Return the response in JSON format with the following structure:
                       <Zap className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="font-semibold mb-2">Ready to Optimize</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Upload a resume file, paste text, or select from your saved resumes to get optimization suggestions.
+                        Upload a resume file, paste text, or select from your
+                        saved resumes to get optimization suggestions.
                       </p>
-                      
+
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
                         <h4 className="font-medium mb-2">What you'll get:</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">

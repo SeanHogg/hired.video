@@ -1,6 +1,6 @@
 /**
  * Centralized Role Utilities
- * 
+ *
  * This module provides a single source of truth for all role-related functionality
  * across the frontend application. It handles conversion between backend enum values
  * and frontend string representations, provides consistent role display labels,
@@ -34,24 +34,27 @@ export const ROLE_DESCRIPTIONS = {
 
 // Dashboard type constants - single source of truth
 export const DASHBOARD_TYPES = {
-  JOB_SEEKER: 'jobseeker',
-  RECRUITER: 'recruiter',
-  EMPLOYER: 'employer',
-  ADMIN: 'admin',
-  DEFAULT: 'default',
+  JOB_SEEKER: "jobseeker",
+  RECRUITER: "recruiter",
+  EMPLOYER: "employer",
+  ADMIN: "admin",
+  DEFAULT: "default",
 } as const;
 
-export type DashboardType = typeof DASHBOARD_TYPES[keyof typeof DASHBOARD_TYPES];
+export type DashboardType =
+  (typeof DASHBOARD_TYPES)[keyof typeof DASHBOARD_TYPES];
 
 /**
  * Converts any role value (numeric, string, or mixed) to the standard UserRole format
  * Handles backend enum integers, various string formats, and edge cases
  */
-export function normalizeRole(role: string | number | undefined | null): UserRole {
+export function normalizeRole(
+  role: string | number | undefined | null,
+): UserRole {
   if (!role && role !== 0) return USER_ROLES.JOB_SEEKER;
 
   // Handle numeric role values from MyVideoResumeRoles enum
-  if (typeof role === 'number' || !isNaN(Number(role))) {
+  if (typeof role === "number" || !isNaN(Number(role))) {
     const numericRole = Number(role);
     switch (numericRole) {
       case BACKEND_ROLE_VALUES.JOB_SEEKER: // 30
@@ -68,16 +71,16 @@ export function normalizeRole(role: string | number | undefined | null): UserRol
   // Handle string role values (case-insensitive)
   const roleStr = String(role).toLowerCase().trim();
   switch (roleStr) {
-    case 'jobseeker':
-    case 'job_seeker':
-    case 'job seeker':
+    case "jobseeker":
+    case "job_seeker":
+    case "job seeker":
       return USER_ROLES.JOB_SEEKER;
-    case 'recruiter':
+    case "recruiter":
       return USER_ROLES.RECRUITER;
-    case 'employer':
+    case "employer":
       return USER_ROLES.EMPLOYER;
-    case 'admin':
-    case 'administrator':
+    case "admin":
+    case "administrator":
       return USER_ROLES.ADMIN;
     default:
       // Try exact match with USER_ROLES values
@@ -96,24 +99,36 @@ export function normalizeRole(role: string | number | undefined | null): UserRol
  * Gets the display label for a role
  * Handles any role format and returns consistent display text
  */
-export function getRoleDisplayLabel(role: string | number | undefined | null): string {
+export function getRoleDisplayLabel(
+  role: string | number | undefined | null,
+): string {
   const normalizedRole = normalizeRole(role);
-  return ROLE_DISPLAY_LABELS[normalizedRole] || ROLE_DISPLAY_LABELS[USER_ROLES.JOB_SEEKER];
+  return (
+    ROLE_DISPLAY_LABELS[normalizedRole] ||
+    ROLE_DISPLAY_LABELS[USER_ROLES.JOB_SEEKER]
+  );
 }
 
 /**
  * Gets the description for a role
  */
-export function getRoleDescription(role: string | number | undefined | null): string {
+export function getRoleDescription(
+  role: string | number | undefined | null,
+): string {
   const normalizedRole = normalizeRole(role);
-  return ROLE_DESCRIPTIONS[normalizedRole] || ROLE_DESCRIPTIONS[USER_ROLES.JOB_SEEKER];
+  return (
+    ROLE_DESCRIPTIONS[normalizedRole] ||
+    ROLE_DESCRIPTIONS[USER_ROLES.JOB_SEEKER]
+  );
 }
 
 /**
  * Converts a role to the format expected by form selects
  * Always returns a valid USER_ROLES constant
  */
-export function roleToSelectValue(role: string | number | undefined | null): UserRole {
+export function roleToSelectValue(
+  role: string | number | undefined | null,
+): UserRole {
   return normalizeRole(role);
 }
 
@@ -121,7 +136,9 @@ export function roleToSelectValue(role: string | number | undefined | null): Use
  * Formats role for display in UI components (badges, labels, etc.)
  * Handles underscores and capitalization
  */
-export function formatRoleForDisplay(role: string | number | undefined | null): string {
+export function formatRoleForDisplay(
+  role: string | number | undefined | null,
+): string {
   const label = getRoleDisplayLabel(role);
   return label;
 }
@@ -152,8 +169,6 @@ export class RolePermissions {
   get isAdmin(): boolean {
     return this.role === USER_ROLES.ADMIN;
   }
-
-
 
   // Permission checks
   get canManageJobs(): boolean {
@@ -205,7 +220,9 @@ export class RolePermissions {
 /**
  * Convenience function to create RolePermissions instance
  */
-export function createRolePermissions(role: string | number | undefined | null): RolePermissions {
+export function createRolePermissions(
+  role: string | number | undefined | null,
+): RolePermissions {
   return new RolePermissions(role);
 }
 
@@ -213,18 +230,18 @@ export function createRolePermissions(role: string | number | undefined | null):
  * Quick permission checks without creating class instance
  */
 export const roleUtils = {
-  isJobSeeker: (role: string | number | undefined | null): boolean => 
+  isJobSeeker: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.JOB_SEEKER,
-  
-  isRecruiter: (role: string | number | undefined | null): boolean => 
+
+  isRecruiter: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.RECRUITER,
-  
+
   isEmployer: (role: string | number | undefined | null): boolean => {
     const normalized = normalizeRole(role);
     return normalized === USER_ROLES.EMPLOYER;
   },
-  
-  isAdmin: (role: string | number | undefined | null): boolean => 
+
+  isAdmin: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.ADMIN,
 
   canManageJobs: (role: string | number | undefined | null): boolean => {
@@ -237,10 +254,12 @@ export const roleUtils = {
     return permissions.canViewResumes;
   },
 
-  getDashboardType: (role: string | number | undefined | null): DashboardType => {
+  getDashboardType: (
+    role: string | number | undefined | null,
+  ): DashboardType => {
     const permissions = new RolePermissions(role);
     return permissions.dashboardType;
-  }
+  },
 };
 
 /**
@@ -248,7 +267,7 @@ export const roleUtils = {
  */
 export function isValidRole(role: string | number | undefined | null): boolean {
   if (!role && role !== 0) return false;
-  
+
   try {
     const normalized = normalizeRole(role);
     return Object.values(USER_ROLES).includes(normalized);
@@ -260,7 +279,11 @@ export function isValidRole(role: string | number | undefined | null): boolean {
 /**
  * Get all available roles for dropdowns/selects
  */
-export function getAvailableRoles(): Array<{ value: UserRole; label: string; description: string }> {
+export function getAvailableRoles(): Array<{
+  value: UserRole;
+  label: string;
+  description: string;
+}> {
   return [
     {
       value: USER_ROLES.JOB_SEEKER,

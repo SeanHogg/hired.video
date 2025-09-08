@@ -6,9 +6,10 @@ import { visualizer } from "rollup-plugin-visualizer";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const sourceMapsEnabled = String(
-    env.VITE_BUILD_SOURCEMAPS ?? env.BUILD_SOURCEMAPS ?? ""
-  ).toLowerCase() === "true";
+  const sourceMapsEnabled =
+    String(
+      env.VITE_BUILD_SOURCEMAPS ?? env.BUILD_SOURCEMAPS ?? "",
+    ).toLowerCase() === "true";
 
   return {
     server: {
@@ -33,19 +34,24 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             // Vendor chunks
-            'react-vendor': ['react', 'react-dom'],
-            'router': ['react-router-dom'],
-            'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs'],
-            'icons': ['lucide-react'],
-            'charts': ['recharts'],
-            'utils': ['clsx', 'tailwind-merge', 'date-fns'],
-            'query': ['@tanstack/react-query'],
-            'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+            "react-vendor": ["react", "react-dom"],
+            router: ["react-router-dom"],
+            "ui-vendor": [
+              "@radix-ui/react-dialog",
+              "@radix-ui/react-dropdown-menu",
+              "@radix-ui/react-select",
+              "@radix-ui/react-tabs",
+            ],
+            icons: ["lucide-react"],
+            charts: ["recharts"],
+            utils: ["clsx", "tailwind-merge", "date-fns"],
+            query: ["@tanstack/react-query"],
+            forms: ["react-hook-form", "@hookform/resolvers", "zod"],
           },
         },
       },
       chunkSizeWarningLimit: 1000,
-      minify: 'terser',
+      minify: "terser",
       terserOptions: {
         compress: {
           drop_console: true,
@@ -56,7 +62,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       visualizer({
-        filename: 'dist/stats.html',
+        filename: "dist/stats.html",
         open: false,
         gzipSize: true,
         brotliSize: true,
@@ -70,17 +76,17 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       include: [
-        'react',
-        'react-dom',
-        'react-router-dom',
-        '@tanstack/react-query',
-        'lucide-react',
-        'clsx',
-        'tailwind-merge',
-        'date-fns',
-        'framer-motion',
+        "react",
+        "react-dom",
+        "react-router-dom",
+        "@tanstack/react-query",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge",
+        "date-fns",
+        "framer-motion",
       ],
-      exclude: ['@vitejs/plugin-react-swc'],
+      exclude: ["@vitejs/plugin-react-swc"],
     },
   };
 });

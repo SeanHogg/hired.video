@@ -227,7 +227,6 @@ export default function Onboarding() {
       {/* Main Content - Flexible */}
       <div className="flex-1 container mx-auto px-4 pb-6 flex flex-col min-h-0">
         <div className="max-w-4xl mx-auto flex flex-col h-full gap-6">
-
           {/* Progress Overview - Fixed */}
           <Card className="flex-shrink-0">
             <CardHeader>
@@ -256,7 +255,6 @@ export default function Onboarding() {
 
           {/* Steps and Form Layout - Flexible */}
           <div className="flex-1 flex flex-col gap-6 min-h-0">
-
             {/* Steps List - Scrollable */}
             <Card className="flex-shrink-0">
               <CardHeader>
@@ -353,9 +351,7 @@ export default function Onboarding() {
               className="gap-2"
               disabled={!steps[currentStep].completed}
             >
-              {currentStep === steps.length - 1
-                ? "Complete Setup"
-                : "Continue"}
+              {currentStep === steps.length - 1 ? "Complete Setup" : "Continue"}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>

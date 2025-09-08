@@ -168,8 +168,7 @@ export default function Pricing() {
     },
     [USER_ROLES.ADMIN]: {
       label: "Admin",
-      freeDescription:
-        "Administrative access to manage the platform.",
+      freeDescription: "Administrative access to manage the platform.",
       premiumDescription:
         "Full administrative control with advanced management features.",
       freeFeatures: [
@@ -579,7 +578,9 @@ export default function Pricing() {
                           Job Postings
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER ? "—" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Unlimited"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           {persona === USER_ROLES.RECRUITER
@@ -602,7 +603,9 @@ export default function Pricing() {
                               : "Up to 2"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "1"
+                            : "Unlimited"}
                         </td>
                       </tr>
                       <tr>
@@ -614,7 +617,9 @@ export default function Pricing() {
                           {persona === USER_ROLES.JOB_SEEKER ? "1" : "1"}
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          {persona === USER_ROLES.JOB_SEEKER ? "1" : "Unlimited"}
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "1"
+                            : "Unlimited"}
                         </td>
                       </tr>
                       <tr>

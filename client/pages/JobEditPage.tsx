@@ -115,7 +115,9 @@ export default function JobEditPage() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                  <p className="text-muted-foreground">Loading job details...</p>
+                  <p className="text-muted-foreground">
+                    Loading job details...
+                  </p>
                 </CardContent>
               </Card>
             ) : job && permissions.canEdit ? (
@@ -131,7 +133,9 @@ export default function JobEditPage() {
                   <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
                   <p className="text-muted-foreground mb-6">
-                    You don't have permission to edit this job. Only the job creator, account owners, and recruiters within the same company can edit jobs.
+                    You don't have permission to edit this job. Only the job
+                    creator, account owners, and recruiters within the same
+                    company can edit jobs.
                   </p>
                   <div className="flex gap-4 justify-center">
                     <Button asChild variant="outline">
@@ -149,7 +153,8 @@ export default function JobEditPage() {
                   <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Job Not Found</h3>
                   <p className="text-muted-foreground mb-6">
-                    The job you're trying to edit could not be found or you don't have permission to edit it.
+                    The job you're trying to edit could not be found or you
+                    don't have permission to edit it.
                   </p>
                   <Button asChild>
                     <Link to="/jobs">Back to Jobs</Link>

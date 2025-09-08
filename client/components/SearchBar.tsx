@@ -523,7 +523,9 @@ export default function SearchBar({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <IconComponent className="w-4 h-4" />
-                {(context || "all").charAt(0).toUpperCase() + (context || "all").slice(1)} Filters
+                {(context || "all").charAt(0).toUpperCase() +
+                  (context || "all").slice(1)}{" "}
+                Filters
               </h3>
               <Button
                 variant="ghost"

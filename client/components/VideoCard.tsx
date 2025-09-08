@@ -61,34 +61,37 @@ export default function VideoCard({
   };
 
   // Use passed actions or fallback to default actions
-  const cardActions = actions && actions.length > 0 ? actions : [
-    {
-      id: "view",
-      label: "View",
-      variant: "outline" as const,
-      icon: Eye,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          console.log("View video:", title);
-        }
-      }
-    },
-    {
-      id: "actions",
-      label: "Actions",
-      variant: "default" as const,
-      icon: Play,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          console.log("Actions clicked for video:", title);
-        }
-      }
-    }
-  ];
+  const cardActions =
+    actions && actions.length > 0
+      ? actions
+      : [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => {
+              if (onView) {
+                onView();
+              } else {
+                console.log("View video:", title);
+              }
+            },
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            variant: "default" as const,
+            icon: Play,
+            onClick: () => {
+              if (onActions) {
+                onActions();
+              } else {
+                console.log("Actions clicked for video:", title);
+              }
+            },
+          },
+        ];
 
   return (
     <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300 border-0 bg-card overflow-hidden">
@@ -179,7 +182,6 @@ export default function VideoCard({
             </div>
           </div>
         </div>
-
       </CardContent>
 
       <CardActions actions={cardActions} />

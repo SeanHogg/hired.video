@@ -53,7 +53,7 @@ export default function ForgotPassword() {
         "/api/account/reset-password",
         {
           method: "POST",
-          body: { email }
+          body: { email },
         },
       );
 

@@ -19,10 +19,10 @@ interface CompanyInfoStepProps {
   onBack: () => void;
 }
 
-export default function CompanyInfoStep({ 
-  onCompanyInfoSubmitted, 
+export default function CompanyInfoStep({
+  onCompanyInfoSubmitted,
   isLoading = false,
-  onBack 
+  onBack,
 }: CompanyInfoStepProps) {
   const [companyName, setCompanyName] = useState("");
   const [companyMission, setCompanyMission] = useState("");
@@ -50,7 +50,8 @@ export default function CompanyInfoStep({
             Company Information
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Optional: Add company details to create a more personalized value proposition
+            Optional: Add company details to create a more personalized value
+            proposition
           </p>
         </div>
         <Button variant="outline" onClick={onBack} disabled={isLoading}>
@@ -62,8 +63,9 @@ export default function CompanyInfoStep({
       <Alert>
         <Building2 className="h-4 w-4" />
         <AlertDescription>
-          Adding company information helps create a more targeted and compelling value proposition. 
-          You can skip this step if you don't have this information available.
+          Adding company information helps create a more targeted and compelling
+          value proposition. You can skip this step if you don't have this
+          information available.
         </AlertDescription>
       </Alert>
 
@@ -119,14 +121,10 @@ export default function CompanyInfoStep({
       </Card>
 
       <div className="flex gap-3 justify-end">
-        <Button 
-          variant="outline" 
-          onClick={handleSkip}
-          disabled={isLoading}
-        >
+        <Button variant="outline" onClick={handleSkip} disabled={isLoading}>
           Skip This Step
         </Button>
-        <Button 
+        <Button
           onClick={handleSubmit}
           disabled={isLoading}
           className="min-w-[140px]"

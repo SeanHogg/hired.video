@@ -52,7 +52,8 @@ export function useJobPermissions(job: Job | null): JobPermissions {
     const rolePermissions = createRolePermissions(user.role);
 
     // Check if user is the job creator
-    const isJobCreator = job.userId === user.id || job.createdByUser?.userId === user.id;
+    const isJobCreator =
+      job.userId === user.id || job.createdByUser?.userId === user.id;
 
     let canEdit = false;
     let canDelete = false;
@@ -106,7 +107,7 @@ export function useJobPermissionsWithAPI(jobId: string | null): JobPermissions {
 
   useEffect(() => {
     if (!jobId) {
-      setPermissions(prev => ({ ...prev, loading: false }));
+      setPermissions((prev) => ({ ...prev, loading: false }));
       return;
     }
 
@@ -132,7 +133,7 @@ export function useJobPermissionsWithAPI(jobId: string | null): JobPermissions {
     // checkPermissions();
 
     // For now, just set loading to false
-    setPermissions(prev => ({ ...prev, loading: false }));
+    setPermissions((prev) => ({ ...prev, loading: false }));
   }, [jobId]);
 
   return permissions;

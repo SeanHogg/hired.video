@@ -626,8 +626,6 @@ export default function ResumeDetail() {
                   </Card>
                 </section>
               )}
-
-
           </div>
 
           <Footer />

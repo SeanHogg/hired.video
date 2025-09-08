@@ -302,7 +302,7 @@ export default function Index() {
                 company: "Independent", // TODO: Get from resume data
                 createdAt: item.createdAt || new Date().toISOString(),
                 ownerId: item.id, // TODO: Get actual owner ID
-                privacy: (item as any).privacy || "public"
+                privacy: (item as any).privacy || "public",
               };
             case "job":
               return {
@@ -343,12 +343,14 @@ export default function Index() {
     : [];
 
   // Create user context for dynamic actions
-  const userContext = user ? createUserContext({
-    userId: user.id,
-    role: user.role || "regular_user",
-    accountId: (user as any).accountId,
-    permissions: (user as any).permissions || []
-  }) : getDefaultUserContext();
+  const userContext = user
+    ? createUserContext({
+        userId: user.id,
+        role: user.role || "regular_user",
+        accountId: (user as any).accountId,
+        permissions: (user as any).permissions || [],
+      })
+    : getDefaultUserContext();
 
   // Create card renderers for different sections with user context
   const featuredSectionRenderer = useCardRenderer({
@@ -357,8 +359,8 @@ export default function Index() {
     showOwnership: false,
     interactions: {
       onView: handleView,
-      onActions: handleOpenActions
-    }
+      onActions: handleOpenActions,
+    },
   });
 
   // Create card renderer for the "all" section (used in grid view)
@@ -368,8 +370,8 @@ export default function Index() {
     showOwnership: false,
     interactions: {
       onView: handleView,
-      onActions: handleOpenActions
-    }
+      onActions: handleOpenActions,
+    },
   });
 
   const recentSectionRenderer = useCardRenderer({
@@ -378,8 +380,8 @@ export default function Index() {
     showOwnership: false,
     interactions: {
       onView: handleView,
-      onActions: handleOpenActions
-    }
+      onActions: handleOpenActions,
+    },
   });
 
   const latestSectionRenderer = useCardRenderer({
@@ -388,8 +390,8 @@ export default function Index() {
     showOwnership: false,
     interactions: {
       onView: handleView,
-      onActions: handleOpenActions
-    }
+      onActions: handleOpenActions,
+    },
   });
 
   const topSectionRenderer = useCardRenderer({
@@ -398,8 +400,8 @@ export default function Index() {
     showOwnership: false,
     interactions: {
       onView: handleView,
-      onActions: handleOpenActions
-    }
+      onActions: handleOpenActions,
+    },
   });
 
   // Fetch companies when filters change or when companies category is selected
@@ -461,8 +463,12 @@ export default function Index() {
       switch (sortBy) {
         case "recent":
           // Sort by creation date (newest first)
-          const aDate = new Date((a as any).createdAt || (a as any).postedDate || 0);
-          const bDate = new Date((b as any).createdAt || (b as any).postedDate || 0);
+          const aDate = new Date(
+            (a as any).createdAt || (a as any).postedDate || 0,
+          );
+          const bDate = new Date(
+            (b as any).createdAt || (b as any).postedDate || 0,
+          );
           return bDate.getTime() - aDate.getTime();
 
         case "featured":
@@ -480,8 +486,18 @@ export default function Index() {
 
         case "latest":
           // Sort by latest activity/updates (newest first)
-          const aUpdate = new Date((a as any).updatedAt || (a as any).createdAt || (a as any).postedDate || 0);
-          const bUpdate = new Date((b as any).updatedAt || (b as any).createdAt || (b as any).postedDate || 0);
+          const aUpdate = new Date(
+            (a as any).updatedAt ||
+              (a as any).createdAt ||
+              (a as any).postedDate ||
+              0,
+          );
+          const bUpdate = new Date(
+            (b as any).updatedAt ||
+              (b as any).createdAt ||
+              (b as any).postedDate ||
+              0,
+          );
           return bUpdate.getTime() - aUpdate.getTime();
 
         default:
@@ -600,7 +616,9 @@ export default function Index() {
 
               {/* Sort Filters */}
               <div className="flex gap-2 justify-center md:justify-start flex-wrap">
-                <span className="text-sm text-muted-foreground self-center mr-2">Sort by:</span>
+                <span className="text-sm text-muted-foreground self-center mr-2">
+                  Sort by:
+                </span>
                 {[
                   { id: "recent", label: "Recent", icon: Clock },
                   { id: "featured", label: "Featured", icon: Sparkles },
@@ -610,10 +628,21 @@ export default function Index() {
                   <Button
                     key={sortOption.id}
                     variant={
-                      searchFilters.sortBy === sortOption.id ? "default" : "outline"
+                      searchFilters.sortBy === sortOption.id
+                        ? "default"
+                        : "outline"
                     }
                     size="sm"
-                    onClick={() => setSearchFilters(prev => ({ ...prev, sortBy: sortOption.id as "recent" | "featured" | "top" | "latest" }))}
+                    onClick={() =>
+                      setSearchFilters((prev) => ({
+                        ...prev,
+                        sortBy: sortOption.id as
+                          | "recent"
+                          | "featured"
+                          | "top"
+                          | "latest",
+                      }))
+                    }
                     className="gap-2"
                   >
                     <sortOption.icon className="w-4 h-4" />
@@ -624,8 +653,6 @@ export default function Index() {
             </div>
           </div>
         </section>
-
-
 
         {/* Video Grid */}
         <section className="py-8 px-4 sm:px-6 lg:px-8">
@@ -652,7 +679,8 @@ export default function Index() {
                   <p className="text-muted-foreground">
                     {filteredItems.length} items found
                     {searchFilters.search && ` for "${searchFilters.search}"`}
-                    {searchFilters.sortBy && ` sorted by ${searchFilters.sortBy}`}
+                    {searchFilters.sortBy &&
+                      ` sorted by ${searchFilters.sortBy}`}
                     {filteredItems.length > itemsPerPage &&
                       ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`}
                   </p>
@@ -728,7 +756,7 @@ export default function Index() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <h3 className="font-semibold text-lg truncate">
-                                  {(item.name ?? item.title ?? "")}
+                                  {item.name ?? item.title ?? ""}
                                 </h3>
                                 <p className="text-muted-foreground">
                                   {item.title}
@@ -744,7 +772,9 @@ export default function Index() {
                                   if (item.type === "people")
                                     navigate(`/people/${item.id}`);
                                   else if (item.type === "company")
-                                    navigate(`/companies/view/${(item as any).id}`);
+                                    navigate(
+                                      `/companies/view/${(item as any).id}`,
+                                    );
                                   else if (item.type === "resume")
                                     navigate(`/resumes/${item.id}`);
                                   else if (item.type === "job")
@@ -809,9 +839,10 @@ export default function Index() {
           user
             ? {
                 ...user,
-                role: (user.role === USER_ROLES.EMPLOYER
-                  ? USER_ROLES.RECRUITER
-                  : user.role || USER_ROLES.JOB_SEEKER),
+                role:
+                  user.role === USER_ROLES.EMPLOYER
+                    ? USER_ROLES.RECRUITER
+                    : user.role || USER_ROLES.JOB_SEEKER,
               }
             : null
         }

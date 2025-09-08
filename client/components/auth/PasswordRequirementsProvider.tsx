@@ -1,6 +1,6 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import { usePasswordRequirements } from '@/hooks/usePasswordRequirements';
-import { ForcePasswordChangeModal } from './ForcePasswordChangeModal';
+import React, { createContext, useContext, ReactNode } from "react";
+import { usePasswordRequirements } from "@/hooks/usePasswordRequirements";
+import { ForcePasswordChangeModal } from "./ForcePasswordChangeModal";
 
 interface PasswordRequirements {
   requiresPasswordChange: boolean;
@@ -22,13 +22,17 @@ interface PasswordRequirementsContextType {
   handlePasswordChanged: () => void;
 }
 
-const PasswordRequirementsContext = createContext<PasswordRequirementsContextType | undefined>(undefined);
+const PasswordRequirementsContext = createContext<
+  PasswordRequirementsContextType | undefined
+>(undefined);
 
 interface PasswordRequirementsProviderProps {
   children: ReactNode;
 }
 
-export const PasswordRequirementsProvider: React.FC<PasswordRequirementsProviderProps> = ({ children }) => {
+export const PasswordRequirementsProvider: React.FC<
+  PasswordRequirementsProviderProps
+> = ({ children }) => {
   const {
     requirements,
     isLoading,
@@ -36,7 +40,7 @@ export const PasswordRequirementsProvider: React.FC<PasswordRequirementsProvider
     checkRequirements,
     showModal,
     setShowModal,
-    handlePasswordChanged
+    handlePasswordChanged,
   } = usePasswordRequirements();
 
   const contextValue = {
@@ -46,13 +50,13 @@ export const PasswordRequirementsProvider: React.FC<PasswordRequirementsProvider
     checkRequirements,
     showModal,
     setShowModal,
-    handlePasswordChanged
+    handlePasswordChanged,
   };
 
   return (
     <PasswordRequirementsContext.Provider value={contextValue}>
       {children}
-      
+
       {/* Global password change modal */}
       {requirements && (
         <ForcePasswordChangeModal
@@ -69,7 +73,9 @@ export const PasswordRequirementsProvider: React.FC<PasswordRequirementsProvider
 export const usePasswordRequirementsContext = () => {
   const context = useContext(PasswordRequirementsContext);
   if (context === undefined) {
-    throw new Error('usePasswordRequirementsContext must be used within a PasswordRequirementsProvider');
+    throw new Error(
+      "usePasswordRequirementsContext must be used within a PasswordRequirementsProvider",
+    );
   }
   return context;
 };

@@ -36,10 +36,18 @@ export const JobResumeMatchResponseSchema = z.object({
 // TYPES
 // ============================================================================
 
-export type JobContentResumeIdMatchRequest = z.infer<typeof JobContentResumeIdMatchRequestSchema>;
-export type JobResumeIdMatchRequest = z.infer<typeof JobResumeIdMatchRequestSchema>;
-export type JobResumeByContentMatchRequest = z.infer<typeof JobResumeByContentMatchRequestSchema>;
-export type JobResumeMatchResponse = z.infer<typeof JobResumeMatchResponseSchema>;
+export type JobContentResumeIdMatchRequest = z.infer<
+  typeof JobContentResumeIdMatchRequestSchema
+>;
+export type JobResumeIdMatchRequest = z.infer<
+  typeof JobResumeIdMatchRequestSchema
+>;
+export type JobResumeByContentMatchRequest = z.infer<
+  typeof JobResumeByContentMatchRequestSchema
+>;
+export type JobResumeMatchResponse = z.infer<
+  typeof JobResumeMatchResponseSchema
+>;
 
 // ============================================================================
 // SERVICE CLASS
@@ -51,12 +59,12 @@ export class MatchService {
    * Uses POST /api/Match endpoint
    */
   async matchJobContentWithResumeId(
-    request: JobContentResumeIdMatchRequest
+    request: JobContentResumeIdMatchRequest,
   ): Promise<JobResumeMatchResponse> {
     const response = await apiClient.post<JobResumeMatchResponse>(
       "/api/Match",
       request,
-      JobResumeMatchResponseSchema
+      JobResumeMatchResponseSchema,
     );
     return response.data;
   }
@@ -66,12 +74,12 @@ export class MatchService {
    * Uses POST /api/Match/byid endpoint
    */
   async matchJobIdWithResumeId(
-    request: JobResumeIdMatchRequest
+    request: JobResumeIdMatchRequest,
   ): Promise<JobResumeMatchResponse> {
     const response = await apiClient.post<JobResumeMatchResponse>(
       "/api/Match/byid",
       request,
-      JobResumeMatchResponseSchema
+      JobResumeMatchResponseSchema,
     );
     return response.data;
   }
@@ -81,12 +89,12 @@ export class MatchService {
    * Uses POST /api/Match/bycontent endpoint
    */
   async matchJobContentWithResumeContent(
-    request: JobResumeByContentMatchRequest
+    request: JobResumeByContentMatchRequest,
   ): Promise<JobResumeMatchResponse> {
     const response = await apiClient.post<JobResumeMatchResponse>(
       "/api/Match/bycontent",
       request,
-      JobResumeMatchResponseSchema
+      JobResumeMatchResponseSchema,
     );
     return response.data;
   }
@@ -119,9 +127,14 @@ export class MatchService {
       return this.matchJobContentWithResumeId({ jobContent, resumeId });
     } else if (jobContent && resumeContent) {
       // Both content strings - use bycontent endpoint
-      return this.matchJobContentWithResumeContent({ jobContent, resumeContent });
+      return this.matchJobContentWithResumeContent({
+        jobContent,
+        resumeContent,
+      });
     } else {
-      throw new Error("Invalid combination of parameters. Cannot match job ID with resume content.");
+      throw new Error(
+        "Invalid combination of parameters. Cannot match job ID with resume content.",
+      );
     }
   }
 }

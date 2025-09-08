@@ -1,11 +1,6 @@
 import React from "react";
 import { TrendingUp } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardMetric } from "@/lib/services/dashboard-service";
 
 interface MetricCardProps {
@@ -41,16 +36,17 @@ export function MetricCard({ metric, loading = false }: MetricCardProps) {
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {metric.title}
         </CardTitle>
-        {metric.icon && React.createElement(metric.icon, { className: "h-4 w-4 text-muted-foreground" })}
+        {metric.icon &&
+          React.createElement(metric.icon, {
+            className: "h-4 w-4 text-muted-foreground",
+          })}
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{metric.value}</div>
         {metric.change && (
           <div
             className={`text-xs flex items-center gap-1 ${
-              metric.trend === "up"
-                ? "text-green-600"
-                : "text-red-600"
+              metric.trend === "up" ? "text-green-600" : "text-red-600"
             }`}
           >
             <TrendingUp
@@ -69,12 +65,20 @@ export function MetricCard({ metric, loading = false }: MetricCardProps) {
   );
 }
 
-export function MetricGrid({ metrics, loading = false, emptyMessage = "No metrics available" }: MetricGridProps) {
+export function MetricGrid({
+  metrics,
+  loading = false,
+  emptyMessage = "No metrics available",
+}: MetricGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {Array.from({ length: 4 }).map((_, index) => (
-          <MetricCard key={index} metric={{} as DashboardMetric} loading={true} />
+          <MetricCard
+            key={index}
+            metric={{} as DashboardMetric}
+            loading={true}
+          />
         ))}
       </div>
     );

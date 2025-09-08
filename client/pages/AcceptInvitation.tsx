@@ -1,25 +1,43 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { CheckCircle, Building2, Users, Mail, AlertCircle, Loader2 } from "lucide-react";
+import {
+  CheckCircle,
+  Building2,
+  Users,
+  Mail,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { accountService } from "@/lib/services/account-service";
-import { InvitationDetailsResponse, AcceptInvitationResponse, getRoleDisplayName } from "@/types/account";
+import {
+  InvitationDetailsResponse,
+  AcceptInvitationResponse,
+  getRoleDisplayName,
+} from "@/types/account";
 import { toast } from "@/hooks/use-toast";
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  
-  const [invitationDetails, setInvitationDetails] = useState<InvitationDetailsResponse | null>(null);
+
+  const [invitationDetails, setInvitationDetails] =
+    useState<InvitationDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const invitationId = searchParams.get("id");
 
   useEffect(() => {
@@ -42,7 +60,9 @@ export default function AcceptInvitation() {
       setError(null);
     } catch (err) {
       console.error("Error loading invitation details:", err);
-      setError("Failed to load invitation details. The invitation may be invalid or expired.");
+      setError(
+        "Failed to load invitation details. The invitation may be invalid or expired.",
+      );
     } finally {
       setLoading(false);
     }
@@ -54,13 +74,13 @@ export default function AcceptInvitation() {
     try {
       setAccepting(true);
       const result = await accountService.acceptInvitation(invitationId);
-      
+
       if (result.success) {
         toast({
           title: "Invitation Accepted!",
           description: `Welcome to ${result.companyName}!`,
         });
-        
+
         // Redirect based on the response
         if (result.redirectUrl) {
           navigate(result.redirectUrl);
@@ -133,8 +153,8 @@ export default function AcceptInvitation() {
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
             {invitationDetails.companyLogoUrl ? (
-              <img 
-                src={invitationDetails.companyLogoUrl} 
+              <img
+                src={invitationDetails.companyLogoUrl}
                 alt={`${invitationDetails.companyName} logo`}
                 className="h-12 w-12 rounded-full object-cover"
               />
@@ -148,7 +168,7 @@ export default function AcceptInvitation() {
             <strong>{invitationDetails.companyName}</strong> on MyVideoResu.ME
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           {/* Company Information */}
           <div className="bg-gray-50 rounded-lg p-4">
@@ -157,7 +177,9 @@ export default function AcceptInvitation() {
               {invitationDetails.companyName}
             </h3>
             {invitationDetails.companyDescription && (
-              <p className="text-gray-600 mb-3">{invitationDetails.companyDescription}</p>
+              <p className="text-gray-600 mb-3">
+                {invitationDetails.companyDescription}
+              </p>
             )}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">
@@ -173,7 +195,9 @@ export default function AcceptInvitation() {
 
           {/* Roles */}
           <div>
-            <h4 className="font-medium mb-3">You'll be assigned these roles:</h4>
+            <h4 className="font-medium mb-3">
+              You'll be assigned these roles:
+            </h4>
             <div className="flex flex-wrap gap-2">
               {invitationDetails.rolesToAssign.map((role) => (
                 <Badge key={role} variant="secondary">
@@ -186,7 +210,9 @@ export default function AcceptInvitation() {
           {/* Personal Message */}
           {invitationDetails.personalMessage && (
             <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-              <p className="text-blue-800 italic">"{invitationDetails.personalMessage}"</p>
+              <p className="text-blue-800 italic">
+                "{invitationDetails.personalMessage}"
+              </p>
             </div>
           )}
 
@@ -195,27 +221,28 @@ export default function AcceptInvitation() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                {invitationDetails.userExists 
+                {invitationDetails.userExists
                   ? "Please log in to accept this invitation."
-                  : "You'll need to create an account to accept this invitation."
-                }
+                  : "You'll need to create an account to accept this invitation."}
               </AlertDescription>
             </Alert>
           )}
 
-          {isAuthenticated && user?.email !== invitationDetails.invitedEmail && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                This invitation is for {invitationDetails.invitedEmail}, but you're logged in as {user?.email}. 
-                Please log in with the correct account.
-              </AlertDescription>
-            </Alert>
-          )}
+          {isAuthenticated &&
+            user?.email !== invitationDetails.invitedEmail && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This invitation is for {invitationDetails.invitedEmail}, but
+                  you're logged in as {user?.email}. Please log in with the
+                  correct account.
+                </AlertDescription>
+              </Alert>
+            )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
-            <Button 
+            <Button
               onClick={handleAcceptInvitation}
               disabled={accepting}
               className="flex-1"
@@ -232,8 +259,8 @@ export default function AcceptInvitation() {
                 </>
               )}
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDecline}
               disabled={accepting}
               className="flex-1"
@@ -243,7 +270,8 @@ export default function AcceptInvitation() {
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            Invited on {new Date(invitationDetails.invitedAt).toLocaleDateString()}
+            Invited on{" "}
+            {new Date(invitationDetails.invitedAt).toLocaleDateString()}
           </p>
         </CardContent>
       </Card>

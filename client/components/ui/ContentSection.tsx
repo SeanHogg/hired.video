@@ -22,7 +22,7 @@ interface ContentSectionProps<T> {
 
 /**
  * ContentSection - Reusable section wrapper for card grids
- * 
+ *
  * Provides:
  * - Consistent section title styling
  * - Responsive grid layouts
@@ -44,20 +44,17 @@ export function ContentSection<T>({
   gridClassName = "",
   emptyMessage = "No items found",
   onRetry,
-  loadingSkeletonCount = 4
+  loadingSkeletonCount = 4,
 }: ContentSectionProps<T>) {
-  
   // Loading state
   if (isLoading) {
     return (
       <div className={cn("space-y-4", className)}>
-        <h3 className={cn("text-lg font-semibold", titleClassName)}>
-          {title}
-        </h3>
+        <h3 className={cn("text-lg font-semibold", titleClassName)}>{title}</h3>
         <div className={cn("grid gap-4", gridCols, gridClassName)}>
           {Array.from({ length: loadingSkeletonCount }).map((_, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className="h-48 bg-muted animate-pulse rounded-lg border"
             />
           ))}
@@ -70,18 +67,12 @@ export function ContentSection<T>({
   if (error) {
     return (
       <div className={cn("space-y-4", className)}>
-        <h3 className={cn("text-lg font-semibold", titleClassName)}>
-          {title}
-        </h3>
+        <h3 className={cn("text-lg font-semibold", titleClassName)}>{title}</h3>
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground mb-4">{error}</p>
           {onRetry && (
-            <Button 
-              variant="outline" 
-              onClick={onRetry}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={onRetry} className="gap-2">
               <RefreshCw className="h-4 w-4" />
               Try Again
             </Button>
@@ -95,9 +86,7 @@ export function ContentSection<T>({
   if (items.length === 0) {
     return (
       <div className={cn("space-y-4", className)}>
-        <h3 className={cn("text-lg font-semibold", titleClassName)}>
-          {title}
-        </h3>
+        <h3 className={cn("text-lg font-semibold", titleClassName)}>{title}</h3>
         <div className="text-center py-8 text-muted-foreground">
           {emptyMessage}
         </div>
@@ -110,9 +99,7 @@ export function ContentSection<T>({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <h3 className={cn("text-lg font-semibold", titleClassName)}>
-        {title}
-      </h3>
+      <h3 className={cn("text-lg font-semibold", titleClassName)}>{title}</h3>
       <div className={cn("grid gap-4", gridCols, gridClassName)}>
         {displayItems.map((item, index) => renderItem(item, index))}
       </div>

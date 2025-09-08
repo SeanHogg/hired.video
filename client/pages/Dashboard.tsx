@@ -28,19 +28,21 @@ export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
 
   // Use custom dashboard hook for data management
-  const { 
-    dashboardData, 
-    loading: dashboardLoading, 
-    error: dashboardError, 
-    lastRefresh, 
-    refreshDashboard 
+  const {
+    dashboardData,
+    loading: dashboardLoading,
+    error: dashboardError,
+    lastRefresh,
+    refreshDashboard,
   } = useDashboard();
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
 
   // Dashboard wrapper component
-  const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({
+    children,
+  }) => (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{dashboardData?.title}</h1>
@@ -64,9 +66,12 @@ export default function Dashboard() {
       onRefresh: refreshDashboard,
     };
 
-    if (rolePermissions.isJobSeeker) return <JobSeekerDashboard {...commonProps} />;
-    if (rolePermissions.isRecruiter) return <RecruiterDashboard {...commonProps} />;
-    if (rolePermissions.isEmployer) return <EmployerDashboard {...commonProps} />;
+    if (rolePermissions.isJobSeeker)
+      return <JobSeekerDashboard {...commonProps} />;
+    if (rolePermissions.isRecruiter)
+      return <RecruiterDashboard {...commonProps} />;
+    if (rolePermissions.isEmployer)
+      return <EmployerDashboard {...commonProps} />;
     if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
 
     // Fallback for unknown roles
@@ -125,15 +130,13 @@ export default function Dashboard() {
       );
     }
 
-    return (
-      <DashboardWrapper>
-        {getDashboardComponent()}
-      </DashboardWrapper>
-    );
+    return <DashboardWrapper>{getDashboardComponent()}</DashboardWrapper>;
   };
 
   // Shared layout component
-  const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  const PageLayout: React.FC<{ children: React.ReactNode }> = ({
+    children,
+  }) => (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
       <Sidebar
         isOpen={sidebarOpen}
@@ -146,9 +149,7 @@ export default function Dashboard() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <div className="pt-16">
-          {children}
-        </div>
+        <div className="pt-16">{children}</div>
       </div>
       <Footer />
     </div>
@@ -178,7 +179,7 @@ export default function Dashboard() {
             <p className="text-muted-foreground mb-8">
               Please log in to access your dashboard.
             </p>
-            <Button onClick={() => window.location.href = '/login'}>
+            <Button onClick={() => (window.location.href = "/login")}>
               Go to Login
             </Button>
           </div>
@@ -188,9 +189,5 @@ export default function Dashboard() {
   }
 
   // Main dashboard render
-  return (
-    <PageLayout>
-      {renderDashboardContent()}
-    </PageLayout>
-  );
+  return <PageLayout>{renderDashboardContent()}</PageLayout>;
 }

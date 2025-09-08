@@ -52,7 +52,9 @@ export default function Login() {
       console.log("Login.handleSubmit: Login result:", success);
 
       if (success) {
-        console.log("Login.handleSubmit: Login successful, navigating to dashboard");
+        console.log(
+          "Login.handleSubmit: Login successful, navigating to dashboard",
+        );
         navigate("/dashboard");
       } else {
         console.log("Login.handleSubmit: Login failed, setting error");

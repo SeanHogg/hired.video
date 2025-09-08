@@ -80,7 +80,12 @@ const JobStatus = {
   Paused: 3,
 };
 
-export default function JobEditForm({ job, onSave, onCancel, loading = false }: JobEditFormProps) {
+export default function JobEditForm({
+  job,
+  onSave,
+  onCancel,
+  loading = false,
+}: JobEditFormProps) {
   const [formData, setFormData] = useState<JobFormData>({
     title: "",
     description: "",
@@ -122,16 +127,23 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
         seniority: job.seniority,
         industry: job.industry || [],
         hiringTarget: job.hiringTarget,
-        goLiveDate: job.goLiveDate ? new Date(job.goLiveDate).toISOString().split('T')[0] : "",
-        expirationDate: job.expirationDate ? new Date(job.expirationDate).toISOString().split('T')[0] : "",
+        goLiveDate: job.goLiveDate
+          ? new Date(job.goLiveDate).toISOString().split("T")[0]
+          : "",
+        expirationDate: job.expirationDate
+          ? new Date(job.expirationDate).toISOString().split("T")[0]
+          : "",
         status: job.status ?? JobStatus.Draft,
         privacy_ShowJob: job.privacy_ShowJob ?? DisplayPrivacy.ToPublic,
       });
     }
   }, [job]);
 
-  const handleInputChange = (field: keyof JobFormData, value: string | number) => {
-    setFormData(prev => ({
+  const handleInputChange = (
+    field: keyof JobFormData,
+    value: string | number,
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -139,7 +151,7 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
 
   const addRequirement = () => {
     if (newRequirement.trim()) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         requirements: [...prev.requirements, newRequirement.trim()],
       }));
@@ -148,7 +160,7 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
   };
 
   const removeRequirement = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       requirements: prev.requirements.filter((_, i) => i !== index),
     }));
@@ -156,7 +168,7 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
 
   const addResponsibility = () => {
     if (newResponsibility.trim()) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         responsibilities: [...prev.responsibilities, newResponsibility.trim()],
       }));
@@ -165,7 +177,7 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
   };
 
   const removeResponsibility = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       responsibilities: prev.responsibilities.filter((_, i) => i !== index),
     }));
@@ -173,12 +185,12 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title.trim()) {
       toast.error("Job title is required");
       return;
     }
-    
+
     if (!formData.description.trim()) {
       toast.error("Job description is required");
       return;
@@ -253,16 +265,22 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
               value={newRequirement}
               onChange={(e) => setNewRequirement(e.target.value)}
               placeholder="Add a requirement..."
-              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addRequirement())}
+              onKeyPress={(e) =>
+                e.key === "Enter" && (e.preventDefault(), addRequirement())
+              }
             />
             <Button type="button" onClick={addRequirement} size="sm">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {formData.requirements.map((req, index) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
+              <Badge
+                key={index}
+                variant="secondary"
+                className="flex items-center gap-1"
+              >
                 {req}
                 <X
                   className="h-3 w-3 cursor-pointer"
@@ -288,16 +306,22 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
               value={newResponsibility}
               onChange={(e) => setNewResponsibility(e.target.value)}
               placeholder="Add a responsibility..."
-              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addResponsibility())}
+              onKeyPress={(e) =>
+                e.key === "Enter" && (e.preventDefault(), addResponsibility())
+              }
             />
             <Button type="button" onClick={addResponsibility} size="sm">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {formData.responsibilities.map((resp, index) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
+              <Badge
+                key={index}
+                variant="secondary"
+                className="flex items-center gap-1"
+              >
                 {resp}
                 <X
                   className="h-3 w-3 cursor-pointer"
@@ -323,7 +347,9 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
               <Label htmlFor="workSetting">Work Setting</Label>
               <Select
                 value={formData.workSetting.toString()}
-                onValueChange={(value) => handleInputChange("workSetting", parseInt(value))}
+                onValueChange={(value) =>
+                  handleInputChange("workSetting", parseInt(value))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -340,7 +366,9 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
               <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status?.toString() || "0"}
-                onValueChange={(value) => handleInputChange("status", parseInt(value))}
+                onValueChange={(value) =>
+                  handleInputChange("status", parseInt(value))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -362,7 +390,12 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
                 id="salary"
                 type="number"
                 value={formData.salary || ""}
-                onChange={(e) => handleInputChange("salary", e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "salary",
+                    e.target.value ? parseInt(e.target.value) : undefined,
+                  )
+                }
                 placeholder="Annual salary"
               />
             </div>
@@ -373,7 +406,12 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
                 id="bonus"
                 type="number"
                 value={formData.bonus || ""}
-                onChange={(e) => handleInputChange("bonus", e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "bonus",
+                    e.target.value ? parseInt(e.target.value) : undefined,
+                  )
+                }
                 placeholder="Annual bonus"
               />
             </div>
@@ -385,7 +423,12 @@ export default function JobEditForm({ job, onSave, onCancel, loading = false }: 
                 type="number"
                 step="0.01"
                 value={formData.equity || ""}
-                onChange={(e) => handleInputChange("equity", e.target.value ? parseFloat(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "equity",
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
+                }
                 placeholder="Equity percentage"
               />
             </div>

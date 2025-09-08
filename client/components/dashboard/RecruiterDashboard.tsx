@@ -1,17 +1,6 @@
 import React from "react";
-import {
-  Briefcase,
-  Target,
-  Calendar,
-  UserPlus,
-  Clock,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Briefcase, Target, Calendar, UserPlus, Clock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
@@ -78,7 +67,7 @@ interface RecruiterDashboardProps {
 export function RecruiterDashboard({
   dashboardData,
   loading = false,
-  onRefresh: _onRefresh
+  onRefresh: _onRefresh,
 }: RecruiterDashboardProps) {
   if (loading) {
     return (
@@ -87,12 +76,18 @@ export function RecruiterDashboard({
         <div className="h-32 bg-gray-200 rounded-lg animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 bg-gray-200 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-24 bg-gray-200 rounded-lg animate-pulse"
+            />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-64 bg-gray-200 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-64 bg-gray-200 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       </div>
@@ -102,13 +97,13 @@ export function RecruiterDashboard({
   return (
     <div className="space-y-6">
       {/* Onboarding Progress */}
-      <OnboardingProgress 
+      <OnboardingProgress
         tasks={dashboardData.onboardingTasks || []}
         loading={loading}
       />
 
       {/* Metrics Grid */}
-      <MetricGrid 
+      <MetricGrid
         metrics={dashboardData.metrics || []}
         loading={loading}
         emptyMessage="Recruitment metrics will appear here once data is available."
@@ -131,13 +126,17 @@ export function RecruiterDashboard({
                   <div className="text-2xl font-bold text-primary">
                     {dashboardData.candidateStats.totalCandidates}
                   </div>
-                  <div className="text-xs text-muted-foreground">Total Candidates</div>
+                  <div className="text-xs text-muted-foreground">
+                    Total Candidates
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
                     {dashboardData.candidateStats.newCandidates}
                   </div>
-                  <div className="text-xs text-muted-foreground">New This Month</div>
+                  <div className="text-xs text-muted-foreground">
+                    New This Month
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
@@ -149,7 +148,9 @@ export function RecruiterDashboard({
                   <div className="text-2xl font-bold text-purple-600">
                     {dashboardData.candidateStats.interviewedCandidates}
                   </div>
-                  <div className="text-xs text-muted-foreground">Interviewed</div>
+                  <div className="text-xs text-muted-foreground">
+                    Interviewed
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -171,25 +172,33 @@ export function RecruiterDashboard({
                   <div className="text-2xl font-bold text-primary">
                     {dashboardData.jobPostingStats.activeJobs}
                   </div>
-                  <div className="text-xs text-muted-foreground">Active Jobs</div>
+                  <div className="text-xs text-muted-foreground">
+                    Active Jobs
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
                     {dashboardData.jobPostingStats.totalApplications}
                   </div>
-                  <div className="text-xs text-muted-foreground">Total Applications</div>
+                  <div className="text-xs text-muted-foreground">
+                    Total Applications
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
                     {dashboardData.jobPostingStats.filledPositions}
                   </div>
-                  <div className="text-xs text-muted-foreground">Filled Positions</div>
+                  <div className="text-xs text-muted-foreground">
+                    Filled Positions
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-purple-600">
                     {dashboardData.jobPostingStats.averageTimeToFill}
                   </div>
-                  <div className="text-xs text-muted-foreground">Avg. Days to Fill</div>
+                  <div className="text-xs text-muted-foreground">
+                    Avg. Days to Fill
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -209,20 +218,37 @@ export function RecruiterDashboard({
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Placements Made</span>
-                <span className="font-semibold text-green-600">{dashboardData.recruitmentMetrics.placementsMade}</span>
+                <span className="text-sm text-muted-foreground">
+                  Placements Made
+                </span>
+                <span className="font-semibold text-green-600">
+                  {dashboardData.recruitmentMetrics.placementsMade}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Placement Rate</span>
-                <span className="font-semibold">{dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%</span>
+                <span className="text-sm text-muted-foreground">
+                  Placement Rate
+                </span>
+                <span className="font-semibold">
+                  {dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Avg. Time to Hire</span>
-                <span className="font-semibold">{dashboardData.recruitmentMetrics.averageTimeToHire} days</span>
+                <span className="text-sm text-muted-foreground">
+                  Avg. Time to Hire
+                </span>
+                <span className="font-semibold">
+                  {dashboardData.recruitmentMetrics.averageTimeToHire} days
+                </span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-sm text-muted-foreground">Cost per Hire</span>
-                <span className="font-semibold">${dashboardData.recruitmentMetrics.costPerHire.toLocaleString()}</span>
+                <span className="text-sm text-muted-foreground">
+                  Cost per Hire
+                </span>
+                <span className="font-semibold">
+                  $
+                  {dashboardData.recruitmentMetrics.costPerHire.toLocaleString()}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -240,13 +266,21 @@ export function RecruiterDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData.newCandidates && dashboardData.newCandidates.length > 0 ? (
+            {dashboardData.newCandidates &&
+            dashboardData.newCandidates.length > 0 ? (
               <div className="space-y-3">
                 {dashboardData.newCandidates.map((candidate, index) => (
-                  <div key={candidate.userId || index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div
+                    key={candidate.userId || index}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                  >
                     <div>
-                      <div className="font-medium text-sm">{candidate.name}</div>
-                      <div className="text-xs text-muted-foreground">{candidate.jobTitle}</div>
+                      <div className="font-medium text-sm">
+                        {candidate.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {candidate.jobTitle}
+                      </div>
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       New
@@ -260,7 +294,9 @@ export function RecruiterDashboard({
             ) : (
               <div className="text-center py-8">
                 <UserPlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No new candidates</p>
+                <p className="text-sm text-muted-foreground">
+                  No new candidates
+                </p>
               </div>
             )}
           </CardContent>
@@ -275,17 +311,29 @@ export function RecruiterDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {dashboardData.scheduledInterviews && dashboardData.scheduledInterviews.length > 0 ? (
+            {dashboardData.scheduledInterviews &&
+            dashboardData.scheduledInterviews.length > 0 ? (
               <div className="space-y-3">
                 {dashboardData.scheduledInterviews.map((interview, index) => (
-                  <div key={interview.id || index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div
+                    key={interview.id || index}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                  >
                     <div>
-                      <div className="font-medium text-sm">{interview.candidateName}</div>
-                      <div className="text-xs text-muted-foreground">{interview.jobTitle}</div>
+                      <div className="font-medium text-sm">
+                        {interview.candidateName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {interview.jobTitle}
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs font-medium">{interview.date}</div>
-                      <div className="text-xs text-muted-foreground">{interview.time}</div>
+                      <div className="text-xs font-medium">
+                        {interview.date}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {interview.time}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -296,7 +344,9 @@ export function RecruiterDashboard({
             ) : (
               <div className="text-center py-8">
                 <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No scheduled interviews</p>
+                <p className="text-sm text-muted-foreground">
+                  No scheduled interviews
+                </p>
               </div>
             )}
           </CardContent>
@@ -317,13 +367,17 @@ export function RecruiterDashboard({
                   <div className="text-2xl font-bold text-red-600">
                     {dashboardData.messageStats.unreadCount}
                   </div>
-                  <div className="text-xs text-muted-foreground">Unread Messages</div>
+                  <div className="text-xs text-muted-foreground">
+                    Unread Messages
+                  </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-primary">
                     {dashboardData.messageStats.totalConversations}
                   </div>
-                  <div className="text-xs text-muted-foreground">Total Conversations</div>
+                  <div className="text-xs text-muted-foreground">
+                    Total Conversations
+                  </div>
                 </div>
                 {dashboardData.messageStats.unreadCount > 0 && (
                   <Button variant="outline" size="sm" className="w-full">
@@ -342,14 +396,13 @@ export function RecruiterDashboard({
         <ActivityFeed
           activities={dashboardData.recentActivity || []}
           loading={loading}
-          onViewAll={() => {/* TODO: Implement view all activity */}}
+          onViewAll={() => {
+            /* TODO: Implement view all activity */
+          }}
         />
 
         {/* Quick Actions */}
-        <QuickActions
-          userRole="recruiter"
-          loading={loading}
-        />
+        <QuickActions userRole="recruiter" loading={loading} />
       </div>
     </div>
   );

@@ -1,11 +1,6 @@
 import React from "react";
 import { Clock } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { ActivityItem } from "@/lib/services/dashboard-service";
 
@@ -26,7 +21,7 @@ export function ActivityFeed({
   showViewAll = true,
   onViewAll,
   emptyMessage = "No recent activity",
-  maxItems = 10
+  maxItems = 10,
 }: ActivityFeedProps) {
   const displayActivities = activities.slice(0, maxItems);
 
@@ -43,7 +38,10 @@ export function ActivityFeed({
           // Loading skeleton
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
+              >
                 <div className="w-2 h-2 bg-gray-200 rounded-full mt-2 flex-shrink-0 animate-pulse" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
@@ -61,9 +59,7 @@ export function ActivityFeed({
               >
                 <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    {activity.content}
-                  </p>
+                  <p className="text-sm font-medium">{activity.content}</p>
                   <p className="text-xs text-muted-foreground">
                     {activity.time}
                   </p>
@@ -79,11 +75,7 @@ export function ActivityFeed({
               </div>
             ))}
             {showViewAll && (
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={onViewAll}
-              >
+              <Button variant="outline" className="w-full" onClick={onViewAll}>
                 View All Activity
               </Button>
             )}

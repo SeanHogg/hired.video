@@ -1,87 +1,87 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Users, 
-  CreditCard, 
-  BarChart3, 
-  Settings, 
-  Shield, 
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Users,
+  CreditCard,
+  BarChart3,
+  Settings,
+  Shield,
   TrendingUp,
   UserPlus,
   DollarSign,
   Calendar,
-  AlertCircle
-} from 'lucide-react';
+  AlertCircle,
+} from "lucide-react";
 
-import { BillingManagement } from '@/components/billing/BillingManagement';
-import { BillingAnalytics } from '@/components/billing/BillingAnalytics';
-import { usePermissions } from '@/hooks/use-permissions';
-import { useAuth } from '@/lib/auth';
+import { BillingManagement } from "@/components/billing/BillingManagement";
+import { BillingAnalytics } from "@/components/billing/BillingAnalytics";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useAuth } from "@/lib/auth";
 
 interface QuickStat {
   title: string;
   value: string;
   change: string;
-  trend: 'up' | 'down' | 'neutral';
+  trend: "up" | "down" | "neutral";
   icon: React.ReactNode;
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState("overview");
   const { user } = useAuth();
   const { isAdmin } = usePermissions();
   const isOwner = isAdmin; // For now, treat admin as owner
 
   const quickStats: QuickStat[] = [
     {
-      title: 'Team Members',
-      value: '12',
-      change: '+2 this month',
-      trend: 'up',
-      icon: <Users className="h-5 w-5" />
+      title: "Team Members",
+      value: "12",
+      change: "+2 this month",
+      trend: "up",
+      icon: <Users className="h-5 w-5" />,
     },
     {
-      title: 'Monthly Revenue',
-      value: '$2,450',
-      change: '+15% from last month',
-      trend: 'up',
-      icon: <DollarSign className="h-5 w-5" />
+      title: "Monthly Revenue",
+      value: "$2,450",
+      change: "+15% from last month",
+      trend: "up",
+      icon: <DollarSign className="h-5 w-5" />,
     },
     {
-      title: 'Active Jobs',
-      value: '34',
-      change: '+8 this week',
-      trend: 'up',
-      icon: <BarChart3 className="h-5 w-5" />
+      title: "Active Jobs",
+      value: "34",
+      change: "+8 this week",
+      trend: "up",
+      icon: <BarChart3 className="h-5 w-5" />,
     },
     {
-      title: 'Subscription',
-      value: 'Employer Plan',
-      change: 'Renews in 15 days',
-      trend: 'neutral',
-      icon: <CreditCard className="h-5 w-5" />
-    }
+      title: "Subscription",
+      value: "Employer Plan",
+      change: "Renews in 15 days",
+      trend: "neutral",
+      icon: <CreditCard className="h-5 w-5" />,
+    },
   ];
 
   const getTrendColor = (trend: string) => {
     switch (trend) {
-      case 'up':
-        return 'text-green-600';
-      case 'down':
-        return 'text-red-600';
+      case "up":
+        return "text-green-600";
+      case "down":
+        return "text-red-600";
       default:
-        return 'text-muted-foreground';
+        return "text-muted-foreground";
     }
   };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case 'up':
+      case "up":
         return <TrendingUp className="h-4 w-4" />;
-      case 'down':
+      case "down":
         return <TrendingUp className="h-4 w-4 rotate-180" />;
       default:
         return <Calendar className="h-4 w-4" />;
@@ -113,13 +113,13 @@ export default function AdminDashboard() {
             Manage your team, billing, and organization settings
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Badge variant={isOwner ? "default" : "secondary"}>
             {isOwner ? "Account Owner" : "Admin"}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Welcome back, {user?.firstName || 'Admin'}
+            Welcome back, {user?.firstName || "Admin"}
           </span>
         </div>
       </div>
@@ -127,11 +127,11 @@ export default function AdminDashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          
+
           {isAdmin && <TabsTrigger value="team">Team</TabsTrigger>}
           {isAdmin && <TabsTrigger value="billing">Billing</TabsTrigger>}
           {isAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
-          
+
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -152,7 +152,9 @@ export default function AdminDashboard() {
                       {stat.icon}
                     </div>
                   </div>
-                  <div className={`flex items-center mt-2 ${getTrendColor(stat.trend)}`}>
+                  <div
+                    className={`flex items-center mt-2 ${getTrendColor(stat.trend)}`}
+                  >
                     {getTrendIcon(stat.trend)}
                     <span className="text-sm ml-1">{stat.change}</span>
                   </div>
@@ -233,7 +235,9 @@ export default function AdminDashboard() {
                       sarah.johnson@company.com was invited as a Recruiter
                     </p>
                   </div>
-                  <span className="text-sm text-muted-foreground">2 hours ago</span>
+                  <span className="text-sm text-muted-foreground">
+                    2 hours ago
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
@@ -246,7 +250,9 @@ export default function AdminDashboard() {
                       Monthly subscription payment of $99.00 processed
                     </p>
                   </div>
-                  <span className="text-sm text-muted-foreground">1 day ago</span>
+                  <span className="text-sm text-muted-foreground">
+                    1 day ago
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
@@ -259,7 +265,9 @@ export default function AdminDashboard() {
                       You've used 85% of your monthly AI credits
                     </p>
                   </div>
-                  <span className="text-sm text-muted-foreground">3 days ago</span>
+                  <span className="text-sm text-muted-foreground">
+                    3 days ago
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -274,7 +282,8 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  Team management features have been moved to the dedicated Account Management page.
+                  Team management features have been moved to the dedicated
+                  Account Management page.
                 </p>
                 <Button asChild>
                   <a href="/account">Go to Account Management</a>
@@ -336,9 +345,12 @@ export default function AdminDashboard() {
                 {isOwner && (
                   <div className="flex items-center justify-between p-4 border rounded-lg border-red-200">
                     <div>
-                      <h3 className="font-semibold text-red-600">Danger Zone</h3>
+                      <h3 className="font-semibold text-red-600">
+                        Danger Zone
+                      </h3>
                       <p className="text-sm text-muted-foreground">
-                        Irreversible actions that affect your entire organization
+                        Irreversible actions that affect your entire
+                        organization
                       </p>
                     </div>
                     <Button variant="destructive" size="sm">

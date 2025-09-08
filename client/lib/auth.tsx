@@ -1,9 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
-import {
-  authService,
-  type UserProfile,
-} from "./services/auth-service";
+import { authService, type UserProfile } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "./user-roles";
@@ -91,7 +88,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   // Check auth consistency on every render - if we have a user but no auth token, clear the user
   useEffect(() => {
     if (user && !authService.isAuthenticated()) {
-      console.log("Auth Context: User exists but no auth token found, clearing user state");
+      console.log(
+        "Auth Context: User exists but no auth token found, clearing user state",
+      );
       setUser(null);
     }
   }, [user]);
@@ -130,19 +129,23 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
     // Listen for logout events from API client (401 errors, auth failures, etc.)
     const handleAuthLogout = () => {
-      console.log("Auth Context: Auth logout event received, clearing user state");
+      console.log(
+        "Auth Context: Auth logout event received, clearing user state",
+      );
       setUser(null);
     };
 
     // Also check localStorage periodically to detect if auth data was cleared externally
     const checkAuthConsistency = () => {
       if (user && !authService.isAuthenticated()) {
-        console.log("Auth Context: Detected auth data cleared externally, clearing user state");
+        console.log(
+          "Auth Context: Detected auth data cleared externally, clearing user state",
+        );
         setUser(null);
       }
     };
 
-    window.addEventListener('auth-logout', handleAuthLogout);
+    window.addEventListener("auth-logout", handleAuthLogout);
 
     // Check auth consistency every 1 second
     const authCheckInterval = setInterval(checkAuthConsistency, 1000);
@@ -155,7 +158,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
 
     return () => {
-      window.removeEventListener('auth-logout', handleAuthLogout);
+      window.removeEventListener("auth-logout", handleAuthLogout);
       clearInterval(authCheckInterval);
     };
   }, [initialUser]);
@@ -274,11 +277,14 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
-  const apiCall = async (url: string, options: RequestInit = {}): Promise<any> => {
+  const apiCall = async (
+    url: string,
+    options: RequestInit = {},
+  ): Promise<any> => {
     const token = authService.getToken();
 
     const headers = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };
@@ -292,8 +298,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       const errorData = await response.json().catch(() => ({}));
 
       // Handle password change required error
-      if (response.status === 403 && errorData.error?.code === 'PASSWORD_CHANGE_REQUIRED') {
-        const error = new Error('PASSWORD_CHANGE_REQUIRED');
+      if (
+        response.status === 403 &&
+        errorData.error?.code === "PASSWORD_CHANGE_REQUIRED"
+      ) {
+        const error = new Error("PASSWORD_CHANGE_REQUIRED");
         (error as any).response = errorData;
         throw error;
       }
@@ -301,7 +310,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       // Handle other authentication errors
       if (response.status === 401) {
         await logout();
-        throw new Error('Authentication required');
+        throw new Error("Authentication required");
       }
 
       throw new Error(errorData.error?.message || `HTTP ${response.status}`);

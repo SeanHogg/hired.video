@@ -62,14 +62,16 @@ export default function Sidebar({
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
     // Admin only navigation
-    ...(isAdmin ? [
-      {
-        name: "Product Dashboard",
-        href: "/admin/product-dashboard",
-        icon: BarChart3,
-        exactMatch: false
-      }
-    ] : []),
+    ...(isAdmin
+      ? [
+          {
+            name: "Product Dashboard",
+            href: "/admin/product-dashboard",
+            icon: BarChart3,
+            exactMatch: false,
+          },
+        ]
+      : []),
   ];
 
   // Helper function to determine if a menu item is active
@@ -85,13 +87,14 @@ export default function Sidebar({
 
     // Special handling for tools - match both /tools and /Tools paths
     if (item.href === "/tools") {
-      return location.pathname.startsWith("/tools") || location.pathname.startsWith("/Tools");
+      return (
+        location.pathname.startsWith("/tools") ||
+        location.pathname.startsWith("/Tools")
+      );
     }
 
     return location.pathname.startsWith(item.href);
   };
-
-
 
   return (
     <>
@@ -171,8 +174,6 @@ export default function Sidebar({
                 ))}
               </nav>
             </div>
-
-
           </div>
 
           {/* Footer */}

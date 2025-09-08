@@ -1,13 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  Briefcase, 
-  Building2, 
-  FileText, 
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Users,
+  Briefcase,
+  Building2,
+  FileText,
   UserCheck,
   TrendingUp,
   TrendingDown,
@@ -16,11 +22,23 @@ import {
   Activity,
   DollarSign,
   BarChart3,
-  PieChart
-} from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+  PieChart,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 interface ProductDashboardData {
   userMetrics: {
@@ -83,22 +101,31 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   change?: string;
-  trend?: 'up' | 'down' | 'neutral';
+  trend?: "up" | "down" | "neutral";
   icon: React.ReactNode;
   description?: string;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, trend, icon, description }) => {
+const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  value,
+  change,
+  trend,
+  icon,
+  description,
+}) => {
   const getTrendIcon = () => {
-    if (trend === 'up') return <TrendingUp className="h-4 w-4 text-green-500" />;
-    if (trend === 'down') return <TrendingDown className="h-4 w-4 text-red-500" />;
+    if (trend === "up")
+      return <TrendingUp className="h-4 w-4 text-green-500" />;
+    if (trend === "down")
+      return <TrendingDown className="h-4 w-4 text-red-500" />;
     return null;
   };
 
   const getTrendColor = () => {
-    if (trend === 'up') return 'text-green-600';
-    if (trend === 'down') return 'text-red-600';
-    return 'text-muted-foreground';
+    if (trend === "up") return "text-green-600";
+    if (trend === "down") return "text-red-600";
+    return "text-muted-foreground";
   };
 
   return (
@@ -108,7 +135,9 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, trend, ic
         {icon}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{typeof value === 'number' ? value.toLocaleString() : value}</div>
+        <div className="text-2xl font-bold">
+          {typeof value === "number" ? value.toLocaleString() : value}
+        </div>
         {change && (
           <div className={`flex items-center text-xs ${getTrendColor()}`}>
             {getTrendIcon()}
@@ -123,17 +152,16 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, trend, ic
   );
 };
 
-
-
 export default function ProductDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardData, setDashboardData] = useState<ProductDashboardData | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [dashboardData, setDashboardData] =
+    useState<ProductDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
   // Check if user is SuperAdmin
-  const isAdmin = user?.role === 'Employer'; // Employer users have admin-like capabilities
+  const isAdmin = user?.role === "Employer"; // Employer users have admin-like capabilities
 
   useEffect(() => {
     if (isAdmin) {
@@ -144,48 +172,48 @@ export default function ProductDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/ProductDashboard', {
+      const response = await fetch("/api/ProductDashboard", {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load dashboard data');
+        throw new Error("Failed to load dashboard data");
       }
 
       const result = await response.json();
       setDashboardData(result.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
   };
 
-  const exportData = async (format: 'csv') => {
+  const exportData = async (format: "csv") => {
     try {
       const response = await fetch(`/api/ProductDashboard/export/${format}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to export data');
+        throw new Error("Failed to export data");
       }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
+      const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
-      a.download = `product-dashboard-${new Date().toISOString().split('T')[0]}.${format}`;
+      a.download = `product-dashboard-${new Date().toISOString().split("T")[0]}.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Export failed:', err);
+      console.error("Export failed:", err);
     }
   };
 
@@ -246,12 +274,12 @@ export default function ProductDashboard() {
             System-wide analytics and metrics for platform administration
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Badge variant="default" className="bg-purple-600">
             Super Admin
           </Badge>
-          <Button variant="outline" onClick={() => exportData('csv')}>
+          <Button variant="outline" onClick={() => exportData("csv")}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
@@ -322,7 +350,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#8884d8"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -341,7 +374,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#82ca9d" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#82ca9d"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -375,29 +413,50 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Account Types Distribution</CardTitle>
-                <CardDescription>Distribution of paid and free accounts by role</CardDescription>
+                <CardDescription>
+                  Distribution of paid and free accounts by role
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPieChart>
                       <Pie
-                        data={Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => ({
-                          name: role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        data={Object.entries(
+                          dashboardData.userMetrics.usersByRole,
+                        ).map(([role, count]) => ({
+                          name: role
+                            .replace("_", " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase()),
                           value: count,
-                          isPaid: role === 'employer' || role === 'recruiter' // Assume employer and recruiter are paid
+                          isPaid: role === "employer" || role === "recruiter", // Assume employer and recruiter are paid
                         }))}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, value, percent }) =>
+                          `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                        }
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {Object.entries(dashboardData.userMetrics.usersByRole).map((entry, index) => {
-                          const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        {Object.entries(
+                          dashboardData.userMetrics.usersByRole,
+                        ).map((entry, index) => {
+                          const colors = [
+                            "#0088FE",
+                            "#00C49F",
+                            "#FFBB28",
+                            "#FF8042",
+                            "#8884D8",
+                          ];
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={colors[index % colors.length]}
+                            />
+                          );
                         })}
                       </Pie>
                       <Tooltip
@@ -409,22 +468,36 @@ export default function ProductDashboard() {
                   </ResponsiveContainer>
                 </div>
                 <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium">Account Status Summary:</div>
-                  {Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => {
-                    const isPaid = role === 'employer' || role === 'recruiter';
-                    return (
-                      <div key={role} className="flex justify-between items-center text-sm">
-                        <span className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${isPaid ? 'bg-green-500' : 'bg-gray-400'}`} />
-                          {role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          <span className={`px-2 py-1 rounded-full text-xs ${isPaid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                            {isPaid ? 'Paid' : 'Free'}
+                  <div className="text-sm font-medium">
+                    Account Status Summary:
+                  </div>
+                  {Object.entries(dashboardData.userMetrics.usersByRole).map(
+                    ([role, count]) => {
+                      const isPaid =
+                        role === "employer" || role === "recruiter";
+                      return (
+                        <div
+                          key={role}
+                          className="flex justify-between items-center text-sm"
+                        >
+                          <span className="flex items-center gap-2">
+                            <div
+                              className={`w-3 h-3 rounded-full ${isPaid ? "bg-green-500" : "bg-gray-400"}`}
+                            />
+                            {role
+                              .replace("_", " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${isPaid ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+                            >
+                              {isPaid ? "Paid" : "Free"}
+                            </span>
                           </span>
-                        </span>
-                        <span className="font-medium">{count}</span>
-                      </div>
-                    );
-                  })}
+                          <span className="font-medium">{count}</span>
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -432,7 +505,9 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>User Growth Trend</CardTitle>
-                <CardDescription>90-day user registration trend</CardDescription>
+                <CardDescription>
+                  90-day user registration trend
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -442,7 +517,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#8884d8"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -476,16 +556,23 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Jobs by Status</CardTitle>
-                <CardDescription>Current job status distribution</CardDescription>
+                <CardDescription>
+                  Current job status distribution
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(([status, count]) => (
-                    <div key={status} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{status}</span>
-                      <Badge variant="secondary">{count}</Badge>
-                    </div>
-                  ))}
+                  {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(
+                    ([status, count]) => (
+                      <div
+                        key={status}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-sm font-medium">{status}</span>
+                        <Badge variant="secondary">{count}</Badge>
+                      </div>
+                    ),
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -503,7 +590,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#82ca9d" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#82ca9d"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -541,8 +633,13 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {Object.entries(dashboardData.companyMetrics.companiesBySize).map(([size, count]) => (
-                    <div key={size} className="flex justify-between items-center">
+                  {Object.entries(
+                    dashboardData.companyMetrics.companiesBySize,
+                  ).map(([size, count]) => (
+                    <div
+                      key={size}
+                      className="flex justify-between items-center"
+                    >
                       <span className="text-sm font-medium">{size}</span>
                       <Badge variant="secondary">{count}</Badge>
                     </div>
@@ -554,7 +651,9 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Company Growth Trend</CardTitle>
-                <CardDescription>90-day company registration trend</CardDescription>
+                <CardDescription>
+                  90-day company registration trend
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -564,7 +663,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#ffc658" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#ffc658"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -602,8 +706,13 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {Object.entries(dashboardData.resumeMetrics.resumesByType).map(([type, count]) => (
-                    <div key={type} className="flex justify-between items-center">
+                  {Object.entries(
+                    dashboardData.resumeMetrics.resumesByType,
+                  ).map(([type, count]) => (
+                    <div
+                      key={type}
+                      className="flex justify-between items-center"
+                    >
                       <span className="text-sm font-medium">{type}</span>
                       <Badge variant="secondary">{count}</Badge>
                     </div>
@@ -625,7 +734,12 @@ export default function ProductDashboard() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="count" stroke="#ff7300" strokeWidth={2} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="#ff7300"
+                      strokeWidth={2}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -638,8 +752,8 @@ export default function ProductDashboard() {
             <MetricCard
               title="MRR"
               value={`$${dashboardData.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`}
-              change={`${dashboardData.saasMetrics.growthRate > 0 ? '+' : ''}${dashboardData.saasMetrics.growthRate.toFixed(1)}%`}
-              trend={dashboardData.saasMetrics.growthRate > 0 ? 'up' : 'down'}
+              change={`${dashboardData.saasMetrics.growthRate > 0 ? "+" : ""}${dashboardData.saasMetrics.growthRate.toFixed(1)}%`}
+              trend={dashboardData.saasMetrics.growthRate > 0 ? "up" : "down"}
               icon={<DollarSign className="h-4 w-4" />}
               description="Monthly Recurring Revenue"
             />
@@ -658,7 +772,7 @@ export default function ProductDashboard() {
             <MetricCard
               title="Churn Rate"
               value={`${dashboardData.saasMetrics.churnRate.toFixed(1)}%`}
-              trend={dashboardData.saasMetrics.churnRate < 5 ? 'up' : 'down'}
+              trend={dashboardData.saasMetrics.churnRate < 5 ? "up" : "down"}
               icon={<TrendingDown className="h-4 w-4" />}
               description="Monthly churn rate"
             />
@@ -695,16 +809,25 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Revenue by Tier</CardTitle>
-                <CardDescription>Monthly revenue breakdown by subscription tier</CardDescription>
+                <CardDescription>
+                  Monthly revenue breakdown by subscription tier
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {Object.entries(dashboardData.saasMetrics.revenueByTier).map(([tier, revenue]) => (
-                    <div key={tier} className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{tier}</span>
-                      <Badge variant="secondary">${revenue.toLocaleString()}</Badge>
-                    </div>
-                  ))}
+                  {Object.entries(dashboardData.saasMetrics.revenueByTier).map(
+                    ([tier, revenue]) => (
+                      <div
+                        key={tier}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-sm font-medium">{tier}</span>
+                        <Badge variant="secondary">
+                          ${revenue.toLocaleString()}
+                        </Badge>
+                      </div>
+                    ),
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -712,35 +835,59 @@ export default function ProductDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Revenue Distribution by Account Type</CardTitle>
-                <CardDescription>Financial breakdown of paid accounts</CardDescription>
+                <CardDescription>
+                  Financial breakdown of paid accounts
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsPieChart>
                       <Pie
-                        data={Object.entries(dashboardData.saasMetrics.revenueByTier).map(([tier, revenue]) => ({
-                          name: tier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        data={Object.entries(
+                          dashboardData.saasMetrics.revenueByTier,
+                        ).map(([tier, revenue]) => ({
+                          name: tier
+                            .replace("_", " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase()),
                           value: revenue,
-                          subscriptions: dashboardData.saasMetrics.subscriptionsByTier[tier] || 0
+                          subscriptions:
+                            dashboardData.saasMetrics.subscriptionsByTier[
+                              tier
+                            ] || 0,
                         }))}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, value, percent }) => `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(1)}%)`}
+                        label={({ name, value, percent }) =>
+                          `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(1)}%)`
+                        }
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {Object.entries(dashboardData.saasMetrics.revenueByTier).map((entry, index) => {
-                          const colors = ['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#8884D8'];
-                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        {Object.entries(
+                          dashboardData.saasMetrics.revenueByTier,
+                        ).map((entry, index) => {
+                          const colors = [
+                            "#00C49F",
+                            "#0088FE",
+                            "#FFBB28",
+                            "#FF8042",
+                            "#8884D8",
+                          ];
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={colors[index % colors.length]}
+                            />
+                          );
                         })}
                       </Pie>
                       <Tooltip
                         formatter={(value, name, props) => [
                           `$${value.toLocaleString()}`,
-                          `${name} (${props.payload.subscriptions} accounts)`
+                          `${name} (${props.payload.subscriptions} accounts)`,
                         ]}
                         labelFormatter={(label) => `Revenue from ${label}`}
                       />
@@ -750,19 +897,28 @@ export default function ProductDashboard() {
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="text-sm font-medium">Subscription Tiers:</div>
-                  {Object.entries(dashboardData.saasMetrics.subscriptionsByTier).map(([tier, count]) => {
-                    const revenue = dashboardData.saasMetrics.revenueByTier[tier] || 0;
+                  {Object.entries(
+                    dashboardData.saasMetrics.subscriptionsByTier,
+                  ).map(([tier, count]) => {
+                    const revenue =
+                      dashboardData.saasMetrics.revenueByTier[tier] || 0;
                     const avgRevenue = count > 0 ? revenue / count : 0;
                     return (
-                      <div key={tier} className="flex justify-between items-center text-sm">
+                      <div
+                        key={tier}
+                        className="flex justify-between items-center text-sm"
+                      >
                         <span className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full bg-blue-500" />
-                          {tier.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          {tier
+                            .replace("_", " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase())}
                         </span>
                         <div className="text-right">
                           <div className="font-medium">{count} accounts</div>
                           <div className="text-xs text-muted-foreground">
-                            ${revenue.toLocaleString()} total (${avgRevenue.toFixed(0)}/avg)
+                            ${revenue.toLocaleString()} total ($
+                            {avgRevenue.toFixed(0)}/avg)
                           </div>
                         </div>
                       </div>

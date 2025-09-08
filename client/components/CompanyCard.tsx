@@ -118,23 +118,26 @@ export default function CompanyCard({
       text: "Following",
       variant: "outline" as const,
       className: "text-xs bg-blue-50 text-blue-700",
-      icon: UserCheck
+      icon: UserCheck,
     });
   }
 
-  if (canEdit && (company.status === "draft" || company.status === "onboarding")) {
+  if (
+    canEdit &&
+    (company.status === "draft" || company.status === "onboarding")
+  ) {
     badges.push({
       text: "Setup Required",
       variant: "outline" as const,
       className: "text-xs bg-orange-50 text-orange-700",
-      icon: AlertCircle
+      icon: AlertCircle,
     });
   }
 
   badges.push({
     text: company.status,
     variant: "secondary" as const,
-    className: getStatusColor(company.status)
+    className: getStatusColor(company.status),
   });
 
   if (getVisibilityIcon(company.visibility)) {
@@ -142,47 +145,53 @@ export default function CompanyCard({
       text: "",
       variant: "outline" as const,
       className: "text-xs",
-      icon: () => getVisibilityIcon(company.visibility)
+      icon: () => getVisibilityIcon(company.visibility),
     });
   }
 
   // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const cardActions = (actions && actions.length > 0) ? actions : [
-    {
-      id: "view",
-      label: "View",
-      variant: "outline" as const,
-      icon: Eye,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/companies/${company.id}`;
-        }
-      }
-    },
-    {
-      id: "share",
-      label: "Share",
-      variant: "default" as const,
-      icon: Share,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          // Default share functionality - copy link to clipboard
-          const url = `${window.location.origin}/companies/${company.id}`;
-          navigator.clipboard.writeText(url).then(() => {
-            // Could show a toast notification here
-            alert('Company link copied to clipboard!');
-          }).catch(() => {
-            // Fallback for older browsers
-            prompt('Copy this link:', url);
-          });
-        }
-      }
-    }
-  ];
+  const cardActions =
+    actions && actions.length > 0
+      ? actions
+      : [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => {
+              if (onView) {
+                onView();
+              } else {
+                window.location.href = `/companies/${company.id}`;
+              }
+            },
+          },
+          {
+            id: "share",
+            label: "Share",
+            variant: "default" as const,
+            icon: Share,
+            onClick: () => {
+              if (onActions) {
+                onActions();
+              } else {
+                // Default share functionality - copy link to clipboard
+                const url = `${window.location.origin}/companies/${company.id}`;
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => {
+                    // Could show a toast notification here
+                    alert("Company link copied to clipboard!");
+                  })
+                  .catch(() => {
+                    // Fallback for older browsers
+                    prompt("Copy this link:", url);
+                  });
+              }
+            },
+          },
+        ];
 
   return (
     <BaseCard>
@@ -192,7 +201,7 @@ export default function CompanyCard({
         avatar={{
           src: company.logo,
           fallback: company.name.substring(0, 2).toUpperCase(),
-          size: "md"
+          size: "md",
         }}
         badges={badges}
         linkTo={`/companies/${company.id}`}
@@ -202,19 +211,19 @@ export default function CompanyCard({
         <div className="space-y-3">
           {/* Company Details */}
           <div className="flex items-center flex-wrap gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1 min-w-0">
-                  <Building2 className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{company.industry}</span>
-                </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  <Users className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{company.size}</span>
-                </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  <MapPin className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{company.location}</span>
-                </div>
-              </div>
+            <div className="flex items-center gap-1 min-w-0">
+              <Building2 className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{company.industry}</span>
+            </div>
+            <div className="flex items-center gap-1 min-w-0">
+              <Users className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{company.size}</span>
+            </div>
+            <div className="flex items-center gap-1 min-w-0">
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{company.location}</span>
+            </div>
+          </div>
 
           {/* Visibility (status is already shown in header) */}
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -226,20 +235,20 @@ export default function CompanyCard({
           </div>
         </div>
 
-          {/* Onboarding Progress */}
-          {onboardingStatus.show && canEdit && (
-            <div className="mt-3 p-3 bg-orange-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-orange-900">
-                  Company Setup
-                </span>
-                <span className="text-xs text-orange-700">
-                  {onboardingStatus.message}
-                </span>
-              </div>
-              <Progress value={onboardingStatus.progress} className="h-2" />
+        {/* Onboarding Progress */}
+        {onboardingStatus.show && canEdit && (
+          <div className="mt-3 p-3 bg-orange-50 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-orange-900">
+                Company Setup
+              </span>
+              <span className="text-xs text-orange-700">
+                {onboardingStatus.message}
+              </span>
             </div>
-          )}
+            <Progress value={onboardingStatus.progress} className="h-2" />
+          </div>
+        )}
         <div className="space-y-3">
           {/* Job Statistics */}
           <div className="grid grid-cols-2 gap-4 text-sm">

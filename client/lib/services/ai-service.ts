@@ -39,8 +39,6 @@ export interface BackendChatResponse {
   };
 }
 
-
-
 // ============================================================================
 // AI SERVICE CLASS
 // ============================================================================
@@ -62,7 +60,9 @@ class AIService {
 
       // Extract user message and history
       const userMessage = messages[messages.length - 1]?.content || "";
-      const history = messages.slice(0, -1).filter(msg => msg.role !== "system");
+      const history = messages
+        .slice(0, -1)
+        .filter((msg) => msg.role !== "system");
 
       const requestData = {
         message: userMessage,
@@ -71,7 +71,10 @@ class AIService {
         temperature: options?.temperature,
       };
 
-      const response = await apiClient.post<BackendChatResponse>("/api/chat/message", requestData);
+      const response = await apiClient.post<BackendChatResponse>(
+        "/api/chat/message",
+        requestData,
+      );
 
       if (!response.data) {
         throw new Error("Invalid response from backend AI API");
@@ -192,8 +195,6 @@ Keep responses concise but informative, using bullet points and emojis to improv
 
     return this.sendChatMessage(messages);
   }
-
-
 }
 
 // ============================================================================
@@ -221,7 +222,9 @@ export async function sendHRMessage(
  */
 export function isAIServiceConfigured(): boolean {
   try {
-    logger.info("AI service configuration check - backend handles AI configuration");
+    logger.info(
+      "AI service configuration check - backend handles AI configuration",
+    );
     return true; // Backend handles AI configuration
   } catch (error) {
     logger.error("Error checking AI service configuration", error);

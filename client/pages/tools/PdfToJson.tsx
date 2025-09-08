@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { ArrowLeft, FileText, Loader2, Upload, Download, Code } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Loader2,
+  Upload,
+  Download,
+  Code,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,7 +49,7 @@ export default function PdfToJson() {
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ];
-      
+
       if (!allowedTypes.includes(selectedFile.type)) {
         setError("Please upload a PDF or Word document.");
         return;
@@ -88,12 +95,13 @@ export default function PdfToJson() {
       }
 
       const result = await response.json();
-      
+
       // Format the JSON result nicely
-      const formattedJson = typeof result.result === 'string' 
-        ? result.result 
-        : JSON.stringify(result.result, null, 2);
-      
+      const formattedJson =
+        typeof result.result === "string"
+          ? result.result
+          : JSON.stringify(result.result, null, 2);
+
       setJsonResult(formattedJson);
     } catch (err) {
       console.error("Conversion failed:", err);
@@ -175,7 +183,7 @@ export default function PdfToJson() {
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-brand-orange/10 rounded-lg flex items-center justify-center">
                   <Code className="h-6 w-6 text-brand-orange" />
@@ -186,7 +194,10 @@ export default function PdfToJson() {
                     Convert PDF and Word documents to structured JSON format
                   </p>
                 </div>
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                <Badge
+                  variant="secondary"
+                  className="bg-orange-100 text-orange-800"
+                >
                   Beta
                 </Badge>
               </div>
@@ -199,10 +210,14 @@ export default function PdfToJson() {
                       <FileText className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-blue-900 mb-1">How it works</h3>
+                      <h3 className="font-semibold text-blue-900 mb-1">
+                        How it works
+                      </h3>
                       <p className="text-sm text-blue-800">
-                        Our AI-powered converter extracts text and structure from your documents and converts them into 
-                        JSON Resume format, making them compatible with modern resume builders and ATS systems.
+                        Our AI-powered converter extracts text and structure
+                        from your documents and converts them into JSON Resume
+                        format, making them compatible with modern resume
+                        builders and ATS systems.
                       </p>
                     </div>
                   </div>
@@ -234,7 +249,10 @@ export default function PdfToJson() {
                           className="hidden"
                           id="document-upload"
                         />
-                        <label htmlFor="document-upload" className="cursor-pointer">
+                        <label
+                          htmlFor="document-upload"
+                          className="cursor-pointer"
+                        >
                           <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                           <p className="text-lg font-medium mb-2">
                             Click to upload or drag and drop
@@ -263,7 +281,7 @@ export default function PdfToJson() {
                       </div>
                     )}
 
-                    <Button 
+                    <Button
                       onClick={handleConversion}
                       disabled={isConverting || !file}
                       className="w-full"
@@ -331,10 +349,18 @@ export default function PdfToJson() {
                           JSON Result
                         </CardTitle>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={copyToClipboard}
+                          >
                             Copy
                           </Button>
-                          <Button variant="outline" size="sm" onClick={downloadJson}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={downloadJson}
+                          >
                             <Download className="h-4 w-4 mr-2" />
                             Download
                           </Button>
@@ -347,21 +373,25 @@ export default function PdfToJson() {
                           {jsonResult}
                         </pre>
                       </div>
-                      
+
                       <div className="flex gap-2 mt-4">
                         <Button variant="outline" onClick={resetConverter}>
                           Convert Another
                         </Button>
-                        <Button 
+                        <Button
                           onClick={() => {
                             // Create a resume from this JSON
-                            const blob = new Blob([jsonResult], { type: "application/json" });
-                            const file = new File([blob], "resume.json", { type: "application/json" });
-                            
+                            const blob = new Blob([jsonResult], {
+                              type: "application/json",
+                            });
+                            const file = new File([blob], "resume.json", {
+                              type: "application/json",
+                            });
+
                             // Navigate to resume creation with this file
                             const formData = new FormData();
                             formData.append("file", file);
-                            
+
                             // This would typically redirect to resume builder
                             window.location.href = "/resumes/builder/new";
                           }}
@@ -379,9 +409,10 @@ export default function PdfToJson() {
                       <Code className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="font-semibold mb-2">Ready to Convert</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Upload a PDF or Word document to convert it to structured JSON format.
+                        Upload a PDF or Word document to convert it to
+                        structured JSON format.
                       </p>
-                      
+
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
                         <h4 className="font-medium mb-2">What you'll get:</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">

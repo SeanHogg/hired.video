@@ -357,8 +357,6 @@ export default function PeopleDetail() {
     }
   };
 
-
-
   const currentPosition = person.data.experience.find((exp) => exp.isCurrent);
 
   return (
@@ -432,7 +430,11 @@ export default function PeopleDetail() {
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
                               <span>
-                                {getRoleDisplayLabel((person as any).role || (person as any).roleSelected || "JobSeeker")}
+                                {getRoleDisplayLabel(
+                                  (person as any).role ||
+                                    (person as any).roleSelected ||
+                                    "JobSeeker",
+                                )}
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -999,7 +1001,8 @@ export default function PeopleDetail() {
                           Member since
                         </span>
                         <span>
-                          {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
+                          {person.createdAt &&
+                          !isNaN(new Date(person.createdAt).getTime())
                             ? new Date(person.createdAt).toLocaleDateString()
                             : "Unknown"}
                         </span>
@@ -1010,8 +1013,10 @@ export default function PeopleDetail() {
                         </span>
                         <span>
                           {(() => {
-                            const lastActive = (person as any).lastActiveAt || person.updatedAt;
-                            return lastActive && !isNaN(new Date(lastActive).getTime())
+                            const lastActive =
+                              (person as any).lastActiveAt || person.updatedAt;
+                            return lastActive &&
+                              !isNaN(new Date(lastActive).getTime())
                               ? new Date(lastActive).toLocaleDateString()
                               : "Unknown";
                           })()}

@@ -7,7 +7,10 @@ interface SentimentRecommendationsProps {
   className?: string;
 }
 
-export default function SentimentRecommendations({ score, className = "" }: SentimentRecommendationsProps) {
+export default function SentimentRecommendations({
+  score,
+  className = "",
+}: SentimentRecommendationsProps) {
   const interpretation = sentimentService.interpretSentiment(score);
 
   return (

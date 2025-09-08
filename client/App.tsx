@@ -156,133 +156,222 @@ const App = () => (
           <CartProvider>
             <AIProvider>
               <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Signup />} />
-                  <Route path="/signup-success" element={<SignupSuccess />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/confirm-email" element={<ConfirmEmail />} />
-                  <Route path="/accept-invitation" element={<AcceptInvitation />} />
-                  <Route
-                    path="/persona-selection"
-                    element={<PersonaSelection />}
-                  />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/onboarding" element={<Onboarding />} />
-                  <Route
-                    path="/features"
-                    element={<Navigate to="/pricing" replace />}
-                  />
-                  <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/for-recruiters" element={<ForRecruiters />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/careers" element={<Careers />} />
-                  <Route path="/resumes" element={<Resumes />} />
-                  <Route
-                    path="/resumes/upload"
-                    element={<ResumeUploadPage />}
-                  />
-                  <Route
-                    path="/resumes/create/:id"
-                    element={<ResumeCreatePage />}
-                  />
-                  <Route
-                    path="/resumes/edit/:id"
-                    element={<ResumeEditPage />}
-                  />
-                  <Route path="/resumes/:id" element={<ResumeDetail />} />
-                  <Route path="/jobs" element={<Jobs />} />
-                  <Route path="/jobs/create" element={<JobCreatePage />} />
-                  <Route path="/jobs/create/:id" element={<JobCreatePage />} />
-                  <Route path="/jobs/edit/:id" element={<JobEditPage />} />
-                  <Route path="/jobs/:id" element={<JobDetail />} />
-                  {/* Redirect old upload route to unified create page */}
-                  <Route path="/jobs/upload" element={<Navigate to="/jobs/create" replace />} />
-                  <Route path="/companies" element={<Companies />} />
-                  <Route
-                    path="/companies/create"
-                    element={<CompanyCreatePage />}
-                  />
-                  <Route
-                    path="/companies/create/:id"
-                    element={<CompanyCreatePage />}
-                  />
-                  <Route
-                    path="/companies/edit/:id"
-                    element={<CompanyEditPage />}
-                  />
-                  <Route path="/companies/:id" element={<CompanyDetail />} />
-                  <Route path="/people" element={<People />} />
-                  <Route path="/people/:id" element={<PeopleDetail />} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/tools" element={<Tools />} />
-                  <Route path="/Tools/SentimentAnalysis" element={<SentimentAnalysis />} />
-                  <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
-                  <Route path="/Tools/JobResumeMatch" element={<JobResumeMatch />} />
-                  <Route path="/tools/job-resume-match" element={<JobResumeMatch />} />
-                  <Route path="/Tools/SummarizeResume" element={<SummarizeResume />} />
-                  <Route path="/tools/summarize-resume" element={<SummarizeResume />} />
-                  <Route path="/Tools/pdftojson" element={<PdfToJson />} />
-                  <Route path="/tools/pdf-to-json" element={<PdfToJson />} />
-                  <Route path="/Tools/ResumeOptimizer" element={<ResumeOptimizer />} />
-                  <Route path="/tools/resume-optimizer" element={<ResumeOptimizer />} />
-                  <Route path="/Tools/SalaryCalculator" element={<SalaryCalculator />} />
-                  <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
-                  <Route path="/Tools/AIResumeScorer" element={<AIResumeScorer />} />
-                  <Route path="/tools/ai-resume-scorer" element={<AIResumeScorer />} />
-                  <Route path="/Tools/ValueProposition" element={<ValueProposition />} />
-                  <Route path="/tools/value-proposition" element={<ValueProposition />} />
-                  <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/outreach" element={<Outreach />} />
-                  <Route path="/account" element={<AccountManagement />} />
-                  <Route path="/admin/product-dashboard" element={<ProductDashboard />} />
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/signup" element={<Signup />} />
+                      <Route
+                        path="/signup-success"
+                        element={<SignupSuccess />}
+                      />
+                      <Route
+                        path="/forgot-password"
+                        element={<ForgotPassword />}
+                      />
+                      <Route
+                        path="/reset-password"
+                        element={<ResetPassword />}
+                      />
+                      <Route path="/confirm-email" element={<ConfirmEmail />} />
+                      <Route
+                        path="/accept-invitation"
+                        element={<AcceptInvitation />}
+                      />
+                      <Route
+                        path="/persona-selection"
+                        element={<PersonaSelection />}
+                      />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/onboarding" element={<Onboarding />} />
+                      <Route
+                        path="/features"
+                        element={<Navigate to="/pricing" replace />}
+                      />
+                      <Route path="/pricing" element={<Pricing />} />
+                      <Route
+                        path="/for-recruiters"
+                        element={<ForRecruiters />}
+                      />
+                      <Route path="/about" element={<About />} />
+                      <Route path="/careers" element={<Careers />} />
+                      <Route path="/resumes" element={<Resumes />} />
+                      <Route
+                        path="/resumes/upload"
+                        element={<ResumeUploadPage />}
+                      />
+                      <Route
+                        path="/resumes/create/:id"
+                        element={<ResumeCreatePage />}
+                      />
+                      <Route
+                        path="/resumes/edit/:id"
+                        element={<ResumeEditPage />}
+                      />
+                      <Route path="/resumes/:id" element={<ResumeDetail />} />
+                      <Route path="/jobs" element={<Jobs />} />
+                      <Route path="/jobs/create" element={<JobCreatePage />} />
+                      <Route
+                        path="/jobs/create/:id"
+                        element={<JobCreatePage />}
+                      />
+                      <Route path="/jobs/edit/:id" element={<JobEditPage />} />
+                      <Route path="/jobs/:id" element={<JobDetail />} />
+                      {/* Redirect old upload route to unified create page */}
+                      <Route
+                        path="/jobs/upload"
+                        element={<Navigate to="/jobs/create" replace />}
+                      />
+                      <Route path="/companies" element={<Companies />} />
+                      <Route
+                        path="/companies/create"
+                        element={<CompanyCreatePage />}
+                      />
+                      <Route
+                        path="/companies/create/:id"
+                        element={<CompanyCreatePage />}
+                      />
+                      <Route
+                        path="/companies/edit/:id"
+                        element={<CompanyEditPage />}
+                      />
+                      <Route
+                        path="/companies/:id"
+                        element={<CompanyDetail />}
+                      />
+                      <Route path="/people" element={<People />} />
+                      <Route path="/people/:id" element={<PeopleDetail />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/tools" element={<Tools />} />
+                      <Route
+                        path="/Tools/SentimentAnalysis"
+                        element={<SentimentAnalysis />}
+                      />
+                      <Route
+                        path="/tools/sentiment-analysis"
+                        element={<SentimentAnalysis />}
+                      />
+                      <Route
+                        path="/Tools/JobResumeMatch"
+                        element={<JobResumeMatch />}
+                      />
+                      <Route
+                        path="/tools/job-resume-match"
+                        element={<JobResumeMatch />}
+                      />
+                      <Route
+                        path="/Tools/SummarizeResume"
+                        element={<SummarizeResume />}
+                      />
+                      <Route
+                        path="/tools/summarize-resume"
+                        element={<SummarizeResume />}
+                      />
+                      <Route path="/Tools/pdftojson" element={<PdfToJson />} />
+                      <Route
+                        path="/tools/pdf-to-json"
+                        element={<PdfToJson />}
+                      />
+                      <Route
+                        path="/Tools/ResumeOptimizer"
+                        element={<ResumeOptimizer />}
+                      />
+                      <Route
+                        path="/tools/resume-optimizer"
+                        element={<ResumeOptimizer />}
+                      />
+                      <Route
+                        path="/Tools/SalaryCalculator"
+                        element={<SalaryCalculator />}
+                      />
+                      <Route
+                        path="/tools/salary-calculator"
+                        element={<SalaryCalculator />}
+                      />
+                      <Route
+                        path="/Tools/AIResumeScorer"
+                        element={<AIResumeScorer />}
+                      />
+                      <Route
+                        path="/tools/ai-resume-scorer"
+                        element={<AIResumeScorer />}
+                      />
+                      <Route
+                        path="/Tools/ValueProposition"
+                        element={<ValueProposition />}
+                      />
+                      <Route
+                        path="/tools/value-proposition"
+                        element={<ValueProposition />}
+                      />
+                      <Route path="/tasks" element={<Tasks />} />
+                      <Route path="/outreach" element={<Outreach />} />
+                      <Route path="/account" element={<AccountManagement />} />
+                      <Route
+                        path="/admin/product-dashboard"
+                        element={<ProductDashboard />}
+                      />
 
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/help" element={<Help />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/insights/privacy-policy" element={<PrivacyPolicy />} />
-                  <Route path="/terms" element={<TermsOfService />} />
-                  <Route
-                    path="/terms-of-service"
-                    element={<TermsOfService />}
-                  />
-                  <Route path="/insights/terms-of-service" element={<TermsOfService />} />
-                  <Route path="/insights/terms-of-use" element={<TermsOfService />} />
-                  <Route path="/insights/how-to-use-job-match-analysis-tool" element={<Navigate to="/Tools/JobResumeMatch" replace />} />
-                  <Route path="/cookies" element={<CookiePolicy />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/help" element={<Help />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route
+                        path="/privacy-policy"
+                        element={<PrivacyPolicy />}
+                      />
+                      <Route path="/privacy" element={<PrivacyPolicy />} />
+                      <Route
+                        path="/insights/privacy-policy"
+                        element={<PrivacyPolicy />}
+                      />
+                      <Route path="/terms" element={<TermsOfService />} />
+                      <Route
+                        path="/terms-of-service"
+                        element={<TermsOfService />}
+                      />
+                      <Route
+                        path="/insights/terms-of-service"
+                        element={<TermsOfService />}
+                      />
+                      <Route
+                        path="/insights/terms-of-use"
+                        element={<TermsOfService />}
+                      />
+                      <Route
+                        path="/insights/how-to-use-job-match-analysis-tool"
+                        element={
+                          <Navigate to="/Tools/JobResumeMatch" replace />
+                        }
+                      />
+                      <Route path="/cookies" element={<CookiePolicy />} />
 
-                  {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}
-                  <Route
-                    path="/embedded-resume/:identifier"
-                    element={<EmbeddedResume />}
-                  />
-                  <Route
-                    path="/embedded/resume/:identifier"
-                    element={<EmbeddedResume />}
-                  />
-                  <Route
-                    path="/embedded/resumes/:identifier"
-                    element={<EmbeddedResume />}
-                  />
+                      {/* Embedded Resume Routes - Multiple patterns for backwards compatibility */}
+                      <Route
+                        path="/embedded-resume/:identifier"
+                        element={<EmbeddedResume />}
+                      />
+                      <Route
+                        path="/embedded/resume/:identifier"
+                        element={<EmbeddedResume />}
+                      />
+                      <Route
+                        path="/embedded/resumes/:identifier"
+                        element={<EmbeddedResume />}
+                      />
 
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
 
-                {/* Global AI Components - Available on all pages */}
-                <FloatingAIButton />
-                <AIChatPanel />
-              </BrowserRouter>
+                  {/* Global AI Components - Available on all pages */}
+                  <FloatingAIButton />
+                  <AIChatPanel />
+                </BrowserRouter>
               </TooltipProvider>
             </AIProvider>
           </CartProvider>

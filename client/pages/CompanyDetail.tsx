@@ -108,11 +108,11 @@ export default function CompanyDetail() {
   const handleTrackCompany = async () => {
     if (!isAuthenticated) {
       // Redirect to login if not authenticated
-      navigate('/login', {
+      navigate("/login", {
         state: {
           from: `/companies/${id}`,
-          message: 'Please log in to follow companies'
-        }
+          message: "Please log in to follow companies",
+        },
       });
       return;
     }

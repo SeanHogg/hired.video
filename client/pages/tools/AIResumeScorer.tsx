@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { ArrowLeft, Brain, Loader2, Upload, Star, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  Brain,
+  Loader2,
+  Upload,
+  Star,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -7,7 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import Footer from "@/components/Footer";
@@ -33,7 +48,7 @@ interface ResumeScore {
 }
 
 interface ScoreRecommendation {
-  category: 'critical' | 'important' | 'minor';
+  category: "critical" | "important" | "minor";
   title: string;
   description: string;
   impact: number;
@@ -78,7 +93,7 @@ export default function AIResumeScorer() {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
       ];
-      
+
       if (!allowedTypes.includes(selectedFile.type)) {
         setError("Please upload a PDF, Word document, or text file.");
         return;
@@ -150,7 +165,7 @@ Return the response in JSON format with the following structure:
       }
 
       const result = await response.json();
-      
+
       // Try to parse as JSON, fallback to mock data if parsing fails
       try {
         const parsedResult = JSON.parse(result.result || result);
@@ -168,39 +183,43 @@ Return the response in JSON format with the following structure:
           strengths: [
             "Clear professional experience section",
             "Good use of action verbs",
-            "Relevant technical skills listed"
+            "Relevant technical skills listed",
           ],
           weaknesses: [
             "Lacks quantified achievements",
             "Missing industry keywords",
-            "Could improve formatting consistency"
+            "Could improve formatting consistency",
           ],
           recommendations: [
             {
               category: "critical",
               title: "Add quantified achievements",
-              description: "Include specific numbers, percentages, and metrics to demonstrate your impact and results.",
-              impact: 8
+              description:
+                "Include specific numbers, percentages, and metrics to demonstrate your impact and results.",
+              impact: 8,
             },
             {
               category: "important",
               title: "Optimize for ATS keywords",
-              description: "Research and include industry-specific keywords that ATS systems look for in your field.",
-              impact: 7
+              description:
+                "Research and include industry-specific keywords that ATS systems look for in your field.",
+              impact: 7,
             },
             {
               category: "important",
               title: "Improve section formatting",
-              description: "Use consistent formatting, bullet points, and spacing throughout your resume.",
-              impact: 6
+              description:
+                "Use consistent formatting, bullet points, and spacing throughout your resume.",
+              impact: 6,
             },
             {
               category: "minor",
               title: "Add professional summary",
-              description: "Include a compelling 2-3 line summary at the top highlighting your key qualifications.",
-              impact: 5
-            }
-          ]
+              description:
+                "Include a compelling 2-3 line summary at the top highlighting your key qualifications.",
+              impact: 5,
+            },
+          ],
         };
 
         // Adjust grade based on overall score
@@ -403,7 +422,7 @@ Return the response in JSON format with the following structure:
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
                   <Brain className="h-6 w-6 text-brand-purple" />
@@ -414,7 +433,10 @@ Return the response in JSON format with the following structure:
                     Get instant AI-powered feedback and scoring for your resume
                   </p>
                 </div>
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                <Badge
+                  variant="secondary"
+                  className="bg-yellow-100 text-yellow-800"
+                >
                   Hot
                 </Badge>
               </div>
@@ -427,10 +449,14 @@ Return the response in JSON format with the following structure:
                       <Star className="h-4 w-4 text-purple-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-purple-900 mb-1">How it works</h3>
+                      <h3 className="font-semibold text-purple-900 mb-1">
+                        How it works
+                      </h3>
                       <p className="text-sm text-purple-800">
-                        Our AI analyzes your resume across multiple dimensions including ATS compatibility, 
-                        content quality, keyword optimization, and formatting to provide a comprehensive score and actionable feedback.
+                        Our AI analyzes your resume across multiple dimensions
+                        including ATS compatibility, content quality, keyword
+                        optimization, and formatting to provide a comprehensive
+                        score and actionable feedback.
                       </p>
                     </div>
                   </div>
@@ -450,11 +476,17 @@ Return the response in JSON format with the following structure:
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue={isAuthenticated ? "existing" : "text"} className="w-full">
+                    <Tabs
+                      defaultValue={isAuthenticated ? "existing" : "text"}
+                      className="w-full"
+                    >
                       <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="text">Paste Text</TabsTrigger>
                         <TabsTrigger value="upload">Upload File</TabsTrigger>
-                        <TabsTrigger value="existing" disabled={!isAuthenticated}>
+                        <TabsTrigger
+                          value="existing"
+                          disabled={!isAuthenticated}
+                        >
                           My Resumes {!isAuthenticated && "(Login Required)"}
                         </TabsTrigger>
                       </TabsList>
@@ -471,7 +503,7 @@ Return the response in JSON format with the following structure:
                             className="min-h-[200px]"
                           />
                         </div>
-                        <Button 
+                        <Button
                           onClick={handleTextScoring}
                           disabled={isScoring || !resumeText.trim()}
                           className="w-full"
@@ -503,7 +535,10 @@ Return the response in JSON format with the following structure:
                               className="hidden"
                               id="resume-upload"
                             />
-                            <label htmlFor="resume-upload" className="cursor-pointer">
+                            <label
+                              htmlFor="resume-upload"
+                              className="cursor-pointer"
+                            >
                               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                               <p className="text-sm text-muted-foreground">
                                 Click to upload or drag and drop
@@ -518,16 +553,24 @@ Return the response in JSON format with the following structure:
                         {file && (
                           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                             <div className="flex items-center gap-2">
-                              <span className="text-lg">{getFileIcon(file)}</span>
-                              <span className="text-sm font-medium">{file.name}</span>
+                              <span className="text-lg">
+                                {getFileIcon(file)}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {file.name}
+                              </span>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={removeFile}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={removeFile}
+                            >
                               Remove
                             </Button>
                           </div>
                         )}
 
-                        <Button 
+                        <Button
                           onClick={handleFileScoring}
                           disabled={isScoring || !file}
                           className="w-full"
@@ -551,13 +594,19 @@ Return the response in JSON format with the following structure:
                           <label className="text-sm font-medium mb-2 block">
                             Select Resume
                           </label>
-                          <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
+                          <Select
+                            value={selectedResumeId}
+                            onValueChange={setSelectedResumeId}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Choose a resume to score" />
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.map((resume) => (
-                                <SelectItem key={resume.id} value={resume.id || ""}>
+                                <SelectItem
+                                  key={resume.id}
+                                  value={resume.id || ""}
+                                >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
@@ -565,7 +614,7 @@ Return the response in JSON format with the following structure:
                           </Select>
                         </div>
 
-                        <Button 
+                        <Button
                           onClick={handleResumeScoring}
                           disabled={isScoring || !selectedResumeId}
                           className="w-full"
@@ -608,10 +657,14 @@ Return the response in JSON format with the following structure:
                       </CardHeader>
                       <CardContent>
                         <div className="text-center p-6 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 rounded-lg mb-4">
-                          <div className={`text-5xl font-bold mb-2 ${getScoreColor(scoreResult.overallScore)}`}>
+                          <div
+                            className={`text-5xl font-bold mb-2 ${getScoreColor(scoreResult.overallScore)}`}
+                          >
                             {scoreResult.overallScore}
                           </div>
-                          <div className={`inline-flex items-center px-3 py-1 rounded-full text-lg font-semibold ${getGradeColor(scoreResult.grade)}`}>
+                          <div
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-lg font-semibold ${getGradeColor(scoreResult.grade)}`}
+                          >
                             {scoreResult.grade}
                           </div>
                           <p className="text-sm text-muted-foreground mt-2">
@@ -624,51 +677,86 @@ Return the response in JSON format with the following structure:
                           <div>
                             <div className="flex justify-between text-sm mb-1">
                               <span>ATS Compatibility</span>
-                              <span className={getScoreColor(scoreResult.atsCompatibility)}>
+                              <span
+                                className={getScoreColor(
+                                  scoreResult.atsCompatibility,
+                                )}
+                              >
                                 {scoreResult.atsCompatibility}%
                               </span>
                             </div>
-                            <Progress value={scoreResult.atsCompatibility} className="h-2" />
+                            <Progress
+                              value={scoreResult.atsCompatibility}
+                              className="h-2"
+                            />
                           </div>
 
                           <div>
                             <div className="flex justify-between text-sm mb-1">
                               <span>Content Quality</span>
-                              <span className={getScoreColor(scoreResult.contentQuality)}>
+                              <span
+                                className={getScoreColor(
+                                  scoreResult.contentQuality,
+                                )}
+                              >
                                 {scoreResult.contentQuality}%
                               </span>
                             </div>
-                            <Progress value={scoreResult.contentQuality} className="h-2" />
+                            <Progress
+                              value={scoreResult.contentQuality}
+                              className="h-2"
+                            />
                           </div>
 
                           <div>
                             <div className="flex justify-between text-sm mb-1">
                               <span>Keywords</span>
-                              <span className={getScoreColor(scoreResult.keywordScore)}>
+                              <span
+                                className={getScoreColor(
+                                  scoreResult.keywordScore,
+                                )}
+                              >
                                 {scoreResult.keywordScore}%
                               </span>
                             </div>
-                            <Progress value={scoreResult.keywordScore} className="h-2" />
+                            <Progress
+                              value={scoreResult.keywordScore}
+                              className="h-2"
+                            />
                           </div>
 
                           <div>
                             <div className="flex justify-between text-sm mb-1">
                               <span>Format</span>
-                              <span className={getScoreColor(scoreResult.formatScore)}>
+                              <span
+                                className={getScoreColor(
+                                  scoreResult.formatScore,
+                                )}
+                              >
                                 {scoreResult.formatScore}%
                               </span>
                             </div>
-                            <Progress value={scoreResult.formatScore} className="h-2" />
+                            <Progress
+                              value={scoreResult.formatScore}
+                              className="h-2"
+                            />
                           </div>
 
                           <div>
                             <div className="flex justify-between text-sm mb-1">
                               <span>Impact</span>
-                              <span className={getScoreColor(scoreResult.impactScore)}>
+                              <span
+                                className={getScoreColor(
+                                  scoreResult.impactScore,
+                                )}
+                              >
                                 {scoreResult.impactScore}%
                               </span>
                             </div>
-                            <Progress value={scoreResult.impactScore} className="h-2" />
+                            <Progress
+                              value={scoreResult.impactScore}
+                              className="h-2"
+                            />
                           </div>
                         </div>
                       </CardContent>
@@ -691,7 +779,10 @@ Return the response in JSON format with the following structure:
                             </h4>
                             <ul className="space-y-1">
                               {scoreResult.strengths.map((strength, index) => (
-                                <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                                <li
+                                  key={index}
+                                  className="text-sm text-muted-foreground flex items-start gap-2"
+                                >
                                   <span className="text-green-600 mt-1">•</span>
                                   {strength}
                                 </li>
@@ -706,7 +797,10 @@ Return the response in JSON format with the following structure:
                             </h4>
                             <ul className="space-y-1">
                               {scoreResult.weaknesses.map((weakness, index) => (
-                                <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                                <li
+                                  key={index}
+                                  className="text-sm text-muted-foreground flex items-start gap-2"
+                                >
                                   <span className="text-red-600 mt-1">•</span>
                                   {weakness}
                                 </li>
@@ -733,14 +827,21 @@ Return the response in JSON format with the following structure:
                                 {getRecommendationIcon(rec.category)}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <h4 className="font-semibold">{rec.title}</h4>
-                                    <Badge 
-                                      variant="secondary" 
-                                      className={getRecommendationBadgeColor(rec.category)}
+                                    <h4 className="font-semibold">
+                                      {rec.title}
+                                    </h4>
+                                    <Badge
+                                      variant="secondary"
+                                      className={getRecommendationBadgeColor(
+                                        rec.category,
+                                      )}
                                     >
                                       {rec.category}
                                     </Badge>
-                                    <Badge variant="outline" className="text-xs">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
                                       Impact: {rec.impact}/10
                                     </Badge>
                                   </div>
@@ -752,14 +853,14 @@ Return the response in JSON format with the following structure:
                             </div>
                           ))}
                         </div>
-                        
+
                         <div className="flex gap-2 mt-6">
                           <Button variant="outline" onClick={resetScoring}>
                             Score Another Resume
                           </Button>
-                          <Button 
+                          <Button
                             onClick={() => {
-                              const report = `Resume Score Report\n\nOverall Score: ${scoreResult.overallScore}% (${scoreResult.grade})\n\nDetailed Scores:\n- ATS Compatibility: ${scoreResult.atsCompatibility}%\n- Content Quality: ${scoreResult.contentQuality}%\n- Keywords: ${scoreResult.keywordScore}%\n- Format: ${scoreResult.formatScore}%\n- Impact: ${scoreResult.impactScore}%\n\nStrengths:\n${scoreResult.strengths.map(s => `- ${s}`).join('\n')}\n\nAreas for Improvement:\n${scoreResult.weaknesses.map(w => `- ${w}`).join('\n')}\n\nGenerated by MyVideoResume AI Resume Scorer`;
+                              const report = `Resume Score Report\n\nOverall Score: ${scoreResult.overallScore}% (${scoreResult.grade})\n\nDetailed Scores:\n- ATS Compatibility: ${scoreResult.atsCompatibility}%\n- Content Quality: ${scoreResult.contentQuality}%\n- Keywords: ${scoreResult.keywordScore}%\n- Format: ${scoreResult.formatScore}%\n- Impact: ${scoreResult.impactScore}%\n\nStrengths:\n${scoreResult.strengths.map((s) => `- ${s}`).join("\n")}\n\nAreas for Improvement:\n${scoreResult.weaknesses.map((w) => `- ${w}`).join("\n")}\n\nGenerated by MyVideoResume AI Resume Scorer`;
                               navigator.clipboard.writeText(report);
                             }}
                             variant="outline"
@@ -778,9 +879,10 @@ Return the response in JSON format with the following structure:
                       <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="font-semibold mb-2">Ready to Score</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Upload a resume file, paste text, or select from your saved resumes to get instant AI-powered scoring.
+                        Upload a resume file, paste text, or select from your
+                        saved resumes to get instant AI-powered scoring.
                       </p>
-                      
+
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
                         <h4 className="font-medium mb-2">What you'll get:</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">

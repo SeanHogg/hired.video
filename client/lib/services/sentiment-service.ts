@@ -3,13 +3,14 @@ import { apiClient } from "../api-client";
 import { resumeService } from "./resume-service";
 import type { Resume } from "@/types/resume";
 
-
 // Schema for sentiment analysis response
 export const SentimentAnalysisResponseSchema = z.object({
   score: z.number().min(0).max(100),
 });
 
-export type SentimentAnalysisResponse = z.infer<typeof SentimentAnalysisResponseSchema>;
+export type SentimentAnalysisResponse = z.infer<
+  typeof SentimentAnalysisResponseSchema
+>;
 
 // Schema for sentiment interpretation
 export interface SentimentInterpretation {
@@ -28,7 +29,7 @@ export class SentimentService {
     const response = await apiClient.post<{ result: number }>(
       "/sentiment/sentimentprediction",
       text,
-      z.object({ result: z.number() })
+      z.object({ result: z.number() }),
     );
     return response.data.result;
   }
@@ -51,7 +52,7 @@ export class SentimentService {
     const response = await apiClient.post<{ result: number }>(
       "/api/Resume/SentimentPrediction",
       resumeId,
-      z.object({ result: z.number() })
+      z.object({ result: z.number() }),
     );
     return response.data.result;
   }
@@ -77,8 +78,6 @@ export class SentimentService {
     });
   }
 
-
-
   /**
    * Interpret sentiment score and provide recommendations
    */
@@ -87,40 +86,43 @@ export class SentimentService {
       return {
         label: "Negative",
         color: "red",
-        description: "Your resume has a negative tone that may discourage employers.",
+        description:
+          "Your resume has a negative tone that may discourage employers.",
         recommendations: [
           "Use more positive and action-oriented language",
           "Replace negative words with neutral or positive alternatives",
           "Focus on achievements and accomplishments rather than duties",
           "Add quantifiable results and metrics to showcase success",
-          "Consider using power words that convey confidence and capability"
-        ]
+          "Consider using power words that convey confidence and capability",
+        ],
       };
     } else if (score >= 31 && score <= 60) {
       return {
         label: "Neutral",
         color: "yellow",
-        description: "Your resume has a neutral tone. There's room for improvement to make it more engaging.",
+        description:
+          "Your resume has a neutral tone. There's room for improvement to make it more engaging.",
         recommendations: [
           "Add more dynamic action verbs to describe your experiences",
           "Include specific achievements and quantifiable results",
           "Use more engaging language to describe your skills and accomplishments",
           "Consider adding testimonials or quotes from supervisors",
-          "Highlight your unique value proposition more clearly"
-        ]
+          "Highlight your unique value proposition more clearly",
+        ],
       };
     } else {
       return {
         label: "Positive",
         color: "green",
-        description: "Excellent! Your resume has a positive tone that will appeal to employers.",
+        description:
+          "Excellent! Your resume has a positive tone that will appeal to employers.",
         recommendations: [
           "Maintain this positive tone throughout your resume",
           "Continue to use strong action verbs and achievement-focused language",
           "Consider this resume as a template for future applications",
           "Share your approach with others who might benefit",
-          "Keep updating with new achievements using the same positive tone"
-        ]
+          "Keep updating with new achievements using the same positive tone",
+        ],
       };
     }
   }

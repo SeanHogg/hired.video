@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Target, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Target,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,54 +19,77 @@ import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { matchService, type JobResumeMatchResponse } from "@/lib/services/match-service";
+import {
+  matchService,
+  type JobResumeMatchResponse,
+} from "@/lib/services/match-service";
 
-type WizardStep = 'job' | 'resume' | 'results';
+type WizardStep = "job" | "resume" | "results";
 
 interface JobData {
   jobId?: string;
   jobContent?: string;
-  source: 'url' | 'paste' | 'file' | 'existing';
+  source: "url" | "paste" | "file" | "existing";
 }
 
 interface ResumeData {
   resumeId?: string;
   resumeContent?: string;
-  source: 'existing' | 'paste' | 'file';
+  source: "existing" | "paste" | "file";
 }
 
 export default function JobResumeMatch() {
   const location = useLocation();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
   const { isAuthenticated } = useAuth();
 
   // SEO for job resume match page
   useSEO(location.pathname);
 
   // Wizard state
-  const [currentStep, setCurrentStep] = useState<WizardStep>('job');
+  const [currentStep, setCurrentStep] = useState<WizardStep>("job");
   const [jobData, setJobData] = useState<JobData | null>(null);
   const [resumeData, setResumeData] = useState<ResumeData | null>(null);
-  const [matchResult, setMatchResult] = useState<JobResumeMatchResponse | null>(null);
-  
+  const [matchResult, setMatchResult] = useState<JobResumeMatchResponse | null>(
+    null,
+  );
+
   // Loading and error states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Step navigation
   const steps = [
-    { id: 'job', title: 'Select Job', description: 'Choose or input job details' },
-    { id: 'resume', title: 'Select Resume', description: 'Choose or input resume details' },
-    { id: 'results', title: 'Match Results', description: 'View analysis and recommendations' }
+    {
+      id: "job",
+      title: "Select Job",
+      description: "Choose or input job details",
+    },
+    {
+      id: "resume",
+      title: "Select Resume",
+      description: "Choose or input resume details",
+    },
+    {
+      id: "results",
+      title: "Match Results",
+      description: "View analysis and recommendations",
+    },
   ];
 
-  const currentStepIndex = steps.findIndex(step => step.id === currentStep);
+  const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
 
   // Handlers
   const handleJobSelected = (data: JobData) => {
     setJobData(data);
     setError(null);
-    setCurrentStep('resume');
+    setCurrentStep("resume");
   };
 
   const handleResumeSelected = async (data: ResumeData) => {
@@ -78,7 +107,7 @@ export default function JobResumeMatch() {
       });
 
       setMatchResult(result);
-      setCurrentStep('results');
+      setCurrentStep("results");
     } catch (err) {
       console.error("Match analysis failed:", err);
       setError("Failed to analyze job-resume match. Please try again.");
@@ -88,7 +117,7 @@ export default function JobResumeMatch() {
   };
 
   const handleStartOver = () => {
-    setCurrentStep('job');
+    setCurrentStep("job");
     setJobData(null);
     setResumeData(null);
     setMatchResult(null);
@@ -96,17 +125,17 @@ export default function JobResumeMatch() {
   };
 
   const handleBackStep = () => {
-    if (currentStep === 'resume') {
-      setCurrentStep('job');
+    if (currentStep === "resume") {
+      setCurrentStep("job");
       setResumeData(null);
-    } else if (currentStep === 'results') {
-      setCurrentStep('resume');
+    } else if (currentStep === "results") {
+      setCurrentStep("resume");
       setMatchResult(null);
     }
     setError(null);
   };
 
-  const canGoBack = currentStep !== 'job' && currentStep !== 'results';
+  const canGoBack = currentStep !== "job" && currentStep !== "results";
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,9 +160,12 @@ export default function JobResumeMatch() {
                   <Target className="h-6 w-6 text-brand-purple" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Job-Resume Match Analysis</h1>
+                  <h1 className="text-3xl font-bold">
+                    Job-Resume Match Analysis
+                  </h1>
                   <p className="text-muted-foreground">
-                    Discover how well your resume matches a specific job opportunity
+                    Discover how well your resume matches a specific job
+                    opportunity
                   </p>
                 </div>
               </div>
@@ -152,23 +184,31 @@ export default function JobResumeMatch() {
                   {steps.map((step, index) => (
                     <div key={step.id} className="flex items-center">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                          index < currentStepIndex 
-                            ? 'bg-primary border-primary text-primary-foreground'
-                            : index === currentStepIndex
-                            ? 'border-primary text-primary'
-                            : 'border-muted-foreground text-muted-foreground'
-                        }`}>
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                            index < currentStepIndex
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : index === currentStepIndex
+                                ? "border-primary text-primary"
+                                : "border-muted-foreground text-muted-foreground"
+                          }`}
+                        >
                           {index < currentStepIndex ? (
                             <CheckCircle2 className="h-5 w-5" />
                           ) : (
-                            <span className="text-sm font-medium">{index + 1}</span>
+                            <span className="text-sm font-medium">
+                              {index + 1}
+                            </span>
                           )}
                         </div>
                         <div className="hidden sm:block">
-                          <div className={`font-medium ${
-                            index <= currentStepIndex ? 'text-foreground' : 'text-muted-foreground'
-                          }`}>
+                          <div
+                            className={`font-medium ${
+                              index <= currentStepIndex
+                                ? "text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
                             {step.title}
                           </div>
                           <div className="text-sm text-muted-foreground">
@@ -177,9 +217,11 @@ export default function JobResumeMatch() {
                         </div>
                       </div>
                       {index < steps.length - 1 && (
-                        <div className={`w-12 h-0.5 mx-4 ${
-                          index < currentStepIndex ? 'bg-primary' : 'bg-muted'
-                        }`} />
+                        <div
+                          className={`w-12 h-0.5 mx-4 ${
+                            index < currentStepIndex ? "bg-primary" : "bg-muted"
+                          }`}
+                        />
                       )}
                     </div>
                   ))}
@@ -189,7 +231,7 @@ export default function JobResumeMatch() {
 
             {/* Step Content */}
             <div className="space-y-6">
-              {currentStep === 'job' && (
+              {currentStep === "job" && (
                 <JobInputStep
                   onJobSelected={handleJobSelected}
                   isLoading={isAnalyzing}
@@ -197,7 +239,7 @@ export default function JobResumeMatch() {
                 />
               )}
 
-              {currentStep === 'resume' && (
+              {currentStep === "resume" && (
                 <ResumeSelectionStep
                   onResumeSelected={handleResumeSelected}
                   isLoading={isAnalyzing}
@@ -205,7 +247,7 @@ export default function JobResumeMatch() {
                 />
               )}
 
-              {currentStep === 'results' && matchResult && (
+              {currentStep === "results" && matchResult && (
                 <MatchResultsStep
                   matchResult={matchResult}
                   onStartOver={handleStartOver}
@@ -218,9 +260,12 @@ export default function JobResumeMatch() {
                 <Card>
                   <CardContent className="p-8 text-center">
                     <Loader2 className="h-16 w-16 mx-auto text-primary animate-spin mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">Analyzing Match...</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      Analyzing Match...
+                    </h3>
                     <p className="text-muted-foreground">
-                      Our AI is comparing your resume with the job requirements. This may take a few moments.
+                      Our AI is comparing your resume with the job requirements.
+                      This may take a few moments.
                     </p>
                   </CardContent>
                 </Card>

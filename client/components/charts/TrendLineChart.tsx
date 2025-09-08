@@ -1,6 +1,21 @@
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface DataPoint {
   date: string;
@@ -26,8 +41,8 @@ const TrendLineChart: React.FC<TrendLineChartProps> = ({
   title,
   description,
   data,
-  dataKey = 'count',
-  color = '#8884d8',
+  dataKey = "count",
+  color = "#8884d8",
   height = 300,
   showLegend = true,
   formatTooltip,
@@ -38,12 +53,12 @@ const TrendLineChart: React.FC<TrendLineChartProps> = ({
     if (formatXAxisLabel) {
       return formatXAxisLabel(dateString);
     }
-    
+
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
       });
     } catch {
       return dateString;
@@ -57,13 +72,21 @@ const TrendLineChart: React.FC<TrendLineChartProps> = ({
     return value.toLocaleString();
   };
 
-  const customTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; name: string }>; label?: string }) => {
+  const customTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: Array<{ value: number; name: string }>;
+    label?: string;
+  }) => {
     if (active && payload?.length) {
       const value = payload[0].value;
-      const formattedValue = formatTooltip 
+      const formattedValue = formatTooltip
         ? formatTooltip(value, payload[0].name)[0]
         : formatValue(value);
-      
+
       return (
         <div className="bg-background border border-border rounded-lg shadow-lg p-3">
           <p className="text-sm font-medium">{formatDate(label)}</p>
@@ -84,23 +107,26 @@ const TrendLineChart: React.FC<TrendLineChartProps> = ({
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={data}
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis 
-              dataKey="date" 
+            <XAxis
+              dataKey="date"
               tickFormatter={formatDate}
               className="text-xs fill-muted-foreground"
             />
-            <YAxis 
+            <YAxis
               tickFormatter={formatValue}
               className="text-xs fill-muted-foreground"
             />
             <Tooltip content={customTooltip} />
             {showLegend && <Legend />}
-            <Line 
-              type="monotone" 
-              dataKey={dataKey} 
-              stroke={color} 
+            <Line
+              type="monotone"
+              dataKey={dataKey}
+              stroke={color}
               strokeWidth={2}
               dot={{ fill: color, strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: color, strokeWidth: 2 }}

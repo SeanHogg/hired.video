@@ -116,7 +116,15 @@ export const SignupRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
-  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.BUSINESS, USER_ROLES.ADMIN]).optional(),
+  role: z
+    .enum([
+      USER_ROLES.JOB_SEEKER,
+      USER_ROLES.RECRUITER,
+      USER_ROLES.EMPLOYER,
+      USER_ROLES.BUSINESS,
+      USER_ROLES.ADMIN,
+    ])
+    .optional(),
 });
 
 /**
@@ -133,7 +141,13 @@ export const UserProfileResponseSchema = z.object({
     summary: z.string(),
     // Add more fields as needed
   }),
-  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.BUSINESS, USER_ROLES.ADMIN]),
+  role: z.enum([
+    USER_ROLES.JOB_SEEKER,
+    USER_ROLES.RECRUITER,
+    USER_ROLES.EMPLOYER,
+    USER_ROLES.BUSINESS,
+    USER_ROLES.ADMIN,
+  ]),
   isVerified: z.boolean(),
   isPremium: z.boolean(),
   createdAt: z.iso.datetime(),
@@ -335,7 +349,7 @@ export function validateApiResponse<T>(
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const issues = (error).issues ?? [];
+      const issues = error.issues ?? [];
       const details = issues.length
         ? issues.map((i) => i.message).join(", ")
         : (error as Error).message || "Invalid data";

@@ -1,4 +1,13 @@
-import { ArrowLeft, RefreshCw, Copy, Download, CheckCircle2, Star, Target, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Copy,
+  Download,
+  CheckCircle2,
+  Star,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +33,9 @@ export default function ValuePropositionResultsStep({
 
   const handleCopyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(valuePropositionResult.valueProposition);
+      await navigator.clipboard.writeText(
+        valuePropositionResult.valueProposition,
+      );
       toast({
         title: "Copied to clipboard",
         description: "Value proposition has been copied to your clipboard.",
@@ -72,7 +83,8 @@ export default function ValuePropositionResultsStep({
             Your Value Proposition
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            AI-generated value proposition tailored to your background and the role
+            AI-generated value proposition tailored to your background and the
+            role
           </p>
         </div>
         <div className="flex gap-2">
@@ -95,18 +107,31 @@ export default function ValuePropositionResultsStep({
               <Target className="h-5 w-5" />
               Confidence Score
             </span>
-            <Badge variant={getScoreBadgeVariant(valuePropositionResult.confidenceScore)}>
+            <Badge
+              variant={getScoreBadgeVariant(
+                valuePropositionResult.confidenceScore,
+              )}
+            >
               {valuePropositionResult.confidenceScore}/100
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <Progress value={valuePropositionResult.confidenceScore} className="h-2" />
-            <p className={`text-sm font-medium ${getScoreColor(valuePropositionResult.confidenceScore)}`}>
-              {valuePropositionResult.confidenceScore >= 80 && "Excellent alignment with the role requirements"}
-              {valuePropositionResult.confidenceScore >= 60 && valuePropositionResult.confidenceScore < 80 && "Good alignment with some areas for improvement"}
-              {valuePropositionResult.confidenceScore < 60 && "Moderate alignment - consider highlighting additional relevant experience"}
+            <Progress
+              value={valuePropositionResult.confidenceScore}
+              className="h-2"
+            />
+            <p
+              className={`text-sm font-medium ${getScoreColor(valuePropositionResult.confidenceScore)}`}
+            >
+              {valuePropositionResult.confidenceScore >= 80 &&
+                "Excellent alignment with the role requirements"}
+              {valuePropositionResult.confidenceScore >= 60 &&
+                valuePropositionResult.confidenceScore < 80 &&
+                "Good alignment with some areas for improvement"}
+              {valuePropositionResult.confidenceScore < 60 &&
+                "Moderate alignment - consider highlighting additional relevant experience"}
             </p>
           </div>
         </CardContent>
@@ -121,7 +146,9 @@ export default function ValuePropositionResultsStep({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm leading-relaxed">{valuePropositionResult.executiveSummary}</p>
+          <p className="text-sm leading-relaxed">
+            {valuePropositionResult.executiveSummary}
+          </p>
         </CardContent>
       </Card>
 
@@ -174,7 +201,11 @@ export default function ValuePropositionResultsStep({
           <div className="flex items-center justify-between">
             <CardTitle>Complete Value Proposition Letter</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopyToClipboard}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyToClipboard}
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy
               </Button>
@@ -187,7 +218,9 @@ export default function ValuePropositionResultsStep({
         </CardHeader>
         <CardContent>
           <div className="bg-muted/50 p-4 rounded-lg">
-            <MarkdownDisplay content={valuePropositionResult.valueProposition} />
+            <MarkdownDisplay
+              content={valuePropositionResult.valueProposition}
+            />
           </div>
         </CardContent>
       </Card>
@@ -202,7 +235,9 @@ export default function ValuePropositionResultsStep({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm leading-relaxed">{valuePropositionResult.callToAction}</p>
+            <p className="text-sm leading-relaxed">
+              {valuePropositionResult.callToAction}
+            </p>
           </CardContent>
         </Card>
       )}

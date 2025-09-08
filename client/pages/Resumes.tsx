@@ -947,7 +947,9 @@ export default function Resumes() {
                           variant="outline"
                           className="text-blue-600 border-blue-200"
                         >
-                          {user.role === USER_ROLES.RECRUITER ? "Recruiter" : "Employer"}{" "}
+                          {user.role === USER_ROLES.RECRUITER
+                            ? "Recruiter"
+                            : "Employer"}{" "}
                           • Tracking{" "}
                           {
                             resumes.filter((r) => r.ownership === "tracked")
@@ -1288,7 +1290,9 @@ export default function Resumes() {
                                               </div>
                                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                 <Calendar className="w-3 h-3" />
-                                                {formatDate(variation.createdAt)}
+                                                {formatDate(
+                                                  variation.createdAt,
+                                                )}
                                               </div>
                                               {!variation.isActive && (
                                                 <Button

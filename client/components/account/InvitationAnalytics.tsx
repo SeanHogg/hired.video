@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   LineChart,
   Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from "recharts";
 import {
   TrendingUp,
@@ -21,9 +21,15 @@ import {
   RefreshCw,
   Target,
   Clock,
-  Calendar
+  Calendar,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { accountService } from "@/lib/services/account-service";
 import { toast } from "@/hooks/use-toast";
@@ -82,27 +88,32 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
 
   const handleExport = () => {
     if (!data) return;
-    
+
     // Create CSV content
     const csvContent = [
-      ['Metric', 'Value'],
-      ['Total Invitations', data.totalInvitations],
-      ['Accepted Invitations', data.acceptedInvitations],
-      ['Pending Invitations', data.pendingInvitations],
-      ['Expired Invitations', data.expiredInvitations],
-      ['Rejected Invitations', data.rejectedInvitations],
-      ['Acceptance Rate (%)', data.acceptanceRate],
-      ['Recent Invitations (30 days)', data.recentInvitations30Days],
-      ['Recent Accepted (30 days)', data.recentAccepted30Days],
-      ['Weekly Invitations', data.weeklyInvitations],
-      ...Object.entries(data.roleDistribution).map(([role, count]) => [`Role: ${role}`, count])
-    ].map(row => row.join(',')).join('\n');
+      ["Metric", "Value"],
+      ["Total Invitations", data.totalInvitations],
+      ["Accepted Invitations", data.acceptedInvitations],
+      ["Pending Invitations", data.pendingInvitations],
+      ["Expired Invitations", data.expiredInvitations],
+      ["Rejected Invitations", data.rejectedInvitations],
+      ["Acceptance Rate (%)", data.acceptanceRate],
+      ["Recent Invitations (30 days)", data.recentInvitations30Days],
+      ["Recent Accepted (30 days)", data.recentAccepted30Days],
+      ["Weekly Invitations", data.weeklyInvitations],
+      ...Object.entries(data.roleDistribution).map(([role, count]) => [
+        `Role: ${role}`,
+        count,
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `invitation-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `invitation-analytics-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
 
@@ -140,7 +151,9 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
       <Card>
         <CardContent className="p-6 text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Unable to Load Analytics</h3>
+          <h3 className="text-lg font-semibold mb-2">
+            Unable to Load Analytics
+          </h3>
           <p className="text-gray-600 mb-4">{error || "No data available"}</p>
           <Button onClick={loadAnalytics}>
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -152,16 +165,18 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
   }
 
   const statusData = [
-    { name: 'Accepted', value: data.acceptedInvitations, color: '#00C49F' },
-    { name: 'Pending', value: data.pendingInvitations, color: '#FFBB28' },
-    { name: 'Expired', value: data.expiredInvitations, color: '#FF8042' },
-    { name: 'Rejected', value: data.rejectedInvitations, color: '#8884D8' },
-  ].filter(item => item.value > 0);
+    { name: "Accepted", value: data.acceptedInvitations, color: "#00C49F" },
+    { name: "Pending", value: data.pendingInvitations, color: "#FFBB28" },
+    { name: "Expired", value: data.expiredInvitations, color: "#FF8042" },
+    { name: "Rejected", value: data.rejectedInvitations, color: "#8884D8" },
+  ].filter((item) => item.value > 0);
 
-  const roleData = Object.entries(data.roleDistribution).map(([role, count]) => ({
-    name: role,
-    value: count
-  }));
+  const roleData = Object.entries(data.roleDistribution).map(
+    ([role, count]) => ({
+      name: role,
+      value: count,
+    }),
+  );
 
   return (
     <div className="space-y-6">
@@ -169,11 +184,20 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Invitation Analytics</h2>
-          <p className="text-gray-600">Track your team invitation performance for {data.companyName}</p>
+          <p className="text-gray-600">
+            Track your team invitation performance for {data.companyName}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={loadAnalytics} variant="outline" size="sm" disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <Button
+            onClick={loadAnalytics}
+            variant="outline"
+            size="sm"
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
           <Button onClick={handleExport} variant="outline" size="sm">
@@ -189,7 +213,9 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Invitations</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Total Invitations
+                </p>
                 <p className="text-3xl font-bold">{data.totalInvitations}</p>
                 <p className="text-xs text-gray-500 mt-1">
                   {data.recentInvitations30Days} in last 30 days
@@ -204,8 +230,12 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Acceptance Rate</p>
-                <p className="text-3xl font-bold text-green-600">{data.acceptanceRate}%</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Acceptance Rate
+                </p>
+                <p className="text-3xl font-bold text-green-600">
+                  {data.acceptanceRate}%
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {data.acceptedInvitations} accepted
                 </p>
@@ -219,11 +249,13 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending Invitations</p>
-                <p className="text-3xl font-bold text-yellow-600">{data.pendingInvitations}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Awaiting response
+                <p className="text-sm font-medium text-gray-600">
+                  Pending Invitations
                 </p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {data.pendingInvitations}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Awaiting response</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
@@ -234,8 +266,12 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Weekly Activity</p>
-                <p className="text-3xl font-bold text-purple-600">{data.weeklyInvitations}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Weekly Activity
+                </p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {data.weeklyInvitations}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">
                   Invitations this week
                 </p>
@@ -266,17 +302,17 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="invitationsSent" 
-                  stroke="#8884d8" 
+                <Line
+                  type="monotone"
+                  dataKey="invitationsSent"
+                  stroke="#8884d8"
                   name="Sent"
                   strokeWidth={2}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="invitationsAccepted" 
-                  stroke="#82ca9d" 
+                <Line
+                  type="monotone"
+                  dataKey="invitationsAccepted"
+                  stroke="#82ca9d"
                   name="Accepted"
                   strokeWidth={2}
                 />
@@ -289,9 +325,7 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
         <Card>
           <CardHeader>
             <CardTitle>Invitation Status Distribution</CardTitle>
-            <CardDescription>
-              Current status of all invitations
-            </CardDescription>
+            <CardDescription>Current status of all invitations</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -301,7 +335,9 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(0)}%`
+                  }
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
@@ -344,25 +380,32 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
       <Card>
         <CardHeader>
           <CardTitle>Recent Activity Summary</CardTitle>
-          <CardDescription>
-            Key metrics from the last 30 days
-          </CardDescription>
+          <CardDescription>Key metrics from the last 30 days</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-2xl font-bold text-blue-600">{data.recentInvitations30Days}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {data.recentInvitations30Days}
+              </p>
               <p className="text-sm text-gray-600">Invitations Sent</p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <p className="text-2xl font-bold text-green-600">{data.recentAccepted30Days}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {data.recentAccepted30Days}
+              </p>
               <p className="text-sm text-gray-600">Invitations Accepted</p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <p className="text-2xl font-bold text-purple-600">
-                {data.recentInvitations30Days > 0 
-                  ? Math.round((data.recentAccepted30Days / data.recentInvitations30Days) * 100)
-                  : 0}%
+                {data.recentInvitations30Days > 0
+                  ? Math.round(
+                      (data.recentAccepted30Days /
+                        data.recentInvitations30Days) *
+                        100,
+                    )
+                  : 0}
+                %
               </p>
               <p className="text-sm text-gray-600">Recent Acceptance Rate</p>
             </div>

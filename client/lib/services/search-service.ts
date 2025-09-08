@@ -59,9 +59,7 @@ export const SearchFiltersSchema = z.object({
   experienceLevel: z.string().optional(),
   employmentType: z.string().optional(),
   datePosted: z.string().optional(),
-  sortBy: z
-    .enum(["recent", "featured", "top", "latest"])
-    .optional(),
+  sortBy: z.enum(["recent", "featured", "top", "latest"]).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(20),
 });

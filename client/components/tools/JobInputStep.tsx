@@ -1,5 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
-import { Upload, Link as LinkIcon, FileText, X, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Upload,
+  Link as LinkIcon,
+  FileText,
+  X,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -16,15 +29,19 @@ interface JobInputStepProps {
   onJobSelected: (jobData: {
     jobId?: string;
     jobContent?: string;
-    source: 'url' | 'paste' | 'file' | 'existing';
+    source: "url" | "paste" | "file" | "existing";
   }) => void;
   isLoading?: boolean;
   error?: string | null;
 }
 
-export default function JobInputStep({ onJobSelected, isLoading = false, error }: JobInputStepProps) {
+export default function JobInputStep({
+  onJobSelected,
+  isLoading = false,
+  error,
+}: JobInputStepProps) {
   const { isAuthenticated } = useAuth();
-  
+
   // State for different input methods
   const [jobUrl, setJobUrl] = useState("");
   const [jobContent, setJobContent] = useState("");
@@ -45,11 +62,11 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
   const allowedTypes = useMemo(
     () => [
       "application/pdf",
-      "application/msword", 
+      "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
     ],
-    []
+    [],
   );
 
   // URL handling
@@ -64,11 +81,13 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
       const job = await jobService.extractJobFromUrl(jobUrl);
       onJobSelected({
         jobContent: job.description || JSON.stringify(job),
-        source: 'url'
+        source: "url",
       });
     } catch (err) {
       console.error("Failed to extract job from URL:", err);
-      setUrlError("Could not extract job content from URL. Please try copy/paste method instead.");
+      setUrlError(
+        "Could not extract job content from URL. Please try copy/paste method instead.",
+      );
     } finally {
       setIsLoadingUrl(false);
     }
@@ -107,7 +126,7 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
         setFile(droppedFile);
       }
     },
-    [allowedTypes]
+    [allowedTypes],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,12 +138,12 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
 
   const handleFileUpload = async () => {
     if (!file) return;
-    
+
     try {
       const job = await jobService.createJobFromFile(file);
       onJobSelected({
         jobContent: job.description || JSON.stringify(job),
-        source: 'file'
+        source: "file",
       });
     } catch (err) {
       console.error("Failed to process job file:", err);
@@ -134,20 +153,20 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
   // Content handling
   const handleContentSubmit = () => {
     if (!jobContent.trim()) return;
-    
+
     onJobSelected({
       jobContent: jobContent.trim(),
-      source: 'paste'
+      source: "paste",
     });
   };
 
   // Existing job handling
   const handleExistingJobSelect = () => {
     if (!selectedJobId) return;
-    
+
     onJobSelected({
       jobId: selectedJobId,
-      source: 'existing'
+      source: "existing",
     });
   };
 
@@ -180,7 +199,7 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
               My Jobs {!isAuthenticated && "(Login Required)"}
             </TabsTrigger>
           </TabsList>
-          
+
           {/* URL Tab */}
           <TabsContent value="url" className="space-y-4">
             <div className="space-y-4">
@@ -217,7 +236,8 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter a job posting URL. Use Preview to see the page, then Extract to analyze.
+                  Enter a job posting URL. Use Preview to see the page, then
+                  Extract to analyze.
                 </p>
               </div>
 
@@ -226,7 +246,9 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                 <div className="space-y-4">
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-muted p-3 flex items-center justify-between">
-                      <span className="text-sm font-medium">Job Posting Preview</span>
+                      <span className="text-sm font-medium">
+                        Job Posting Preview
+                      </span>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -257,8 +279,9 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      If the job posting doesn't load properly in the preview, click "Extract Job Details"
-                      to automatically extract the content, or use the copy/paste method instead.
+                      If the job posting doesn't load properly in the preview,
+                      click "Extract Job Details" to automatically extract the
+                      content, or use the copy/paste method instead.
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -287,10 +310,11 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                   disabled={isLoading}
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Copy and paste the complete job description from the job posting
+                  Copy and paste the complete job description from the job
+                  posting
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={handleContentSubmit}
                 disabled={!jobContent.trim() || isLoading}
                 className="w-full"
@@ -347,13 +371,18 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                         </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={removeFile} disabled={isLoading}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeFile}
+                      disabled={isLoading}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <Button 
-                  onClick={handleFileUpload} 
+                <Button
+                  onClick={handleFileUpload}
                   disabled={isLoading}
                   className="w-full"
                 >
@@ -379,7 +408,10 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="job-select">Select Job</Label>
-                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                  <Select
+                    value={selectedJobId}
+                    onValueChange={setSelectedJobId}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a job from your saved jobs" />
                     </SelectTrigger>
@@ -395,8 +427,8 @@ export default function JobInputStep({ onJobSelected, isLoading = false, error }
                     </SelectContent>
                   </Select>
                 </div>
-                <Button 
-                  onClick={handleExistingJobSelect} 
+                <Button
+                  onClick={handleExistingJobSelect}
                   disabled={!selectedJobId || isLoading}
                   className="w-full"
                 >

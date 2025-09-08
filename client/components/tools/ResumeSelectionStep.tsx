@@ -1,5 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
-import { Upload, FileText, X, AlertTriangle, Loader2, User } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  X,
+  AlertTriangle,
+  Loader2,
+  User,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { resumeService, type Resume } from "@/lib/services/resume-service";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -16,15 +29,19 @@ interface ResumeSelectionStepProps {
   onResumeSelected: (resumeData: {
     resumeId?: string;
     resumeContent?: string;
-    source: 'existing' | 'paste' | 'file';
+    source: "existing" | "paste" | "file";
   }) => void;
   isLoading?: boolean;
   error?: string | null;
 }
 
-export default function ResumeSelectionStep({ onResumeSelected, isLoading = false, error }: ResumeSelectionStepProps) {
+export default function ResumeSelectionStep({
+  onResumeSelected,
+  isLoading = false,
+  error,
+}: ResumeSelectionStepProps) {
   const { isAuthenticated } = useAuth();
-  
+
   // State for different input methods
   const [resumeContent, setResumeContent] = useState("");
   const [selectedResumeId, setSelectedResumeId] = useState("");
@@ -41,11 +58,11 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
   const allowedTypes = useMemo(
     () => [
       "application/pdf",
-      "application/msword", 
+      "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
     ],
-    []
+    [],
   );
 
   // File handling
@@ -69,7 +86,7 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
         setFile(droppedFile);
       }
     },
-    [allowedTypes]
+    [allowedTypes],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,7 +98,7 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
 
   const handleFileUpload = async () => {
     if (!file) return;
-    
+
     try {
       // For now, we'll need to extract text content from the file
       // This would typically involve a file processing service
@@ -90,7 +107,7 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
         const content = e.target?.result as string;
         onResumeSelected({
           resumeContent: content,
-          source: 'file'
+          source: "file",
         });
       };
       reader.readAsText(file);
@@ -102,20 +119,20 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
   // Content handling
   const handleContentSubmit = () => {
     if (!resumeContent.trim()) return;
-    
+
     onResumeSelected({
       resumeContent: resumeContent.trim(),
-      source: 'paste'
+      source: "paste",
     });
   };
 
   // Existing resume handling
   const handleExistingResumeSelect = () => {
     if (!selectedResumeId) return;
-    
+
     onResumeSelected({
       resumeId: selectedResumeId,
-      source: 'existing'
+      source: "existing",
     });
   };
 
@@ -139,7 +156,10 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue={isAuthenticated ? "existing" : "paste"} className="w-full">
+        <Tabs
+          defaultValue={isAuthenticated ? "existing" : "paste"}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="existing" disabled={!isAuthenticated}>
               My Resumes {!isAuthenticated && "(Login Required)"}
@@ -147,14 +167,17 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
             <TabsTrigger value="paste">Copy & Paste</TabsTrigger>
             <TabsTrigger value="upload">Upload File</TabsTrigger>
           </TabsList>
-          
+
           {/* Existing Resumes Tab */}
           <TabsContent value="existing" className="space-y-4">
             {isAuthenticated ? (
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="resume-select">Select Resume</Label>
-                  <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
+                  <Select
+                    value={selectedResumeId}
+                    onValueChange={setSelectedResumeId}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a resume to analyze" />
                     </SelectTrigger>
@@ -178,12 +201,13 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
                   </Select>
                   {resumes.length === 0 && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      No resumes found. Create a resume first or use the other options.
+                      No resumes found. Create a resume first or use the other
+                      options.
                     </p>
                   )}
                 </div>
-                <Button 
-                  onClick={handleExistingResumeSelect} 
+                <Button
+                  onClick={handleExistingResumeSelect}
                   disabled={!selectedResumeId || isLoading}
                   className="w-full"
                 >
@@ -223,10 +247,11 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
                   disabled={isLoading}
                 />
                 <p className="text-sm text-muted-foreground mt-1">
-                  Copy and paste your complete resume content (text format works best)
+                  Copy and paste your complete resume content (text format works
+                  best)
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={handleContentSubmit}
                 disabled={!resumeContent.trim() || isLoading}
                 className="w-full"
@@ -265,7 +290,10 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
                   disabled={isLoading}
                 />
                 <Button variant="outline" asChild>
-                  <label htmlFor="resume-file-upload" className="cursor-pointer">
+                  <label
+                    htmlFor="resume-file-upload"
+                    className="cursor-pointer"
+                  >
                     Choose File
                   </label>
                 </Button>
@@ -283,13 +311,18 @@ export default function ResumeSelectionStep({ onResumeSelected, isLoading = fals
                         </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={removeFile} disabled={isLoading}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeFile}
+                      disabled={isLoading}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <Button 
-                  onClick={handleFileUpload} 
+                <Button
+                  onClick={handleFileUpload}
                   disabled={isLoading}
                   className="w-full"
                 >

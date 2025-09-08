@@ -376,7 +376,10 @@ export class ResumeService {
    * Get specific resume by ID
    */
   async getResumeById(id: string): Promise<Resume> {
-    const response = await apiClient.get<Resume>(`/api/Resume/${id}`, ResumeSchema);
+    const response = await apiClient.get<Resume>(
+      `/api/Resume/${id}`,
+      ResumeSchema,
+    );
     return response.data;
   }
 

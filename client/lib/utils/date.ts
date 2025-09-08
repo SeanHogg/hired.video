@@ -12,14 +12,17 @@ export const getCurrentYear = (): number => {
  * @param endYear - The ending year (defaults to current year)
  * @returns Formatted year range string (e.g., "2024" or "2024-2025")
  */
-export const formatCopyrightYear = (startYear: number, endYear?: number): string => {
+export const formatCopyrightYear = (
+  startYear: number,
+  endYear?: number,
+): string => {
   const currentYear = getCurrentYear();
   const finalEndYear = endYear || currentYear;
-  
+
   if (startYear === finalEndYear) {
     return startYear.toString();
   }
-  
+
   return `${startYear}-${finalEndYear}`;
 };
 
@@ -29,7 +32,10 @@ export const formatCopyrightYear = (startYear: number, endYear?: number): string
  * @param startYear - The starting year (defaults to 2024)
  * @returns Full copyright string
  */
-export const getCopyrightString = (companyName: string, startYear = 2024): string => {
+export const getCopyrightString = (
+  companyName: string,
+  startYear = 2024,
+): string => {
   const yearRange = formatCopyrightYear(startYear);
   return `© ${yearRange} ${companyName}. All rights reserved.`;
 };

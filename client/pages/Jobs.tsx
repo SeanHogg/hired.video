@@ -196,22 +196,22 @@ export default function Jobs() {
           ownership: "tracked" as const,
           slug: (j as any).slug || "",
           experienceLevel: (j as any).experienceLevel || "entry",
-            status: "active" as const,
-            privacy: "public" as const,
-            description: (j as any).description || "",
-            views: (j as any).views || 0,
-            applications: (j as any).applications || 0,
-            summary: (j as any).summary || "",
-            userId: (j as any).userId || "",
-            createdAt: (j as any).createdAt || "",
-            updatedAt: (j as any).updatedAt || "",
-          })),
-        });
-      } catch (error) {
-        console.error("Failed to load user jobs:", error);
-      } finally {
-        setIsLoading(false);
-      }
+          status: "active" as const,
+          privacy: "public" as const,
+          description: (j as any).description || "",
+          views: (j as any).views || 0,
+          applications: (j as any).applications || 0,
+          summary: (j as any).summary || "",
+          userId: (j as any).userId || "",
+          createdAt: (j as any).createdAt || "",
+          updatedAt: (j as any).updatedAt || "",
+        })),
+      });
+    } catch (error) {
+      console.error("Failed to load user jobs:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Only load user jobs when specifically needed (not on every page load)
@@ -226,8 +226,7 @@ export default function Jobs() {
   if (isAuthenticated && user) {
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
     const isRecruiterOrEmployer =
-      user.role === USER_ROLES.RECRUITER ||
-      user.role === USER_ROLES.EMPLOYER;
+      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
     return (
       <div className="min-h-screen bg-background">
@@ -473,7 +472,11 @@ export default function Jobs() {
                 </Link>
               </div>
               <div className="mt-4 text-center">
-                <Button size="sm" variant="ghost" className="text-muted-foreground">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                >
                   <Play className="mr-2 h-4 w-4" />
                   See How It Works
                 </Button>
@@ -602,8 +605,9 @@ export default function Jobs() {
                   Hiring? Find Top Talent Fast
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                  Post your job openings and connect with qualified candidates who match your requirements.
-                  Our AI-powered platform helps you find the right talent quickly.
+                  Post your job openings and connect with qualified candidates
+                  who match your requirements. Our AI-powered platform helps you
+                  find the right talent quickly.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup?role=recruiter">

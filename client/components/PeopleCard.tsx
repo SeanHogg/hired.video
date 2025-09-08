@@ -112,48 +112,60 @@ export default function PeopleCard({
     }
   };
 
-
-
   // Derive safe display name and initials
-  const displayFullName = (person.fullName && person.fullName.trim().length > 0)
-    ? person.fullName
-    : (person as { name?: string })?.name?.toString()?.trim?.() || `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "User";
-  const firstInitial = ((person.firstName?.[0]) ?? displayFullName?.trim()?.[0] ?? "?")
+  const displayFullName =
+    person.fullName && person.fullName.trim().length > 0
+      ? person.fullName
+      : (person as { name?: string })?.name?.toString()?.trim?.() ||
+        `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() ||
+        "User";
+  const firstInitial = (
+    person.firstName?.[0] ??
+    displayFullName?.trim()?.[0] ??
+    "?"
+  )
     .toString()
     .toUpperCase();
-  const lastInitial = ((person.lastName?.[0]) ?? displayFullName?.trim()?.split(" ").slice(-1)[0]?.[0] ?? "")
+  const lastInitial = (
+    person.lastName?.[0] ??
+    displayFullName?.trim()?.split(" ").slice(-1)[0]?.[0] ??
+    ""
+  )
     .toString()
     .toUpperCase();
 
   // Use passed actions or fallback to default actions
-  const cardActions = actions && actions.length > 0 ? actions : [
-    {
-      id: "view",
-      label: "View",
-      variant: "outline" as const,
-      icon: UserCheck,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/people/${person.id}`;
-        }
-      }
-    },
-    {
-      id: "actions",
-      label: "Actions",
-      variant: "default" as const,
-      icon: MessageCircle,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          console.log("Actions clicked for person:", person.id);
-        }
-      }
-    }
-  ];
+  const cardActions =
+    actions && actions.length > 0
+      ? actions
+      : [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: UserCheck,
+            onClick: () => {
+              if (onView) {
+                onView();
+              } else {
+                window.location.href = `/people/${person.id}`;
+              }
+            },
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            variant: "default" as const,
+            icon: MessageCircle,
+            onClick: () => {
+              if (onActions) {
+                onActions();
+              } else {
+                console.log("Actions clicked for person:", person.id);
+              }
+            },
+          },
+        ];
 
   return (
     <Card className="hover:shadow-lg transition-shadow relative">
@@ -282,19 +294,20 @@ export default function PeopleCard({
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              Active {person.lastActiveAt && !isNaN(new Date(person.lastActiveAt).getTime())
+              Active{" "}
+              {person.lastActiveAt &&
+              !isNaN(new Date(person.lastActiveAt).getTime())
                 ? new Date(person.lastActiveAt).toLocaleDateString()
                 : "Unknown"}
             </div>
             <div className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              Joined {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
+              Joined{" "}
+              {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
                 ? new Date(person.createdAt).toLocaleDateString()
                 : "Unknown"}
             </div>
           </div>
-
-
 
           {/* Connection Actions (Secondary Row) */}
           {user && person.id !== user.id && (
@@ -318,12 +331,7 @@ export default function PeopleCard({
                   </Button>
                 </div>
               ) : isPendingSent ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  disabled
-                >
+                <Button variant="outline" size="sm" className="flex-1" disabled>
                   <Clock className="h-3 w-3 mr-1" />
                   Pending
                 </Button>

@@ -90,7 +90,7 @@ export default function JobCard({
       text: "Tracked",
       variant: "outline" as const,
       className: "text-xs bg-blue-50 text-blue-700",
-      icon: UserCheck
+      icon: UserCheck,
     });
   }
 
@@ -99,14 +99,14 @@ export default function JobCard({
       text: "Draft",
       variant: "outline" as const,
       className: "text-xs bg-orange-50 text-orange-700",
-      icon: Edit
+      icon: Edit,
     });
   }
 
   badges.push({
     text: job.status,
     variant: "secondary" as const,
-    className: getStatusColor(job.status)
+    className: getStatusColor(job.status),
   });
 
   if (getPrivacyIcon(job.privacy)) {
@@ -114,47 +114,53 @@ export default function JobCard({
       text: "",
       variant: "outline" as const,
       className: "text-xs",
-      icon: () => getPrivacyIcon(job.privacy)
+      icon: () => getPrivacyIcon(job.privacy),
     });
   }
 
   // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const cardActions = (actions && actions.length > 0) ? actions : [
-    {
-      id: "view",
-      label: "View",
-      variant: "outline" as const,
-      icon: Eye,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/jobs/${job.id}`;
-        }
-      }
-    },
-    {
-      id: "share",
-      label: "Share",
-      variant: "default" as const,
-      icon: Share,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          // Default share functionality - copy link to clipboard
-          const url = `${window.location.origin}/jobs/${job.id}`;
-          navigator.clipboard.writeText(url).then(() => {
-            // Could show a toast notification here
-            alert('Job link copied to clipboard!');
-          }).catch(() => {
-            // Fallback for older browsers
-            prompt('Copy this link:', url);
-          });
-        }
-      }
-    }
-  ];
+  const cardActions =
+    actions && actions.length > 0
+      ? actions
+      : [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => {
+              if (onView) {
+                onView();
+              } else {
+                window.location.href = `/jobs/${job.id}`;
+              }
+            },
+          },
+          {
+            id: "share",
+            label: "Share",
+            variant: "default" as const,
+            icon: Share,
+            onClick: () => {
+              if (onActions) {
+                onActions();
+              } else {
+                // Default share functionality - copy link to clipboard
+                const url = `${window.location.origin}/jobs/${job.id}`;
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => {
+                    // Could show a toast notification here
+                    alert("Job link copied to clipboard!");
+                  })
+                  .catch(() => {
+                    // Fallback for older browsers
+                    prompt("Copy this link:", url);
+                  });
+              }
+            },
+          },
+        ];
 
   return (
     <BaseCard>
@@ -213,7 +219,6 @@ export default function JobCard({
               Posted {new Date(job.createdAt).toLocaleDateString()}
             </div>
           </div>
-
         </div>
       </CardContent>
 

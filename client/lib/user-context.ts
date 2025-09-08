@@ -1,6 +1,6 @@
 /**
  * User Context and Ownership Detection Utilities
- * 
+ *
  * Provides utilities for determining user permissions, item ownership,
  * and context-aware access control for card actions.
  */
@@ -9,7 +9,7 @@ import type {
   UserContext,
   ItemOwnership,
   RawApiItem,
-  NormalizedCardData
+  NormalizedCardData,
 } from "@/types/normalized-cards";
 
 /**
@@ -17,7 +17,7 @@ import type {
  */
 export function determineItemOwnership(
   item: RawApiItem | NormalizedCardData,
-  userContext?: UserContext
+  userContext?: UserContext,
 ): ItemOwnership {
   if (!userContext?.isAuthenticated) {
     return {
@@ -25,7 +25,7 @@ export function determineItemOwnership(
       canEdit: false,
       canDelete: false,
       canManage: false,
-      showOwnership: false
+      showOwnership: false,
     };
   }
 
@@ -41,7 +41,7 @@ export function determineItemOwnership(
       canEdit: true,
       canDelete: true,
       canManage: true,
-      showOwnership: true
+      showOwnership: true,
     };
   }
 
@@ -49,7 +49,7 @@ export function determineItemOwnership(
   if (itemAccountId && itemAccountId === accountId) {
     const canManage = role === "account_owner";
     const canEdit = role === "account_owner" || role === "recruiter";
-    
+
     return {
       ownership: "account_owned",
       ownerId: itemUserId,
@@ -57,7 +57,7 @@ export function determineItemOwnership(
       canEdit,
       canDelete: canManage,
       canManage,
-      showOwnership: true
+      showOwnership: true,
     };
   }
 
@@ -69,7 +69,7 @@ export function determineItemOwnership(
       canEdit: false,
       canDelete: false,
       canManage: false,
-      showOwnership: true
+      showOwnership: true,
     };
   }
 
@@ -79,7 +79,7 @@ export function determineItemOwnership(
     canEdit: false,
     canDelete: false,
     canManage: false,
-    showOwnership: false
+    showOwnership: false,
   };
 }
 
@@ -91,7 +91,7 @@ function checkIfTracked(
   // eslint-disable-next-line no-unused-vars
   _item: RawApiItem | NormalizedCardData,
   // eslint-disable-next-line no-unused-vars
-  _userId: string
+  _userId: string,
 ): boolean {
   // TODO: Implement actual tracking check
   // This could check localStorage, a tracking service, or user preferences
@@ -103,7 +103,7 @@ function checkIfTracked(
  */
 export function hasPermission(
   userContext: UserContext,
-  permission: string
+  permission: string,
 ): boolean {
   if (!userContext.isAuthenticated) {
     return false;
@@ -125,7 +125,7 @@ export function getUserRoleDisplayName(role: UserContext["role"]): string {
     admin: "Administrator",
     account_owner: "Account Owner",
     recruiter: "Recruiter",
-    regular_user: "User"
+    regular_user: "User",
   };
 
   return roleNames[role] || "User";
@@ -137,7 +137,7 @@ export function getUserRoleDisplayName(role: UserContext["role"]): string {
 export function canPerformAction(
   action: string,
   itemOwnership: ItemOwnership,
-  userContext: UserContext
+  userContext: UserContext,
 ): boolean {
   if (!userContext.isAuthenticated) {
     return false;
@@ -146,34 +146,38 @@ export function canPerformAction(
   switch (action) {
     case "view":
       return true; // Everyone can view (visibility handled elsewhere)
-    
+
     case "edit":
       return itemOwnership.canEdit;
-    
+
     case "delete":
       return itemOwnership.canDelete;
-    
+
     case "manage":
       return itemOwnership.canManage;
-    
+
     case "track":
       return itemOwnership.ownership === "none";
-    
+
     case "untrack":
       return itemOwnership.ownership === "tracked";
-    
+
     case "assign":
-      return userContext.role === "account_owner" && 
-             itemOwnership.ownership === "account_owned";
-    
+      return (
+        userContext.role === "account_owner" &&
+        itemOwnership.ownership === "account_owned"
+      );
+
     case "contact":
-      return userContext.role === "recruiter" || 
-             userContext.role === "account_owner";
-    
+      return (
+        userContext.role === "recruiter" || userContext.role === "account_owner"
+      );
+
     case "review":
-      return userContext.role === "recruiter" || 
-             userContext.role === "account_owner";
-    
+      return (
+        userContext.role === "recruiter" || userContext.role === "account_owner"
+      );
+
     default:
       return false;
   }
@@ -187,7 +191,7 @@ export function getDefaultUserContext(): UserContext {
     userId: "",
     role: "regular_user",
     permissions: [],
-    isAuthenticated: false
+    isAuthenticated: false,
   };
 }
 
@@ -205,6 +209,6 @@ export function createUserContext(authData: {
     role: authData.role as UserContext["role"],
     accountId: authData.accountId,
     permissions: authData.permissions || [],
-    isAuthenticated: true
+    isAuthenticated: true,
   };
 }

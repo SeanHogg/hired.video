@@ -1,12 +1,27 @@
 import { useState } from "react";
-import { ArrowLeft, Calculator, Loader2, DollarSign, TrendingUp, MapPin, Briefcase, GraduationCap } from "lucide-react";
+import {
+  ArrowLeft,
+  Calculator,
+  Loader2,
+  DollarSign,
+  TrendingUp,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import Footer from "@/components/Footer";
@@ -74,7 +89,7 @@ export default function SalaryCalculator() {
     "Transportation",
     "Energy",
     "Telecommunications",
-    "Other"
+    "Other",
   ];
 
   const educationLevels = [
@@ -83,7 +98,7 @@ export default function SalaryCalculator() {
     "Bachelor's Degree",
     "Master's Degree",
     "PhD/Doctorate",
-    "Professional Certification"
+    "Professional Certification",
   ];
 
   const calculateSalary = async () => {
@@ -110,9 +125,9 @@ Job Details:
 - Job Title: ${jobTitle}
 - Location: ${location_}
 - Years of Experience: ${experience[0]}
-- Education Level: ${education || 'Not specified'}
-- Industry: ${industry || 'Not specified'}
-- Company: ${company || 'Not specified'}
+- Education Level: ${education || "Not specified"}
+- Industry: ${industry || "Not specified"}
+- Company: ${company || "Not specified"}
 
 Please provide a detailed salary analysis in the following JSON format (return ONLY valid JSON, no additional text):
 
@@ -137,16 +152,19 @@ Please provide a detailed salary analysis in the following JSON format (return O
 Base your analysis on current 2024 market data, considering cost of living adjustments, industry standards, and experience premiums. Ensure all numbers are realistic and based on actual market conditions.`;
 
       // Call AI service
-      const response = await aiService.sendChatMessage([
+      const response = await aiService.sendChatMessage(
+        [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
         {
-          role: "user",
-          content: prompt
-        }
-      ], {
-        model: "meta-llama/llama-3.1-8b-instruct:free",
-        maxTokens: 1000,
-        temperature: 0.3 // Lower temperature for more consistent numerical outputs
-      });
+          model: "meta-llama/llama-3.1-8b-instruct:free",
+          maxTokens: 1000,
+          temperature: 0.3, // Lower temperature for more consistent numerical outputs
+        },
+      );
 
       // Parse AI response
       let aiSalaryData: SalaryData;
@@ -157,39 +175,77 @@ Base your analysis on current 2024 market data, considering cost of living adjus
         aiSalaryData = JSON.parse(jsonString);
 
         // Validate and sanitize the data
-        if (!aiSalaryData.baseSalary || typeof aiSalaryData.baseSalary !== 'number') {
-          throw new Error('Invalid salary data from AI');
+        if (
+          !aiSalaryData.baseSalary ||
+          typeof aiSalaryData.baseSalary !== "number"
+        ) {
+          throw new Error("Invalid salary data from AI");
         }
 
         // Ensure all required fields exist with reasonable defaults
         aiSalaryData = {
           baseSalary: Math.round(aiSalaryData.baseSalary),
-          lowRange: Math.round(aiSalaryData.lowRange || aiSalaryData.baseSalary * 0.8),
-          highRange: Math.round(aiSalaryData.highRange || aiSalaryData.baseSalary * 1.3),
-          marketAverage: Math.round(aiSalaryData.marketAverage || aiSalaryData.baseSalary * 1.05),
-          percentile25: Math.round(aiSalaryData.percentile25 || aiSalaryData.baseSalary * 0.85),
-          percentile75: Math.round(aiSalaryData.percentile75 || aiSalaryData.baseSalary * 1.2),
-          totalCompensation: Math.round(aiSalaryData.totalCompensation || aiSalaryData.baseSalary * 1.25),
+          lowRange: Math.round(
+            aiSalaryData.lowRange || aiSalaryData.baseSalary * 0.8,
+          ),
+          highRange: Math.round(
+            aiSalaryData.highRange || aiSalaryData.baseSalary * 1.3,
+          ),
+          marketAverage: Math.round(
+            aiSalaryData.marketAverage || aiSalaryData.baseSalary * 1.05,
+          ),
+          percentile25: Math.round(
+            aiSalaryData.percentile25 || aiSalaryData.baseSalary * 0.85,
+          ),
+          percentile75: Math.round(
+            aiSalaryData.percentile75 || aiSalaryData.baseSalary * 1.2,
+          ),
+          totalCompensation: Math.round(
+            aiSalaryData.totalCompensation || aiSalaryData.baseSalary * 1.25,
+          ),
           locationAdjustment: Math.round(aiSalaryData.locationAdjustment || 0),
-          experienceAdjustment: Math.round(aiSalaryData.experienceAdjustment || experience[0] * 5),
+          experienceAdjustment: Math.round(
+            aiSalaryData.experienceAdjustment || experience[0] * 5,
+          ),
           industryComparison: aiSalaryData.industryComparison || [
-            { industry: "Technology", averageSalary: Math.round(aiSalaryData.baseSalary * 1.1), difference: 10 },
-            { industry: "Finance", averageSalary: Math.round(aiSalaryData.baseSalary * 1.05), difference: 5 },
-            { industry: "Healthcare", averageSalary: Math.round(aiSalaryData.baseSalary * 0.95), difference: -5 },
-            { industry: "Education", averageSalary: Math.round(aiSalaryData.baseSalary * 0.8), difference: -20 }
-          ]
+            {
+              industry: "Technology",
+              averageSalary: Math.round(aiSalaryData.baseSalary * 1.1),
+              difference: 10,
+            },
+            {
+              industry: "Finance",
+              averageSalary: Math.round(aiSalaryData.baseSalary * 1.05),
+              difference: 5,
+            },
+            {
+              industry: "Healthcare",
+              averageSalary: Math.round(aiSalaryData.baseSalary * 0.95),
+              difference: -5,
+            },
+            {
+              industry: "Education",
+              averageSalary: Math.round(aiSalaryData.baseSalary * 0.8),
+              difference: -20,
+            },
+          ],
         };
-
       } catch (parseError) {
         console.error("Failed to parse AI response:", parseError);
         console.log("AI Response:", response.message);
-        throw new Error("Failed to parse salary analysis from AI. Please try again.");
+        throw new Error(
+          "Failed to parse salary analysis from AI. Please try again.",
+        );
       }
 
       setSalaryData(aiSalaryData);
     } catch (err) {
       console.error("Salary calculation failed:", err);
-      setError(err instanceof Error ? err.message : "Failed to calculate salary. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to calculate salary. Please try again.",
+      );
     } finally {
       setIsCalculating(false);
     }
@@ -207,9 +263,9 @@ Base your analysis on current 2024 market data, considering cost of living adjus
   };
 
   const formatSalary = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -249,15 +305,18 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-brand-green/10 rounded-lg flex items-center justify-center">
                   <Calculator className="h-6 w-6 text-brand-green" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">AI-Powered Salary Calculator</h1>
+                  <h1 className="text-3xl font-bold">
+                    AI-Powered Salary Calculator
+                  </h1>
                   <p className="text-muted-foreground">
-                    Get AI-driven salary insights based on current market data and trends
+                    Get AI-driven salary insights based on current market data
+                    and trends
                   </p>
                 </div>
               </div>
@@ -270,10 +329,14 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       <DollarSign className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-blue-900 mb-1">AI-Powered Analysis</h3>
+                      <h3 className="font-semibold text-blue-900 mb-1">
+                        AI-Powered Analysis
+                      </h3>
                       <p className="text-sm text-blue-800">
-                        Our AI analyzes current market data, location cost-of-living, experience premiums, and industry standards
-                        to provide personalized salary estimates and comprehensive compensation insights.
+                        Our AI analyzes current market data, location
+                        cost-of-living, experience premiums, and industry
+                        standards to provide personalized salary estimates and
+                        comprehensive compensation insights.
                       </p>
                     </div>
                   </div>
@@ -380,9 +443,11 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       />
                     </div>
 
-                    <Button 
+                    <Button
                       onClick={calculateSalary}
-                      disabled={isCalculating || !jobTitle.trim() || !location_.trim()}
+                      disabled={
+                        isCalculating || !jobTitle.trim() || !location_.trim()
+                      }
                       className="w-full"
                       size="lg"
                     >
@@ -432,12 +497,20 @@ Base your analysis on current 2024 market data, considering cost of living adjus
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div className="text-center p-3 bg-muted rounded-lg">
-                            <div className="font-semibold">{formatSalary(salaryData.lowRange)}</div>
-                            <div className="text-muted-foreground">Low Range</div>
+                            <div className="font-semibold">
+                              {formatSalary(salaryData.lowRange)}
+                            </div>
+                            <div className="text-muted-foreground">
+                              Low Range
+                            </div>
                           </div>
                           <div className="text-center p-3 bg-muted rounded-lg">
-                            <div className="font-semibold">{formatSalary(salaryData.highRange)}</div>
-                            <div className="text-muted-foreground">High Range</div>
+                            <div className="font-semibold">
+                              {formatSalary(salaryData.highRange)}
+                            </div>
+                            <div className="text-muted-foreground">
+                              High Range
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -454,28 +527,35 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       <CardContent className="space-y-4">
                         <div className="flex justify-between items-center">
                           <span>Market Average</span>
-                          <span className="font-semibold">{formatSalary(salaryData.marketAverage)}</span>
+                          <span className="font-semibold">
+                            {formatSalary(salaryData.marketAverage)}
+                          </span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center">
                           <span>25th Percentile</span>
-                          <span className="font-semibold">{formatSalary(salaryData.percentile25)}</span>
+                          <span className="font-semibold">
+                            {formatSalary(salaryData.percentile25)}
+                          </span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center">
                           <span>75th Percentile</span>
-                          <span className="font-semibold">{formatSalary(salaryData.percentile75)}</span>
+                          <span className="font-semibold">
+                            {formatSalary(salaryData.percentile75)}
+                          </span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center border-t pt-3">
                           <span>Total Compensation</span>
                           <span className="font-semibold text-brand-green">
                             {formatSalary(salaryData.totalCompensation)}
                           </span>
                         </div>
-                        
+
                         <div className="text-xs text-muted-foreground">
-                          * Total compensation includes estimated benefits and bonuses
+                          * Total compensation includes estimated benefits and
+                          bonuses
                         </div>
                       </CardContent>
                     </Card>
@@ -494,11 +574,18 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                             <MapPin className="h-4 w-4" />
                             Location Adjustment
                           </span>
-                          <Badge variant={salaryData.locationAdjustment >= 0 ? "default" : "secondary"}>
-                            {salaryData.locationAdjustment >= 0 ? "+" : ""}{salaryData.locationAdjustment}%
+                          <Badge
+                            variant={
+                              salaryData.locationAdjustment >= 0
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {salaryData.locationAdjustment >= 0 ? "+" : ""}
+                            {salaryData.locationAdjustment}%
                           </Badge>
                         </div>
-                        
+
                         <div className="flex justify-between items-center">
                           <span className="flex items-center gap-2">
                             <Briefcase className="h-4 w-4" />
@@ -521,15 +608,27 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {salaryData.industryComparison.map((comp, index) => (
-                          <div key={index} className="flex justify-between items-center">
+                          <div
+                            key={index}
+                            className="flex justify-between items-center"
+                          >
                             <span>{comp.industry}</span>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold">{formatSalary(comp.averageSalary)}</span>
-                              <Badge 
-                                variant={comp.difference >= 0 ? "default" : "secondary"}
-                                className={comp.difference >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                              <span className="font-semibold">
+                                {formatSalary(comp.averageSalary)}
+                              </span>
+                              <Badge
+                                variant={
+                                  comp.difference >= 0 ? "default" : "secondary"
+                                }
+                                className={
+                                  comp.difference >= 0
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }
                               >
-                                {comp.difference >= 0 ? "+" : ""}{comp.difference}%
+                                {comp.difference >= 0 ? "+" : ""}
+                                {comp.difference}%
                               </Badge>
                             </div>
                           </div>
@@ -541,7 +640,7 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       <Button variant="outline" onClick={resetCalculator}>
                         Calculate Another
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => {
                           const report = `Salary Report for ${jobTitle} in ${location_}\n\nEstimated Salary: ${formatSalary(salaryData.baseSalary)}\nSalary Range: ${formatSalary(salaryData.lowRange)} - ${formatSalary(salaryData.highRange)}\nTotal Compensation: ${formatSalary(salaryData.totalCompensation)}\n\nGenerated by MyVideoResume Salary Calculator`;
                           navigator.clipboard.writeText(report);
@@ -560,9 +659,10 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                       <Calculator className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="font-semibold mb-2">Ready to Calculate</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Enter your job details to get personalized salary insights and market data.
+                        Enter your job details to get personalized salary
+                        insights and market data.
                       </p>
-                      
+
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
                         <h4 className="font-medium mb-2">What you'll get:</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">
@@ -584,9 +684,13 @@ Base your analysis on current 2024 market data, considering cost of living adjus
               <div className="mt-8">
                 <Alert className="bg-amber-50 border-amber-200">
                   <AlertDescription className="text-amber-800">
-                    <strong>AI-Generated Estimates:</strong> These salary estimates are generated by AI based on market analysis and should be used as a general guide.
-                    Actual salaries may vary based on specific company policies, negotiation, additional skills, and current market conditions.
-                    We recommend using multiple sources and conducting your own research for the most accurate salary information.
+                    <strong>AI-Generated Estimates:</strong> These salary
+                    estimates are generated by AI based on market analysis and
+                    should be used as a general guide. Actual salaries may vary
+                    based on specific company policies, negotiation, additional
+                    skills, and current market conditions. We recommend using
+                    multiple sources and conducting your own research for the
+                    most accurate salary information.
                   </AlertDescription>
                 </Alert>
               </div>

@@ -22,7 +22,7 @@ export function formatDate(
     month: "2-digit",
     day: "2-digit",
   },
-  fallback = "No date"
+  fallback = "No date",
 ): string {
   if (!dateString) return fallback;
   const dateObj = new Date(dateString);

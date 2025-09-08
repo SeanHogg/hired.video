@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import { Eye, EyeOff, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Eye, EyeOff, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 interface PasswordRequirements {
   requiresPasswordChange: boolean;
@@ -38,20 +44,18 @@ interface ForcePasswordChangeModalProps {
   onClose?: () => void;
 }
 
-export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> = ({
-  isOpen,
-  requirements,
-  onPasswordChanged,
-  onClose
-}) => {
+export const ForcePasswordChangeModal: React.FC<
+  ForcePasswordChangeModalProps
+> = ({ isOpen, requirements, onPasswordChanged, onClose }) => {
   const { apiCall } = useAuth();
   const [formData, setFormData] = useState({
-    newPassword: '',
-    confirmPassword: ''
+    newPassword: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength | null>(null);
+  const [passwordStrength, setPasswordStrength] =
+    useState<PasswordStrength | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -67,39 +71,42 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
 
   const checkPasswordStrength = async (password: string) => {
     try {
-      const response = await apiCall('/api/password-management/validate-strength', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(password)
-      });
+      const response = await apiCall(
+        "/api/password-management/validate-strength",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(password),
+        },
+      );
 
       if (response.success) {
         setPasswordStrength(response.data);
       }
     } catch (error) {
-      console.error('Error checking password strength:', error);
+      console.error("Error checking password strength:", error);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.newPassword !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (!passwordStrength?.isValid) {
-      setError('Password does not meet security requirements');
+      setError("Password does not meet security requirements");
       return;
     }
 
@@ -107,13 +114,13 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
     setError(null);
 
     try {
-      const response = await apiCall('/api/password-management/force-change', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await apiCall("/api/password-management/force-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           newPassword: formData.newPassword,
-          confirmPassword: formData.confirmPassword
-        })
+          confirmPassword: formData.confirmPassword,
+        }),
       });
 
       if (response.success) {
@@ -122,10 +129,13 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
           onPasswordChanged();
         }, 2000);
       } else {
-        setError(response.error?.message || 'Failed to change password');
+        setError(response.error?.message || "Failed to change password");
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while changing password';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An error occurred while changing password";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -133,10 +143,10 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
   };
 
   const getStrengthText = (score: number) => {
-    if (score >= 85) return 'Strong';
-    if (score >= 60) return 'Good';
-    if (score >= 40) return 'Fair';
-    return 'Weak';
+    if (score >= 85) return "Strong";
+    if (score >= 60) return "Good";
+    if (score >= 40) return "Fair";
+    return "Weak";
   };
 
   if (success) {
@@ -151,7 +161,8 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
           </DialogHeader>
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground">
-              Your password has been updated successfully. You will be redirected shortly.
+              Your password has been updated successfully. You will be
+              redirected shortly.
             </p>
           </div>
         </DialogContent>
@@ -160,7 +171,10 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={requirements.canSkip ? onClose : undefined}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={requirements.canSkip ? onClose : undefined}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -168,7 +182,8 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             Password Change Required
           </DialogTitle>
           <DialogDescription>
-            {requirements.reason || 'You must change your password to continue.'}
+            {requirements.reason ||
+              "You must change your password to continue."}
           </DialogDescription>
         </DialogHeader>
 
@@ -186,7 +201,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               <Input
                 id="newPassword"
                 name="newPassword"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={formData.newPassword}
                 onChange={handleInputChange}
                 placeholder="Enter your new password"
@@ -214,19 +229,22 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span>Password Strength:</span>
-                <span className={`font-medium ${
-                  passwordStrength.score >= 85 ? 'text-green-600' : 
-                  passwordStrength.score >= 60 ? 'text-yellow-600' : 
-                  passwordStrength.score >= 40 ? 'text-orange-600' : 'text-red-600'
-                }`}>
+                <span
+                  className={`font-medium ${
+                    passwordStrength.score >= 85
+                      ? "text-green-600"
+                      : passwordStrength.score >= 60
+                        ? "text-yellow-600"
+                        : passwordStrength.score >= 40
+                          ? "text-orange-600"
+                          : "text-red-600"
+                  }`}
+                >
                   {getStrengthText(passwordStrength.score)}
                 </span>
               </div>
-              <Progress 
-                value={passwordStrength.score} 
-                className="h-2"
-              />
-              
+              <Progress value={passwordStrength.score} className="h-2" />
+
               {passwordStrength.requirements.length > 0 && (
                 <div className="text-xs text-red-600 space-y-1">
                   {passwordStrength.requirements.map((req, index) => (
@@ -258,7 +276,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
+                type={showConfirmPassword ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
                 placeholder="Confirm your new password"
@@ -282,28 +300,29 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             </div>
           </div>
 
-          {formData.confirmPassword && formData.newPassword !== formData.confirmPassword && (
-            <div className="text-xs text-red-600 flex items-center gap-1">
-              <XCircle className="h-3 w-3" />
-              Passwords do not match
-            </div>
-          )}
+          {formData.confirmPassword &&
+            formData.newPassword !== formData.confirmPassword && (
+              <div className="text-xs text-red-600 flex items-center gap-1">
+                <XCircle className="h-3 w-3" />
+                Passwords do not match
+              </div>
+            )}
 
           <div className="flex gap-2 pt-4">
             <Button
               type="submit"
               className="flex-1"
               disabled={
-                isLoading || 
-                !passwordStrength?.isValid || 
+                isLoading ||
+                !passwordStrength?.isValid ||
                 formData.newPassword !== formData.confirmPassword ||
                 !formData.newPassword ||
                 !formData.confirmPassword
               }
             >
-              {isLoading ? 'Changing Password...' : 'Change Password'}
+              {isLoading ? "Changing Password..." : "Change Password"}
             </Button>
-            
+
             {requirements.canSkip && onClose && (
               <Button
                 type="button"
@@ -320,19 +339,22 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
         {requirements.isTemporaryPassword && (
           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
             <div className="text-sm text-amber-800">
-              <strong>Temporary Password:</strong> You are currently using a temporary password. 
-              Please set a secure password to continue using your account.
+              <strong>Temporary Password:</strong> You are currently using a
+              temporary password. Please set a secure password to continue using
+              your account.
             </div>
           </div>
         )}
 
-        {requirements.daysUntilExpiry > 0 && requirements.daysUntilExpiry <= 7 && (
-          <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
-            <div className="text-sm text-orange-800">
-              <strong>Password Expiring:</strong> Your password will expire in {requirements.daysUntilExpiry} day(s).
+        {requirements.daysUntilExpiry > 0 &&
+          requirements.daysUntilExpiry <= 7 && (
+            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+              <div className="text-sm text-orange-800">
+                <strong>Password Expiring:</strong> Your password will expire in{" "}
+                {requirements.daysUntilExpiry} day(s).
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </DialogContent>
     </Dialog>
   );

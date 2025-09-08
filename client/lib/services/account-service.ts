@@ -72,8 +72,6 @@ class AccountService {
     }
   }
 
-
-
   /**
    * Get available accounts for the current user (for account switching)
    */
@@ -101,10 +99,9 @@ class AccountService {
    */
   async switchAccount(accountId: string): Promise<any> {
     try {
-      const response = await apiClient.post<any>(
-        "/api/account/switch",
-        { accountId },
-      );
+      const response = await apiClient.post<any>("/api/account/switch", {
+        accountId,
+      });
 
       localStorage.setItem("currentAccountId", accountId);
       return response.data;
@@ -129,7 +126,9 @@ class AccountService {
   /**
    * Get invitation details
    */
-  async getInvitationDetails(invitationId: string): Promise<InvitationDetailsResponse> {
+  async getInvitationDetails(
+    invitationId: string,
+  ): Promise<InvitationDetailsResponse> {
     try {
       const response = await apiClient.get<InvitationDetailsResponse>(
         `/api/account/invitation/${invitationId}`,
@@ -144,7 +143,9 @@ class AccountService {
   /**
    * Accept an invitation to join an account
    */
-  async acceptInvitation(invitationId: string): Promise<AcceptInvitationResponse> {
+  async acceptInvitation(
+    invitationId: string,
+  ): Promise<AcceptInvitationResponse> {
     try {
       const response = await apiClient.post<AcceptInvitationResponse>(
         `/api/account/accept-invitation/${invitationId}`,
@@ -189,7 +190,10 @@ class AccountService {
    */
   async updateAccountSettings(settings: any): Promise<any> {
     try {
-      const response = await apiClient.post<any>("/api/account/settings", settings);
+      const response = await apiClient.post<any>(
+        "/api/account/settings",
+        settings,
+      );
       return response.data;
     } catch (error) {
       console.error("Error updating account settings:", error);
@@ -213,7 +217,9 @@ class AccountService {
   /**
    * Send bulk invitations to multiple users
    */
-  async bulkInviteUsers(request: BulkInviteUsersRequest): Promise<BulkInviteUsersResponse> {
+  async bulkInviteUsers(
+    request: BulkInviteUsersRequest,
+  ): Promise<BulkInviteUsersResponse> {
     try {
       const response = await apiClient.post<BulkInviteUsersResponse>(
         "/api/account/bulk-invite",

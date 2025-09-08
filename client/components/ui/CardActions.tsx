@@ -4,7 +4,13 @@ import { cn } from "@/lib/utils";
 
 interface CardAction {
   label: string;
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  variant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
   size?: "default" | "sm" | "lg" | "icon";
   icon?: React.ComponentType<{ className?: string }>;
   // eslint-disable-next-line no-unused-vars
@@ -22,7 +28,7 @@ interface CardActionsProps {
 
 /**
  * CardActions - Standardized card footer component for action buttons
- * 
+ *
  * Provides:
  * - Consistent button layouts and spacing
  * - Multiple layout options (horizontal, vertical, space-between, center)
@@ -30,24 +36,24 @@ interface CardActionsProps {
  * - Loading and disabled states
  * - Event propagation handling (stops card click events)
  */
-export function CardActions({ 
-  actions, 
+export function CardActions({
+  actions,
   className = "",
   layout = "space-between",
-  gap = "md"
+  gap = "md",
 }: CardActionsProps) {
   // Always show action buttons - if no actions provided, show default actions
   const defaultActions = [
     {
       label: "View",
       variant: "outline" as const,
-      onClick: () => console.log("View clicked")
+      onClick: () => console.log("View clicked"),
     },
     {
       label: "Actions",
       variant: "default" as const,
-      onClick: () => console.log("Actions clicked")
-    }
+      onClick: () => console.log("Actions clicked"),
+    },
   ];
 
   const finalActions = actions.length > 0 ? actions : defaultActions;
@@ -56,22 +62,24 @@ export function CardActions({
     horizontal: "flex items-center",
     vertical: "flex flex-col",
     "space-between": "flex items-center justify-between",
-    center: "flex items-center justify-center"
+    center: "flex items-center justify-center",
   };
 
   const gapStyles = {
     sm: "gap-1",
-    md: "gap-2", 
-    lg: "gap-4"
+    md: "gap-2",
+    lg: "gap-4",
   };
 
   return (
-    <div className={cn(
-      "p-4 bg-background border-t border-border",
-      layoutStyles[layout],
-      gapStyles[gap],
-      className
-    )}>
+    <div
+      className={cn(
+        "p-4 bg-background border-t border-border",
+        layoutStyles[layout],
+        gapStyles[gap],
+        className,
+      )}
+    >
       {finalActions.map((action, index) => (
         <Button
           key={index}
@@ -84,7 +92,7 @@ export function CardActions({
           }}
           className={cn(
             action.icon && "gap-2",
-            layout === "vertical" && "w-full"
+            layout === "vertical" && "w-full",
           )}
         >
           {action.loading ? (

@@ -5,7 +5,11 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import { createRolePermissions, DASHBOARD_TYPES, type DashboardType } from "../role-utils";
+import {
+  createRolePermissions,
+  DASHBOARD_TYPES,
+  type DashboardType,
+} from "../role-utils";
 import {
   searchService,
   type SearchResponse,
@@ -66,13 +70,15 @@ export const ProfileStatsSchema = z.object({
   viewsThisWeek: z.number(),
   viewsThisMonth: z.number(),
   viewsChangePercentage: z.number(),
-  recentViewers: z.array(z.object({
-    userId: z.string().optional(),
-    name: z.string(),
-    company: z.string().optional(),
-    role: z.string().optional(),
-    viewedAt: z.string().transform((val) => new Date(val)),
-  })),
+  recentViewers: z.array(
+    z.object({
+      userId: z.string().optional(),
+      name: z.string(),
+      company: z.string().optional(),
+      role: z.string().optional(),
+      viewedAt: z.string().transform((val) => new Date(val)),
+    }),
+  ),
 });
 
 // Application stats schema
@@ -82,48 +88,59 @@ export const ApplicationStatsSchema = z.object({
   interviewRequests: z.number(),
   rejectedApplications: z.number(),
   successRate: z.number(),
-  recentApplications: z.array(z.object({
-    applicationId: z.string(),
-    jobTitle: z.string(),
-    company: z.string(),
-    status: z.string(),
-    appliedAt: z.string().transform((val) => new Date(val)),
-    updatedAt: z.string().transform((val) => new Date(val)).optional(),
-  })),
+  recentApplications: z.array(
+    z.object({
+      applicationId: z.string(),
+      jobTitle: z.string(),
+      company: z.string(),
+      status: z.string(),
+      appliedAt: z.string().transform((val) => new Date(val)),
+      updatedAt: z
+        .string()
+        .transform((val) => new Date(val))
+        .optional(),
+    }),
+  ),
 });
 
 // Job seeker dashboard schema
 export const JobSeekerDashboardSchema = BaseDashboardSchema.extend({
   profileStats: ProfileStatsSchema,
   applicationStats: ApplicationStatsSchema,
-  jobMatches: z.array(z.object({
-    jobId: z.string(),
-    title: z.string(),
-    company: z.string(),
-    location: z.string(),
-    matchScore: z.number(),
-    postedDate: z.string().transform((val) => new Date(val)),
-    salary: z.string().optional(),
-  })),
-  upcomingInterviews: z.array(z.object({
-    id: z.string(),
-    jobTitle: z.string(),
-    company: z.string(),
-    scheduledTime: z.string().transform((val) => new Date(val)),
-    type: z.string(),
-    status: z.string(),
-    notes: z.string().optional(),
-  })),
+  jobMatches: z.array(
+    z.object({
+      jobId: z.string(),
+      title: z.string(),
+      company: z.string(),
+      location: z.string(),
+      matchScore: z.number(),
+      postedDate: z.string().transform((val) => new Date(val)),
+      salary: z.string().optional(),
+    }),
+  ),
+  upcomingInterviews: z.array(
+    z.object({
+      id: z.string(),
+      jobTitle: z.string(),
+      company: z.string(),
+      scheduledTime: z.string().transform((val) => new Date(val)),
+      type: z.string(),
+      status: z.string(),
+      notes: z.string().optional(),
+    }),
+  ),
   messageStats: z.object({
     unreadCount: z.number(),
     totalConversations: z.number(),
-    recentMessages: z.array(z.object({
-      conversationId: z.string(),
-      senderName: z.string(),
-      preview: z.string(),
-      sentAt: z.string().transform((val) => new Date(val)),
-      isRead: z.boolean(),
-    })),
+    recentMessages: z.array(
+      z.object({
+        conversationId: z.string(),
+        senderName: z.string(),
+        preview: z.string(),
+        sentAt: z.string().transform((val) => new Date(val)),
+        isRead: z.boolean(),
+      }),
+    ),
   }),
 });
 
@@ -424,16 +441,20 @@ export class DashboardService {
    */
   async getDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard") as { data: any };
+      const response = (await apiClient.get("/api/userdashboard")) as {
+        data: any;
+      };
       const dashboard = BaseDashboardSchema.parse(response.data);
-
 
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error creating default dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch dashboard data",
       };
     }
   }
@@ -441,7 +462,9 @@ export class DashboardService {
   /**
    * Get dashboard data based on user role - centralized role logic
    */
-  async getDashboardForRole(userRole: string | number | undefined | null): Promise<DashboardResponse<any>> {
+  async getDashboardForRole(
+    userRole: string | number | undefined | null,
+  ): Promise<DashboardResponse<any>> {
     const rolePermissions = createRolePermissions(userRole);
     const dashboardType = rolePermissions.dashboardType;
 
@@ -463,7 +486,10 @@ export class DashboardService {
       console.error("Error fetching role-based dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch dashboard data",
       };
     }
   }
@@ -471,9 +497,13 @@ export class DashboardService {
   /**
    * Get job seeker specific dashboard data
    */
-  async getJobSeekerDashboard(): Promise<DashboardResponse<JobSeekerDashboard>> {
+  async getJobSeekerDashboard(): Promise<
+    DashboardResponse<JobSeekerDashboard>
+  > {
     try {
-      const response = await apiClient.get("/api/userdashboard/jobseeker") as { data: any };
+      const response = (await apiClient.get(
+        "/api/userdashboard/jobseeker",
+      )) as { data: any };
       const dashboard = JobSeekerDashboardSchema.parse(response.data);
 
       return { success: true, data: dashboard };
@@ -481,7 +511,10 @@ export class DashboardService {
       console.error("Error creating job seeker dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch job seeker dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch job seeker dashboard data",
       };
     }
   }
@@ -491,16 +524,20 @@ export class DashboardService {
    */
   async getRecruiterDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/recruiter") as { data: any };
+      const response = (await apiClient.get(
+        "/api/userdashboard/recruiter",
+      )) as { data: any };
       const dashboard = BaseDashboardSchema.parse(response.data);
-
 
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error creating recruiter dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch recruiter dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch recruiter dashboard data",
       };
     }
   }
@@ -510,17 +547,20 @@ export class DashboardService {
    */
   async getEmployerDashboard(): Promise<DashboardResponse<EmployerDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/employer") as { data: any };
+      const response = (await apiClient.get("/api/userdashboard/employer")) as {
+        data: any;
+      };
       const dashboard = EmployerDashboardSchema.parse(response.data);
-
-
 
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error creating employer dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch employer dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch employer dashboard data",
       };
     }
   }
@@ -530,16 +570,20 @@ export class DashboardService {
    */
   async getAdminDashboard(): Promise<DashboardResponse<BaseDashboard>> {
     try {
-      const response = await apiClient.get("/api/userdashboard/admin") as { data: any };
+      const response = (await apiClient.get("/api/userdashboard/admin")) as {
+        data: any;
+      };
       const dashboard = BaseDashboardSchema.parse(response.data);
-
 
       return { success: true, data: dashboard };
     } catch (error) {
       console.error("Error creating admin dashboard:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch admin dashboard data"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch admin dashboard data",
       };
     }
   }
@@ -547,7 +591,9 @@ export class DashboardService {
   /**
    * Record a profile view for analytics
    */
-  async recordProfileView(request: RecordProfileViewRequest): Promise<DashboardResponse<void>> {
+  async recordProfileView(
+    request: RecordProfileViewRequest,
+  ): Promise<DashboardResponse<void>> {
     try {
       await apiClient.post("/api/userdashboard/profile-view", request);
       return { success: true };
@@ -555,7 +601,10 @@ export class DashboardService {
       console.error("Error recording profile view:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to record profile view"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to record profile view",
       };
     }
   }
@@ -563,7 +612,9 @@ export class DashboardService {
   /**
    * Record user activity for analytics
    */
-  async recordActivity(request: RecordActivityRequest): Promise<DashboardResponse<void>> {
+  async recordActivity(
+    request: RecordActivityRequest,
+  ): Promise<DashboardResponse<void>> {
     try {
       await apiClient.post("/api/userdashboard/activity", request);
       return { success: true };
@@ -571,7 +622,8 @@ export class DashboardService {
       console.error("Error recording activity:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to record activity"
+        error:
+          error instanceof Error ? error.message : "Failed to record activity",
       };
     }
   }
@@ -579,7 +631,9 @@ export class DashboardService {
   /**
    * Record user engagement session
    */
-  async recordEngagement(request: RecordEngagementRequest): Promise<DashboardResponse<void>> {
+  async recordEngagement(
+    request: RecordEngagementRequest,
+  ): Promise<DashboardResponse<void>> {
     try {
       await apiClient.post("/api/userdashboard/engagement", request);
       return { success: true };
@@ -587,7 +641,10 @@ export class DashboardService {
       console.error("Error recording engagement:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to record engagement"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to record engagement",
       };
     }
   }
@@ -603,7 +660,10 @@ export class DashboardService {
       console.error("Error refreshing dashboard metrics:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to refresh dashboard metrics"
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to refresh dashboard metrics",
       };
     }
   }

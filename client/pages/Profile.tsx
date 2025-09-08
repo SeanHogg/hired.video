@@ -18,7 +18,6 @@ import {
   Download,
   Share,
   ExternalLink,
-
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -54,7 +53,7 @@ import {
   roleToSelectValue,
   formatRoleForDisplay,
   getAvailableRoles,
-  createRolePermissions
+  createRolePermissions,
 } from "@/lib/role-utils";
 
 export default function Profile() {
@@ -171,8 +170,6 @@ export default function Profile() {
     });
     setIsEditing(false);
   };
-
-
 
   // If user is not authenticated, redirect to login
   if (!isAuthenticated || !user) {
@@ -438,7 +435,10 @@ export default function Profile() {
                             </SelectTrigger>
                             <SelectContent>
                               {getAvailableRoles().map((roleOption) => (
-                                <SelectItem key={roleOption.value} value={roleOption.value}>
+                                <SelectItem
+                                  key={roleOption.value}
+                                  value={roleOption.value}
+                                >
                                   {roleOption.label}
                                 </SelectItem>
                               ))}
@@ -652,9 +652,6 @@ export default function Profile() {
                 </div>
               </CardContent>
             </Card>
-
-
-
 
             <ShareModal
               open={shareOpen}

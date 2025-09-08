@@ -8,7 +8,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
-import { Button , Button as UiButton } from "@/components/ui/button";
+import { Button, Button as UiButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAI } from "@/lib/ai-context";
 import {

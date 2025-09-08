@@ -77,10 +77,8 @@ export enum MyVideoResumeRole {
   Admin = "Admin",
   JobSeeker = "JobSeeker",
   Recruiter = "Recruiter",
-  Employer = "Employer"
+  Employer = "Employer",
 }
-
-
 
 export enum AccountUsageType {
   Individual = 0,
@@ -264,11 +262,7 @@ export const getInviteStatusColor = (status: InviteStatus): string => {
 };
 
 export const canManageUsers = (userRoles: string[]): boolean => {
-  return userRoles.some(
-    (role) =>
-      role === "Admin" ||
-      role === "Employer",
-  );
+  return userRoles.some((role) => role === "Admin" || role === "Employer");
 };
 
 export const canInviteUsers = (userRoles: string[]): boolean => {
@@ -286,31 +280,19 @@ export const canEditRoles = (
 
   // Employer users can edit non-admin roles
   if (userRoles.includes("Employer")) {
-    return !targetUserRoles.some(
-      (role) =>
-        role === "Admin",
-    );
+    return !targetUserRoles.some((role) => role === "Admin");
   }
 
   return false;
 };
 
-export const getAvailableRolesForInvite = (
-  userRoles: string[],
-): string[] => {
+export const getAvailableRolesForInvite = (userRoles: string[]): string[] => {
   if (userRoles.includes("Admin")) {
-    return [
-      "Recruiter",
-      "Employer",
-      "JobSeeker",
-    ];
+    return ["Recruiter", "Employer", "JobSeeker"];
   }
 
   if (userRoles.includes("Employer")) {
-    return [
-      "Recruiter",
-      "JobSeeker",
-    ];
+    return ["Recruiter", "JobSeeker"];
   }
 
   return [];

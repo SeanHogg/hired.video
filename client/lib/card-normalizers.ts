@@ -1,6 +1,6 @@
 /**
  * Card Data Normalizers
- * 
+ *
  * These functions transform inconsistent API data into standardized card interfaces,
  * eliminating hardcoded business assumptions and data structure inconsistencies.
  */
@@ -13,19 +13,19 @@ import type {
   NormalizedResumeData,
   NormalizedVideoData,
   CardContext,
-  CardType
+  CardType,
 } from "@/types/normalized-cards";
 
 /**
  * Normalize job data from various API formats
  */
 export function normalizeJobData(
-  item: RawApiItem, 
-  context: CardContext
+  item: RawApiItem,
+  context: CardContext,
 ): NormalizedJobData {
   // Handle nested jobData structure vs flat structure
   const jobData = item.jobData || item;
-  
+
   return {
     id: jobData.id || item.id,
     type: "job" as const,
@@ -33,21 +33,36 @@ export function normalizeJobData(
     company: jobData.company || item.company || "Unknown Company",
     location: jobData.location || item.location || "Remote",
     salary: (jobData as any)?.salary || (item as any)?.salary,
-    employmentType: jobData.employmentType || item.employmentType || "Full-time",
-    experienceLevel: (jobData as any)?.experienceLevel || (item as any)?.experienceLevel || "Not specified",
+    employmentType:
+      jobData.employmentType || item.employmentType || "Full-time",
+    experienceLevel:
+      (jobData as any)?.experienceLevel ||
+      (item as any)?.experienceLevel ||
+      "Not specified",
     status: (jobData as any)?.status || (item as any)?.status || "active",
     privacy: (jobData as any)?.privacy || (item as any)?.privacy || "public",
     summary: (jobData as any)?.summary || (item as any)?.summary || "",
-    createdAt: (jobData as any)?.createdAt || (jobData as any)?.postedDate || (item as any)?.createdAt || new Date().toISOString(),
-    updatedAt: (jobData as any)?.updatedAt || (item as any)?.updatedAt || new Date().toISOString(),
+    createdAt:
+      (jobData as any)?.createdAt ||
+      (jobData as any)?.postedDate ||
+      (item as any)?.createdAt ||
+      new Date().toISOString(),
+    updatedAt:
+      (jobData as any)?.updatedAt ||
+      (item as any)?.updatedAt ||
+      new Date().toISOString(),
     views: jobData.views || item.views || 0,
-    applications: (jobData as any)?.applications || (item as any)?.applications || 0,
-    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
+    applications:
+      (jobData as any)?.applications || (item as any)?.applications || 0,
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
     userId: (jobData as any)?.userId || (item as any)?.userId || "unknown",
     companyId: (jobData as any)?.companyId || (item as any)?.companyId,
     expiresAt: (jobData as any)?.expiresAt || (item as any)?.expiresAt,
-    slug: (jobData as any)?.slug || (item as any)?.slug || `job-${item.id}`
+    slug: (jobData as any)?.slug || (item as any)?.slug || `job-${item.id}`,
   };
 }
 
@@ -56,7 +71,7 @@ export function normalizeJobData(
  */
 export function normalizeCompanyData(
   item: RawApiItem,
-  context: CardContext
+  context: CardContext,
 ): NormalizedCompanyData {
   return {
     id: item.id,
@@ -75,12 +90,15 @@ export function normalizeCompanyData(
     followers: item.followers || 0,
     jobCount: item.jobCount || 0,
     activeJobCount: item.activeJobCount || 0,
-    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
     userId: item.userId || "unknown",
     teamMembers: item.teamMembers || [],
     onboardingProgress: item.onboardingProgress || 0,
-    slug: item.slug || `company-${item.id}`
+    slug: item.slug || `company-${item.id}`,
   };
 }
 
@@ -89,11 +107,15 @@ export function normalizeCompanyData(
  */
 export function normalizePersonData(
   item: RawApiItem,
-  context: CardContext
+  context: CardContext,
 ): NormalizedPersonData {
   const firstName = item.firstName || "";
   const lastName = item.lastName || "";
-  const fullName = item.fullName || item.name || `${firstName} ${lastName}`.trim() || "Unknown User";
+  const fullName =
+    item.fullName ||
+    item.name ||
+    `${firstName} ${lastName}`.trim() ||
+    "Unknown User";
 
   return {
     id: item.id,
@@ -122,9 +144,15 @@ export function normalizePersonData(
     experienceLevel: item.experienceLevel,
     currentPosition: item.currentPosition || item.role,
     currentCompany: item.currentCompany || item.company,
-    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked" | "connected",
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as
+            | "owned"
+            | "tracked"
+            | "connected"),
     showOwnership: context.showOwnership || false,
-    slug: item.slug || `person-${item.id}`
+    slug: item.slug || `person-${item.id}`,
   };
 }
 
@@ -133,7 +161,7 @@ export function normalizePersonData(
  */
 export function normalizeResumeData(
   item: RawApiItem,
-  context: CardContext
+  context: CardContext,
 ): NormalizedResumeData {
   return {
     id: item.id,
@@ -149,9 +177,12 @@ export function normalizeResumeData(
     isMaster: item.isMaster,
     isActive: item.isActive,
     parentId: item.parentId,
-    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
-    slug: item.slug || `resume-${item.id}`
+    slug: item.slug || `resume-${item.id}`,
   };
 }
 
@@ -160,7 +191,7 @@ export function normalizeResumeData(
  */
 export function normalizeVideoData(
   item: RawApiItem,
-  context: CardContext
+  context: CardContext,
 ): NormalizedVideoData {
   return {
     id: item.id,
@@ -176,10 +207,13 @@ export function normalizeVideoData(
     updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
     slug: item.slug || `video-${item.id}`,
-    ownership: determineOwnership(item, context) === "none" ? "tracked" : determineOwnership(item, context) as "owned" | "tracked",
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
     userId: item.userId,
-    status: (item.status as "active" | "draft" | "archived") || "active"
+    status: (item.status as "active" | "draft" | "archived") || "active",
   };
 }
 
@@ -189,17 +223,17 @@ export function normalizeVideoData(
 function determineOwnership(
   item: RawApiItem,
   // eslint-disable-next-line no-unused-vars
-  _context: CardContext
+  _context: CardContext,
 ): "owned" | "tracked" | "none" {
   // Remove hardcoded "tracked" assumption
   if (item.ownership) {
     return item.ownership;
   }
-  
+
   if (item.userId) {
     return "owned";
   }
-  
+
   return "none";
 }
 
@@ -208,15 +242,21 @@ function determineOwnership(
  */
 function normalizeResumePrivacy(
   item: RawApiItem,
-  context: CardContext
+  context: CardContext,
 ): "public" | "recruiter_only" | "private" | "draft" {
   // Handle the inconsistency between "Latest Resumes" and "All" sections
   if (context.section === "latest") {
-    return (item.privacy as "public" | "private" | "draft" | "recruiter_only") || "public";
+    return (
+      (item.privacy as "public" | "private" | "draft" | "recruiter_only") ||
+      "public"
+    );
   }
 
   // For "All" section, don't override with hardcoded "public"
-  return (item.privacy as "public" | "private" | "draft" | "recruiter_only") || "draft";
+  return (
+    (item.privacy as "public" | "private" | "draft" | "recruiter_only") ||
+    "draft"
+  );
 }
 
 /**
@@ -230,16 +270,25 @@ export function getCardType(item: RawApiItem): CardType {
   // Infer type from data structure - improved detection
 
   // Company detection - look for company-specific fields
-  if (item.industry || item.size || item.logo ||
-      (item.title === 'Company') ||
-      (item.summary && item.summary.includes('Company'))) {
+  if (
+    item.industry ||
+    item.size ||
+    item.logo ||
+    item.title === "Company" ||
+    (item.summary && item.summary.includes("Company"))
+  ) {
     return "company";
   }
 
   // Job detection - look for job-specific fields
-  if (item.jobData || item.company || item.location || item.salary ||
-      (item.title && item.title.includes('Engineer')) ||
-      (item.summary && item.summary.includes('at Unknown Company'))) {
+  if (
+    item.jobData ||
+    item.company ||
+    item.location ||
+    item.salary ||
+    (item.title && item.title.includes("Engineer")) ||
+    (item.summary && item.summary.includes("at Unknown Company"))
+  ) {
     return "job";
   }
 
@@ -249,7 +298,10 @@ export function getCardType(item: RawApiItem): CardType {
   }
 
   // Resume detection
-  if (item.privacy && (item.privacy === "public" || item.privacy === "private")) {
+  if (
+    item.privacy &&
+    (item.privacy === "public" || item.privacy === "private")
+  ) {
     return "resume";
   }
 

@@ -200,17 +200,21 @@ export default function Tasks() {
               <span className="text-muted-foreground">Start</span>
               <span>
                 {selectedTask.startDate
-                  ? (selectedTask.startDate && !isNaN(new Date(selectedTask.startDate).getTime())
-                      ? new Date(selectedTask.startDate).toLocaleDateString()
-                      : "Invalid date")
+                  ? selectedTask.startDate &&
+                    !isNaN(new Date(selectedTask.startDate).getTime())
+                    ? new Date(selectedTask.startDate).toLocaleDateString()
+                    : "Invalid date"
                   : "-"}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Due</span>
-              <span>{selectedTask.dueDate && !isNaN(new Date(selectedTask.dueDate).getTime())
-                ? new Date(selectedTask.dueDate).toLocaleDateString()
-                : "Invalid date"}</span>
+              <span>
+                {selectedTask.dueDate &&
+                !isNaN(new Date(selectedTask.dueDate).getTime())
+                  ? new Date(selectedTask.dueDate).toLocaleDateString()
+                  : "Invalid date"}
+              </span>
             </div>
             {selectedTask.assignedTo && (
               <div className="flex items-center justify-between">
@@ -300,7 +304,8 @@ export default function Tasks() {
             </div>
 
             {/* Task Assignment - only show for employer/recruiter roles */}
-            {(user?.role === USER_ROLES.EMPLOYER || user?.role === USER_ROLES.RECRUITER) &&
+            {(user?.role === USER_ROLES.EMPLOYER ||
+              user?.role === USER_ROLES.RECRUITER) &&
               assignableUsers.length > 0 && (
                 <div>
                   <Label htmlFor="edit-assigned">Assign To</Label>

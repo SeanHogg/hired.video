@@ -74,7 +74,11 @@ export default function ResumeViewer({
   };
 
   const formatDateForResume = (dateString: string) => {
-    return formatDate(dateString, { year: "numeric", month: "short" }, "Present");
+    return formatDate(
+      dateString,
+      { year: "numeric", month: "short" },
+      "Present",
+    );
   };
 
   const getPrivacyIcon = (privacy: ResumePrivacy) => {

@@ -13,10 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { accountService } from "@/lib/services/account-service";
-import {
-  AccountOption,
-  getRoleDisplayName,
-} from "@/types/account";
+import { AccountOption, getRoleDisplayName } from "@/types/account";
 
 interface AccountSwitcherProps {
   className?: string;

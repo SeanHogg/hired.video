@@ -57,10 +57,6 @@ export default function ResumeCard({
   onView,
   onActions,
 }: ResumeCardProps) {
-
-
-
-
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
       case "public":
@@ -114,7 +110,7 @@ export default function ResumeCard({
       text: "Tracked",
       variant: "secondary" as const,
       className: "text-xs bg-blue-100 text-blue-800",
-      icon: () => <UserCheck className="w-3 h-3" />
+      icon: () => <UserCheck className="w-3 h-3" />,
     });
   }
 
@@ -123,7 +119,7 @@ export default function ResumeCard({
       text: "Active",
       variant: "secondary" as const,
       className: "text-xs bg-green-100 text-green-800",
-      icon: () => <Target className="w-3 h-3" />
+      icon: () => <Target className="w-3 h-3" />,
     });
   }
 
@@ -132,7 +128,7 @@ export default function ResumeCard({
       text: "Master",
       variant: "secondary" as const,
       className: "text-xs bg-yellow-100 text-yellow-800",
-      icon: () => <Star className="w-3 h-3" />
+      icon: () => <Star className="w-3 h-3" />,
     });
   }
 
@@ -141,7 +137,7 @@ export default function ResumeCard({
       text: "Variation",
       variant: "outline" as const,
       className: "text-xs",
-      icon: () => <Copy className="w-3 h-3" />
+      icon: () => <Copy className="w-3 h-3" />,
     });
   }
 
@@ -149,46 +145,52 @@ export default function ResumeCard({
     text: getPrivacyText(privacy),
     variant: "secondary" as const,
     className: `text-xs ${getPrivacyColor(privacy)}`,
-    icon: () => getPrivacyIcon(privacy)
+    icon: () => getPrivacyIcon(privacy),
   });
 
   // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const cardActions = (actions && actions.length > 0) ? actions : [
-    {
-      id: "view",
-      label: "View",
-      variant: "outline" as const,
-      icon: Eye,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/resumes/${id}`;
-        }
-      }
-    },
-    {
-      id: "share",
-      label: "Share",
-      variant: "default" as const,
-      icon: Share,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          // Default share functionality - copy link to clipboard
-          const url = `${window.location.origin}/resumes/${id}`;
-          navigator.clipboard.writeText(url).then(() => {
-            // Could show a toast notification here
-            alert('Resume link copied to clipboard!');
-          }).catch(() => {
-            // Fallback for older browsers
-            prompt('Copy this link:', url);
-          });
-        }
-      }
-    }
-  ];
+  const cardActions =
+    actions && actions.length > 0
+      ? actions
+      : [
+          {
+            id: "view",
+            label: "View",
+            variant: "outline" as const,
+            icon: Eye,
+            onClick: () => {
+              if (onView) {
+                onView();
+              } else {
+                window.location.href = `/resumes/${id}`;
+              }
+            },
+          },
+          {
+            id: "share",
+            label: "Share",
+            variant: "default" as const,
+            icon: Share,
+            onClick: () => {
+              if (onActions) {
+                onActions();
+              } else {
+                // Default share functionality - copy link to clipboard
+                const url = `${window.location.origin}/resumes/${id}`;
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => {
+                    // Could show a toast notification here
+                    alert("Resume link copied to clipboard!");
+                  })
+                  .catch(() => {
+                    // Fallback for older browsers
+                    prompt("Copy this link:", url);
+                  });
+              }
+            },
+          },
+        ];
 
   return (
     <BaseCard>
@@ -198,7 +200,7 @@ export default function ResumeCard({
         avatar={{
           src: undefined, // Resumes don't typically have avatars
           fallback: "R",
-          size: "md"
+          size: "md",
         }}
         badges={badges}
         linkTo={`/resumes/${id}`}

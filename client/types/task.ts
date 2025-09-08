@@ -138,8 +138,6 @@ export enum InviteStatus {
   Owner = 5,
 }
 
-
-
 // Frontend-specific types for UI components
 export interface TaskUIState {
   id: string;

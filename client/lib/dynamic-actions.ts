@@ -1,6 +1,6 @@
 /**
  * Dynamic Action Generator
- * 
+ *
  * Generates context-aware actions for cards based on user permissions,
  * item ownership, and business rules.
  */
@@ -23,14 +23,14 @@ import {
   BarChart3,
   Users,
   Building2,
-  Calendar
+  Calendar,
 } from "lucide-react";
 
 import type {
   UserContext,
   ItemOwnership,
   NormalizedCardData,
-  CardInteractions
+  CardInteractions,
 } from "@/types/normalized-cards";
 
 import { canPerformAction } from "@/lib/user-context";
@@ -39,7 +39,13 @@ import { canPerformAction } from "@/lib/user-context";
 export interface DynamicCardAction {
   id: string;
   label: string;
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  variant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
   size?: "default" | "sm" | "lg" | "icon";
   icon?: React.ComponentType<{ className?: string }>;
   // eslint-disable-next-line no-unused-vars
@@ -58,7 +64,7 @@ export function generateJobActions(
   job: NormalizedCardData,
   userContext: UserContext,
   itemOwnership: ItemOwnership,
-  interactions: CardInteractions
+  interactions: CardInteractions,
 ): DynamicCardAction[] {
   const actions: DynamicCardAction[] = [];
 
@@ -69,7 +75,7 @@ export function generateJobActions(
     variant: "outline",
     icon: Eye,
     onClick: () => interactions.onView?.(job),
-    priority: 1
+    priority: 1,
   });
 
   // Owner actions
@@ -79,7 +85,7 @@ export function generateJobActions(
       label: "Edit",
       icon: Edit,
       onClick: () => interactions.onEdit?.(job.id),
-      priority: 2
+      priority: 2,
     });
 
     actions.push({
@@ -87,7 +93,7 @@ export function generateJobActions(
       label: "Analytics",
       icon: BarChart3,
       onClick: () => handleJobAnalytics(job.id),
-      priority: 5
+      priority: 5,
     });
 
     // Job-specific owner actions
@@ -97,7 +103,7 @@ export function generateJobActions(
         label: "Pause",
         icon: Pause,
         onClick: () => handleJobStatusChange(job.id, "paused"),
-        priority: 3
+        priority: 3,
       });
     } else if (job.status === "paused") {
       actions.push({
@@ -105,7 +111,7 @@ export function generateJobActions(
         label: "Activate",
         icon: Play,
         onClick: () => handleJobStatusChange(job.id, "active"),
-        priority: 3
+        priority: 3,
       });
     }
 
@@ -114,7 +120,7 @@ export function generateJobActions(
       label: "Clone",
       icon: Copy,
       onClick: () => handleJobClone(job.id),
-      priority: 4
+      priority: 4,
     });
   }
 
@@ -125,7 +131,7 @@ export function generateJobActions(
       label: "Assign Recruiter",
       icon: UserPlus,
       onClick: () => interactions.onAssign?.(job.id),
-      priority: 3
+      priority: 3,
     });
 
     actions.push({
@@ -133,7 +139,7 @@ export function generateJobActions(
       label: "Manage",
       icon: Settings,
       onClick: () => interactions.onManage?.(job.id),
-      priority: 4
+      priority: 4,
     });
   }
 
@@ -144,7 +150,7 @@ export function generateJobActions(
       label: "Review Applications",
       icon: FileText,
       onClick: () => interactions.onReview?.(job.id),
-      priority: 2
+      priority: 2,
     });
 
     actions.push({
@@ -152,7 +158,7 @@ export function generateJobActions(
       label: "Contact Candidates",
       icon: MessageCircle,
       onClick: () => interactions.onContact?.(job.id),
-      priority: 3
+      priority: 3,
     });
   }
 
@@ -163,7 +169,7 @@ export function generateJobActions(
       label: "Track",
       icon: Bookmark,
       onClick: () => interactions.onTrack?.(job.id),
-      priority: 6
+      priority: 6,
     });
   } else if (canPerformAction("untrack", itemOwnership, userContext)) {
     actions.push({
@@ -171,7 +177,7 @@ export function generateJobActions(
       label: "Untrack",
       icon: BookmarkX,
       onClick: () => interactions.onUntrack?.(job.id),
-      priority: 6
+      priority: 6,
     });
   }
 
@@ -184,7 +190,7 @@ export function generateJobActions(
       icon: Trash2,
       onClick: () => interactions.onDelete?.(job.id),
       requiresConfirmation: true,
-      priority: 10
+      priority: 10,
     });
   }
 
@@ -198,7 +204,7 @@ export function generateCompanyActions(
   company: NormalizedCardData,
   userContext: UserContext,
   itemOwnership: ItemOwnership,
-  interactions: CardInteractions
+  interactions: CardInteractions,
 ): DynamicCardAction[] {
   const actions: DynamicCardAction[] = [];
 
@@ -209,7 +215,7 @@ export function generateCompanyActions(
     variant: "outline",
     icon: Eye,
     onClick: () => interactions.onView?.(company),
-    priority: 1
+    priority: 1,
   });
 
   // Owner actions
@@ -219,7 +225,7 @@ export function generateCompanyActions(
       label: "Edit Profile",
       icon: Edit,
       onClick: () => interactions.onEdit?.(company.id),
-      priority: 2
+      priority: 2,
     });
 
     actions.push({
@@ -227,7 +233,7 @@ export function generateCompanyActions(
       label: "Manage Team",
       icon: Users,
       onClick: () => handleTeamManagement(company.id),
-      priority: 3
+      priority: 3,
     });
 
     actions.push({
@@ -235,7 +241,7 @@ export function generateCompanyActions(
       label: "Post Job",
       icon: FileText,
       onClick: () => handleJobPosting(company.id),
-      priority: 4
+      priority: 4,
     });
   }
 
@@ -246,7 +252,7 @@ export function generateCompanyActions(
       label: "Contact",
       icon: MessageCircle,
       onClick: () => interactions.onContact?.(company.id),
-      priority: 3
+      priority: 3,
     });
   }
 
@@ -257,7 +263,7 @@ export function generateCompanyActions(
       label: "Follow",
       icon: Bookmark,
       onClick: () => interactions.onTrack?.(company.id),
-      priority: 5
+      priority: 5,
     });
   } else if (canPerformAction("untrack", itemOwnership, userContext)) {
     actions.push({
@@ -265,7 +271,7 @@ export function generateCompanyActions(
       label: "Unfollow",
       icon: BookmarkX,
       onClick: () => interactions.onUntrack?.(company.id),
-      priority: 5
+      priority: 5,
     });
   }
 
@@ -279,7 +285,7 @@ export function generateResumeActions(
   resume: NormalizedCardData,
   userContext: UserContext,
   itemOwnership: ItemOwnership,
-  interactions: CardInteractions
+  interactions: CardInteractions,
 ): DynamicCardAction[] {
   const actions: DynamicCardAction[] = [];
 
@@ -290,7 +296,7 @@ export function generateResumeActions(
     variant: "outline",
     icon: Eye,
     onClick: () => interactions.onView?.(resume),
-    priority: 1
+    priority: 1,
   });
 
   // Owner actions
@@ -300,7 +306,7 @@ export function generateResumeActions(
       label: "Edit",
       icon: Edit,
       onClick: () => interactions.onEdit?.(resume.id),
-      priority: 2
+      priority: 2,
     });
 
     actions.push({
@@ -308,7 +314,7 @@ export function generateResumeActions(
       label: "Download",
       icon: Download,
       onClick: () => handleResumeDownload(resume.id),
-      priority: 3
+      priority: 3,
     });
 
     actions.push({
@@ -316,7 +322,7 @@ export function generateResumeActions(
       label: "Share",
       icon: Share2,
       onClick: () => handleResumeShare(resume.id),
-      priority: 4
+      priority: 4,
     });
   }
 
@@ -327,7 +333,7 @@ export function generateResumeActions(
       label: "Download",
       icon: Download,
       onClick: () => handleResumeDownload(resume.id),
-      priority: 2
+      priority: 2,
     });
 
     actions.push({
@@ -335,7 +341,7 @@ export function generateResumeActions(
       label: "Contact",
       icon: MessageCircle,
       onClick: () => interactions.onContact?.(resume.id),
-      priority: 3
+      priority: 3,
     });
 
     actions.push({
@@ -343,7 +349,7 @@ export function generateResumeActions(
       label: "Schedule Interview",
       icon: Calendar,
       onClick: () => handleScheduleInterview(resume.id),
-      priority: 4
+      priority: 4,
     });
   }
 

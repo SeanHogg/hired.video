@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -56,7 +62,7 @@ export default function SummarizeResume() {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
       ];
-      
+
       if (!allowedTypes.includes(selectedFile.type)) {
         setError("Please upload a PDF, Word document, or text file.");
         return;
@@ -260,7 +266,7 @@ export default function SummarizeResume() {
                   </Button>
                 </Link>
               </div>
-              
+
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-brand-green/10 rounded-lg flex items-center justify-center">
                   <Sparkles className="h-6 w-6 text-brand-green" />
@@ -286,11 +292,17 @@ export default function SummarizeResume() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue={isAuthenticated ? "existing" : "text"} className="w-full">
+                    <Tabs
+                      defaultValue={isAuthenticated ? "existing" : "text"}
+                      className="w-full"
+                    >
                       <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="text">Paste Text</TabsTrigger>
                         <TabsTrigger value="upload">Upload File</TabsTrigger>
-                        <TabsTrigger value="existing" disabled={!isAuthenticated}>
+                        <TabsTrigger
+                          value="existing"
+                          disabled={!isAuthenticated}
+                        >
                           My Resumes {!isAuthenticated && "(Login Required)"}
                         </TabsTrigger>
                       </TabsList>
@@ -307,7 +319,7 @@ export default function SummarizeResume() {
                             className="min-h-[200px]"
                           />
                         </div>
-                        <Button 
+                        <Button
                           onClick={handleTextSummarization}
                           disabled={isAnalyzing || !resumeText.trim()}
                           className="w-full"
@@ -339,7 +351,10 @@ export default function SummarizeResume() {
                               className="hidden"
                               id="resume-upload"
                             />
-                            <label htmlFor="resume-upload" className="cursor-pointer">
+                            <label
+                              htmlFor="resume-upload"
+                              className="cursor-pointer"
+                            >
                               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                               <p className="text-sm text-muted-foreground">
                                 Click to upload or drag and drop
@@ -354,16 +369,24 @@ export default function SummarizeResume() {
                         {file && (
                           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                             <div className="flex items-center gap-2">
-                              <span className="text-lg">{getFileIcon(file)}</span>
-                              <span className="text-sm font-medium">{file.name}</span>
+                              <span className="text-lg">
+                                {getFileIcon(file)}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {file.name}
+                              </span>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={removeFile}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={removeFile}
+                            >
                               Remove
                             </Button>
                           </div>
                         )}
 
-                        <Button 
+                        <Button
                           onClick={handleFileSummarization}
                           disabled={isAnalyzing || !file}
                           className="w-full"
@@ -387,13 +410,19 @@ export default function SummarizeResume() {
                           <label className="text-sm font-medium mb-2 block">
                             Select Resume
                           </label>
-                          <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
+                          <Select
+                            value={selectedResumeId}
+                            onValueChange={setSelectedResumeId}
+                          >
                             <SelectTrigger>
                               <SelectValue placeholder="Choose a resume to summarize" />
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.map((resume) => (
-                                <SelectItem key={resume.id} value={resume.id || ""}>
+                                <SelectItem
+                                  key={resume.id}
+                                  value={resume.id || ""}
+                                >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
@@ -401,7 +430,7 @@ export default function SummarizeResume() {
                           </Select>
                         </div>
 
-                        <Button 
+                        <Button
                           onClick={handleResumeSummarization}
                           disabled={isAnalyzing || !selectedResumeId}
                           className="w-full"
@@ -446,12 +475,12 @@ export default function SummarizeResume() {
                           {summary}
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2 mt-6">
                         <Button variant="outline" onClick={resetAnalysis}>
                           Summarize Another
                         </Button>
-                        <Button 
+                        <Button
                           onClick={() => navigator.clipboard.writeText(summary)}
                           variant="outline"
                         >
@@ -468,7 +497,8 @@ export default function SummarizeResume() {
                       <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <h3 className="font-semibold mb-2">Ready to Summarize</h3>
                       <p className="text-sm text-muted-foreground">
-                        Upload a resume file, paste text, or select from your saved resumes to get started.
+                        Upload a resume file, paste text, or select from your
+                        saved resumes to get started.
                       </p>
                     </CardContent>
                   </Card>

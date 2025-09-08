@@ -1,10 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, Play, Pause, RotateCcw, X, Video, FileVideo } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState, useRef, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Upload,
+  Play,
+  Pause,
+  RotateCcw,
+  X,
+  Video,
+  FileVideo,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface VideoUploadProps {
   onVideoUploaded: (videoData: VideoUploadResult) => void;
@@ -28,10 +36,10 @@ interface VideoUploadResult {
 }
 
 const DEFAULT_ACCEPTED_FORMATS = [
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
-  'video/x-msvideo'
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
 ];
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -42,7 +50,7 @@ export function VideoUpload({
   onCancel,
   maxSizeBytes = MAX_FILE_SIZE,
   acceptedFormats = DEFAULT_ACCEPTED_FORMATS,
-  className
+  className,
 }: VideoUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -58,37 +66,40 @@ export function VideoUpload({
     resolution?: string;
   } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const validateFile = (file: File): string | null => {
     if (!acceptedFormats.includes(file.type)) {
-      return `Unsupported format. Please use: ${acceptedFormats.map(f => f.split('/')[1]).join(', ')}`;
+      return `Unsupported format. Please use: ${acceptedFormats.map((f) => f.split("/")[1]).join(", ")}`;
     }
-    
+
     if (file.size > maxSizeBytes) {
       return `File too large. Maximum size: ${Math.round(maxSizeBytes / (1024 * 1024))}MB`;
     }
-    
+
     return null;
   };
 
   const generateThumbnail = (video: HTMLVideoElement): Promise<string> => {
     return new Promise((resolve) => {
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
+      const ctx = canvas.getContext("2d");
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       ctx.drawImage(video, 0, 0);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
     });
   };
 
-  const extractVideoMetadata = (video: HTMLVideoElement, file: File): {
+  const extractVideoMetadata = (
+    video: HTMLVideoElement,
+    file: File,
+  ): {
     duration: number;
     width: number;
     height: number;
@@ -102,47 +113,49 @@ export function VideoUpload({
       height: video.videoHeight,
       size: file.size,
       format: file.type,
-      resolution: `${video.videoWidth}x${video.videoHeight}`
+      resolution: `${video.videoWidth}x${video.videoHeight}`,
     };
   };
 
   const processVideo = async (file: File) => {
     setIsProcessing(true);
     setError(null);
-    
+
     try {
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
+
       // Create video element for metadata extraction
-      const video = document.createElement('video');
+      const video = document.createElement("video");
       video.src = url;
-      
+
       await new Promise((resolve, reject) => {
         video.onloadedmetadata = resolve;
         video.onerror = reject;
       });
-      
+
       // Validate duration
       if (video.duration > MAX_DURATION) {
-        throw new Error(`Video too long. Maximum duration: ${MAX_DURATION / 60} minutes`);
+        throw new Error(
+          `Video too long. Maximum duration: ${MAX_DURATION / 60} minutes`,
+        );
       }
-      
+
       const metadata = extractVideoMetadata(video, file);
       setVideoMetadata(metadata);
-      
+
       // Generate thumbnail
       video.currentTime = Math.min(2, video.duration / 2); // 2 seconds or middle
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         video.onseeked = resolve;
       });
-      
+
       if (videoRef.current) {
         videoRef.current.src = url;
       }
-      
+
       const thumbnail = await generateThumbnail(video);
-      
+
       const result: VideoUploadResult = {
         file,
         url,
@@ -152,14 +165,13 @@ export function VideoUpload({
           size: file.size,
           format: file.type,
           resolution: metadata.resolution,
-          bitrate: Math.round(file.size * 8 / video.duration / 1000) // Rough estimate
-        }
+          bitrate: Math.round((file.size * 8) / video.duration / 1000), // Rough estimate
+        },
       };
-      
+
       onVideoUploaded(result);
-      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process video');
+      setError(err instanceof Error ? err.message : "Failed to process video");
     } finally {
       setIsProcessing(false);
     }
@@ -171,14 +183,14 @@ export function VideoUpload({
       setError(validationError);
       return;
     }
-    
+
     await processVideo(file);
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFileSelect(files[0]);
@@ -214,7 +226,7 @@ export function VideoUpload({
     setIsProcessing(false);
     setIsPlaying(false);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -238,22 +250,28 @@ export function VideoUpload({
           <div
             className={cn(
               "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-              isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25",
-              "hover:border-primary/50 hover:bg-primary/5"
+              isDragging
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25",
+              "hover:border-primary/50 hover:bg-primary/5",
             )}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
             <FileVideo className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Upload Your Video Resume</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              Upload Your Video Resume
+            </h3>
             <p className="text-muted-foreground mb-4">
               Drag and drop your video file here, or click to browse
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Supported formats: MP4, WebM, MOV, AVI • Max size: {Math.round(maxSizeBytes / (1024 * 1024))}MB • Max duration: {MAX_DURATION / 60} minutes
+              Supported formats: MP4, WebM, MOV, AVI • Max size:{" "}
+              {Math.round(maxSizeBytes / (1024 * 1024))}MB • Max duration:{" "}
+              {MAX_DURATION / 60} minutes
             </p>
-            
+
             <Button
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
@@ -262,11 +280,11 @@ export function VideoUpload({
               <Upload className="h-4 w-4 mr-2" />
               Choose Video File
             </Button>
-            
+
             <input
               ref={fileInputRef}
               type="file"
-              accept={acceptedFormats.join(',')}
+              accept={acceptedFormats.join(",")}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleFileSelect(file);
@@ -285,7 +303,7 @@ export function VideoUpload({
                 onPause={() => setIsPlaying(false)}
                 controls={false}
               />
-              
+
               {/* Custom Controls */}
               <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2">
                 <Button
@@ -294,13 +312,18 @@ export function VideoUpload({
                   onClick={togglePlayback}
                   className="bg-black/50 hover:bg-black/70"
                 >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
                 </Button>
-                
+
                 <div className="flex-1 text-white text-sm">
                   {videoMetadata && (
                     <span>
-                      {Math.round(videoMetadata.duration)}s • {videoMetadata.resolution}
+                      {Math.round(videoMetadata.duration)}s •{" "}
+                      {videoMetadata.resolution}
                     </span>
                   )}
                 </div>
@@ -311,16 +334,20 @@ export function VideoUpload({
             {videoMetadata && (
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium">Duration:</span> {Math.round(videoMetadata.duration)}s
+                  <span className="font-medium">Duration:</span>{" "}
+                  {Math.round(videoMetadata.duration)}s
                 </div>
                 <div>
-                  <span className="font-medium">Size:</span> {Math.round(videoMetadata.size / (1024 * 1024))}MB
+                  <span className="font-medium">Size:</span>{" "}
+                  {Math.round(videoMetadata.size / (1024 * 1024))}MB
                 </div>
                 <div>
-                  <span className="font-medium">Resolution:</span> {videoMetadata.resolution}
+                  <span className="font-medium">Resolution:</span>{" "}
+                  {videoMetadata.resolution}
                 </div>
                 <div>
-                  <span className="font-medium">Format:</span> {videoMetadata.format.split('/')[1].toUpperCase()}
+                  <span className="font-medium">Format:</span>{" "}
+                  {videoMetadata.format.split("/")[1].toUpperCase()}
                 </div>
               </div>
             )}

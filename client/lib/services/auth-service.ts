@@ -28,7 +28,14 @@ export const RegisterRequestSchema = z.object({
   confirmPassword: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z.enum([USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN]).optional(),
+  role: z
+    .enum([
+      USER_ROLES.JOB_SEEKER,
+      USER_ROLES.RECRUITER,
+      USER_ROLES.EMPLOYER,
+      USER_ROLES.ADMIN,
+    ])
+    .optional(),
 });
 
 // Use the shared login response schema from @shared/api
@@ -62,8 +69,6 @@ export const UserProfileDTOSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
-
-
 // ============================================================================
 // Role normalization
 // ============================================================================
@@ -90,7 +95,8 @@ function mapServerRole(role: string | number | undefined | null): string {
   // string input
   const r = String(role).trim().toLowerCase();
 
-  if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return USER_ROLES.JOB_SEEKER;
+  if (r === "jobseeker" || r === "job_seeker" || r === "job seeker")
+    return USER_ROLES.JOB_SEEKER;
   if (r === "recruiter") return USER_ROLES.RECRUITER;
   if (r === "employer") return USER_ROLES.EMPLOYER;
   // If it's numeric-like string, coerce to number mapping
@@ -207,8 +213,6 @@ export class AuthService {
     // Clear local storage
     this.clearAuthData();
   }
-
-
 
   /**
    * Logout user locally only (for cases where backend has already signed out the user)

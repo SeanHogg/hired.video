@@ -23,7 +23,10 @@ interface DeleteAccountDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogProps) {
+export function DeleteAccountDialog({
+  open,
+  onOpenChange,
+}: DeleteAccountDialogProps) {
   const { toast } = useToast();
   const { logout } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -34,9 +37,12 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
     privacy: false,
   });
 
-  const isConfirmationValid = confirmationText.toLowerCase() === "delete my account";
-  const allWarningsAcknowledged = Object.values(acknowledgeWarnings).every(Boolean);
-  const canDelete = isConfirmationValid && allWarningsAcknowledged && !isDeleting;
+  const isConfirmationValid =
+    confirmationText.toLowerCase() === "delete my account";
+  const allWarningsAcknowledged =
+    Object.values(acknowledgeWarnings).every(Boolean);
+  const canDelete =
+    isConfirmationValid && allWarningsAcknowledged && !isDeleting;
 
   const handleDelete = async () => {
     if (!canDelete) return;
@@ -48,7 +54,8 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
 
       toast({
         title: "Account Deleted",
-        description: "Your account has been successfully deleted. You will be redirected to the home page.",
+        description:
+          "Your account has been successfully deleted. You will be redirected to the home page.",
       });
 
       // Close dialog
@@ -59,13 +66,13 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
 
       // Force a complete page reload to ensure all state is cleared
       window.location.replace("/");
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error deleting account:", error);
       toast({
         title: "Deletion Failed",
-        description: "Failed to delete your account. Please try again or contact support.",
+        description:
+          "Failed to delete your account. Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
@@ -98,25 +105,41 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left space-y-4">
             <p className="font-medium">
-              This action will permanently delete your account and cannot be undone.
+              This action will permanently delete your account and cannot be
+              undone.
             </p>
-            
+
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
-              <h4 className="font-semibold text-destructive">What happens when you delete your account:</h4>
+              <h4 className="font-semibold text-destructive">
+                What happens when you delete your account:
+              </h4>
               <ul className="space-y-2 text-sm">
                 <li>• Your account will be deactivated immediately</li>
-                <li>• All your resumes and profile information will be made private</li>
+                <li>
+                  • All your resumes and profile information will be made
+                  private
+                </li>
                 <li>• Your personal data will be anonymized for privacy</li>
-                <li>• You will be removed from any company accounts you&apos;re associated with</li>
+                <li>
+                  • You will be removed from any company accounts you&apos;re
+                  associated with
+                </li>
                 <li>• Your email address will be freed up for future use</li>
-                <li>• Company profiles you own will be made private but not deleted</li>
+                <li>
+                  • Company profiles you own will be made private but not
+                  deleted
+                </li>
               </ul>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-800 mb-2">Before you delete:</h4>
+              <h4 className="font-semibold text-blue-800 mb-2">
+                Before you delete:
+              </h4>
               <p className="text-sm text-blue-700">
-                Make sure to download any important data (resumes, company information) as you won&apos;t be able to access it after deletion.
+                Make sure to download any important data (resumes, company
+                information) as you won&apos;t be able to access it after
+                deletion.
               </p>
             </div>
           </AlertDialogDescription>
@@ -130,33 +153,43 @@ export function DeleteAccountDialog({ open, onOpenChange }: DeleteAccountDialogP
                 id="dataLoss"
                 checked={acknowledgeWarnings.dataLoss}
                 onCheckedChange={(checked) =>
-                  setAcknowledgeWarnings(prev => ({ ...prev, dataLoss: !!checked }))
+                  setAcknowledgeWarnings((prev) => ({
+                    ...prev,
+                    dataLoss: !!checked,
+                  }))
                 }
               />
               <Label htmlFor="dataLoss" className="text-sm leading-5">
-                I understand that all my data will be made private and anonymized
+                I understand that all my data will be made private and
+                anonymized
               </Label>
             </div>
-            
+
             <div className="flex items-start space-x-2">
               <Checkbox
                 id="permanent"
                 checked={acknowledgeWarnings.permanent}
                 onCheckedChange={(checked) =>
-                  setAcknowledgeWarnings(prev => ({ ...prev, permanent: !!checked }))
+                  setAcknowledgeWarnings((prev) => ({
+                    ...prev,
+                    permanent: !!checked,
+                  }))
                 }
               />
               <Label htmlFor="permanent" className="text-sm leading-5">
                 I understand this action is permanent and cannot be undone
               </Label>
             </div>
-            
+
             <div className="flex items-start space-x-2">
               <Checkbox
                 id="privacy"
                 checked={acknowledgeWarnings.privacy}
                 onCheckedChange={(checked) =>
-                  setAcknowledgeWarnings(prev => ({ ...prev, privacy: !!checked }))
+                  setAcknowledgeWarnings((prev) => ({
+                    ...prev,
+                    privacy: !!checked,
+                  }))
                 }
               />
               <Label htmlFor="privacy" className="text-sm leading-5">

@@ -59,23 +59,24 @@ export const CreateJobSchema = z.object({
   description: z.string().min(1),
   responsibilities: z.array(z.string()).optional(),
   requirements: z.array(z.string()).optional(),
-  employmentType: z.array(z.enum([
-    "FullTime",
-    "PartTime",
-    "Freelance",
-    "Contractor",
-    "ContractToHire",
-    "Temporary",
-    "Internship",
-  ])).optional(),
-  seniority: z.array(z.enum([
-    "Entry",
-    "Junior",
-    "Mid",
-    "Senior",
-    "LeadExecutive",
-    "None",
-  ])).optional(),
+  employmentType: z
+    .array(
+      z.enum([
+        "FullTime",
+        "PartTime",
+        "Freelance",
+        "Contractor",
+        "ContractToHire",
+        "Temporary",
+        "Internship",
+      ]),
+    )
+    .optional(),
+  seniority: z
+    .array(
+      z.enum(["Entry", "Junior", "Mid", "Senior", "LeadExecutive", "None"]),
+    )
+    .optional(),
   workSetting: z.enum(["Onsite", "Remote", "Hybrid"]).optional(),
   expirationDate: z.string().optional(),
   status: z.enum(["Draft", "Open", "Closed", "Hired"]).optional(),
@@ -248,8 +249,6 @@ export class JobService {
 
     return response.data;
   }
-
-
 
   /**
    * Delete job

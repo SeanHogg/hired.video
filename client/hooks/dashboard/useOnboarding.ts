@@ -10,13 +10,16 @@ interface UseOnboardingReturn {
   isComplete: boolean;
 }
 
-export function useOnboarding(tasks: OnboardingTask[] = []): UseOnboardingReturn {
+export function useOnboarding(
+  tasks: OnboardingTask[] = [],
+): UseOnboardingReturn {
   const onboardingData = useMemo(() => {
     const completedTasksCount = tasks.filter((task) => task.completed).length;
     const totalTasksCount = tasks.length;
-    const progressPercentage = totalTasksCount > 0 ? Math.round(
-      (completedTasksCount / totalTasksCount) * 100
-    ) : 0;
+    const progressPercentage =
+      totalTasksCount > 0
+        ? Math.round((completedTasksCount / totalTasksCount) * 100)
+        : 0;
     const incompleteTasks = tasks.filter((task) => !task.completed);
     const isComplete = progressPercentage >= 100;
 

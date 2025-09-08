@@ -58,10 +58,10 @@ export default function Contact() {
     }
 
     // Create and load HubSpot script
-    const script = document.createElement('script');
-    script.src = '//js-na2.hsforms.net/forms/embed/v2.js';
-    script.charset = 'utf-8';
-    script.type = 'text/javascript';
+    const script = document.createElement("script");
+    script.src = "//js-na2.hsforms.net/forms/embed/v2.js";
+    script.charset = "utf-8";
+    script.type = "text/javascript";
     script.onload = () => {
       createForm();
     };
@@ -69,7 +69,9 @@ export default function Contact() {
 
     return () => {
       // Cleanup: remove script when component unmounts
-      const existingScript = document.querySelector('script[src="//js-na2.hsforms.net/forms/embed/v2.js"]');
+      const existingScript = document.querySelector(
+        'script[src="//js-na2.hsforms.net/forms/embed/v2.js"]',
+      );
       if (existingScript) {
         existingScript.remove();
       }
@@ -82,7 +84,7 @@ export default function Contact() {
         portalId: "242403512",
         formId: "59fc922d-e44c-410a-8579-76ccd3a1fe33",
         region: "na2",
-        target: '#hubspot-form'
+        target: "#hubspot-form",
       });
       setHubspotLoaded(true);
     }
@@ -115,19 +117,23 @@ export default function Contact() {
   const faqs = [
     {
       question: "How do I create a video resume?",
-      answer: "Simply sign up for an account, upload your existing resume, and use our AI-powered tools to create a compelling video resume that showcases your skills and personality."
+      answer:
+        "Simply sign up for an account, upload your existing resume, and use our AI-powered tools to create a compelling video resume that showcases your skills and personality.",
     },
     {
       question: "Is MyVideoResu.me free to use?",
-      answer: "We offer both free and premium plans. Our free plan includes basic video resume creation, while premium plans offer advanced features like AI optimization and priority support."
+      answer:
+        "We offer both free and premium plans. Our free plan includes basic video resume creation, while premium plans offer advanced features like AI optimization and priority support.",
     },
     {
       question: "How do employers find my video resume?",
-      answer: "Employers can discover your profile through our platform's search and matching algorithms, or you can share your video resume directly via a custom link."
+      answer:
+        "Employers can discover your profile through our platform's search and matching algorithms, or you can share your video resume directly via a custom link.",
     },
     {
       question: "What video formats are supported?",
-      answer: "We support all major video formats including MP4, MOV, and AVI. Our platform automatically optimizes your videos for the best viewing experience across all devices."
+      answer:
+        "We support all major video formats including MP4, MOV, and AVI. Our platform automatically optimizes your videos for the best viewing experience across all devices.",
     },
   ];
 
@@ -154,8 +160,9 @@ export default function Contact() {
                   Get in Touch
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8">
-                  Have questions about MyVideoResu.me? We're here to help you succeed in your career journey.
-                  Reach out to our team and we'll get back to you as soon as possible.
+                  Have questions about MyVideoResu.me? We're here to help you
+                  succeed in your career journey. Reach out to our team and
+                  we'll get back to you as soon as possible.
                 </p>
               </div>
             </div>
@@ -166,7 +173,10 @@ export default function Contact() {
             <div className="max-w-6xl mx-auto px-6">
               <div className="grid md:grid-cols-3 gap-8 mb-16">
                 {contactInfo.map((info, index) => (
-                  <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+                  <Card
+                    key={index}
+                    className="text-center hover:shadow-lg transition-shadow"
+                  >
                     <CardHeader>
                       <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <info.icon className="h-6 w-6 text-primary" />
@@ -185,10 +195,15 @@ export default function Contact() {
                         </Button>
                       )}
                       {info.action === "#" && (
-                        <Button variant="outline" onClick={() => {
-                          // Scroll to contact form
-                          document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' });
-                        }}>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            // Scroll to contact form
+                            document
+                              .getElementById("contact-form")
+                              ?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
                           Start Chat
                           <MessageCircle className="ml-2 h-4 w-4" />
                         </Button>
@@ -206,7 +221,8 @@ export default function Contact() {
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold mb-4">Send Us a Message</h2>
                 <p className="text-lg text-muted-foreground">
-                  Fill out the form below and we'll get back to you within 24 hours.
+                  Fill out the form below and we'll get back to you within 24
+                  hours.
                 </p>
               </div>
 
@@ -214,16 +230,22 @@ export default function Contact() {
                 <CardHeader>
                   <CardTitle className="text-center">Contact Form</CardTitle>
                   <CardDescription className="text-center">
-                    We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+                    We'd love to hear from you. Send us a message and we'll
+                    respond as soon as possible.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {/* HubSpot Form Container */}
-                  <div id="hubspot-form" className="min-h-[400px] flex items-center justify-center">
+                  <div
+                    id="hubspot-form"
+                    className="min-h-[400px] flex items-center justify-center"
+                  >
                     {!hubspotLoaded && (
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                        <p className="text-muted-foreground">Loading contact form...</p>
+                        <p className="text-muted-foreground">
+                          Loading contact form...
+                        </p>
                       </div>
                     )}
                   </div>
@@ -236,7 +258,9 @@ export default function Contact() {
           <section className="py-16">
             <div className="max-w-4xl mx-auto px-6">
               <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
+                <h2 className="text-3xl font-bold mb-4">
+                  Frequently Asked Questions
+                </h2>
                 <p className="text-lg text-muted-foreground">
                   Find answers to common questions about MyVideoResu.me
                 </p>

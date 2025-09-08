@@ -45,10 +45,10 @@ export default function Signup() {
   // Handle URL parameters for role pre-selection
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const roleParam = searchParams.get('role');
-    if (roleParam === 'recruiter') {
+    const roleParam = searchParams.get("role");
+    if (roleParam === "recruiter") {
       setRole(USER_ROLES.RECRUITER);
-    } else if (roleParam === 'employer') {
+    } else if (roleParam === "employer") {
       setRole(USER_ROLES.EMPLOYER);
     }
   }, [location.search]);

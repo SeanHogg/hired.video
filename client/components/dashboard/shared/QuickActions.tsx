@@ -10,12 +10,7 @@ import {
   Download,
   BarChart3,
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createRolePermissions } from "@/lib/role-utils";
 
@@ -24,7 +19,13 @@ interface QuickAction {
   label: string;
   onClick?: () => void;
   href?: string;
-  variant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
+  variant?:
+    | "default"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link"
+    | "destructive";
 }
 
 interface QuickActionsProps {
@@ -33,7 +34,11 @@ interface QuickActionsProps {
   loading?: boolean;
 }
 
-export function QuickActions({ userRole, customActions = [], loading = false }: QuickActionsProps) {
+export function QuickActions({
+  userRole,
+  customActions = [],
+  loading = false,
+}: QuickActionsProps) {
   const rolePermissions = createRolePermissions(userRole);
 
   // Define role-specific actions
@@ -56,7 +61,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           icon: Target,
           label: "Find New Jobs",
           href: "/jobs",
-        }
+        },
       );
     }
 
@@ -76,7 +81,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           icon: Calendar,
           label: "Schedule Interviews",
           href: "/interviews",
-        }
+        },
       );
     }
 
@@ -108,7 +113,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           onClick: () => {
             // TODO: Handle export functionality
           },
-        }
+        },
       );
     }
 
@@ -135,7 +140,7 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
           onClick: () => {
             // TODO: Handle export functionality
           },
-        }
+        },
       );
     }
 
@@ -156,7 +161,10 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
         </CardHeader>
         <CardContent className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+            <div
+              key={index}
+              className="h-10 w-full bg-gray-200 rounded animate-pulse"
+            />
           ))}
         </CardContent>
       </Card>
@@ -175,7 +183,9 @@ export function QuickActions({ userRole, customActions = [], loading = false }: 
         <CardContent>
           <div className="text-center py-8">
             <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No actions available</p>
+            <p className="text-sm text-muted-foreground">
+              No actions available
+            </p>
           </div>
         </CardContent>
       </Card>

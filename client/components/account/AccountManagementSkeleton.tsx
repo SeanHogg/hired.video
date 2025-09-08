@@ -6,7 +6,9 @@ interface AccountManagementSkeletonProps {
   showTabs?: boolean;
 }
 
-export function AccountManagementSkeleton({ showTabs = true }: AccountManagementSkeletonProps) {
+export function AccountManagementSkeleton({
+  showTabs = true,
+}: AccountManagementSkeletonProps) {
   return (
     <div className="space-y-6">
       {/* Header Skeleton */}

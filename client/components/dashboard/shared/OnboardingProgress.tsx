@@ -25,12 +25,13 @@ export function OnboardingProgress({
   loading = false,
   onTaskComplete,
   showAllTasksLink = true,
-  maxVisibleTasks = 2
+  maxVisibleTasks = 2,
 }: OnboardingProgressProps) {
   const completedTasksCount = tasks.filter((task) => task.completed).length;
-  const progressPercentage = tasks.length > 0 ? Math.round(
-    (completedTasksCount / tasks.length) * 100
-  ) : 0;
+  const progressPercentage =
+    tasks.length > 0
+      ? Math.round((completedTasksCount / tasks.length) * 100)
+      : 0;
 
   // Don't show the component if progress is 100%
   if (progressPercentage >= 100) {
@@ -56,7 +57,10 @@ export function OnboardingProgress({
           <div className="h-3 w-full bg-gray-200 rounded animate-pulse mb-4" />
           <div className="space-y-2">
             {Array.from({ length: 2 }).map((_, index) => (
-              <div key={index} className="h-12 w-full bg-gray-200 rounded animate-pulse" />
+              <div
+                key={index}
+                className="h-12 w-full bg-gray-200 rounded animate-pulse"
+              />
             ))}
           </div>
         </CardContent>
@@ -85,9 +89,7 @@ export function OnboardingProgress({
             <div className="text-2xl font-bold text-primary">
               {progressPercentage}%
             </div>
-            <div className="text-xs text-muted-foreground">
-              Complete
-            </div>
+            <div className="text-xs text-muted-foreground">Complete</div>
           </div>
         </div>
       </CardHeader>
@@ -110,8 +112,8 @@ export function OnboardingProgress({
                   )}
                 </div>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => onTaskComplete?.(task.id)}
                 asChild={!!task.url}
