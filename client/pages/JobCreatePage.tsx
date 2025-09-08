@@ -197,8 +197,8 @@ export default function JobCreatePage() {
       if (user && user.role === USER_ROLES.EMPLOYER) {
         try {
           const company = await companyService.getMyCompany();
-          if (company && company.name) {
-            setValue("company", company.name);
+          if (company && company.data && company.data.name) {
+            setValue("company", company.data.name);
           }
         } catch (error) {
           // Company not found or error - user can still enter manually
