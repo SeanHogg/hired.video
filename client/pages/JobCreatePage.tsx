@@ -205,27 +205,42 @@ export default function JobCreatePage() {
     }
   }, [user, setValue]);
 
-  // Two-way binding between isRemote checkbox and workSetting field (fixed)
+  // Two-way binding between isRemote checkbox and workSetting field (no infinite loop)
   const isRemoteValue = watch("isRemote");
   const workSettingValue = watch("workSetting");
 
-  useEffect(() => {
-    // Prevent infinite loops by checking if values actually need to change
-    if (isRemoteValue && workSettingValue !== "Remote") {
-      setValue("workSetting", "Remote", { shouldValidate: false });
-    } else if (!isRemoteValue && workSettingValue === "Remote") {
-      setValue("workSetting", "Onsite", { shouldValidate: false });
-    }
-  }, [isRemoteValue, setValue, workSettingValue]);
+  // Use refs to track the last source of change to prevent infinite loops
+  const lastChangeSource = useRef<'checkbox' | 'dropdown' | null>(null);
 
   useEffect(() => {
-    // Prevent infinite loops by checking if values actually need to change
-    if (workSettingValue === "Remote" && !isRemoteValue) {
+    // When checkbox is checked and workSetting is not Remote
+    if (isRemoteValue && workSettingValue !== "Remote" && lastChangeSource.current !== 'checkbox') {
+      lastChangeSource.current = 'checkbox';
+      setValue("workSetting", "Remote", { shouldValidate: false });
+    }
+    // When checkbox is unchecked and workSetting is Remote
+    else if (!isRemoteValue && workSettingValue === "Remote" && lastChangeSource.current !== 'checkbox') {
+      lastChangeSource.current = 'checkbox';
+      setValue("workSetting", "Onsite", { shouldValidate: false });
+    }
+    // When workSetting is Remote and checkbox is not checked
+    else if (workSettingValue === "Remote" && !isRemoteValue && lastChangeSource.current !== 'dropdown') {
+      lastChangeSource.current = 'dropdown';
       setValue("isRemote", true, { shouldValidate: false });
-    } else if (workSettingValue !== "Remote" && isRemoteValue) {
+    }
+    // When workSetting is not Remote and checkbox is checked
+    else if (workSettingValue !== "Remote" && isRemoteValue && lastChangeSource.current !== 'dropdown') {
+      lastChangeSource.current = 'dropdown';
       setValue("isRemote", false, { shouldValidate: false });
     }
-  }, [workSettingValue, setValue, isRemoteValue]);
+
+    // Reset the change source after a brief delay
+    const timer = setTimeout(() => {
+      lastChangeSource.current = null;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isRemoteValue, workSettingValue, setValue]);
 
   // File upload handlers
   const handleFileUpload = async (file: File) => {
