@@ -11,7 +11,6 @@ import {
   FileSpreadsheet,
   FileImage,
   Plus,
-  X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -45,7 +44,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
-// import { companyService } from "@/lib/services/company-service"; // Disabled until backend deployment
+
 
 // Job creation form schema
 const jobCreateSchema = z.object({
@@ -191,31 +190,20 @@ export default function JobCreatePage() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Auto-populate company field for employers (production-compatible approach)
+  // Simple company field helper for employers
   useEffect(() => {
-    const loadCompanyInfo = async () => {
-      if (user && user.role === USER_ROLES.EMPLOYER) {
-        try {
-          // For now, skip auto-population until the backend endpoint is deployed
-          // This prevents the 400 error on production
-          console.log("Company auto-population disabled until backend deployment");
-
-          // TODO: Enable this once /api/Companies/me is deployed to production
-          // const company = await companyService.getMyCompany();
-          // if (company && company.data && company.data.name) {
-          //   setValue("company", company.data.name);
-          // }
-        } catch (error) {
-          // Company not found or error - user can still enter manually
-          console.log("Could not load company information:", error);
-        }
+    if (user && user.role === USER_ROLES.EMPLOYER) {
+      // If the user object contains company information, use it
+      // This is a simple approach that works with existing data
+      const userAny = user as any;
+      if (userAny.companyName) {
+        setValue("company", userAny.companyName);
+      } else if (userAny.company?.name) {
+        setValue("company", userAny.company.name);
       }
-    };
-
-    if (isAuthenticated && user) {
-      loadCompanyInfo();
+      // Otherwise, user can enter company name manually
     }
-  }, [isAuthenticated, user, setValue]);
+  }, [user, setValue]);
 
   // Two-way binding between isRemote checkbox and workSetting field (fixed)
   const isRemoteValue = watch("isRemote");

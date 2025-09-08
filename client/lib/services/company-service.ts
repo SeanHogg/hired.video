@@ -159,17 +159,7 @@ export class CompanyService {
     return response.data;
   }
 
-  /**
-   * Get current user's company (for employers)
-   */
-  async getMyCompany(): Promise<any> {
-    const response = await apiClient.get<any>(
-      "/api/Companies/me",
-      z.any(), // Use any for now since the backend returns CompanyProfileDTO
-    );
 
-    return response.data;
-  }
 
   /**
    * Check if current user follows a company
