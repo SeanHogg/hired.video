@@ -45,7 +45,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
-import { companyService } from "@/lib/services/company-service";
+// import { companyService } from "@/lib/services/company-service"; // Disabled until backend deployment
 
 // Job creation form schema
 const jobCreateSchema = z.object({
@@ -191,15 +191,20 @@ export default function JobCreatePage() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Auto-populate company field for employers
+  // Auto-populate company field for employers (production-compatible approach)
   useEffect(() => {
     const loadCompanyInfo = async () => {
       if (user && user.role === USER_ROLES.EMPLOYER) {
         try {
-          const company = await companyService.getMyCompany();
-          if (company && company.data && company.data.name) {
-            setValue("company", company.data.name);
-          }
+          // For now, skip auto-population until the backend endpoint is deployed
+          // This prevents the 400 error on production
+          console.log("Company auto-population disabled until backend deployment");
+
+          // TODO: Enable this once /api/Companies/me is deployed to production
+          // const company = await companyService.getMyCompany();
+          // if (company && company.data && company.data.name) {
+          //   setValue("company", company.data.name);
+          // }
         } catch (error) {
           // Company not found or error - user can still enter manually
           console.log("Could not load company information:", error);
@@ -212,27 +217,27 @@ export default function JobCreatePage() {
     }
   }, [isAuthenticated, user, setValue]);
 
-  // Two-way binding between isRemote checkbox and workSetting field
-  useEffect(() => {
-    const subscription = watch((value, { name }) => {
-      if (name === "isRemote") {
-        if (value.isRemote) {
-          setValue("workSetting", "Remote");
-        } else {
-          // Reset to default when unchecked
-          setValue("workSetting", "Onsite");
-        }
-      } else if (name === "workSetting") {
-        if (value.workSetting === "Remote") {
-          setValue("isRemote", true);
-        } else {
-          setValue("isRemote", false);
-        }
-      }
-    });
+  // Two-way binding between isRemote checkbox and workSetting field (fixed)
+  const isRemoteValue = watch("isRemote");
+  const workSettingValue = watch("workSetting");
 
-    return () => subscription.unsubscribe();
-  }, [watch, setValue]);
+  useEffect(() => {
+    // Prevent infinite loops by checking if values actually need to change
+    if (isRemoteValue && workSettingValue !== "Remote") {
+      setValue("workSetting", "Remote", { shouldValidate: false });
+    } else if (!isRemoteValue && workSettingValue === "Remote") {
+      setValue("workSetting", "Onsite", { shouldValidate: false });
+    }
+  }, [isRemoteValue, setValue, workSettingValue]);
+
+  useEffect(() => {
+    // Prevent infinite loops by checking if values actually need to change
+    if (workSettingValue === "Remote" && !isRemoteValue) {
+      setValue("isRemote", true, { shouldValidate: false });
+    } else if (workSettingValue !== "Remote" && isRemoteValue) {
+      setValue("isRemote", false, { shouldValidate: false });
+    }
+  }, [workSettingValue, setValue, isRemoteValue]);
 
   // File upload handlers
   const handleFileUpload = async (file: File) => {
