@@ -81,7 +81,7 @@ export default function Help() {
         {
           question: "Can I change my persona type after registration?",
           answer:
-            "Yes, you can update your role (Job Seeker, Recruiter, Business) in your Profile settings. Note that this will change your dashboard and available features.",
+            "Yes, you can update your role (Job Seeker, Recruiter, Employer) in your Profile settings. Note that this will change your dashboard and available features.",
         },
         {
           question: "How do I delete my account?",

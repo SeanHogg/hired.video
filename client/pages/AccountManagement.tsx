@@ -341,7 +341,7 @@ export default function AccountManagement() {
                   Manage Your Team and Organization
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Streamline your business operations with powerful account
+                  Streamline your company operations with powerful account
                   management tools. Invite team members, assign roles, track
                   analytics, and manage permissions all from one centralized
                   dashboard.

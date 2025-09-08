@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { User } from "@/lib/auth";
+import { User, USER_ROLES } from "@/lib/auth";
 
 interface ContentItem {
   id: string;
@@ -54,7 +54,7 @@ export default function ActionsModal({
   }
 
   const isOwner = user && user.id === item.ownerId;
-  const isRecruiter = user && user.role === "Recruiter";
+  const isRecruiter = user && user.role === USER_ROLES.RECRUITER;
   const isAuthenticated = !!user;
 
   const getAvailableActions = () => {

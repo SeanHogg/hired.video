@@ -47,8 +47,8 @@ const personas = [
     iconColor: "text-blue-600",
   },
   {
-    id: USER_ROLES.BUSINESS,
-    title: "Business",
+    id: USER_ROLES.EMPLOYER,
+    title: "Employer",
     description: "Managing your company's hiring operations",
     icon: Building2,
     features: [

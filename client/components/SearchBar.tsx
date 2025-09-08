@@ -171,7 +171,7 @@ export default function SearchBar({
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="job_seeker">Job Seekers</SelectItem>
                 <SelectItem value="recruiter">Recruiters</SelectItem>
-                <SelectItem value="business">Business Leaders</SelectItem>
+                <SelectItem value="employer">Employers</SelectItem>
               </SelectContent>
             </Select>
           </div>

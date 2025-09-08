@@ -80,7 +80,6 @@ export function EditRolesModal({
         return "Can manage users, settings, and account configuration";
       case "Recruiter":
         return "Can post jobs, manage candidates, and access recruitment tools";
-      case "Business":
       case "Employer":
         return "Can post jobs and manage hiring processes";
       case "JobSeeker":

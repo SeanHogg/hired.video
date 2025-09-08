@@ -116,7 +116,7 @@ export function BillingAnalytics() {
       setPlanDistribution([
         { plan: 'Free', subscribers: 1250, revenue: 0, percentage: 65.2, color: COLORS[0] },
         { plan: 'Professional', subscribers: 342, revenue: 9918, percentage: 17.8, color: COLORS[1] },
-        { plan: 'Business', subscribers: 89, revenue: 8811, percentage: 4.6, color: COLORS[2] },
+        { plan: 'Employer', subscribers: 89, revenue: 8811, percentage: 4.6, color: COLORS[2] },
         { plan: 'Enterprise', subscribers: 23, revenue: 6877, percentage: 1.2, color: COLORS[3] }
       ]);
 

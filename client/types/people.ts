@@ -129,10 +129,10 @@ export interface UserProfile {
   id: string;
   slug: string; // User-friendly URL identifier (e.g., "john-seeker" or "jane-doe-123")
   data: UserData;
-  role: "job_seeker" | "recruiter" | "business"; // System role
+  role: "job_seeker" | "recruiter" | "employer"; // System role
   visibility: UserVisibility;
   status: UserStatus;
-  companyId?: string; // For recruiters/business users
+  companyId?: string; // For recruiters/employer users
   createdAt: string;
   updatedAt: string;
   lastActiveAt: string;

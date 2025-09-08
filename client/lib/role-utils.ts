@@ -20,7 +20,7 @@ export const BACKEND_ROLE_VALUES = {
 export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
   [USER_ROLES.RECRUITER]: "Recruiter",
-  [USER_ROLES.EMPLOYER]: "Business Leader",
+  [USER_ROLES.EMPLOYER]: "Employer",
   [USER_ROLES.ADMIN]: "Administrator",
 } as const;
 
@@ -28,7 +28,7 @@ export const ROLE_DISPLAY_LABELS = {
 export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.JOB_SEEKER]: "Looking for job opportunities",
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
-  [USER_ROLES.EMPLOYER]: "Managing business and hiring",
+  [USER_ROLES.EMPLOYER]: "Managing company and hiring",
   [USER_ROLES.ADMIN]: "System administration",
 } as const;
 
@@ -75,9 +75,6 @@ export function normalizeRole(role: string | number | undefined | null): UserRol
     case 'recruiter':
       return USER_ROLES.RECRUITER;
     case 'employer':
-    case 'business':
-    case 'business_leader':
-    case 'business leader':
       return USER_ROLES.EMPLOYER;
     case 'admin':
     case 'administrator':
@@ -156,9 +153,7 @@ export class RolePermissions {
     return this.role === USER_ROLES.ADMIN;
   }
 
-  get isBusiness(): boolean {
-    return this.isEmployer; // Business is conceptually the same as Employer
-  }
+
 
   // Permission checks
   get canManageJobs(): boolean {

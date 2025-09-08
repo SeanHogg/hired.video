@@ -66,7 +66,7 @@ export function EmployerDashboard({
       <MetricGrid 
         metrics={dashboardData.metrics || []}
         loading={loading}
-        emptyMessage="Business metrics will appear here once data is available."
+        emptyMessage="Employer metrics will appear here once data is available."
       />
 
       {/* Team & Budget Metrics Row */}

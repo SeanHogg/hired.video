@@ -72,7 +72,7 @@ export const UserProfileDTOSchema = z.object({
 // - Server may return enum number (0=JobSeeker, 1=Recruiter, 2=Employer)
 // - Or PascalCase strings (JobSeeker/Recruiter/Employer)
 // - Our UI expects USER_ROLES constants: "JobSeeker" | "Recruiter" | "Employer"
-// Note: Backend only supports 3 roles - Business is mapped to Employer
+// Note: Backend supports 3 roles: JobSeeker, Recruiter, Employer
 function mapServerRole(role: string | number | undefined | null): string {
   if (role === undefined || role === null) return USER_ROLES.JOB_SEEKER;
   if (typeof role === "number") {
@@ -92,7 +92,7 @@ function mapServerRole(role: string | number | undefined | null): string {
 
   if (r === "jobseeker" || r === "job_seeker" || r === "job seeker") return USER_ROLES.JOB_SEEKER;
   if (r === "recruiter") return USER_ROLES.RECRUITER;
-  if (r === "employer" || r === "business" || r === "company") return USER_ROLES.EMPLOYER;
+  if (r === "employer") return USER_ROLES.EMPLOYER;
   // If it's numeric-like string, coerce to number mapping
   const num = Number(r);
   if (!Number.isNaN(num)) return mapServerRole(num);

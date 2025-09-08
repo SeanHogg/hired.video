@@ -88,7 +88,7 @@ class AccountService {
         role: account.role,
         logoUrl: account.logoUrl ?? undefined,
         isOwner: account.role === "Admin",
-        isAdmin: account.role === "Admin" || account.role === "Business",
+        isAdmin: account.role === "Admin" || account.role === "Employer",
       }));
     } catch (error) {
       console.error("Error fetching available accounts:", error);

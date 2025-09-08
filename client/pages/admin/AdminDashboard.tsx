@@ -59,7 +59,7 @@ export default function AdminDashboard() {
     },
     {
       title: 'Subscription',
-      value: 'Business Plan',
+      value: 'Employer Plan',
       change: 'Renews in 15 days',
       trend: 'neutral',
       icon: <CreditCard className="h-5 w-5" />

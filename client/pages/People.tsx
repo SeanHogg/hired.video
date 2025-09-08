@@ -327,7 +327,7 @@ export default function People() {
     const peopleData: PeopleData = getPeopleForUser() as PeopleData;
     const rolePermissions = createRolePermissions(user.role);
     const isJobSeeker = rolePermissions.isJobSeeker;
-    const isRecruiterOrBusiness = rolePermissions.isRecruiter || rolePermissions.isEmployer;
+    const isRecruiterOrEmployer = rolePermissions.isRecruiter || rolePermissions.isEmployer;
 
     return (
       <div className="min-h-screen bg-background">

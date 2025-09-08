@@ -64,7 +64,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
   },
   '/pricing': {
     title: 'Pricing Plans - MyVideoResu.me',
-    description: 'Choose the perfect plan for your career goals. Affordable pricing for job seekers, recruiters, and businesses.',
+    description: 'Choose the perfect plan for your career goals. Affordable pricing for job seekers, recruiters, and employers.',
     keywords: 'pricing, plans, subscription, video resume cost, recruitment pricing',
   },
   '/for-recruiters': {

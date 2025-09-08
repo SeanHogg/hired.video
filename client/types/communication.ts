@@ -43,7 +43,7 @@ export enum EmailTemplateTargetRole {
   All = 0,
   JobSeeker = 1,
   Recruiter = 2,
-  Business = 3,
+  Employer = 3,
 }
 
 export enum EmailCampaignStatus {

@@ -469,7 +469,7 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <Network className="h-12 w-12 mx-auto text-purple-600 mb-4" />
-                      <CardTitle>Businesses</CardTitle>
+                      <CardTitle>Employers</CardTitle>
                       <CardDescription>
                         Build partnerships, connect with vendors, and maintain
                         professional relationships that drive growth.

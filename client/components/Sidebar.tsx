@@ -38,7 +38,7 @@ export default function Sidebar({
   const location = useLocation();
 
   // Check if user is Admin (using the actual role values)
-  const isAdmin = user?.role === USER_ROLES.EMPLOYER; // Business users have admin-like capabilities
+  const isAdmin = user?.role === USER_ROLES.EMPLOYER; // Employer users have admin-like capabilities
 
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },

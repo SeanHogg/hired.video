@@ -172,7 +172,7 @@ export default function Companies() {
   if (isAuthenticated && user) {
     const companiesData = getCompaniesForUser();
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
-    const isRecruiterOrBusiness =
+    const isRecruiterOrEmployer =
       user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
     return (
@@ -202,7 +202,7 @@ export default function Companies() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {isRecruiterOrBusiness && (
+                  {isRecruiterOrEmployer && (
                     <Button asChild>
                       <Link to="/companies/create">
                         <Plus className="h-4 w-4 mr-2" />
@@ -227,8 +227,8 @@ export default function Companies() {
 
               {/* Company Listings */}
               <div className="space-y-6">
-                {/* Owned Companies (for recruiters/business) */}
-                {isRecruiterOrBusiness &&
+                {/* Owned Companies (for recruiters/employers) */}
+                {isRecruiterOrEmployer &&
                   "owned" in companiesData &&
                   companiesData.owned.length > 0 && (
                     <div>

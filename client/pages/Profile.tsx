@@ -587,7 +587,7 @@ export default function Profile() {
                       );
                     }
 
-                    // recruiter/business
+                    // recruiter/employer
                     return (
                       <>
                         <Button

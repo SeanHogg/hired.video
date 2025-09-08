@@ -81,7 +81,6 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
     switch (role) {
       case "Admin":
         return <Crown className="h-3 w-3" />;
-      case "Business":
       case "Employer":
         return <Shield className="h-3 w-3" />;
       default:
@@ -93,7 +92,6 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
     switch (role) {
       case "Admin":
         return "bg-purple-100 text-purple-800";
-      case "Business":
       case "Employer":
         return "bg-blue-100 text-blue-800";
       case "Recruiter":

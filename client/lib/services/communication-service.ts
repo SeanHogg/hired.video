@@ -563,10 +563,10 @@ export class CommunicationService {
     }
   }
 
-  // ===== GROUP COMMUNICATION (Business/Recruiter) =====
+  // ===== GROUP COMMUNICATION (Employer/Recruiter) =====
 
   /**
-   * Get team members for group communication (business/recruiter accounts)
+   * Get team members for group communication (employer/recruiter accounts)
    */
   async getTeamMembers(): Promise<
     {

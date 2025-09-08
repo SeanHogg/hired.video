@@ -4,6 +4,7 @@
  */
 
 import { UserProfile } from "@/lib/services/user-service";
+import { AccountUsageType } from "./account";
 
 // Backend enums - must match exactly
 export enum TaskType {
@@ -137,11 +138,7 @@ export enum InviteStatus {
   Owner = 5,
 }
 
-export enum AccountUsageType {
-  Individual = 0,
-  Business = 1,
-  Employee = 2,
-}
+
 
 // Frontend-specific types for UI components
 export interface TaskUIState {

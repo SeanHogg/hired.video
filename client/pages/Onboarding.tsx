@@ -45,7 +45,7 @@ export default function Onboarding() {
     id: "user123",
     name: "Sarah Johnson",
     email: "sarah@example.com",
-    persona: "recruiter" as "job_seeker" | "recruiter" | "business",
+    persona: "recruiter" as "job_seeker" | "recruiter" | "employer",
   });
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -141,7 +141,7 @@ export default function Onboarding() {
             component: JobPostStep,
           },
         ];
-      case "business":
+      case "employer":
         return [
           ...baseSteps,
           {

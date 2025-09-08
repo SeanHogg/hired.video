@@ -48,7 +48,7 @@ export default function Signup() {
     const roleParam = searchParams.get('role');
     if (roleParam === 'recruiter') {
       setRole(USER_ROLES.RECRUITER);
-    } else if (roleParam === 'employer' || roleParam === 'business') {
+    } else if (roleParam === 'employer') {
       setRole(USER_ROLES.EMPLOYER);
     }
   }, [location.search]);
@@ -209,7 +209,7 @@ export default function Signup() {
                             value={USER_ROLES.EMPLOYER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                           >
-                            <Building2 className="h-4 w-4 mr-2" /> Business
+                            <Building2 className="h-4 w-4 mr-2" /> Employer
                           </ToggleGroupItem>
                         </ToggleGroup>
                       </div>

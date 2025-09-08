@@ -190,7 +190,7 @@ export const DEFAULT_ONBOARDING_TASKS: Array<
 > = [
   {
     id: "update_profile",
-    title: "Update Business Profile",
+    title: "Update Company Profile",
     description:
       "Complete your company profile with description, culture, and benefits",
     required: true,

@@ -142,32 +142,7 @@ export default function Pricing() {
       userCountLabel: "Seats",
     },
     [USER_ROLES.EMPLOYER]: {
-      label: "Business",
-      freeDescription:
-        "Core HR tools to start hiring and organizing candidates.",
-      premiumDescription:
-        "All-in-one HR suite with engagement and advanced analytics.",
-      freeFeatures: [
-        "ATS + Job postings",
-        "Recruiting & Sales CRM",
-        "1 admin user",
-        "Up to 2 employees",
-        "Basic scheduling",
-        "AI assistance (10/mo)",
-      ],
-      premiumFeatures: [
-        "Employee community (Engage/Inform/Inspire)",
-        "Hiring & Onboarding (Offers)",
-        "Performance management",
-        "Calendar & notifications",
-        "Advanced analytics & API",
-        "Unlimited users",
-      ],
-      unitLabel: "per user / month",
-      userCountLabel: "Users",
-    },
-    [USER_ROLES.BUSINESS]: {
-      label: "Business",
+      label: "Employer",
       freeDescription:
         "Core HR tools to start hiring and organizing candidates.",
       premiumDescription:
@@ -341,10 +316,10 @@ export default function Pricing() {
                           <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                         </ToggleGroupItem>
                         <ToggleGroupItem
-                          value="business"
+                          value="employer"
                           className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                         >
-                          <Building2 className="h-4 w-4 mr-2" /> Business
+                          <Building2 className="h-4 w-4 mr-2" /> Employer
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
@@ -438,7 +413,7 @@ export default function Pricing() {
                       )}
                     </div>
 
-                    {/* Seats selector only for recruiter/business */}
+                    {/* Seats selector only for recruiter/employer */}
                     {persona !== USER_ROLES.JOB_SEEKER && (
                       <div className="flex items-center justify-center gap-4">
                         <Label htmlFor="user-select">
@@ -1147,7 +1122,7 @@ export default function Pricing() {
                 Trusted by thousands of companies
               </h3>
               <p className="text-muted-foreground mb-6">
-                Join the growing community of businesses revolutionizing their
+                Join the growing community of employers revolutionizing their
                 talent management with our comprehensive HR platform
               </p>
               <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">

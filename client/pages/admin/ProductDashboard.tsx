@@ -133,7 +133,7 @@ export default function ProductDashboard() {
   const { user } = useAuth();
 
   // Check if user is SuperAdmin
-  const isAdmin = user?.role === 'Employer'; // Business users have admin-like capabilities
+  const isAdmin = user?.role === 'Employer'; // Employer users have admin-like capabilities
 
   useEffect(() => {
     if (isAdmin) {
@@ -385,7 +385,7 @@ export default function ProductDashboard() {
                         data={Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => ({
                           name: role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
                           value: count,
-                          isPaid: role === 'business' || role === 'recruiter' // Assume business and recruiter are paid
+                          isPaid: role === 'employer' || role === 'recruiter' // Assume employer and recruiter are paid
                         }))}
                         cx="50%"
                         cy="50%"
@@ -411,7 +411,7 @@ export default function ProductDashboard() {
                 <div className="mt-4 space-y-2">
                   <div className="text-sm font-medium">Account Status Summary:</div>
                   {Object.entries(dashboardData.userMetrics.usersByRole).map(([role, count]) => {
-                    const isPaid = role === 'business' || role === 'recruiter';
+                    const isPaid = role === 'employer' || role === 'recruiter';
                     return (
                       <div key={role} className="flex justify-between items-center text-sm">
                         <span className="flex items-center gap-2">

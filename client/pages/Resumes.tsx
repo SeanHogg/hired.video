@@ -62,7 +62,7 @@ import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { generateResumeId, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type {
@@ -941,13 +941,13 @@ export default function Resumes() {
                           No active resume
                         </Badge>
                       )}
-                      {(user?.role === "Recruiter" ||
-                        user?.role === "Employer") && (
+                      {(user?.role === USER_ROLES.RECRUITER ||
+                        user?.role === USER_ROLES.EMPLOYER) && (
                         <Badge
                           variant="outline"
                           className="text-blue-600 border-blue-200"
                         >
-                          {user.role === "Recruiter" ? "Recruiter" : "Business"}{" "}
+                          {user.role === USER_ROLES.RECRUITER ? "Recruiter" : "Employer"}{" "}
                           • Tracking{" "}
                           {
                             resumes.filter((r) => r.ownership === "tracked")
@@ -1389,8 +1389,8 @@ export default function Resumes() {
                             </Button>
                           </>
                         )}
-                        {(user?.role === "Recruiter" ||
-                          user?.role === "Employer") && (
+                        {(user?.role === USER_ROLES.RECRUITER ||
+                          user?.role === USER_ROLES.EMPLOYER) && (
                           <p className="text-sm text-muted-foreground">
                             Browse and track candidate resumes from the home
                             page search.

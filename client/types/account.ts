@@ -77,7 +77,6 @@ export enum MyVideoResumeRole {
   Admin = "Admin",
   JobSeeker = "JobSeeker",
   Recruiter = "Recruiter",
-  Business = "Business",
   Employer = "Employer"
 }
 
@@ -85,7 +84,7 @@ export enum MyVideoResumeRole {
 
 export enum AccountUsageType {
   Individual = 0,
-  Business = 1,
+  Employer = 1,
   Employee = 2,
 }
 
@@ -219,9 +218,8 @@ export const getRoleDisplayName = (role: string): string => {
       return "Job Seeker";
     case "Recruiter":
       return "Recruiter";
-    case "Business":
     case "Employer":
-      return "Business";
+      return "Employer";
     default:
       return role || "Unknown";
   }
@@ -269,7 +267,6 @@ export const canManageUsers = (userRoles: string[]): boolean => {
   return userRoles.some(
     (role) =>
       role === "Admin" ||
-      role === "Business" ||
       role === "Employer",
   );
 };
@@ -287,8 +284,8 @@ export const canEditRoles = (
     return !targetUserRoles.includes("Admin");
   }
 
-  // Business users can edit non-admin roles
-  if (userRoles.includes("Business") || userRoles.includes("Employer")) {
+  // Employer users can edit non-admin roles
+  if (userRoles.includes("Employer")) {
     return !targetUserRoles.some(
       (role) =>
         role === "Admin",
@@ -304,12 +301,12 @@ export const getAvailableRolesForInvite = (
   if (userRoles.includes("Admin")) {
     return [
       "Recruiter",
-      "Business",
+      "Employer",
       "JobSeeker",
     ];
   }
 
-  if (userRoles.includes("Business") || userRoles.includes("Employer")) {
+  if (userRoles.includes("Employer")) {
     return [
       "Recruiter",
       "JobSeeker",

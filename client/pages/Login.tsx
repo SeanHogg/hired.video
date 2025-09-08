@@ -209,7 +209,7 @@ export default function Login() {
                     disabled={isLoading}
                     className="text-left justify-start"
                   >
-                    Demo Business (michael.business@example.com)
+                    Demo Employer (michael.business@example.com)
                   </Button>
                 </div>
 

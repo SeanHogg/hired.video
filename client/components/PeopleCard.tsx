@@ -105,7 +105,7 @@ export default function PeopleCard({
         return <Users className="h-3 w-3" />;
       case "recruiter":
         return <UserCheck className="h-3 w-3" />;
-      case "business":
+      case "employer":
         return <Building2 className="h-3 w-3" />;
       default:
         return <Users className="h-3 w-3" />;
@@ -254,7 +254,7 @@ export default function PeopleCard({
             </div>
           )}
 
-          {/* Company Info (for recruiters/business) */}
+          {/* Company Info (for recruiters/employers) */}
           {person.companyName && (
             <div className="flex items-center gap-2 text-sm">
               <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />

@@ -31,7 +31,6 @@ export function usePermissions() {
 
     // Role type checks
     isAdmin: permissions.isAdmin,
-    isBusiness: permissions.isBusiness,
     isEmployer: permissions.isEmployer,
     isRecruiter: permissions.isRecruiter,
     isJobSeeker: permissions.isJobSeeker,

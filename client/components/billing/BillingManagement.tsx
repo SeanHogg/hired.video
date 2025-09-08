@@ -93,8 +93,8 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     isPopular: true
   },
   {
-    id: 'business',
-    name: 'Business',
+    id: 'employer',
+    name: 'Employer',
     price: 99,
     interval: 'month',
     features: ['Team collaboration', 'Advanced analytics', 'Custom branding', 'Priority support'],

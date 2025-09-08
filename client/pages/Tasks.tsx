@@ -70,7 +70,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
   SheetContent,
@@ -299,8 +299,8 @@ export default function Tasks() {
               </div>
             </div>
 
-            {/* Task Assignment - only show for business/recruiter roles */}
-            {(user?.role === "Employer" || user?.role === "Recruiter") &&
+            {/* Task Assignment - only show for employer/recruiter roles */}
+            {(user?.role === USER_ROLES.EMPLOYER || user?.role === USER_ROLES.RECRUITER) &&
               assignableUsers.length > 0 && (
                 <div>
                   <Label htmlFor="edit-assigned">Assign To</Label>

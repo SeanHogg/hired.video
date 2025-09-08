@@ -335,7 +335,7 @@ export default function LoginModal({
                     >
                       <option value="JobSeeker">Job Seeker</option>
                       <option value="Recruiter">Recruiter</option>
-                      <option value="Business">Business Owner</option>
+                      <option value="Employer">Employer</option>
                     </select>
                   </div>
 

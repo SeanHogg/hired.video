@@ -281,7 +281,7 @@ export default function Jobs() {
 
               {/* Job Listings */}
               <div className="space-y-6">
-                {/* Owned Jobs (for recruiters/business) */}
+                {/* Owned Jobs (for recruiters/employers) */}
                 {isRecruiterOrEmployer &&
                   "owned" in jobsData &&
                   jobsData.owned.length > 0 && (
