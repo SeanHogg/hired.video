@@ -381,6 +381,8 @@ export default function JobCreatePage() {
   };
 
   const onSubmit = async (data: JobCreateForm) => {
+    console.log("🚀 Form submitted with data:", data);
+    console.log("📋 Form validation errors:", errors);
     try {
       setIsSubmitting(true);
       setSubmitError(null);
@@ -411,6 +413,7 @@ export default function JobCreatePage() {
       };
 
       // Use auth context's apiCall for proper authentication handling
+      console.log("🌐 Making API call to POST /api/Job with data:", jobData);
       const result = await apiCall("/api/Job", {
         method: "POST",
         headers: {
@@ -418,6 +421,7 @@ export default function JobCreatePage() {
         },
         body: JSON.stringify(jobData),
       });
+      console.log("✅ API call successful, result:", result);
       console.log("Job created successfully:", result);
 
       setSubmitSuccess(true);
@@ -721,7 +725,10 @@ export default function JobCreatePage() {
                   </Alert>
                 )}
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                <form onSubmit={handleSubmit(onSubmit, (errors) => {
+                  console.log("❌ Form validation failed with errors:", errors);
+                  console.log("📝 Current form values:", watchedValues);
+                })} className="space-y-8">
                   {/* Basic Information */}
                   <Card>
                     <CardHeader>
@@ -1061,6 +1068,7 @@ export default function JobCreatePage() {
                       type="submit"
                       disabled={isSubmitting}
                       className="min-w-[120px]"
+                      onClick={() => console.log("🖱️ Post Job button clicked!")}
                     >
                       {isSubmitting ? (
                         <>
