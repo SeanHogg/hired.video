@@ -225,10 +225,9 @@ export default function Jobs() {
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
-    const isRecruiterOrBusiness =
+    const isRecruiterOrEmployer =
       user.role === USER_ROLES.RECRUITER ||
-      user.role === USER_ROLES.EMPLOYER ||
-      user.role === USER_ROLES.BUSINESS;
+      user.role === USER_ROLES.EMPLOYER;
 
     return (
       <div className="min-h-screen bg-background">
@@ -257,7 +256,7 @@ export default function Jobs() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {isRecruiterOrBusiness && (
+                  {isRecruiterOrEmployer && (
                     <Button asChild>
                       <Link to="/jobs/create">
                         <Plus className="h-4 w-4 mr-2" />
@@ -283,7 +282,7 @@ export default function Jobs() {
               {/* Job Listings */}
               <div className="space-y-6">
                 {/* Owned Jobs (for recruiters/business) */}
-                {isRecruiterOrBusiness &&
+                {isRecruiterOrEmployer &&
                   "owned" in jobsData &&
                   jobsData.owned.length > 0 && (
                     <div>

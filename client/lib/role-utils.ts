@@ -19,9 +19,8 @@ export const BACKEND_ROLE_VALUES = {
 // Role display labels - single source of truth
 export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
-  [USER_ROLES.RECRUITER]: "Recruiter", 
+  [USER_ROLES.RECRUITER]: "Recruiter",
   [USER_ROLES.EMPLOYER]: "Business Leader",
-  [USER_ROLES.BUSINESS]: "Business Leader", // Alias for EMPLOYER
   [USER_ROLES.ADMIN]: "Administrator",
 } as const;
 
@@ -30,7 +29,6 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.JOB_SEEKER]: "Looking for job opportunities",
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
   [USER_ROLES.EMPLOYER]: "Managing business and hiring",
-  [USER_ROLES.BUSINESS]: "Managing business and hiring", // Alias for EMPLOYER
   [USER_ROLES.ADMIN]: "System administration",
 } as const;
 
@@ -151,7 +149,7 @@ export class RolePermissions {
   }
 
   get isEmployer(): boolean {
-    return this.role === USER_ROLES.EMPLOYER || this.role === USER_ROLES.BUSINESS;
+    return this.role === USER_ROLES.EMPLOYER;
   }
 
   get isAdmin(): boolean {
@@ -159,7 +157,7 @@ export class RolePermissions {
   }
 
   get isBusiness(): boolean {
-    return this.isEmployer; // Business is alias for Employer
+    return this.isEmployer; // Business is conceptually the same as Employer
   }
 
   // Permission checks
@@ -228,7 +226,7 @@ export const roleUtils = {
   
   isEmployer: (role: string | number | undefined | null): boolean => {
     const normalized = normalizeRole(role);
-    return normalized === USER_ROLES.EMPLOYER || normalized === USER_ROLES.BUSINESS;
+    return normalized === USER_ROLES.EMPLOYER;
   },
   
   isAdmin: (role: string | number | undefined | null): boolean => 

@@ -139,7 +139,7 @@ export default function JobCreatePage() {
       return;
     }
 
-    if (user && user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER && user.role !== USER_ROLES.BUSINESS) {
+    if (user && user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER) {
       navigate("/jobs");
       return;
     }
@@ -340,6 +340,8 @@ export default function JobCreatePage() {
             <h3 className="text-lg font-semibold mb-2">Access Restricted</h3>
             <p className="text-muted-foreground mb-4">
               Only recruiters and employers can create job postings.
+              <br />
+              <small className="text-xs">Debug: Your role is "{user.role}"</small>
             </p>
             <Button asChild>
               <Link to="/jobs">Back to Jobs</Link>
