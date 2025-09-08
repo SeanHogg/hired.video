@@ -44,7 +44,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
-import { jobService, type CreateJob } from "@/lib/services/job-service";
+import { jobService } from "@/lib/services/job-service";
+import { companyService } from "@/lib/services/company-service";
 
 // Job creation form schema
 const jobCreateSchema = z.object({
@@ -132,7 +133,7 @@ export default function JobCreatePage() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, apiCall } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [excelError, setExcelError] = useState<string | null>(null);
@@ -189,6 +190,49 @@ export default function JobCreatePage() {
       return;
     }
   }, [isAuthenticated, user, navigate]);
+
+  // Auto-populate company field for employers
+  useEffect(() => {
+    const loadCompanyInfo = async () => {
+      if (user && user.role === USER_ROLES.EMPLOYER) {
+        try {
+          const company = await companyService.getMyCompany();
+          if (company && company.name) {
+            setValue("company", company.name);
+          }
+        } catch (error) {
+          // Company not found or error - user can still enter manually
+          console.log("Could not load company information:", error);
+        }
+      }
+    };
+
+    if (isAuthenticated && user) {
+      loadCompanyInfo();
+    }
+  }, [isAuthenticated, user, setValue]);
+
+  // Two-way binding between isRemote checkbox and workSetting field
+  useEffect(() => {
+    const subscription = watch((value, { name }) => {
+      if (name === "isRemote") {
+        if (value.isRemote) {
+          setValue("workSetting", "Remote");
+        } else {
+          // Reset to default when unchecked
+          setValue("workSetting", "Onsite");
+        }
+      } else if (name === "workSetting") {
+        if (value.workSetting === "Remote") {
+          setValue("isRemote", true);
+        } else {
+          setValue("isRemote", false);
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [watch, setValue]);
 
   // File upload handlers
   const handleFileUpload = async (file: File) => {
@@ -335,10 +379,12 @@ export default function JobCreatePage() {
       setExcelError(null);
       setDocumentError(null);
 
-      // Convert form data to CreateJob format
-      const jobData: CreateJob = {
+      // Convert form data to backend JobItem format
+      const jobData = {
         title: data.title,
         description: data.description,
+        company: data.company,
+        location: data.location,
         responsibilities: data.responsibilities
           ? data.responsibilities.split("\n").filter((r) => r.trim())
           : undefined,
@@ -350,9 +396,21 @@ export default function JobCreatePage() {
         workSetting: data.workSetting,
         expirationDate: data.expirationDate,
         status: data.status,
+        salaryMin: data.salaryMin,
+        salaryMax: data.salaryMax,
+        currency: data.currency,
+        isPublic: data.isPublic,
       };
 
-      await jobService.createJob(jobData);
+      // Use auth context's apiCall for proper authentication handling
+      const result = await apiCall("/api/Job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(jobData),
+      });
+      console.log("Job created successfully:", result);
 
       setSubmitSuccess(true);
 

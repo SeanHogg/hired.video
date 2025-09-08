@@ -160,6 +160,18 @@ export class CompanyService {
   }
 
   /**
+   * Get current user's company (for employers)
+   */
+  async getMyCompany(): Promise<Company> {
+    const response = await apiClient.get<Company>(
+      "/api/Companies/me",
+      CompanyMetadataSchema,
+    );
+
+    return response.data;
+  }
+
+  /**
    * Check if current user follows a company
    */
   async isFollowingCompany(id: string): Promise<boolean> {
