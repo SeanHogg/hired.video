@@ -31,7 +31,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService, type CreateJob } from "@/lib/services/job-service";
-import { aiService } from "@/lib/services/ai-service";
 
 
 // Job creation form schema
@@ -171,72 +170,47 @@ export default function JobCreatePage() {
 
   const handleExcelUpload = async (file: File) => {
     try {
-      const result = await aiService.parseExcelFile(file);
+      // Use the job service to create a job from Excel file
+      const job = await jobService.createJobFromFile(file);
 
-      if (result.success && result.jobs.length > 0) {
-        const excelJobsData = result.jobs.map(job => ({
-          title: job.title,
-          description: job.description,
-          company: job.company || "",
-          location: job.location || "",
-          employmentType: job.employmentType?.[0] || "FullTime",
-          seniority: job.seniority?.[0] || "Mid",
-          workSetting: job.workSetting || "Onsite",
-          responsibilities: job.responsibilities?.join('\n') || "",
-          requirements: job.requirements?.join('\n') || ""
-        }));
+      // Convert the single job response to our expected format
+      const excelJobData = {
+        title: job.title || "",
+        description: job.description || "",
+        company: job.company || "",
+        location: job.location || "",
+        employmentType: job.employmentType || "FullTime",
+        seniority: job.experienceLevel || "Mid",
+        workSetting: job.isRemote ? "Remote" : "Onsite",
+        responsibilities: "", // Will be extracted from description if needed
+        requirements: job.requirements?.join('\n') || ""
+      };
 
-        setExcelJobs(excelJobsData);
-        setShowExcelPreview(true);
-        setActiveMethod("excel");
-      } else {
-        throw new Error(result.error || 'No jobs found in Excel file');
-      }
-    } catch (error: any) {
-      // Fallback to sample data for demo purposes
-      setExcelJobs([
-        {
-          title: "Sample Job from Excel",
-          description: "Excel parsing is being implemented. This is sample data.",
-          company: "Sample Company",
-          location: "Sample Location",
-          employmentType: "FullTime",
-          seniority: "Mid",
-          workSetting: "Onsite"
-        }
-      ]);
+      setExcelJobs([excelJobData]);
       setShowExcelPreview(true);
       setActiveMethod("excel");
-      console.warn("Excel parsing not yet implemented, showing sample data:", error.message);
+    } catch (error: any) {
+      console.error("Excel upload error:", error);
+      throw new Error(error.message || 'Failed to parse Excel file');
     }
   };
 
   const handleDocumentUpload = async (file: File) => {
     try {
-      const result = await aiService.parseJobDocument(file);
+      // Use the job service to create a job from document file
+      const job = await jobService.createJobFromFile(file);
 
-      if (result.success && result.jobs.length > 0) {
-        setParsedJobs(result.jobs);
-        setSelectedJobIndex(0);
-        setActiveMethod("document");
-
-        // Pre-fill the form with the first parsed job
-        populateFormWithParsedData(result.jobs[0]);
-      } else {
-        throw new Error(result.error || 'No job data found in document');
-      }
-    } catch (error: any) {
-      // Fallback to sample data for demo purposes
+      // Convert the job response to our expected format
       const parsedJob: ParsedJobData = {
-        title: "Sample Parsed Job Title",
-        description: "AI document parsing is being implemented. This is sample data extracted from your document.",
-        responsibilities: ["Sample Responsibility 1", "Sample Responsibility 2"],
-        requirements: ["Sample Requirement 1", "Sample Requirement 2"],
-        employmentType: ["FullTime"],
-        seniority: ["Mid"],
-        workSetting: "Onsite",
-        company: "Sample Company",
-        location: "Sample Location"
+        title: job.title || "",
+        description: job.description || "",
+        responsibilities: [], // Will be extracted from description if needed
+        requirements: job.requirements || [],
+        employmentType: [job.employmentType || "FullTime"],
+        seniority: [job.experienceLevel || "Mid"],
+        workSetting: job.isRemote ? "Remote" : "Onsite",
+        company: job.company || "",
+        location: job.location || ""
       };
 
       setParsedJobs([parsedJob]);
@@ -245,8 +219,9 @@ export default function JobCreatePage() {
 
       // Pre-fill the form with parsed data
       populateFormWithParsedData(parsedJob);
-
-      console.warn("Document parsing not yet implemented, showing sample data:", error.message);
+    } catch (error: any) {
+      console.error("Document upload error:", error);
+      throw new Error(error.message || 'Failed to parse document');
     }
   };
 
