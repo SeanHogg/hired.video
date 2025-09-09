@@ -271,6 +271,29 @@ export const PaginatedResumesSchema = z.object({
   HasPreviousPage: z.boolean().nullable().optional(),
 });
 
+// Master Resume System Schemas
+const ResumeWithOwnershipSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  privacy: z.enum(["public", "recruiter_only", "private", "draft"]),
+  isMaster: z.boolean(),
+  isActive: z.boolean(),
+  parentId: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  views: z.number(),
+  summary: z.string(),
+  title: z.string(),
+  userId: z.string(),
+  ownership: z.enum(["owned", "tracked"]),
+});
+
+const MasterResumeGroupSchema = z.object({
+  masterResume: ResumeSchema,
+  variations: z.array(ResumeSchema),
+});
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -279,6 +302,8 @@ export type Resume = z.infer<typeof ResumeSchema>;
 export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
 export type CreateResume = z.infer<typeof CreateResumeSchema>;
 export type PaginatedResumes = z.infer<typeof PaginatedResumesSchema>;
+export type ResumeWithOwnership = z.infer<typeof ResumeWithOwnershipSchema>;
+export type MasterResumeGroup = z.infer<typeof MasterResumeGroupSchema>;
 
 // ============================================================================
 // RESUME SERVICE CLASS
@@ -519,6 +544,111 @@ export class ResumeService {
     );
 
     return response.data;
+  }
+
+  // Master Resume System Methods
+
+  /**
+   * Set a resume as the master resume
+   */
+  async setMasterResume(id: string): Promise<boolean> {
+    try {
+      const response = await apiClient.post<boolean>(
+        `/api/Resume/${id}/setMaster`,
+        {},
+        z.boolean(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error setting master resume:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to set master resume. Please try again."
+      );
+    }
+  }
+
+  /**
+   * Set a resume as the active resume
+   */
+  async setActiveResume(id: string): Promise<boolean> {
+    try {
+      const response = await apiClient.post<boolean>(
+        `/api/Resume/${id}/setActive`,
+        {},
+        z.boolean(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error setting active resume:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to set active resume. Please try again."
+      );
+    }
+  }
+
+  /**
+   * Create a variation of a master resume
+   */
+  async createResumeVariation(parentId: string, name: string): Promise<Resume> {
+    try {
+      const response = await apiClient.post<Resume>(
+        `/api/Resume/${parentId}/createVariation`,
+        { name },
+        ResumeSchema,
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error creating resume variation:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to create resume variation. Please try again."
+      );
+    }
+  }
+
+  /**
+   * Get master resume groups for the current user
+   */
+  async getMasterResumeGroups(): Promise<MasterResumeGroup[]> {
+    try {
+      const response = await apiClient.get<MasterResumeGroup[]>(
+        `/api/Resume/masterGroups`,
+        z.array(MasterResumeGroupSchema),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching master resume groups:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load resume collections. Please try again."
+      );
+    }
+  }
+
+  /**
+   * Get resumes with ownership information
+   */
+  async getResumesWithOwnership(): Promise<ResumeWithOwnership[]> {
+    try {
+      const response = await apiClient.get<ResumeWithOwnership[]>(
+        `/api/Resume/withOwnership`,
+        z.array(ResumeWithOwnershipSchema),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching resumes with ownership:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load resumes. Please try again."
+      );
+    }
   }
 }
 

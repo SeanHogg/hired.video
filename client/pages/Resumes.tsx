@@ -57,6 +57,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
+import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
+import CreateVariationDialog from "@/components/CreateVariationDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -72,6 +74,8 @@ import type {
   ResumeUploadResponse,
   ResumeWithOwnership,
 } from "@/types/resume";
+import type { MasterResumeGroup } from "@/lib/services/resume-service";
+import { useOptimisticResumes } from "@/hooks/useOptimisticResumes";
 import {
   ResumeMetadata,
   ResumePrivacy,
@@ -101,8 +105,28 @@ export default function Resumes() {
   );
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
+  const [masterResumeGroups, setMasterResumeGroups] = useState<MasterResumeGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Optimistic updates
+  const [optimisticState, optimisticActions] = useOptimisticResumes(resumes, masterResumeGroups);
+
+  // Use optimistic state for rendering
+  const displayResumes = optimisticState.resumes;
+  const displayMasterGroups = optimisticState.masterGroups;
+
+  // Master Resume System state
+  const [showMasterGroups, setShowMasterGroups] = useState(true);
+  const [variationDialog, setVariationDialog] = useState<{
+    isOpen: boolean;
+    masterResumeId: string;
+    masterResumeName: string;
+  }>({
+    isOpen: false,
+    masterResumeId: "",
+    masterResumeName: "",
+  });
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -128,50 +152,22 @@ export default function Resumes() {
   // Get user's resumes from API
   const getUserResumes = async (): Promise<ResumeWithOwnership[]> => {
     try {
-      // Get user's owned resumes
-      const owned = await resumeService.getUserResumes();
-      // TODO: Implement tracked resumes functionality when API supports it
-      const tracked: any[] = [];
-
-      const ownedWithOwnership: ResumeWithOwnership[] = owned.map((resume) => ({
-        id: resume.id,
-        slug: resume.slug,
-        name: resume.name,
-        privacy: (resume as any).privacy || "private",
-        isMaster: (resume as any).isMaster || false,
-        isActive: (resume as any).isActive || true,
-        parentId: (resume as any).parentId || null,
-        createdAt: resume.createdAt,
-        updatedAt: resume.updatedAt,
-        views: (resume as any).views || 0,
-        summary: (resume as any).data?.Basics?.Summary || "",
-        title: (resume as any).data?.Basics?.Label || resume.name || "",
-        userId: resume.userId,
-        ownership: "owned" as const,
-      }));
-
-      const trackedWithOwnership: ResumeWithOwnership[] = tracked.map(
-        (resume) => ({
-          id: resume.id,
-          slug: resume.slug,
-          name: resume.name,
-          privacy: resume.privacy,
-          isMaster: resume.isMaster,
-          isActive: resume.isActive,
-          parentId: resume.parentId,
-          createdAt: resume.createdAt,
-          updatedAt: resume.updatedAt,
-          views: resume.views,
-          summary: resume.data.Basics.Summary,
-          title: resume.data.Basics.Label,
-          userId: resume.userId,
-          ownership: "tracked" as const,
-        }),
-      );
-
-      return [...ownedWithOwnership, ...trackedWithOwnership];
+      // Use the new API endpoint that includes ownership information
+      const resumesWithOwnership = await resumeService.getResumesWithOwnership();
+      return resumesWithOwnership;
     } catch (error) {
-      console.error("Failed to get user resumes:", error);
+      console.error("Error fetching user resumes:", error);
+      return [];
+    }
+  };
+
+  // Get master resume groups
+  const getMasterResumeGroups = async (): Promise<MasterResumeGroup[]> => {
+    try {
+      const groups = await resumeService.getMasterResumeGroups();
+      return groups;
+    } catch (error) {
+      console.error("Error fetching master resume groups:", error);
       return [];
     }
   };
@@ -190,8 +186,18 @@ export default function Resumes() {
     setLoading(true);
     setError(null);
     try {
-      const userResumes = await getUserResumes();
+      const [userResumes, masterGroups] = await Promise.all([
+        getUserResumes(),
+        getMasterResumeGroups(),
+      ]);
       setResumes(userResumes);
+      setMasterResumeGroups(masterGroups);
+
+      // Update optimistic state with fresh data
+      optimisticActions.updateState({
+        resumes: userResumes,
+        masterGroups: masterGroups,
+      });
     } catch (error) {
       console.error("Failed to load resumes:", error);
       setError("Failed to load resumes. Please try again.");
@@ -305,9 +311,70 @@ export default function Resumes() {
     navigate(`/resumes/${resumeId}`);
   };
 
-  const handleCreateVariation = (parentId: string) => {
-    // Load parent resume data and pre-populate builder
-    setView("builder");
+  const handleCreateVariation = (masterResumeId: string) => {
+    const masterGroup = displayMasterGroups.find(g => g.masterResume.id === masterResumeId);
+    if (masterGroup) {
+      setVariationDialog({
+        isOpen: true,
+        masterResumeId,
+        masterResumeName: masterGroup.masterResume.name,
+      });
+    }
+  };
+
+  // Master Resume System handlers
+  const handleSetMasterResume = async (resumeId: string) => {
+    try {
+      await resumeService.setMasterResume(resumeId);
+      toast({
+        title: "Success",
+        description: "Master resume set successfully!",
+      });
+      loadResumes();
+    } catch (error) {
+      console.error("Error setting master resume:", error);
+      toast({
+        title: "Error",
+        description: "Failed to set master resume. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSetActiveResume = async (resumeId: string) => {
+    // Optimistic update
+    optimisticActions.setActiveOptimistic(resumeId);
+
+    try {
+      await resumeService.setActiveResume(resumeId);
+      toast({
+        title: "Success",
+        description: "Active resume set successfully!",
+      });
+      // Refresh data to ensure consistency
+      loadResumes();
+    } catch (error) {
+      console.error("Error setting active resume:", error);
+      // Revert optimistic update on error
+      optimisticActions.revertOptimistic();
+      toast({
+        title: "Error",
+        description: "Failed to set active resume. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleVariationCreated = () => {
+    loadResumes();
+  };
+
+  const handleCloseVariationDialog = () => {
+    setVariationDialog({
+      isOpen: false,
+      masterResumeId: "",
+      masterResumeName: "",
+    });
   };
 
   // Action handlers for ActionsModal
@@ -415,7 +482,7 @@ export default function Resumes() {
     setSearchFilters({});
   };
 
-  const filteredResumes = resumes.filter((resume) => {
+  const filteredResumes = displayResumes.filter((resume) => {
     const searchTerm = searchFilters.search || "";
     if (
       searchTerm &&
@@ -994,29 +1061,52 @@ export default function Resumes() {
                   />
 
                   {/* View Mode Toggle */}
-                  <div className="flex justify-end">
+                  <div className="flex justify-end space-x-2">
+                    {/* Master Groups Toggle */}
                     <div className="flex items-center border rounded-md">
                       <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        variant={showMasterGroups ? "default" : "ghost"}
                         size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
+                        onClick={() => setShowMasterGroups(true)}
+                        className="rounded-r-none text-xs px-3"
                       >
-                        <Grid className="h-4 w-4" />
+                        Collections
                       </Button>
                       <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
+                        variant={!showMasterGroups ? "default" : "ghost"}
                         size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
+                        onClick={() => setShowMasterGroups(false)}
+                        className="rounded-l-none text-xs px-3"
                       >
-                        <List className="h-4 w-4" />
+                        All Resumes
                       </Button>
                     </div>
+
+                    {/* Grid/List Toggle (only show when not in master groups view) */}
+                    {!showMasterGroups && (
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant={viewMode === "grid" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("grid")}
+                          className="rounded-r-none"
+                        >
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={viewMode === "list" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("list")}
+                          className="rounded-l-none"
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Resume Grid/List */}
+                {/* Master Resume Groups */}
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
@@ -1024,337 +1114,192 @@ export default function Resumes() {
                       Loading resumes...
                     </p>
                   </div>
-                ) : filteredResumes.length > 0 ? (
+                ) : showMasterGroups && displayMasterGroups.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold">My Resume Collections</h2>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMasterGroups(false)}
+                      >
+                        Show All Resumes
+                      </Button>
+                    </div>
+                    {displayMasterGroups.map((group) => (
+                      <MasterResumeGroupComponent
+                        key={group.masterResume.id}
+                        group={group}
+                        userRole={user?.role || "JobSeeker"}
+                        isOwned={true} // Master resume groups are always owned by the current user
+                        onViewResume={handleResumeView}
+                        onCreateVariation={handleCreateVariation}
+                        onSetActive={handleSetActiveResume}
+                        onEditResume={(id) => navigate(`/resumes/edit/${id}`)}
+                        onDeleteResume={(resumeId) => {
+                          const resume = displayResumes.find(r => r.id === resumeId);
+                          if (resume) handleDelete(resume);
+                        }}
+                        onTrackResume={(resumeId) => {
+                          const resume = displayResumes.find(r => r.id === resumeId);
+                          if (resume) handleTrack(resume);
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : !showMasterGroups && filteredResumes.length > 0 ? (
                   <>
-                    {viewMode === "grid" ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {paginatedResumes.map((resume) => (
-                          <ResumeCard
-                            key={resume.id}
-                            id={resume.id}
-                            name={resume.name}
-                            title={resume.title}
-                            summary={resume.summary}
-                            createdAt={resume.createdAt}
-                            views={resume.views}
-                            privacy={resume.privacy}
-                            isMaster={resume.isMaster}
-                            isActive={resume.isActive}
-                            parentId={resume.parentId}
-                            ownership={resume.ownership}
-                            onView={() => handleResumeView(resume.id)}
-                            onActions={() => handleOpenActions(resume.id)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {paginatedResumeTree.map((masterResume) => (
-                          <div
-                            key={masterResume.id}
-                            className="border rounded-lg overflow-hidden"
-                          >
-                            {/* Master Resume */}
-                            <div className="bg-muted/30">
-                              <div className="flex items-center p-4">
-                                {masterResume.children.length > 0 && (
+                  <div className="space-y-8">
+                    {/* My Resumes Section */}
+                    {filteredResumes.filter(r => r.ownership === "owned").length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-xl font-semibold">My Resumes</h2>
+                          <div className="text-sm text-muted-foreground">
+                            {filteredResumes.filter(r => r.ownership === "owned").length} resume{filteredResumes.filter(r => r.ownership === "owned").length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        {viewMode === "grid" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
+                              <ResumeCard
+                                key={resume.id}
+                                id={resume.id}
+                                name={resume.name}
+                                title={resume.title}
+                                summary={resume.summary}
+                                createdAt={resume.createdAt}
+                                views={resume.views}
+                                privacy={resume.privacy}
+                                isMaster={resume.isMaster}
+                                isActive={resume.isActive}
+                                parentId={resume.parentId}
+                                ownership={resume.ownership}
+                                onView={() => handleResumeView(resume.id)}
+                                onActions={() => handleOpenActions(resume.id)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
+                              <div key={resume.id} className="border rounded-lg p-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2">
+                                      <h3 className="font-medium">{resume.name}</h3>
+                                      {resume.isMaster && (
+                                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                                          Master
+                                        </Badge>
+                                      )}
+                                      {resume.isActive && (
+                                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                          Active
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">{resume.summary}</p>
+                                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                                      <span>Created {formatDate(resume.createdAt)}</span>
+                                      <div className="flex items-center">
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        {resume.views}
+                                      </div>
+                                    </div>
+                                  </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() =>
-                                      toggleMasterExpansion(masterResume.id)
-                                    }
-                                    className="mr-3 p-1 h-6 w-6"
+                                    onClick={() => handleOpenActions(resume.id)}
                                   >
-                                    {expandedMasters.has(masterResume.id) ? (
-                                      <ChevronDown className="h-4 w-4" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4" />
-                                    )}
+                                    <MoreHorizontal className="h-4 w-4" />
                                   </Button>
-                                )}
-                                {masterResume.children.length === 0 && (
-                                  <div className="mr-3 w-6" />
-                                )}
-
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div>
-                                        <h3 className="font-semibold text-lg">
-                                          {masterResume.name}
-                                        </h3>
-                                        {masterResume.title && (
-                                          <p className="text-sm text-muted-foreground">
-                                            {masterResume.title}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        {masterResume.isActive && (
-                                          <Badge
-                                            variant="secondary"
-                                            className="text-xs bg-green-100 text-green-800"
-                                          >
-                                            <Target className="w-3 h-3 mr-1" />
-                                            Active
-                                          </Badge>
-                                        )}
-                                        {masterResume.isMaster && (
-                                          <Badge
-                                            variant="secondary"
-                                            className="text-xs bg-yellow-100 text-yellow-800"
-                                          >
-                                            <Star className="w-3 h-3 mr-1" />
-                                            Master
-                                          </Badge>
-                                        )}
-                                        <Badge
-                                          className={`text-xs ${
-                                            masterResume.privacy === "public"
-                                              ? "bg-green-100 text-green-800"
-                                              : masterResume.privacy ===
-                                                  "recruiter_only"
-                                                ? "bg-blue-100 text-blue-800"
-                                                : "bg-gray-100 text-gray-800"
-                                          }`}
-                                        >
-                                          {masterResume.privacy ===
-                                            "public" && (
-                                            <Globe className="w-3 h-3 mr-1" />
-                                          )}
-                                          {masterResume.privacy ===
-                                            "recruiter_only" && (
-                                            <Users className="w-3 h-3 mr-1" />
-                                          )}
-                                          {masterResume.privacy ===
-                                            "private" && (
-                                            <Lock className="w-3 h-3 mr-1" />
-                                          )}
-                                          {masterResume.privacy === "public"
-                                            ? "Public"
-                                            : masterResume.privacy ===
-                                                "recruiter_only"
-                                              ? "Recruiter Only"
-                                              : "Private"}
-                                        </Badge>
-                                        {masterResume.children.length > 0 && (
-                                          <Badge
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {masterResume.children.length}{" "}
-                                            variation
-                                            {masterResume.children.length !== 1
-                                              ? "s"
-                                              : ""}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Eye className="w-3 h-3" />
-                                        {masterResume.views}
-                                      </div>
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="w-3 h-3" />
-                                        {formatDate(masterResume.createdAt)}
-                                      </div>
-                                      {!masterResume.isActive && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            handleSetActive(masterResume.id)
-                                          }
-                                          className="text-green-600 border-green-200 hover:bg-green-50"
-                                        >
-                                          <Power className="w-4 h-4 mr-2" />
-                                          Set Active
-                                        </Button>
-                                      )}
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleResumeView(masterResume.id)
-                                        }
-                                      >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        View
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleOpenActions(masterResume.id)
-                                        }
-                                      >
-                                        <MoreHorizontal className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                                    {masterResume.summary}
-                                  </p>
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Child Variations */}
-                            {expandedMasters.has(masterResume.id) &&
-                              masterResume.children.length > 0 && (
-                                <div className="bg-background border-t">
-                                  {masterResume.children.map(
-                                    (variation, index) => (
-                                      <div
-                                        key={variation.id}
-                                        className={`flex items-center p-4 pl-12 ${
-                                          index <
-                                          masterResume.children.length - 1
-                                            ? "border-b border-muted"
-                                            : ""
-                                        }`}
-                                      >
-                                        <div className="flex-1">
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                              <div>
-                                                <h4 className="font-medium">
-                                                  {variation.name}
-                                                </h4>
-                                                {variation.title && (
-                                                  <p className="text-sm text-muted-foreground">
-                                                    {variation.title}
-                                                  </p>
-                                                )}
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                {variation.isActive && (
-                                                  <Badge
-                                                    variant="secondary"
-                                                    className="text-xs bg-green-100 text-green-800"
-                                                  >
-                                                    <Target className="w-3 h-3 mr-1" />
-                                                    Active
-                                                  </Badge>
-                                                )}
-                                                <Badge
-                                                  variant="outline"
-                                                  className="text-xs"
-                                                >
-                                                  <Copy className="w-3 h-3 mr-1" />
-                                                  Variation
-                                                </Badge>
-                                                <Badge
-                                                  className={`text-xs ${
-                                                    variation.privacy ===
-                                                    "public"
-                                                      ? "bg-green-100 text-green-800"
-                                                      : variation.privacy ===
-                                                          "recruiter_only"
-                                                        ? "bg-blue-100 text-blue-800"
-                                                        : "bg-gray-100 text-gray-800"
-                                                  }`}
-                                                >
-                                                  {variation.privacy ===
-                                                    "public" && (
-                                                    <Globe className="w-3 h-3 mr-1" />
-                                                  )}
-                                                  {variation.privacy ===
-                                                    "recruiter_only" && (
-                                                    <Users className="w-3 h-3 mr-1" />
-                                                  )}
-                                                  {variation.privacy ===
-                                                    "private" && (
-                                                    <Lock className="w-3 h-3 mr-1" />
-                                                  )}
-                                                  {variation.privacy ===
-                                                  "public"
-                                                    ? "Public"
-                                                    : variation.privacy ===
-                                                        "recruiter_only"
-                                                      ? "Recruiter Only"
-                                                      : "Private"}
-                                                </Badge>
-                                              </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Eye className="w-3 h-3" />
-                                                {variation.views}
-                                              </div>
-                                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Calendar className="w-3 h-3" />
-                                                {formatDate(
-                                                  variation.createdAt,
-                                                )}
-                                              </div>
-                                              {!variation.isActive && (
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  onClick={() =>
-                                                    handleSetActive(
-                                                      variation.id,
-                                                    )
-                                                  }
-                                                  className="text-green-600 border-green-200 hover:bg-green-50"
-                                                >
-                                                  <Power className="w-4 h-4 mr-2" />
-                                                  Set Active
-                                                </Button>
-                                              )}
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                  handleResumeView(variation.id)
-                                                }
-                                              >
-                                                <Eye className="w-4 h-4 mr-2" />
-                                                View
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                  handleOpenActions(
-                                                    variation.id,
-                                                  )
-                                                }
-                                              >
-                                                <MoreHorizontal className="w-4 h-4" />
-                                              </Button>
-                                            </div>
-                                          </div>
-
-                                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                                            {variation.summary}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              )}
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
 
-                    {/* Pagination */}
-                    <Pagination
-                      currentPage={currentPage}
-                      totalItems={filteredResumes.length}
-                      itemsPerPage={itemsPerPage}
-                      onPageChange={setCurrentPage}
-                      onItemsPerPageChange={handleItemsPerPageChange}
-                    />
+                    {/* Tracked Resumes Section */}
+                    {filteredResumes.filter(r => r.ownership === "tracked").length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-xl font-semibold">Tracked Resumes</h2>
+                          <div className="text-sm text-muted-foreground">
+                            {filteredResumes.filter(r => r.ownership === "tracked").length} resume{filteredResumes.filter(r => r.ownership === "tracked").length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        {viewMode === "grid" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
+                              <ResumeCard
+                                key={resume.id}
+                                id={resume.id}
+                                name={resume.name}
+                                title={resume.title}
+                                summary={resume.summary}
+                                createdAt={resume.createdAt}
+                                views={resume.views}
+                                privacy={resume.privacy}
+                                isMaster={resume.isMaster}
+                                isActive={resume.isActive}
+                                parentId={resume.parentId}
+                                ownership={resume.ownership}
+                                onView={() => handleResumeView(resume.id)}
+                                onActions={() => handleOpenActions(resume.id)}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
+                              <div key={resume.id} className="border rounded-lg p-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2">
+                                      <h3 className="font-medium">{resume.name}</h3>
+                                      <Badge variant="outline" className="text-blue-600 border-blue-200">
+                                        Tracked
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">{resume.summary}</p>
+                                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
+                                      <span>Created {formatDate(resume.createdAt)}</span>
+                                      <div className="flex items-center">
+                                        <Eye className="h-3 w-3 mr-1" />
+                                        {resume.views}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenActions(resume.id)}
+                                  >
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pagination */}
+                  <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredResumes.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
                   </>
                 ) : (
                   <Card>
@@ -1434,6 +1379,15 @@ export default function Resumes() {
         }
         onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+      />
+
+      {/* Create Variation Dialog */}
+      <CreateVariationDialog
+        isOpen={variationDialog.isOpen}
+        onClose={handleCloseVariationDialog}
+        masterResumeId={variationDialog.masterResumeId}
+        masterResumeName={variationDialog.masterResumeName}
+        onVariationCreated={handleVariationCreated}
       />
     </div>
   );
