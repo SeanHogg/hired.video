@@ -7,6 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+import type { ResumeData } from "@/types/resume";
 
 // ============================================================================
 // SCHEMAS
@@ -409,19 +410,129 @@ export class ResumeService {
   }
 
   /**
-   * Create new resume
+   * Create new resume from CreateResumeRequest
    */
-  async createResume(resumeData: CreateResume): Promise<Resume> {
-    const response = await apiClient.post<Resume>(
+  async createResume(request: {
+    name: string;
+    data: ResumeData;
+    privacy?: string;
+    isMaster?: boolean;
+    isActive?: boolean;
+  }): Promise<Resume> {
+    // Convert ResumeData to JSON string format expected by backend
+    const resumeJson = JSON.stringify(request.data);
+
+    const response = await apiClient.request<Resume>(
       "/api/Resume/Save",
-      resumeData,
+      {
+        method: "POST",
+        body: resumeJson,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
       ResumeSchema,
     );
     return response.data;
   }
 
   /**
-   * Create resume from file upload
+   * Parse resume from file upload (without saving)
+   */
+  async parseResumeFromFile(file: File): Promise<{
+    data: Partial<ResumeData>;
+    confidence: number;
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await apiClient.request<{
+      result: string;
+      errorMessage?: string;
+    }>(
+      "/api/Resume/Parse",
+      {
+        method: "POST",
+        body: formData,
+        headers: {}, // Remove Content-Type to let browser set it for FormData
+      },
+      z.object({
+        result: z.string(),
+        errorMessage: z.string().optional(),
+      }),
+    );
+
+    if (response.data.errorMessage) {
+      throw new Error(response.data.errorMessage);
+    }
+
+    try {
+      // Parse the JSON result from the AI parsing
+      const parsedData = JSON.parse(response.data.result);
+
+      // Convert to ResumeData format
+      const resumeData: Partial<ResumeData> = {
+        Basics: {
+          Name: parsedData.basics?.name || "",
+          Label: parsedData.basics?.label || "",
+          Image: parsedData.basics?.image || "",
+          Email: parsedData.basics?.email || "",
+          Phone: parsedData.basics?.phone || "",
+          Url: parsedData.basics?.url || "",
+          Summary: parsedData.basics?.summary || "",
+          Location: parsedData.basics?.location ? {
+            Address: parsedData.basics.location.address || "",
+            PostalCode: parsedData.basics.location.postalCode || "",
+            City: parsedData.basics.location.city || "",
+            CountryCode: parsedData.basics.location.countryCode || "",
+            Region: parsedData.basics.location.region || "",
+          } : null,
+        },
+        Work: (parsedData.work || []).map((w: any) => ({
+          Name: w.name || w.company || "",
+          Position: w.position || "",
+          Summary: w.summary || "",
+          StartDate: w.startDate || "",
+          EndDate: w.endDate || "",
+          Highlights: Array.isArray(w.highlights) ? w.highlights : [],
+          Url: w.url || "",
+        })),
+        Education: (parsedData.education || []).map((e: any) => ({
+          Institution: e.institution || "",
+          Area: e.area || "",
+          StudyType: e.studyType || "",
+          StartDate: e.startDate || "",
+          EndDate: e.endDate || "",
+          Score: e.score || "",
+          Courses: Array.isArray(e.courses) ? e.courses : null,
+          Url: e.url || "",
+        })),
+        Skills: (parsedData.skills || []).map((s: any) => ({
+          Name: s.name || "",
+          Level: s.level || "",
+          Keywords: Array.isArray(s.keywords) ? s.keywords : [],
+        })),
+        Volunteer: [],
+        Awards: [],
+        Certificates: [],
+        Publications: [],
+        Languages: [],
+        Interests: [],
+        References: [],
+        Projects: [],
+      };
+
+      return {
+        data: resumeData,
+        confidence: 0.8, // Default confidence score
+      };
+    } catch (parseError) {
+      throw new Error(`Failed to parse resume data: ${parseError}`);
+    }
+  }
+
+  /**
+   * Create resume from file upload (saves immediately)
    */
   async createResumeFromFile(file: File): Promise<Resume> {
     const formData = new FormData();

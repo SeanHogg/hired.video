@@ -37,12 +37,28 @@ export default function ResumeCreatePage() {
     }
   }, [location.state]);
 
-  const handleCreateResume = (request: CreateResumeRequest) => {
-    // In a real app, this would save to the backend
-    console.log("Creating resume with ID:", resumeId, request);
+  const handleCreateResume = async (request: CreateResumeRequest) => {
+    try {
+      // Convert CreateResumeRequest to the format expected by the service
+      const resumeRequest = {
+        name: request.name || "New Resume",
+        data: request.data,
+        privacy: "private", // Default privacy setting
+        isMaster: true, // New resumes are master resumes by default
+        isActive: true, // New resumes are active by default
+      };
 
-    // Navigate to the view page for the new resume
-    navigate(`/resumes/${resumeId}`);
+      // Save the resume to the backend
+      const savedResume = await resumeService.createResume(resumeRequest);
+
+      console.log("Resume created successfully:", savedResume.id);
+
+      // Navigate to the resumes list page
+      navigate("/resumes");
+    } catch (error) {
+      console.error("Failed to create resume:", error);
+      // TODO: Show error message to user
+    }
   };
 
   const handleCancel = () => {

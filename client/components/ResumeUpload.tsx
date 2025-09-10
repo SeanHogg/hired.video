@@ -203,21 +203,17 @@ export default function ResumeUpload({
         isMaster,
       };
 
-      // Call backend to create resume from file
-      const created = await resumeService.createResumeFromFile(
-        uploadRequest.file,
-      );
+      // Parse resume file without saving to database
+      const parsed = await resumeService.parseResumeFromFile(uploadRequest.file);
 
-      // Map API entity to ResumeData for the builder
-      const uploadedData = created.metaResume
-        ? mapMetaResumeToResumeData(created.metaResume)
-        : getEmptyResumeData();
+      // Map parsed data to ResumeData for the builder
+      const uploadedData = parsed.data || getEmptyResumeData();
 
       const response: ResumeUploadResponse = {
-        id: created.id || `resume_${Date.now()}`,
+        id: `resume_${Date.now()}`, // Temporary ID for form
         data: uploadedData,
-        message: created.name || "Resume uploaded",
-        confidence: 1,
+        message: uploadRequest.name,
+        confidence: parsed.confidence || 0.8,
       };
 
       onUploadSuccess(response);
