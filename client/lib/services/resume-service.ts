@@ -440,7 +440,7 @@ export class ResumeService {
    * Parse resume from file upload (without saving)
    */
   async parseResumeFromFile(file: File): Promise<{
-    data: Partial<ResumeData>;
+    data: ResumeData;
     confidence: number;
   }> {
     const formData = new FormData();
@@ -471,47 +471,55 @@ export class ResumeService {
       const parsedData = JSON.parse(response.data.result);
 
       // Convert to ResumeData format
-      const resumeData: Partial<ResumeData> = {
+      const resumeData: ResumeData = {
         Basics: {
-          Name: parsedData.basics?.name || "",
-          Label: parsedData.basics?.label || "",
-          Image: parsedData.basics?.image || "",
-          Email: parsedData.basics?.email || "",
-          Phone: parsedData.basics?.phone || "",
-          Url: parsedData.basics?.url || "",
-          Summary: parsedData.basics?.summary || "",
-          Location: parsedData.basics?.location ? {
-            Address: parsedData.basics.location.address || "",
-            PostalCode: parsedData.basics.location.postalCode || "",
-            City: parsedData.basics.location.city || "",
-            CountryCode: parsedData.basics.location.countryCode || "",
-            Region: parsedData.basics.location.region || "",
-          } : null,
+          Name: parsedData.basics?.name ?? "",
+          Label: parsedData.basics?.label ?? "",
+          Image: parsedData.basics?.image ?? "",
+          Email: parsedData.basics?.email ?? "",
+          Phone: parsedData.basics?.phone ?? "",
+          Url: parsedData.basics?.url ?? "",
+          Summary: parsedData.basics?.summary ?? "",
+          Location: parsedData.basics?.location
+            ? {
+                Address: parsedData.basics.location.address ?? "",
+                PostalCode: parsedData.basics.location.postalCode ?? "",
+                City: parsedData.basics.location.city ?? "",
+                CountryCode: parsedData.basics.location.countryCode ?? "",
+                Region: parsedData.basics.location.region ?? "",
+              }
+            : null,
         },
-        Work: (parsedData.work || []).map((w: any) => ({
-          Name: w.name || w.company || "",
-          Position: w.position || "",
-          Summary: w.summary || "",
-          StartDate: w.startDate || "",
-          EndDate: w.endDate || "",
-          Highlights: Array.isArray(w.highlights) ? w.highlights : [],
-          Url: w.url || "",
-        })),
-        Education: (parsedData.education || []).map((e: any) => ({
-          Institution: e.institution || "",
-          Area: e.area || "",
-          StudyType: e.studyType || "",
-          StartDate: e.startDate || "",
-          EndDate: e.endDate || "",
-          Score: e.score || "",
-          Courses: Array.isArray(e.courses) ? e.courses : null,
-          Url: e.url || "",
-        })),
-        Skills: (parsedData.skills || []).map((s: any) => ({
-          Name: s.name || "",
-          Level: s.level || "",
-          Keywords: Array.isArray(s.keywords) ? s.keywords : [],
-        })),
+        Work: Array.isArray(parsedData.work)
+          ? parsedData.work.map((w: any) => ({
+              Name: w?.name ?? w?.company ?? "",
+              Position: w?.position ?? "",
+              Summary: w?.summary ?? "",
+              StartDate: w?.startDate ?? "",
+              EndDate: w?.endDate ?? "",
+              Highlights: Array.isArray(w?.highlights) ? w.highlights : [],
+              Url: w?.url ?? "",
+            }))
+          : [],
+        Education: Array.isArray(parsedData.education)
+          ? parsedData.education.map((e: any) => ({
+              Institution: e?.institution ?? "",
+              Area: e?.area ?? "",
+              StudyType: e?.studyType ?? "",
+              StartDate: e?.startDate ?? "",
+              EndDate: e?.endDate ?? "",
+              Score: e?.score ?? "",
+              Courses: Array.isArray(e?.courses) ? e.courses : null,
+              Url: e?.url ?? "",
+            }))
+          : [],
+        Skills: Array.isArray(parsedData.skills)
+          ? parsedData.skills.map((s: any) => ({
+              Name: s?.name ?? "",
+              Level: s?.level ?? "",
+              Keywords: Array.isArray(s?.keywords) ? s.keywords : [],
+            }))
+          : [],
         Volunteer: [],
         Awards: [],
         Certificates: [],
@@ -520,6 +528,7 @@ export class ResumeService {
         Interests: [],
         References: [],
         Projects: [],
+        Meta: undefined,
       };
 
       return {
