@@ -88,6 +88,7 @@ export class ApiClient {
     this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...config.headers,
     };
@@ -200,6 +201,11 @@ export class ApiClient {
           body = JSON.stringify(config.body);
         }
       }
+      // Avoid sending Content-Type on requests with no body (e.g., GET) to satisfy servers with strict content negotiation
+      if (!body) {
+        delete headers["Content-Type"];
+      }
+
 
       const response = await fetch(url, {
         method: config.method || "GET",
