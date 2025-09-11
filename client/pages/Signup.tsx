@@ -95,7 +95,7 @@ export default function Signup() {
     }
 
     try {
-      const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
+      const success = await signup(email, password, firstName, lastName, role);
       if (success) {
         // Redirect to success page with email confirmation instructions
         navigate(
@@ -212,18 +212,6 @@ export default function Signup() {
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
-
-	                  {/* Referral code */}
-	                  <div className="space-y-2">
-	                    <Label htmlFor="referralCode">Referral Code (optional)</Label>
-	                    <Input
-	                      id="referralCode"
-	                      type="text"
-	                      placeholder="Have a referral code? Enter it here"
-	                      value={referralCode}
-	                      onChange={(e) => setReferralCode(e.target.value)}
-	                    />
-	                  </div>
 
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter

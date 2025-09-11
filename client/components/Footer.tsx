@@ -74,6 +74,7 @@ export default function Footer() {
                 >
                   For Companies
                 </Link>
+              </li>
               <li>
                 <Link
                   to="/affiliate-program"
