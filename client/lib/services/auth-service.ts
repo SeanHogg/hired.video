@@ -36,6 +36,7 @@ export const RegisterRequestSchema = z.object({
       USER_ROLES.ADMIN,
     ])
     .optional(),
+  referralCode: z.string().trim().min(1).max(64).optional(),
 });
 
 // Use the shared login response schema from @shared/api

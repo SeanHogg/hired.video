@@ -74,6 +74,13 @@ export default function Footer() {
                 >
                   For Companies
                 </Link>
+              <li>
+                <Link
+                  to="/affiliate-program"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Affiliate Program
+                </Link>
               </li>
             </ul>
           </div>

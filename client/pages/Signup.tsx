@@ -42,6 +42,8 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [referralCode, setReferralCode] = useState("");
+
   // Handle URL parameters for role pre-selection
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -50,6 +52,14 @@ export default function Signup() {
       setRole(USER_ROLES.RECRUITER);
     } else if (roleParam === "employer") {
       setRole(USER_ROLES.EMPLOYER);
+
+	  // Capture referral code from URL
+	  useEffect(() => {
+	    const searchParams = new URLSearchParams(location.search);
+	    const code = searchParams.get("ref");
+	    if (code) setReferralCode(code);
+	  }, [location.search]);
+
     }
   }, [location.search]);
 
@@ -85,7 +95,7 @@ export default function Signup() {
     }
 
     try {
-      const success = await signup(email, password, firstName, lastName, role);
+      const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
       if (success) {
         // Redirect to success page with email confirmation instructions
         navigate(
@@ -202,6 +212,19 @@ export default function Signup() {
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
                             className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+
+	                  {/* Referral code */}
+	                  <div className="space-y-2">
+	                    <Label htmlFor="referralCode">Referral Code (optional)</Label>
+	                    <Input
+	                      id="referralCode"
+	                      type="text"
+	                      placeholder="Have a referral code? Enter it here"
+	                      value={referralCode}
+	                      onChange={(e) => setReferralCode(e.target.value)}
+	                    />
+	                  </div>
+
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
@@ -215,6 +238,19 @@ export default function Signup() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Referral code */}
+                  <div className="space-y-2">
+                    <Label htmlFor="referralCode">Referral Code (optional)</Label>
+                    <Input
+                      id="referralCode"
+                      type="text"
+                      placeholder="Have a referral code? Enter it here"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value)}
+                    />
+                  </div>
+
 
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>

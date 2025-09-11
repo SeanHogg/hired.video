@@ -200,6 +200,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     firstName: string,
     lastName: string,
     role: UserRole = USER_ROLES.JOB_SEEKER,
+    referralCode?: string,
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -210,6 +211,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         firstName,
         lastName,
         role,
+        referralCode,
       });
       const profile = authService.getStoredUser();
       if (profile) setUser(userProfileToUser(profile));

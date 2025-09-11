@@ -64,6 +64,8 @@ const Outreach = lazy(() => import("./pages/Outreach"));
 const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
+const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
+
 
 // Other pages (lazy loaded)
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -231,6 +233,8 @@ const App = () => (
                         path="/companies/create"
                         element={<CompanyCreatePage />}
                       />
+                      <Route path="/affiliate-program" element={<AffiliateProgram />} />
+
                       <Route
                         path="/companies/create/:id"
                         element={<CompanyCreatePage />}
