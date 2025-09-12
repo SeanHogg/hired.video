@@ -166,6 +166,25 @@ export default function Pricing() {
       unitLabel: "per user / month",
       userCountLabel: "Users",
     },
+    [USER_ROLES.BUSINESS]: {
+      label: "Business",
+      freeDescription: "Manage hiring and team workflows for your business.",
+      premiumDescription:
+        "Advanced HR, recruiting, and analytics for growing teams.",
+      freeFeatures: [
+        "Company profile",
+        "Basic ATS & CRM",
+        "1 admin user",
+      ],
+      premiumFeatures: [
+        "Unlimited users",
+        "Advanced analytics & API",
+        "Team collaboration tools",
+      ],
+      unitLabel: "per user / month",
+      userCountLabel: "Users",
+    },
+
     [USER_ROLES.ADMIN]: {
       label: "Admin",
       freeDescription: "Administrative access to manage the platform.",

@@ -121,7 +121,7 @@ export const SignupRequestSchema = z.object({
       USER_ROLES.JOB_SEEKER,
       USER_ROLES.RECRUITER,
       USER_ROLES.EMPLOYER,
-      USER_ROLES.BUSINESS,
+      USER_ROLES.AFFILIATE,
       USER_ROLES.ADMIN,
     ])
     .optional(),
@@ -145,7 +145,7 @@ export const UserProfileResponseSchema = z.object({
     USER_ROLES.JOB_SEEKER,
     USER_ROLES.RECRUITER,
     USER_ROLES.EMPLOYER,
-    USER_ROLES.BUSINESS,
+    USER_ROLES.AFFILIATE,
     USER_ROLES.ADMIN,
   ]),
   isVerified: z.boolean(),

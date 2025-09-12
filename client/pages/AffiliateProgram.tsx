@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { USER_ROLES } from "@/lib/user-roles";
+// import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -35,7 +35,8 @@ export default function AffiliateProgram() {
       return;
     }
 
-    const ok = await signup(email, password, firstName, lastName, 50 /* MyVideoResumeRoles.Affiliate */);
+    // Do not send a special role; backend expects standard string roles. Affiliate status is managed via profile.
+    const ok = await signup(email, password, firstName, lastName);
     if (ok) {
       setSuccess("Registration successful! Redirecting to your affiliate dashboard...");
       setTimeout(() => navigate("/affiliate/dashboard"), 1200);

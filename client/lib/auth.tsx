@@ -3,7 +3,7 @@ import { logger } from "./logger";
 import { authService, type UserProfile } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
-import { USER_ROLES, type UserRole } from "./user-roles";
+import { USER_ROLES, type UserRole } from "@shared/user-roles";
 export { USER_ROLES, type UserRole };
 
 export interface User {
@@ -39,7 +39,7 @@ interface AuthContextType {
     password: string,
     firstName: string,
     lastName: string,
-    role?: UserRole | number,
+    role?: UserRole,
     referralCode?: string,
   ) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -200,7 +200,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     password: string,
     firstName: string,
     lastName: string,
-    role: UserRole | number = USER_ROLES.JOB_SEEKER,
+    role: UserRole = USER_ROLES.JOB_SEEKER,
     referralCode?: string,
   ): Promise<boolean> => {
     try {

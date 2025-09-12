@@ -7,7 +7,7 @@
  * and centralizes role-based permission logic.
  */
 
-import { USER_ROLES, type UserRole } from "./user-roles";
+import { USER_ROLES, type UserRole } from "@shared/user-roles";
 
 // Backend enum values from MyVideoResumeRoles
 export const BACKEND_ROLE_VALUES = {
