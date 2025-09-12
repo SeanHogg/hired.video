@@ -39,7 +39,8 @@ interface AuthContextType {
     password: string,
     firstName: string,
     lastName: string,
-    role?: UserRole,
+    role?: UserRole | number,
+    referralCode?: string,
   ) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
@@ -199,7 +200,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     password: string,
     firstName: string,
     lastName: string,
-    role: UserRole = USER_ROLES.JOB_SEEKER,
+    role: UserRole | number = USER_ROLES.JOB_SEEKER,
     referralCode?: string,
   ): Promise<boolean> => {
     try {

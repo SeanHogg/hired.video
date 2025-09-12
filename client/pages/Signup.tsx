@@ -95,7 +95,7 @@ export default function Signup() {
     }
 
     try {
-      const success = await signup(email, password, firstName, lastName, role);
+      const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
       if (success) {
         // Redirect to success page with email confirmation instructions
         navigate(

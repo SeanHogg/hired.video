@@ -2,21 +2,229 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { useSEO } from "@/lib/seo";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth";
+import { USER_ROLES } from "@/lib/user-roles";
+import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function AffiliateProgram() {
   useSEO("/affiliate-program");
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+  const navigate = useNavigate();
+  const { signup, isLoading } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!email || !password || !firstName || !lastName) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    const ok = await signup(email, password, firstName, lastName, 50 /* MyVideoResumeRoles.Affiliate */);
+    if (ok) {
+      setSuccess("Registration successful! Redirecting to your affiliate dashboard...");
+      setTimeout(() => navigate("/affiliate/dashboard"), 1200);
+    } else {
+      setError("Registration failed. Please verify your details or try again later.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <main className="pt-16">
-          <section className="max-w-4xl mx-auto p-6 space-y-4">
-            <h1 className="text-3xl font-bold">Affiliate Program</h1>
-            <p>Earn 25% commission on the first month of any referral's subscription. Minimum payout $25.00.</p>
-            <p>Share your referral link with your audience. When they sign up and purchase their first month, you get paid.</p>
+          {/* Hero */}
+          <section className="max-w-6xl mx-auto px-6 py-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+              <div className="space-y-6">
+                <h1 className="text-4xl font-bold tracking-tight">Partner with MyVideoResume</h1>
+                <p className="text-muted-foreground text-lg">
+                  Help professionals stand out with AI-powered video and traditional resumes. Earn commissions by sharing a platform that accelerates job searches and improves hiring outcomes.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-start space-x-3">
+                    <CheckCircle2 className="h-6 w-6 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">AI-enhanced resume builder</p>
+                      <p className="text-sm text-muted-foreground">Guided creation, tailored keyword suggestions, and ATS-ready formats.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <Video className="h-6 w-6 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Video resumes that convert</p>
+                      <p className="text-sm text-muted-foreground">Record or upload compelling intros that increase response rates.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <Users className="h-6 w-6 text-purple-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Collaboration tools</p>
+                      <p className="text-sm text-muted-foreground">Share, get feedback, and manage variations with master collections.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <BarChart3 className="h-6 w-6 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Analytics & insights</p>
+                      <p className="text-sm text-muted-foreground">Track views, engagement, and the active resume with clarity.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button size="lg" onClick={() => document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" })}>
+                    Join the affiliate program
+                  </Button>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Fair, transparent payouts
+                  </div>
+                </div>
+              </div>
+
+              {/* Registration Card */}
+              <Card id="affiliate-signup" className="shadow-lg">
+                <CardHeader>
+                  <CardTitle>Become an Affiliate</CardTitle>
+                  <CardDescription>Register as an affiliate to get your unique referral link and start earning.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form className="space-y-4" onSubmit={handleRegister}>
+                    <div>
+                      <label className="text-sm font-medium">First name</label>
+                      <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" required />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Last name</label>
+                      <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" required />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Email address</label>
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Password</label>
+                      <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                      <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
+                    </div>
+                    {error && <p className="text-sm text-red-600">{error}</p>}
+                    {success && <p className="text-sm text-green-600">{success}</p>}
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? "Creating account..." : "Create affiliate account"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      By continuing, you agree to our Terms and Privacy Policy.
+                    </p>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* Earnings & Payouts */}
+          <section className="max-w-6xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Commission</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p><strong>25% commission</strong> on the first month subscription fee only (one-time payment per referral).</p>
+                  <p>Example: If your referral purchases a $20 plan, you earn $5.</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center"><Zap className="h-5 w-5 mr-2" /> Payout threshold</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p><strong>$25.00 minimum</strong> required to request a payout.</p>
+                  <p>Payout requests are processed as soon as the threshold is met.</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center"><LinkIcon className="h-5 w-5 mr-2" /> Payments</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p><strong>Timeline:</strong> First-month commission becomes eligible after the initial charge clears.</p>
+                  <p><strong>Methods:</strong> We process payouts via standard methods (e.g., PayPal, bank transfer). You’ll set your preferred method in your affiliate settings.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* Value propositions */}
+          <section className="max-w-6xl mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Great for creators</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Monetize your audience with a product that helps job seekers get noticed faster.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Built for recruiters</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Recommend modern, shareable resumes to candidates and track engagement.
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Transparent tracking</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Real-time referral attribution and clear dashboard stats.
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* Social proof */}
+          <section className="max-w-6xl mx-auto px-6 py-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>What affiliates say</CardTitle>
+                <CardDescription>Early partners have reported higher click-through with video resumes vs text-only.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
+                <blockquote className="p-4 bg-muted rounded-md">“MyVideoResume is the first tool my audience asked me to keep recommending.” — Career Coach</blockquote>
+                <blockquote className="p-4 bg-muted rounded-md">“Video intros increased recruiter responses. Easy sell.” — Content Creator</blockquote>
+                <blockquote className="p-4 bg-muted rounded-md">“The collections feature makes managing resume variants a breeze.” — Staffing Agency</blockquote>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Final CTA */}
+          <section className="max-w-6xl mx-auto px-6 py-10">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <h2 className="text-2xl font-semibold">Ready to start earning?</h2>
+              <p className="text-muted-foreground">Create your affiliate account and get your unique referral link in minutes.</p>
+              <Button size="lg" onClick={() => document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" })}>
+                Join now
+              </Button>
+            </div>
           </section>
         </main>
         <Footer />

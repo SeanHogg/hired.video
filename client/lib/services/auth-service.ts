@@ -28,14 +28,15 @@ export const RegisterRequestSchema = z.object({
   confirmPassword: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z
-    .enum([
+  role: z.union([
+    z.enum([
       USER_ROLES.JOB_SEEKER,
       USER_ROLES.RECRUITER,
       USER_ROLES.EMPLOYER,
       USER_ROLES.ADMIN,
-    ])
-    .optional(),
+    ]),
+    z.number(), // allow backend numeric enum like MyVideoResumeRoles.Affiliate
+  ]).optional(),
   referralCode: z.string().trim().min(1).max(64).optional(),
 });
 
