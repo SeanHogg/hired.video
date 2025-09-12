@@ -280,7 +280,7 @@ const ResumeWithOwnershipSchema = z.object({
   privacy: z.enum(["public", "recruiter_only", "private", "draft"]),
   isMaster: z.boolean(),
   isActive: z.boolean(),
-  parentId: z.string().optional(),
+  parentId: nullableString(),
   createdAt: z.string(),
   updatedAt: z.string(),
   views: z.number(),
