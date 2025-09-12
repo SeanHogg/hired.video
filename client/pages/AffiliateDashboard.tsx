@@ -80,7 +80,7 @@ export default function AffiliateDashboard() {
 
 
 	            {/* Not an affiliate notice */}
-	            {user && user.role !== "Affiliate" && (
+	            {user && !loading && !profile && (
 	              <Card>
 	                <CardHeader>
 	                  <CardTitle>Become an Affiliate</CardTitle>
