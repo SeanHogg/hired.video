@@ -185,6 +185,24 @@ export default function Pricing() {
       userCountLabel: "Users",
     },
 
+    [USER_ROLES.AFFILIATE]: {
+      label: "Affiliate",
+      freeDescription: "Earn 25% commission from referred subscribers.",
+      premiumDescription: "Affiliates earn commissions; no paid plan required.",
+      freeFeatures: [
+        "Unique referral link",
+        "Dashboard with referrals & payouts",
+        "$25 minimum payout threshold",
+      ],
+      premiumFeatures: [
+        "Priority support",
+        "Advanced tracking (coming soon)",
+        "Payout history export",
+      ],
+      unitLabel: "",
+      userCountLabel: "",
+    },
+
     [USER_ROLES.ADMIN]: {
       label: "Admin",
       freeDescription: "Administrative access to manage the platform.",
