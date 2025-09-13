@@ -634,11 +634,81 @@ export class ResumeService {
    * Transform API resume response to frontend Resume interface
    */
   private transformApiResumeToResume(apiResponse: any): FrontendResume {
-    const metaResume = apiResponse.metaResume || {};
-    const basics = metaResume.basics || {};
-    const work = metaResume.work || [];
-    const education = metaResume.education || [];
-    const skills = metaResume.skills || [];
+
+    let metaResume = apiResponse.metaResume || {};
+    let basics = metaResume.basics || {};
+    let work = metaResume.work || [];
+    let education = metaResume.education || [];
+    let skills = metaResume.skills || [];
+
+    // Fallback: If metaResume is incomplete but resumeSerialized exists, use that
+    if ((!basics.name && !basics.label) && apiResponse.resumeSerialized) {
+      console.log("transformApiResumeToResume - Using resumeSerialized fallback");
+      try {
+        const serializedData = JSON.parse(apiResponse.resumeSerialized);
+        console.log("transformApiResumeToResume - Parsed resumeSerialized:", serializedData);
+
+        // Use the serialized data if it has more complete information
+        if (serializedData.Basics || serializedData.basics) {
+          const serializedBasics = serializedData.Basics || serializedData.basics;
+          const serializedWork = serializedData.Work || serializedData.work || [];
+          const serializedEducation = serializedData.Education || serializedData.education || [];
+          const serializedSkills = serializedData.Skills || serializedData.skills || [];
+
+          // Convert PascalCase to camelCase for consistency with existing logic
+          basics = {
+            name: serializedBasics.Name || serializedBasics.name || "",
+            label: serializedBasics.Label || serializedBasics.label || "",
+            image: serializedBasics.Image || serializedBasics.image || "",
+            email: serializedBasics.Email || serializedBasics.email || "",
+            phone: serializedBasics.Phone || serializedBasics.phone || "",
+            url: serializedBasics.Url || serializedBasics.url || "",
+            summary: serializedBasics.Summary || serializedBasics.summary || "",
+            location: serializedBasics.Location || serializedBasics.location || null
+          };
+
+          work = serializedWork.map((w: any) => ({
+            name: w.Name || w.name || w.Company || w.company || "",
+            position: w.Position || w.position || "",
+            summary: w.Summary || w.summary || "",
+            startDate: w.StartDate || w.startDate || "",
+            endDate: w.EndDate || w.endDate || "",
+            highlights: w.Highlights || w.highlights || [],
+            url: w.Url || w.url || ""
+          }));
+
+          education = serializedEducation.map((e: any) => ({
+            institution: e.Institution || e.institution || "",
+            area: e.Area || e.area || "",
+            studyType: e.StudyType || e.studyType || "",
+            startDate: e.StartDate || e.startDate || "",
+            endDate: e.EndDate || e.endDate || "",
+            score: e.Score || e.score || "",
+            courses: e.Courses || e.courses || null,
+            url: e.Url || e.url || ""
+          }));
+
+          skills = serializedSkills.map((s: any) => ({
+            name: s.Name || s.name || "",
+            level: s.Level || s.level || "",
+            keywords: s.Keywords || s.keywords || []
+          }));
+        }
+      } catch (error) {
+        console.error("transformApiResumeToResume - Error parsing resumeSerialized:", error);
+      }
+    }
+
+    console.log("transformApiResumeToResume - Final extracted data:", {
+      metaResume: !!metaResume,
+      basics: !!basics,
+      basicsKeys: Object.keys(basics),
+      workCount: work.length,
+      educationCount: education.length,
+      skillsCount: skills.length,
+      hasLocation: !!basics.location,
+      locationData: basics.location
+    });
 
     // Map privacy enum values
     const mapPrivacy = (privacyValue: number): ResumePrivacy => {
@@ -662,11 +732,11 @@ export class ResumeService {
         Url: basics.url || "",
         Summary: basics.summary || "",
         Location: basics.location ? {
-          Address: basics.location.address || "",
-          PostalCode: basics.location.postalCode || "",
-          City: basics.location.city || "",
-          CountryCode: basics.location.countryCode || "",
-          Region: basics.location.region || "",
+          Address: basics.location.Address || basics.location.address || "",
+          PostalCode: basics.location.PostalCode || basics.location.postalCode || "",
+          City: basics.location.City || basics.location.city || "",
+          CountryCode: basics.location.CountryCode || basics.location.countryCode || "",
+          Region: basics.location.Region || basics.location.region || "",
         } : null,
       },
       Work: work.map((w: any) => ({

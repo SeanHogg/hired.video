@@ -51,12 +51,27 @@ export default function ResumeViewer({
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
 
+  // Debug logging
+  console.log("ResumeViewer - Received resume data:", JSON.stringify(resume, null, 2));
+
   // Safety check for resume data
   if (!resume) {
+    console.log("ResumeViewer - No resume data provided");
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
         <h2 className="text-xl font-semibold mb-2">Resume data not available</h2>
         <p className="text-muted-foreground">Unable to load resume information.</p>
+      </div>
+    );
+  }
+
+  // Additional safety checks
+  if (!resume.data) {
+    console.log("ResumeViewer - Resume data.data is missing");
+    return (
+      <div className="max-w-4xl mx-auto p-6 text-center">
+        <h2 className="text-xl font-semibold mb-2">Resume content not available</h2>
+        <p className="text-muted-foreground">Resume data structure is incomplete.</p>
       </div>
     );
   }
