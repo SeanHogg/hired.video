@@ -190,25 +190,40 @@ export default function PeopleDetail() {
   >("none"); // TODO: Implement with real API
   const isOwnProfile = user && userProfile && userProfile.id === user.id;
 
-  // Check if person has an active public resume via API (simplified: any public resumes exist?)
+  // Check if person has an active public resume and fetch it
   const [hasActivePublicResume, setHasActivePublicResume] = useState(false);
+  const [activePublicResume, setActivePublicResume] = useState<any>(null);
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
       if (!userProfile?.id) {
         setHasActivePublicResume(false);
+        setActivePublicResume(null);
         return;
       }
       try {
-        const list = await resumeService.getPublicResumes(1, 1);
+        const list = await resumeService.getPublicResumes(1, 20);
         if (!isMounted) return;
-        setHasActivePublicResume(
-          (list.items ?? []).some(
-            (r) => r.userId === userProfile.id && r.isPublic,
-          ),
+
+        // Find this user's public resumes
+        const userPublicResumes = (list.items ?? []).filter(
+          (r) => r.userId === userProfile.id && r.isPublic,
         );
+
+        if (userPublicResumes.length > 0) {
+          // Find active resume or use the first public one
+          const activeResume = userPublicResumes.find(r => r.isActive) || userPublicResumes[0];
+          setActivePublicResume(activeResume);
+          setHasActivePublicResume(true);
+        } else {
+          setHasActivePublicResume(false);
+          setActivePublicResume(null);
+        }
       } catch {
-        if (isMounted) setHasActivePublicResume(false);
+        if (isMounted) {
+          setHasActivePublicResume(false);
+          setActivePublicResume(null);
+        }
       }
     };
     load();
@@ -377,7 +392,11 @@ export default function PeopleDetail() {
           {!isAuthenticated && (
             <AuthOverlay
               contentType="person"
-              title={`${person?.data.firstName} ${person?.data.lastName}`}
+              title={
+                person?.data.firstName && person?.data.lastName
+                  ? `${person.data.firstName} ${person.data.lastName}`
+                  : person?.data.firstName || person?.data.lastName || "User Profile"
+              }
             />
           )}
           <div className="max-w-6xl mx-auto p-6">
@@ -414,7 +433,9 @@ export default function PeopleDetail() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <CardTitle className="text-3xl">
-                              {person.data.firstName} {person.data.lastName}
+                              {person.data.firstName && person.data.lastName
+                                ? `${person.data.firstName} ${person.data.lastName}`
+                                : person.data.firstName || person.data.lastName || "User"}
                             </CardTitle>
                             {(person as any).isVerified && (
                               <CheckCircle className="h-6 w-6 text-blue-600" />
