@@ -697,17 +697,6 @@ export class ResumeService {
       }
     }
 
-    console.log("transformApiResumeToResume - Final extracted data:", {
-      metaResume: !!metaResume,
-      basics: !!basics,
-      basicsKeys: Object.keys(basics),
-      workCount: work.length,
-      educationCount: education.length,
-      skillsCount: skills.length,
-      hasLocation: !!basics.location,
-      locationData: basics.location
-    });
-
     // Map privacy enum values
     const mapPrivacy = (privacyValue: number): ResumePrivacy => {
       switch (privacyValue) {
