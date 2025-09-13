@@ -116,8 +116,9 @@ export default function Resumes() {
   const displayResumes = optimisticState.resumes;
   const displayMasterGroups = optimisticState.masterGroups;
 
-  // Master Resume System state
-  const [showMasterGroups, setShowMasterGroups] = useState(true);
+  // Master Resume System state - only applicable to Job Seekers
+  const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
+  const [showMasterGroups, setShowMasterGroups] = useState(false); // Will be set based on role in useEffect
   const [variationDialog, setVariationDialog] = useState<{
     isOpen: boolean;
     masterResumeId: string;
@@ -171,6 +172,14 @@ export default function Resumes() {
       return [];
     }
   };
+
+  // Set default view state based on user role
+  useEffect(() => {
+    if (user?.role) {
+      // Job Seekers default to Collections view, others default to All Resumes view
+      setShowMasterGroups(user.role === USER_ROLES.JOB_SEEKER);
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     if (id) {
@@ -1062,28 +1071,30 @@ export default function Resumes() {
 
                   {/* View Mode Toggle */}
                   <div className="flex justify-end space-x-2">
-                    {/* Master Groups Toggle */}
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={showMasterGroups ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowMasterGroups(true)}
-                        className="rounded-r-none text-xs px-3"
-                      >
-                        Collections
-                      </Button>
-                      <Button
-                        variant={!showMasterGroups ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowMasterGroups(false)}
-                        className="rounded-l-none text-xs px-3"
-                      >
-                        All Resumes
-                      </Button>
-                    </div>
+                    {/* Master Groups Toggle - Only for Job Seekers */}
+                    {isJobSeeker && (
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant={showMasterGroups ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setShowMasterGroups(true)}
+                          className="rounded-r-none text-xs px-3"
+                        >
+                          Collections
+                        </Button>
+                        <Button
+                          variant={!showMasterGroups ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setShowMasterGroups(false)}
+                          className="rounded-l-none text-xs px-3"
+                        >
+                          All Resumes
+                        </Button>
+                      </div>
+                    )}
 
-                    {/* Grid/List Toggle (only show when not in master groups view) */}
-                    {!showMasterGroups && (
+                    {/* Grid/List Toggle - Show for all roles when not in master groups view, or always for non-Job Seekers */}
+                    {(!isJobSeeker || !showMasterGroups) && (
                       <div className="flex items-center border rounded-md">
                         <Button
                           variant={viewMode === "grid" ? "default" : "ghost"}
@@ -1106,7 +1117,7 @@ export default function Resumes() {
                   </div>
                 </div>
 
-                {/* Master Resume Groups */}
+                {/* Master Resume Groups - Only for Job Seekers */}
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
@@ -1114,7 +1125,7 @@ export default function Resumes() {
                       Loading resumes...
                     </p>
                   </div>
-                ) : showMasterGroups && displayMasterGroups.length > 0 ? (
+                ) : isJobSeeker && showMasterGroups && displayMasterGroups.length > 0 ? (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-semibold">My Resume Collections</h2>
@@ -1147,7 +1158,7 @@ export default function Resumes() {
                       />
                     ))}
                   </div>
-                ) : !showMasterGroups && filteredResumes.length > 0 ? (
+                ) : (!isJobSeeker || !showMasterGroups) && filteredResumes.length > 0 ? (
                   <>
                   <div className="space-y-8">
                     {/* My Resumes Section */}
