@@ -199,12 +199,86 @@ export default function Resumes() {
         getUserResumes(),
         getMasterResumeGroups(),
       ]);
-      setResumes(userResumes);
+
+      let finalResumes = userResumes;
+
+      // Helper function to map privacy numbers to strings
+      const mapPrivacyFromNumber = (privacyValue: number): "public" | "recruiter_only" | "private" | "draft" => {
+        switch (privacyValue) {
+          case 0: return "private";
+          case 1: return "public";
+          case 2: return "recruiter_only";
+          case 3: return "draft";
+          default: return "private";
+        }
+      };
+
+      // Helper function to extract summary from resume data
+      const extractSummary = (resumeSerialized?: string): string => {
+        try {
+          if (resumeSerialized) {
+            const resumeData = JSON.parse(resumeSerialized);
+            return resumeData?.Basics?.Summary || resumeData?.basics?.summary || "";
+          }
+        } catch (error) {
+          console.warn("Failed to parse resume data for summary:", error);
+        }
+        return "";
+      };
+
+      // If userResumes is empty but we have master groups, create resume entries from master groups
+      if (userResumes.length === 0 && masterGroups.length > 0) {
+        finalResumes = [];
+
+        for (const group of masterGroups) {
+          // Add master resume
+          if (group.masterResume) {
+            finalResumes.push({
+              id: group.masterResume.id || "",
+              slug: group.masterResume.slug || "",
+              name: group.masterResume.name || "",
+              privacy: mapPrivacyFromNumber(group.masterResume.privacy_ShowResume || 0),
+              isMaster: group.masterResume.isMaster || false,
+              isActive: group.masterResume.isActive || false,
+              parentId: group.masterResume.parentId || undefined,
+              createdAt: group.masterResume.creationDateTime || group.masterResume.createdAt || new Date().toISOString(),
+              updatedAt: group.masterResume.updateDateTime || group.masterResume.updatedAt || new Date().toISOString(),
+              views: group.masterResume.views || 0,
+              summary: extractSummary(group.masterResume.resumeSerialized),
+              title: group.masterResume.name || "",
+              userId: group.masterResume.userId || "",
+              ownership: "owned" as const,
+            });
+          }
+
+          // Add variations
+          for (const variation of group.variations) {
+            finalResumes.push({
+              id: variation.id || "",
+              slug: variation.slug || "",
+              name: variation.name || "",
+              privacy: mapPrivacyFromNumber(variation.privacy_ShowResume || 0),
+              isMaster: variation.isMaster || false,
+              isActive: variation.isActive || false,
+              parentId: variation.parentId || undefined,
+              createdAt: variation.creationDateTime || variation.createdAt || new Date().toISOString(),
+              updatedAt: variation.updateDateTime || variation.updatedAt || new Date().toISOString(),
+              views: variation.views || 0,
+              summary: extractSummary(variation.resumeSerialized),
+              title: variation.name || "",
+              userId: variation.userId || "",
+              ownership: "owned" as const,
+            });
+          }
+        }
+      }
+
+      setResumes(finalResumes);
       setMasterResumeGroups(masterGroups);
 
       // Update optimistic state with fresh data
       optimisticActions.updateState({
-        resumes: userResumes,
+        resumes: finalResumes,
         masterGroups: masterGroups,
       });
     } catch (error) {
@@ -474,9 +548,40 @@ export default function Resumes() {
   };
 
   const getActiveResume = () => {
-    return resumes.find(
+    // First check in the regular resumes array
+    const activeFromResumes = resumes.find(
       (resume) => resume.isActive && resume.ownership === "owned",
     );
+
+    if (activeFromResumes) {
+      return activeFromResumes;
+    }
+
+    // Also check in master resume groups
+    for (const group of masterResumeGroups) {
+      if (group.masterResume.isActive) {
+        // Convert the master resume to the expected format
+        return {
+          id: group.masterResume.id || "",
+          name: group.masterResume.name || "",
+          isActive: group.masterResume.isActive || false,
+          ownership: "owned" as const,
+        };
+      }
+
+      // Check variations too
+      const activeVariation = group.variations.find(v => v.isActive);
+      if (activeVariation) {
+        return {
+          id: activeVariation.id || "",
+          name: activeVariation.name || "",
+          isActive: activeVariation.isActive || false,
+          ownership: "owned" as const,
+        };
+      }
+    }
+
+    return undefined;
   };
 
   const handleSearch = (query: string) => {

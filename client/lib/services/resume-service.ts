@@ -39,6 +39,12 @@ export const ResumeSchema = z
     createdAt: nullableString(),
     updatedAt: nullableString(),
     views: nullableNumber(),
+    // Add missing fields that are present in the API response
+    isMaster: nullableBoolean(),
+    isActive: nullableBoolean(),
+    parentId: nullableString(),
+    creationDateTime: nullableString(),
+    updateDateTime: nullableString(),
     metaResume: z
       .object({
         id: nullableString(),
