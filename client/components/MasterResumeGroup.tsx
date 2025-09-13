@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, Star, Eye, Plus, MoreHorizontal } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -90,7 +91,14 @@ export default function MasterResumeGroupComponent({
             </Button>
             <div className="flex items-center space-x-2">
               <Star className="h-5 w-5 text-yellow-500 fill-current" />
-              <CardTitle className="text-lg">{group.masterResume.name}</CardTitle>
+              <CardTitle className="text-lg">
+                <Link
+                  to={`/resumes/${group.masterResume.id}`}
+                  className="hover:text-primary transition-colors"
+                >
+                  {group.masterResume.name}
+                </Link>
+              </CardTitle>
               {group.masterResume.isActive && (
                 <Badge variant="secondary" className="bg-green-100 text-green-800">
                   Active
@@ -189,7 +197,14 @@ export default function MasterResumeGroupComponent({
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <h5 className="font-medium">{variation.name}</h5>
+                      <h5 className="font-medium">
+                        <Link
+                          to={`/resumes/${variation.id}`}
+                          className="hover:text-primary transition-colors"
+                        >
+                          {variation.name}
+                        </Link>
+                      </h5>
                       {variation.isActive && (
                         <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                           Active

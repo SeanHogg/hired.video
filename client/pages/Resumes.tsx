@@ -1009,7 +1009,7 @@ export default function Resumes() {
                           Active: {getActiveResume()?.name}
                         </Badge>
                       )}
-                      {!getActiveResume() && user?.role === "JobSeeker" && (
+                      {!loading && !getActiveResume() && user?.role === "JobSeeker" && (
                         <Badge
                           variant="outline"
                           className="text-orange-600 border-orange-200"
