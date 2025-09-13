@@ -643,10 +643,8 @@ export class ResumeService {
 
     // Fallback: If metaResume is incomplete but resumeSerialized exists, use that
     if ((!basics.name && !basics.label) && apiResponse.resumeSerialized) {
-      console.log("transformApiResumeToResume - Using resumeSerialized fallback");
       try {
         const serializedData = JSON.parse(apiResponse.resumeSerialized);
-        console.log("transformApiResumeToResume - Parsed resumeSerialized:", serializedData);
 
         // Use the serialized data if it has more complete information
         if (serializedData.Basics || serializedData.basics) {
