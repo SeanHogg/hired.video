@@ -295,10 +295,10 @@ export default function EmbeddedResume() {
                     <div className="flex flex-wrap gap-2">
                       {resume.data.Skills.map((skill, index) => (
                         <Badge key={index} variant="secondary">
-                          {skill.name}
-                          {skill.level && (
+                          {skill.Name}
+                          {skill.Level && (
                             <span className="ml-1 text-xs">
-                              ({skill.level})
+                              ({skill.Level})
                             </span>
                           )}
                         </Badge>
@@ -317,36 +317,36 @@ export default function EmbeddedResume() {
                     {resume.data.Work
                       .sort((a, b) => {
                         // Sort by start date descending (most recent first)
-                        const dateA = new Date(a.startDate || "1900-01-01");
-                        const dateB = new Date(b.startDate || "1900-01-01");
+                        const dateA = new Date(a.StartDate || "1900-01-01");
+                        const dateB = new Date(b.StartDate || "1900-01-01");
                         return dateB.getTime() - dateA.getTime();
                       })
                       .map((job, index) => (
                         <div key={index}>
                           <div className="flex items-start justify-between">
                             <div>
-                              <h4 className="font-medium">{job.position}</h4>
+                              <h4 className="font-medium">{job.Position}</h4>
                               <p className="text-muted-foreground">
-                                {job.name}
+                                {job.Name}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {job.startDate} - {job.endDate || "Present"}
+                                {job.StartDate} - {job.EndDate || "Present"}
                               </p>
                             </div>
                           </div>
-                          {job.summary && (
+                          {job.Summary && (
                             <p className="text-muted-foreground mt-2 leading-relaxed">
-                              {job.summary}
+                              {job.Summary}
                             </p>
                           )}
-                          {job.highlights && job.highlights.length > 0 && (
+                          {job.Highlights && job.Highlights.length > 0 && (
                             <ul className="list-disc list-inside mt-2 text-muted-foreground">
-                              {job.highlights.map((highlight, idx) => (
+                              {job.Highlights.map((highlight, idx) => (
                                 <li key={idx}>{highlight}</li>
                               ))}
                             </ul>
                           )}
-                          {index < resume.metaResume.work.length - 1 && (
+                          {index < resume.data.Work.length - 1 && (
                             <Separator className="mt-6" />
                           )}
                         </div>
@@ -357,36 +357,36 @@ export default function EmbeddedResume() {
             )}
 
             {/* Education */}
-            {resume.metaResume.education &&
-              resume.metaResume.education.length > 0 && (
+            {resume.data.Education &&
+              resume.data.Education.length > 0 && (
                 <Card>
                   <CardContent className="p-6">
                     <h3 className="font-semibold mb-4">Education</h3>
                     <div className="space-y-4">
-                      {resume.metaResume.education
+                      {resume.data.Education
                         .sort((a, b) => {
                           // Sort by start date descending (most recent first)
-                          const dateA = new Date(a.startDate || "1900-01-01");
-                          const dateB = new Date(b.startDate || "1900-01-01");
+                          const dateA = new Date(a.StartDate || "1900-01-01");
+                          const dateB = new Date(b.StartDate || "1900-01-01");
                           return dateB.getTime() - dateA.getTime();
                         })
                         .map((edu, index) => (
                           <div key={index}>
                             <h4 className="font-medium">
-                              {edu.studyType} in {edu.area}
+                              {edu.StudyType} in {edu.Area}
                             </h4>
                             <p className="text-muted-foreground">
-                              {edu.institution}
+                              {edu.Institution}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {edu.startDate} - {edu.endDate || "Present"}
+                              {edu.StartDate} - {edu.EndDate || "Present"}
                             </p>
-                            {edu.score && (
+                            {edu.Score && (
                               <p className="text-sm text-muted-foreground">
-                                Score: {edu.score}
+                                Score: {edu.Score}
                               </p>
                             )}
-                            {index < resume.metaResume.education.length - 1 && (
+                            {index < resume.data.Education.length - 1 && (
                               <Separator className="mt-4" />
                             )}
                           </div>
@@ -429,13 +429,12 @@ export default function EmbeddedResume() {
         onOpenChange={setShareModalOpen}
         shareUrl={getShareUrl()}
         title={
-          resume?.metaResume?.basics?.name ||
+          resume?.data?.Basics?.Name ||
           resume?.name ||
           "Professional Resume"
         }
         message={
-          resume?.metaResume?.basics?.label ||
-          resume?.description ||
+          resume?.data?.Basics?.Label ||
           "Share this professional resume"
         }
       />
