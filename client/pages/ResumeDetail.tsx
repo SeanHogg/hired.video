@@ -581,8 +581,8 @@ export default function ResumeDetail() {
               )}
 
             {/* Volunteer Experience Timeline */}
-            {(resume as any).metaResume?.volunteer &&
-              (resume as any).metaResume.volunteer.length > 0 && (
+            {resume?.data?.Volunteer &&
+              resume.data.Volunteer.length > 0 && (
                 <section>
                   <div className="flex items-center gap-3 mb-8">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
