@@ -65,6 +65,28 @@ export default function ResumeBuilder({
     initialData?.Education || [],
   );
   const [skills, setSkills] = useState<Skill[]>(initialData?.Skills || []);
+  const [volunteer, setVolunteer] = useState<VolunteerExperience[]>(
+    initialData?.Volunteer || [],
+  );
+  const [languages, setLanguages] = useState<Language[]>(
+    initialData?.Languages || [],
+  );
+  const [interests, setInterests] = useState<Interest[]>(
+    initialData?.Interests || [],
+  );
+  const [references, setReferences] = useState<Reference[]>(
+    initialData?.References || [],
+  );
+  const [projects, setProjects] = useState<Project[]>(
+    initialData?.Projects || [],
+  );
+  const [awards, setAwards] = useState<Award[]>(initialData?.Awards || []);
+  const [certificates, setCertificates] = useState<Certificate[]>(
+    initialData?.Certificates || [],
+  );
+  const [publications, setPublications] = useState<Publication[]>(
+    initialData?.Publications || [],
+  );
 
   const addWorkExperience = () => {
     setWork([
@@ -150,6 +172,226 @@ export default function ResumeBuilder({
     setSkills(skills.filter((_, i) => i !== index));
   };
 
+  // Volunteer Experience functions
+  const addVolunteer = () => {
+    setVolunteer([
+      ...volunteer,
+      {
+        Organization: "",
+        Position: "",
+        Summary: "",
+        StartDate: "",
+        EndDate: "",
+        Highlights: null,
+        Url: "",
+      },
+    ]);
+  };
+
+  const updateVolunteer = (
+    index: number,
+    field: keyof VolunteerExperience,
+    value: string | string[] | null,
+  ) => {
+    const updatedVolunteer = [...volunteer];
+    updatedVolunteer[index] = { ...updatedVolunteer[index], [field]: value };
+    setVolunteer(updatedVolunteer);
+  };
+
+  const removeVolunteer = (index: number) => {
+    setVolunteer(volunteer.filter((_, i) => i !== index));
+  };
+
+  // Languages functions
+  const addLanguage = () => {
+    setLanguages([
+      ...languages,
+      {
+        Language: "",
+        Fluency: "",
+      },
+    ]);
+  };
+
+  const updateLanguage = (
+    index: number,
+    field: keyof Language,
+    value: string,
+  ) => {
+    const updatedLanguages = [...languages];
+    updatedLanguages[index] = { ...updatedLanguages[index], [field]: value };
+    setLanguages(updatedLanguages);
+  };
+
+  const removeLanguage = (index: number) => {
+    setLanguages(languages.filter((_, i) => i !== index));
+  };
+
+  // Interests functions
+  const addInterest = () => {
+    setInterests([
+      ...interests,
+      {
+        Name: "",
+        Keywords: [],
+      },
+    ]);
+  };
+
+  const updateInterest = (
+    index: number,
+    field: keyof Interest,
+    value: string | string[],
+  ) => {
+    const updatedInterests = [...interests];
+    updatedInterests[index] = { ...updatedInterests[index], [field]: value };
+    setInterests(updatedInterests);
+  };
+
+  const removeInterest = (index: number) => {
+    setInterests(interests.filter((_, i) => i !== index));
+  };
+
+  // References functions
+  const addReference = () => {
+    setReferences([
+      ...references,
+      {
+        Name: "",
+        Reference: "",
+      },
+    ]);
+  };
+
+  const updateReference = (
+    index: number,
+    field: keyof Reference,
+    value: string,
+  ) => {
+    const updatedReferences = [...references];
+    updatedReferences[index] = { ...updatedReferences[index], [field]: value };
+    setReferences(updatedReferences);
+  };
+
+  const removeReference = (index: number) => {
+    setReferences(references.filter((_, i) => i !== index));
+  };
+
+  // Projects functions
+  const addProject = () => {
+    setProjects([
+      ...projects,
+      {
+        Name: "",
+        Description: "",
+        Highlights: [],
+        Keywords: [],
+        StartDate: "",
+        EndDate: "",
+        Url: "",
+        Roles: [],
+        Entity: "",
+        Type: "",
+      },
+    ]);
+  };
+
+  const updateProject = (
+    index: number,
+    field: keyof Project,
+    value: string | string[],
+  ) => {
+    const updatedProjects = [...projects];
+    updatedProjects[index] = { ...updatedProjects[index], [field]: value };
+    setProjects(updatedProjects);
+  };
+
+  const removeProject = (index: number) => {
+    setProjects(projects.filter((_, i) => i !== index));
+  };
+
+  // Awards functions
+  const addAward = () => {
+    setAwards([
+      ...awards,
+      {
+        Title: "",
+        Date: "",
+        Awarder: "",
+        Summary: "",
+      },
+    ]);
+  };
+
+  const updateAward = (
+    index: number,
+    field: keyof Award,
+    value: string,
+  ) => {
+    const updatedAwards = [...awards];
+    updatedAwards[index] = { ...updatedAwards[index], [field]: value };
+    setAwards(updatedAwards);
+  };
+
+  const removeAward = (index: number) => {
+    setAwards(awards.filter((_, i) => i !== index));
+  };
+
+  // Certificates functions
+  const addCertificate = () => {
+    setCertificates([
+      ...certificates,
+      {
+        Name: "",
+        Date: "",
+        Issuer: "",
+        Url: "",
+      },
+    ]);
+  };
+
+  const updateCertificate = (
+    index: number,
+    field: keyof Certificate,
+    value: string,
+  ) => {
+    const updatedCertificates = [...certificates];
+    updatedCertificates[index] = { ...updatedCertificates[index], [field]: value };
+    setCertificates(updatedCertificates);
+  };
+
+  const removeCertificate = (index: number) => {
+    setCertificates(certificates.filter((_, i) => i !== index));
+  };
+
+  // Publications functions
+  const addPublication = () => {
+    setPublications([
+      ...publications,
+      {
+        Name: "",
+        Publisher: "",
+        ReleaseDate: "",
+        Url: "",
+        Summary: "",
+      },
+    ]);
+  };
+
+  const updatePublication = (
+    index: number,
+    field: keyof Publication,
+    value: string,
+  ) => {
+    const updatedPublications = [...publications];
+    updatedPublications[index] = { ...updatedPublications[index], [field]: value };
+    setPublications(updatedPublications);
+  };
+
+  const removePublication = (index: number) => {
+    setPublications(publications.filter((_, i) => i !== index));
+  };
+
   const addHighlight = (workIndex: number) => {
     const updatedWork = [...work];
     updatedWork[workIndex].Highlights.push("");
@@ -178,16 +420,16 @@ export default function ResumeBuilder({
     const resumeData: ResumeData = {
       Basics: basics,
       Work: work,
-      Volunteer: [],
+      Volunteer: volunteer,
       Education: education,
-      Awards: [],
-      Certificates: [],
-      Publications: [],
+      Awards: awards,
+      Certificates: certificates,
+      Publications: publications,
       Skills: skills,
-      Languages: [],
-      Interests: [],
-      References: [],
-      Projects: [],
+      Languages: languages,
+      Interests: interests,
+      References: references,
+      Projects: projects,
     };
 
     const request: CreateResumeRequest = {
@@ -253,22 +495,54 @@ export default function ResumeBuilder({
       </Card>
 
       <Tabs defaultValue="basics" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="basics" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
+          <TabsTrigger value="basics" className="flex items-center gap-1 text-xs">
+            <User className="h-3 w-3" />
             Basics
           </TabsTrigger>
-          <TabsTrigger value="work" className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
+          <TabsTrigger value="work" className="flex items-center gap-1 text-xs">
+            <Briefcase className="h-3 w-3" />
             Work
           </TabsTrigger>
-          <TabsTrigger value="education" className="flex items-center gap-2">
-            <GraduationCap className="h-4 w-4" />
+          <TabsTrigger value="education" className="flex items-center gap-1 text-xs">
+            <GraduationCap className="h-3 w-3" />
             Education
           </TabsTrigger>
-          <TabsTrigger value="skills" className="flex items-center gap-2">
-            <Award className="h-4 w-4" />
+          <TabsTrigger value="skills" className="flex items-center gap-1 text-xs">
+            <Award className="h-3 w-3" />
             Skills
+          </TabsTrigger>
+          <TabsTrigger value="volunteer" className="flex items-center gap-1 text-xs">
+            <Heart className="h-3 w-3" />
+            Volunteer
+          </TabsTrigger>
+          <TabsTrigger value="projects" className="flex items-center gap-1 text-xs">
+            <FolderOpen className="h-3 w-3" />
+            Projects
+          </TabsTrigger>
+          <TabsTrigger value="languages" className="flex items-center gap-1 text-xs">
+            <Globe className="h-3 w-3" />
+            Languages
+          </TabsTrigger>
+          <TabsTrigger value="awards" className="flex items-center gap-1 text-xs">
+            <Trophy className="h-3 w-3" />
+            Awards
+          </TabsTrigger>
+          <TabsTrigger value="certificates" className="flex items-center gap-1 text-xs">
+            <FileText className="h-3 w-3" />
+            Certificates
+          </TabsTrigger>
+          <TabsTrigger value="publications" className="flex items-center gap-1 text-xs">
+            <BookOpen className="h-3 w-3" />
+            Publications
+          </TabsTrigger>
+          <TabsTrigger value="interests" className="flex items-center gap-1 text-xs">
+            <Lightbulb className="h-3 w-3" />
+            Interests
+          </TabsTrigger>
+          <TabsTrigger value="references" className="flex items-center gap-1 text-xs">
+            <UserCheck className="h-3 w-3" />
+            References
           </TabsTrigger>
         </TabsList>
 
