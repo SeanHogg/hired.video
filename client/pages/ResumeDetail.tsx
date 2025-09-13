@@ -386,13 +386,13 @@ export default function ResumeDetail() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    {(resume as any).metaResume?.basics?.email && (
+                    {resume?.data?.Basics?.Email && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
                           window.open(
-                            `mailto:${(resume as any).metaResume.basics.email}`,
+                            `mailto:${resume.data.Basics.Email}`,
                           )
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
@@ -401,13 +401,13 @@ export default function ResumeDetail() {
                         Email
                       </Button>
                     )}
-                    {(resume as any).metaResume?.basics?.phone && (
+                    {resume?.data?.Basics?.Phone && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
                           window.open(
-                            `tel:${(resume as any).metaResume.basics.phone}`,
+                            `tel:${resume.data.Basics.Phone}`,
                           )
                         }
                         className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
@@ -416,13 +416,13 @@ export default function ResumeDetail() {
                         Call
                       </Button>
                     )}
-                    {(resume as any).metaResume?.basics?.url && (
+                    {resume?.data?.Basics?.Url && (
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() =>
                           window.open(
-                            (resume as any).metaResume.basics.url,
+                            resume.data.Basics.Url,
                             "_blank",
                           )
                         }
@@ -443,7 +443,7 @@ export default function ResumeDetail() {
                   </div>
 
                   <p className="text-lg leading-relaxed opacity-95">
-                    {(resume as any).metaResume?.basics?.summary}
+                    {resume?.data?.Basics?.Summary || ""}
                   </p>
                 </div>
 
@@ -468,7 +468,7 @@ export default function ResumeDetail() {
                             <DialogHeader>
                               <DialogTitle>
                                 Video Resume -{" "}
-                                {(resume as any).metaResume?.basics?.name}
+                                {resume?.data?.Basics?.Name || resume?.name}
                               </DialogTitle>
                             </DialogHeader>
                             <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
@@ -498,8 +498,8 @@ export default function ResumeDetail() {
           {/* Content */}
           <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
             {/* Work Experience Timeline */}
-            {(resume as any).metaResume?.work &&
-              (resume as any).metaResume.work.length > 0 && (
+            {resume?.data?.Work &&
+              resume.data.Work.length > 0 && (
                 <section>
                   <div className="flex items-center gap-3 mb-8">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -511,25 +511,24 @@ export default function ResumeDetail() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {(resume as any).metaResume.work
+                        {resume.data.Work
                           .sort(
                             (a, b) =>
-                              new Date(b.startDate || "").getTime() -
-                              new Date(a.startDate || "").getTime(),
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((work, index) => (
                             <TimelineItem
                               key={index}
-                              title={work.position || ""}
-                              subtitle={work.name || ""}
-                              startDate={work.startDate || ""}
-                              endDate={work.endDate || "Present"}
-                              description={work.summary || ""}
-                              highlights={work.highlights}
+                              title={work.Position || ""}
+                              subtitle={work.Name || ""}
+                              startDate={work.StartDate || ""}
+                              endDate={work.EndDate || "Present"}
+                              description={work.Summary || ""}
+                              highlights={work.Highlights}
                               icon={Building}
                               isLast={
-                                index ===
-                                (resume as any).metaResume!.work!.length - 1
+                                index === resume.data.Work.length - 1
                               }
                             />
                           ))}
@@ -540,8 +539,8 @@ export default function ResumeDetail() {
               )}
 
             {/* Education Timeline */}
-            {(resume as any).metaResume?.education &&
-              (resume as any).metaResume.education.length > 0 && (
+            {resume?.data?.Education &&
+              resume.data.Education.length > 0 && (
                 <section>
                   <div className="flex items-center gap-3 mb-8">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -553,11 +552,11 @@ export default function ResumeDetail() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {(resume as any).metaResume.education
+                        {resume.data.Education
                           .sort(
                             (a, b) =>
-                              new Date(b.startDate || "").getTime() -
-                              new Date(a.startDate || "").getTime(),
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((edu, index) => (
                             <TimelineItem
