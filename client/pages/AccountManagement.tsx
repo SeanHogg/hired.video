@@ -46,12 +46,12 @@ import { accountService } from "@/lib/services/account-service";
 import {
   AccountUser,
   InviteStatus,
-  getRoleDisplayName,
   getInviteStatusDisplayName,
   getInviteStatusColor,
   canManageUsers,
   canEditRoles,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { InviteUserModal } from "@/components/account/InviteUserModal";
 import { BulkInviteModal } from "@/components/account/BulkInviteModal";
 import { InvitationManagement } from "@/components/account/InvitationManagement";

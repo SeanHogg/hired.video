@@ -486,6 +486,7 @@ export default function People() {
                           experienceLevel: "Mid Level",
                           currentPosition: person.currentRole || "",
                           currentCompany: person.currentCompany || "",
+                          ownership: "tracked" as const,
                         };
 
                         return (

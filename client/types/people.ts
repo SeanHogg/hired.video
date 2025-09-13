@@ -153,7 +153,7 @@ export interface UserMetadata {
   avatar?: string;
   headline: string;
   location: string;
-  role: string;
+  role: string | number;
   visibility: UserVisibility;
   status: UserStatus;
   companyId?: string;
