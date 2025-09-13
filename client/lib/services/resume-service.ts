@@ -7,7 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData } from "@/types/resume";
+import type { ResumeData, ResumePrivacy } from "@/types/resume";
 
 // ============================================================================
 // SCHEMAS
@@ -402,11 +402,13 @@ export class ResumeService {
    * Get specific resume by ID
    */
   async getResumeById(id: string): Promise<Resume> {
-    const response = await apiClient.get<Resume>(
+    const response = await apiClient.get<any>(
       `/api/Resume/${id}`,
-      ResumeSchema,
+      z.any(), // Use any for now since we need to transform the response
     );
-    return response.data;
+
+    // Transform the API response to match the expected Resume interface
+    return this.transformApiResumeToResume(response.data);
   }
 
   /**
@@ -620,6 +622,96 @@ export class ResumeService {
    */
   async unwatchResume(id: string): Promise<void> {
     await apiClient.post(`/api/Resume/unwatch/${id}`);
+  }
+
+  /**
+   * Transform API resume response to frontend Resume interface
+   */
+  private transformApiResumeToResume(apiResponse: any): Resume {
+    const metaResume = apiResponse.metaResume || {};
+    const basics = metaResume.basics || {};
+    const work = metaResume.work || [];
+    const education = metaResume.education || [];
+    const skills = metaResume.skills || [];
+
+    // Map privacy enum values
+    const mapPrivacy = (privacyValue: number): ResumePrivacy => {
+      switch (privacyValue) {
+        case 0: return "private";
+        case 1: return "public";
+        case 2: return "recruiter_only";
+        case 3: return "draft";
+        default: return "private";
+      }
+    };
+
+    // Transform to ResumeData format
+    const resumeData: ResumeData = {
+      Basics: {
+        Name: basics.name || "",
+        Label: basics.label || "",
+        Image: basics.image || "",
+        Email: basics.email || "",
+        Phone: basics.phone || "",
+        Url: basics.url || "",
+        Summary: basics.summary || "",
+        Location: basics.location ? {
+          Address: basics.location.address || "",
+          PostalCode: basics.location.postalCode || "",
+          City: basics.location.city || "",
+          CountryCode: basics.location.countryCode || "",
+          Region: basics.location.region || "",
+        } : null,
+      },
+      Work: work.map((w: any) => ({
+        Name: w.name || "",
+        Position: w.position || "",
+        Summary: w.summary || "",
+        StartDate: w.startDate || "",
+        EndDate: w.endDate || "",
+        Highlights: w.highlights || [],
+        Url: w.url || "",
+      })),
+      Education: education.map((e: any) => ({
+        Institution: e.institution || "",
+        Area: e.area || "",
+        StudyType: e.studyType || "",
+        StartDate: e.startDate || "",
+        EndDate: e.endDate || "",
+        Score: e.score || "",
+        Courses: e.courses || null,
+        Url: e.url || "",
+      })),
+      Skills: skills.map((s: any) => ({
+        Name: s.name || "",
+        Level: s.level || "",
+        Keywords: Array.isArray(s.keywords) ? s.keywords : [],
+      })),
+      Volunteer: [],
+      Awards: [],
+      Certificates: [],
+      Publications: [],
+      Languages: [],
+      Interests: [],
+      References: [],
+      Projects: [],
+    };
+
+    // Return the transformed Resume object
+    return {
+      id: apiResponse.id || "",
+      slug: apiResponse.slug || "",
+      name: apiResponse.name || "",
+      data: resumeData,
+      privacy: mapPrivacy(apiResponse.privacy_ShowResume || 0),
+      isMaster: apiResponse.isMaster || false,
+      isActive: apiResponse.isActive || false,
+      parentId: apiResponse.parentId || undefined,
+      createdAt: apiResponse.creationDateTime || new Date().toISOString(),
+      updatedAt: apiResponse.updateDateTime || new Date().toISOString(),
+      views: apiResponse.views || 0,
+      userId: apiResponse.userId || "",
+    };
   }
 
   /**

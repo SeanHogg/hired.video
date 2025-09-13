@@ -25,6 +25,7 @@ export default function ResumeEditPage() {
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadResume = async () => {
@@ -34,19 +35,19 @@ export default function ResumeEditPage() {
       }
 
       setLoading(true);
+      setError(null);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
         const foundResume = await resumeService.getResumeById(id);
         if (foundResume) {
-          setResume(foundResume as any);
+          setResume(foundResume);
         } else {
-          navigate("/resumes");
+          setError("Resume not found");
+          console.error("Resume not found");
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load resume";
+        setError(errorMessage);
         console.error("Failed to load resume:", error);
-        navigate("/resumes");
       } finally {
         setLoading(false);
       }
@@ -106,7 +107,7 @@ export default function ResumeEditPage() {
     );
   }
 
-  if (!resume) {
+  if (error || (!loading && !resume)) {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar
@@ -122,14 +123,26 @@ export default function ResumeEditPage() {
           />
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
+              <h1 className="text-2xl font-bold mb-4">
+                {error ? "Error Loading Resume" : "Resume Not Found"}
+              </h1>
               <p className="text-muted-foreground mb-6">
-                The resume you're trying to edit doesn't exist.
+                {error || "The resume you're trying to edit doesn't exist."}
               </p>
-              <Button onClick={() => navigate("/resumes")}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Resumes
-              </Button>
+              <div className="flex gap-4 justify-center">
+                <Button onClick={() => navigate("/resumes")}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Resumes
+                </Button>
+                {error && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.reload()}
+                  >
+                    Try Again
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

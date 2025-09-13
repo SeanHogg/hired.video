@@ -48,8 +48,34 @@ export default function ResumeViewer({
   canEdit = true,
 }: ResumeViewerProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [privacy, setPrivacy] = useState<ResumePrivacy>(resume.privacy);
+  const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
+
+  // Safety check for resume data
+  if (!resume) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 text-center">
+        <h2 className="text-xl font-semibold mb-2">Resume data not available</h2>
+        <p className="text-muted-foreground">Unable to load resume information.</p>
+      </div>
+    );
+  }
+
+  // Ensure resume.data exists and has required structure
+  const resumeData = resume.data || {
+    Basics: { Name: "", Label: "", Email: "", Phone: "", Summary: "", Location: null },
+    Work: [],
+    Education: [],
+    Skills: [],
+    Volunteer: [],
+    Awards: [],
+    Certificates: [],
+    Publications: [],
+    Languages: [],
+    Interests: [],
+    References: [],
+    Projects: [],
+  };
 
   const handlePrivacyChange = (newPrivacy: ResumePrivacy) => {
     setPrivacy(newPrivacy);
@@ -209,27 +235,27 @@ export default function ResumeViewer({
           {/* Header Section */}
           <div className="bg-primary text-primary-foreground p-8">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold">{resume.data.Basics.Name}</h1>
-              <p className="text-xl opacity-90">{resume.data.Basics.Label}</p>
+              <h1 className="text-4xl font-bold">{resumeData.Basics.Name}</h1>
+              <p className="text-xl opacity-90">{resumeData.Basics.Label}</p>
 
               <div className="flex flex-wrap justify-center gap-4 text-sm opacity-80">
-                {resume.data.Basics.Email && (
+                {resumeData.Basics.Email && (
                   <div className="flex items-center gap-1">
                     <Mail className="h-4 w-4" />
-                    {resume.data.Basics.Email}
+                    {resumeData.Basics.Email}
                   </div>
                 )}
-                {resume.data.Basics.Phone && (
+                {resumeData.Basics.Phone && (
                   <div className="flex items-center gap-1">
                     <Phone className="h-4 w-4" />
-                    {resume.data.Basics.Phone}
+                    {resumeData.Basics.Phone}
                   </div>
                 )}
-                {resume.data.Basics.Url && (
+                {resumeData.Basics.Url && (
                   <div className="flex items-center gap-1">
                     <ExternalLink className="h-4 w-4" />
                     <a
-                      href={resume.data.Basics.Url}
+                      href={resumeData.Basics.Url}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -243,23 +269,23 @@ export default function ResumeViewer({
 
           <div className="p-8 space-y-8">
             {/* Summary */}
-            {resume.data.Basics.Summary && (
+            {resumeData.Basics.Summary && (
               <section>
                 <h2 className="text-2xl font-bold mb-4">
                   Professional Summary
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  {resume.data.Basics.Summary}
+                  {resumeData.Basics.Summary}
                 </p>
               </section>
             )}
 
             {/* Work Experience */}
-            {resume.data.Work.length > 0 && (
+            {resumeData.Work.length > 0 && (
               <section>
                 <h2 className="text-2xl font-bold mb-6">Work Experience</h2>
                 <div className="space-y-6">
-                  {resume.data.Work.map((work, index) => (
+                  {resumeData.Work.map((work, index) => (
                     <div
                       key={index}
                       className="border-l-2 border-primary/20 pl-6 relative"
@@ -299,11 +325,11 @@ export default function ResumeViewer({
             )}
 
             {/* Education */}
-            {resume.data.Education.length > 0 && (
+            {resumeData.Education.length > 0 && (
               <section>
                 <h2 className="text-2xl font-bold mb-6">Education</h2>
                 <div className="space-y-4">
-                  {resume.data.Education.map((edu, index) => (
+                  {resumeData.Education.map((edu, index) => (
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
@@ -329,11 +355,11 @@ export default function ResumeViewer({
             )}
 
             {/* Skills */}
-            {resume.data.Skills.length > 0 && (
+            {resumeData.Skills.length > 0 && (
               <section>
                 <h2 className="text-2xl font-bold mb-6">Skills</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {resume.data.Skills.map((skill, index) => (
+                  {resumeData.Skills.map((skill, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 border rounded-lg"
