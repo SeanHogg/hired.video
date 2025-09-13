@@ -685,176 +685,75 @@ export default function ResumeBuilder({
         </TabsContent>
 
         <TabsContent value="volunteer">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Volunteer Experience</CardTitle>
-              <Button onClick={addVolunteer} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Volunteer Experience
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {volunteer.map((vol, index) => (
-                <div key={index} className="space-y-4 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Volunteer Experience {index + 1}</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeVolunteer(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+          <VolunteerSection
+            volunteer={volunteer}
+            onAdd={addVolunteer}
+            onUpdate={updateVolunteer}
+            onRemove={removeVolunteer}
+          />
+        </TabsContent>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Organization</Label>
-                      <Input
-                        value={vol.Organization}
-                        onChange={(e) =>
-                          updateVolunteer(index, "Organization", e.target.value)
-                        }
-                        placeholder="Red Cross"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Position</Label>
-                      <Input
-                        value={vol.Position}
-                        onChange={(e) =>
-                          updateVolunteer(index, "Position", e.target.value)
-                        }
-                        placeholder="Volunteer Coordinator"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Date</Label>
-                      <Input
-                        type="date"
-                        value={vol.StartDate}
-                        onChange={(e) =>
-                          updateVolunteer(index, "StartDate", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Date</Label>
-                      <Input
-                        type="date"
-                        value={vol.EndDate}
-                        onChange={(e) =>
-                          updateVolunteer(index, "EndDate", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Website</Label>
-                    <Input
-                      value={vol.Url}
-                      onChange={(e) =>
-                        updateVolunteer(index, "Url", e.target.value)
-                      }
-                      placeholder="https://redcross.org"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Summary</Label>
-                    <Textarea
-                      value={vol.Summary}
-                      onChange={(e) =>
-                        updateVolunteer(index, "Summary", e.target.value)
-                      }
-                      placeholder="Describe your volunteer work..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              ))}
-
-              {volunteer.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No volunteer experience added yet.</p>
-                  <p className="text-sm">Click "Add Volunteer Experience" to get started.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="projects">
+          <ProjectsSection
+            projects={projects}
+            onAdd={addProject}
+            onUpdate={updateProject}
+            onRemove={removeProject}
+          />
         </TabsContent>
 
         <TabsContent value="languages">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Languages</CardTitle>
-              <Button onClick={addLanguage} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Language
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {languages.map((lang, index) => (
-                <div key={index} className="space-y-4 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Language {index + 1}</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeLanguage(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+          <LanguagesSection
+            languages={languages}
+            onAdd={addLanguage}
+            onUpdate={updateLanguage}
+            onRemove={removeLanguage}
+          />
+        </TabsContent>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Language</Label>
-                      <Input
-                        value={lang.Language}
-                        onChange={(e) =>
-                          updateLanguage(index, "Language", e.target.value)
-                        }
-                        placeholder="English"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Fluency Level</Label>
-                      <Select
-                        value={lang.Fluency}
-                        onValueChange={(value) =>
-                          updateLanguage(index, "Fluency", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select fluency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Native">Native</SelectItem>
-                          <SelectItem value="Fluent">Fluent</SelectItem>
-                          <SelectItem value="Conversational">Conversational</SelectItem>
-                          <SelectItem value="Basic">Basic</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        <TabsContent value="awards">
+          <AwardsSection
+            awards={awards}
+            onAdd={addAward}
+            onUpdate={updateAward}
+            onRemove={removeAward}
+          />
+        </TabsContent>
 
-              {languages.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No languages added yet.</p>
-                  <p className="text-sm">Click "Add Language" to get started.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="certificates">
+          <CertificatesSection
+            certificates={certificates}
+            onAdd={addCertificate}
+            onUpdate={updateCertificate}
+            onRemove={removeCertificate}
+          />
+        </TabsContent>
+
+        <TabsContent value="publications">
+          <PublicationsSection
+            publications={publications}
+            onAdd={addPublication}
+            onUpdate={updatePublication}
+            onRemove={removePublication}
+          />
+        </TabsContent>
+
+        <TabsContent value="interests">
+          <InterestsSection
+            interests={interests}
+            onAdd={addInterest}
+            onUpdate={updateInterest}
+            onRemove={removeInterest}
+          />
+        </TabsContent>
+
+        <TabsContent value="references">
+          <ReferencesSection
+            references={references}
+            onAdd={addReference}
+            onUpdate={updateReference}
+            onRemove={removeReference}
+          />
         </TabsContent>
       </Tabs>
 
