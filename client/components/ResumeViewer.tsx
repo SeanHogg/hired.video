@@ -143,7 +143,7 @@ export default function ResumeViewer({
   if (isEditing) {
     return (
       <ResumeBuilder
-        initialData={resume.data}
+        initialData={resumeData}
         onSave={handleEditComplete}
         onCancel={() => setIsEditing(false)}
       />
