@@ -594,26 +594,24 @@ export default function ResumeDetail() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {(resume as any).metaResume.volunteer
+                        {resume.data.Volunteer
                           .sort(
                             (a, b) =>
-                              new Date(b.startDate || "").getTime() -
-                              new Date(a.startDate || "").getTime(),
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((volunteer, index) => (
                             <TimelineItem
                               key={index}
-                              title={volunteer.position || ""}
-                              subtitle={volunteer.organization || ""}
-                              startDate={volunteer.startDate || ""}
-                              endDate={volunteer.endDate || "Present"}
-                              description={volunteer.summary || ""}
-                              highlights={volunteer.highlights || undefined}
+                              title={volunteer.Position || ""}
+                              subtitle={volunteer.Organization || ""}
+                              startDate={volunteer.StartDate || ""}
+                              endDate={volunteer.EndDate || "Present"}
+                              description={volunteer.Summary || ""}
+                              highlights={volunteer.Highlights || undefined}
                               icon={Heart}
                               isLast={
-                                index ===
-                                (resume as any).metaResume!.volunteer!.length -
-                                  1
+                                index === resume.data.Volunteer.length - 1
                               }
                             />
                           ))}
