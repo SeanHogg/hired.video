@@ -202,30 +202,30 @@ export default function EmbeddedResume() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center space-x-4">
-                    {resume.metaResume.basics?.image && (
+                    {resume.data.Basics?.Image && (
                       <img
-                        src={resume.metaResume.basics.image}
-                        alt={resume.metaResume.basics?.name || "Profile"}
+                        src={resume.data.Basics.Image}
+                        alt={resume.data.Basics?.Name || "Profile"}
                         className="w-20 h-20 rounded-full object-cover"
                       />
                     )}
                     <div>
                       <h1 className="text-3xl font-bold">
-                        {resume.metaResume.basics?.name ||
+                        {resume.data.Basics?.Name ||
                           resume.name ||
                           "Resume"}
                       </h1>
-                      {resume.metaResume.basics?.label && (
+                      {resume.data.Basics?.Label && (
                         <p className="text-xl text-muted-foreground mt-1">
-                          {resume.metaResume.basics.label}
+                          {resume.data.Basics.Label}
                         </p>
                       )}
-                      {resume.metaResume.basics?.location && (
+                      {resume.data.Basics?.Location && (
                         <p className="text-muted-foreground mt-2">
                           {[
-                            resume.metaResume.basics.location.city,
-                            resume.metaResume.basics.location.region,
-                            resume.metaResume.basics.location.countryCode,
+                            resume.data.Basics.Location.City,
+                            resume.data.Basics.Location.Region,
+                            resume.data.Basics.Location.CountryCode,
                           ]
                             .filter(Boolean)
                             .join(", ")}
@@ -235,11 +235,11 @@ export default function EmbeddedResume() {
                   </div>
                 </div>
 
-                {resume.metaResume.basics?.summary && (
+                {resume.data.Basics?.Summary && (
                   <div>
                     <h3 className="font-semibold mb-2">Summary</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                      {resume.metaResume.basics.summary}
+                      {resume.data.Basics.Summary}
                     </p>
                   </div>
                 )}
@@ -251,35 +251,35 @@ export default function EmbeddedResume() {
               <CardContent className="p-6">
                 <h3 className="font-semibold mb-4">Contact Information</h3>
                 <div className="space-y-2">
-                  {resume.metaResume.basics?.email && (
+                  {resume.data.Basics?.Email && (
                     <p className="text-muted-foreground">
                       <span className="font-medium">Email:</span>{" "}
-                      {resume.metaResume.basics.email}
+                      {resume.data.Basics.Email}
                     </p>
                   )}
-                  {resume.metaResume.basics?.phone && (
+                  {resume.data.Basics?.Phone && (
                     <p className="text-muted-foreground">
                       <span className="font-medium">Phone:</span>{" "}
-                      {resume.metaResume.basics.phone}
+                      {resume.data.Basics.Phone}
                     </p>
                   )}
-                  {resume.metaResume.basics?.url && (
+                  {resume.data.Basics?.Url && (
                     <p className="text-muted-foreground">
                       <span className="font-medium">Website:</span>{" "}
                       <a
-                        href={resume.metaResume.basics.url}
+                        href={resume.data.Basics.Url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
                       >
-                        {resume.metaResume.basics.url}
+                        {resume.data.Basics.Url}
                       </a>
                     </p>
                   )}
-                  {resume.metaResume.basics?.location?.address && (
+                  {resume.data.Basics?.Location?.Address && (
                     <p className="text-muted-foreground">
                       <span className="font-medium">Address:</span>{" "}
-                      {resume.metaResume.basics.location.address}
+                      {resume.data.Basics.Location.Address}
                     </p>
                   )}
                 </div>
@@ -287,13 +287,13 @@ export default function EmbeddedResume() {
             </Card>
 
             {/* Skills */}
-            {resume.metaResume.skills &&
-              resume.metaResume.skills.length > 0 && (
+            {resume.data.Skills &&
+              resume.data.Skills.length > 0 && (
                 <Card>
                   <CardContent className="p-6">
                     <h3 className="font-semibold mb-4">Skills</h3>
                     <div className="flex flex-wrap gap-2">
-                      {resume.metaResume.skills.map((skill, index) => (
+                      {resume.data.Skills.map((skill, index) => (
                         <Badge key={index} variant="secondary">
                           {skill.name}
                           {skill.level && (
@@ -309,12 +309,12 @@ export default function EmbeddedResume() {
               )}
 
             {/* Work Experience */}
-            {resume.metaResume.work && resume.metaResume.work.length > 0 && (
+            {resume.data.Work && resume.data.Work.length > 0 && (
               <Card>
                 <CardContent className="p-6">
                   <h3 className="font-semibold mb-4">Work Experience</h3>
                   <div className="space-y-6">
-                    {resume.metaResume.work
+                    {resume.data.Work
                       .sort((a, b) => {
                         // Sort by start date descending (most recent first)
                         const dateA = new Date(a.startDate || "1900-01-01");
