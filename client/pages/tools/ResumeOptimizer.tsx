@@ -294,7 +294,7 @@ Return the response in JSON format with the following structure:
 
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
-      const result = await optimizeResume(resume.resumeSerialized || "");
+      const result = await optimizeResume(JSON.stringify(resume.data) || "");
       setOptimizationResult(result);
     } catch (err) {
       console.error("Resume optimization failed:", err);

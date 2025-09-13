@@ -194,7 +194,7 @@ export default function SummarizeResume() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(resume.resumeSerialized || ""),
+        body: JSON.stringify(resume.data || {}),
       });
 
       if (!response.ok) {

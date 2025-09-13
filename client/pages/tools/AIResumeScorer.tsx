@@ -322,7 +322,7 @@ Return the response in JSON format with the following structure:
 
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
-      const result = await scoreResume(resume.resumeSerialized || "");
+      const result = await scoreResume(JSON.stringify(resume.data) || "");
       setScoreResult(result);
     } catch (err) {
       console.error("Resume scoring failed:", err);
