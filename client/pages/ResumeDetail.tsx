@@ -561,18 +561,16 @@ export default function ResumeDetail() {
                           .map((edu, index) => (
                             <TimelineItem
                               key={index}
-                              title={`${edu.studyType || ""} in ${edu.area || ""}`}
-                              subtitle={edu.institution || ""}
-                              startDate={edu.startDate || ""}
-                              endDate={edu.endDate || ""}
+                              title={`${edu.StudyType || ""} in ${edu.Area || ""}`}
+                              subtitle={edu.Institution || ""}
+                              startDate={edu.StartDate || ""}
+                              endDate={edu.EndDate || ""}
                               description={
-                                edu.score ? `GPA: ${edu.score}` : undefined
+                                edu.Score ? `GPA: ${edu.Score}` : undefined
                               }
                               icon={GraduationCap}
                               isLast={
-                                index ===
-                                (resume as any).metaResume!.education!.length -
-                                  1
+                                index === resume.data.Education.length - 1
                               }
                             />
                           ))}
