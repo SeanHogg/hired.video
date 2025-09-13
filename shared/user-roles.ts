@@ -7,8 +7,8 @@ export const USER_ROLES = {
   RECRUITER: "Recruiter",
   EMPLOYER: "Employer",
   AFFILIATE: "Affiliate",
-  BUSINESS: "Business",
   ADMIN: "Admin",
+  SUPER_ADMIN: "SuperAdmin",
 } as const;
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];

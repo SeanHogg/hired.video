@@ -24,7 +24,8 @@ import {
   BarChart3,
   PieChart,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
+import { apiClient } from "@/lib/api-client";
 
 import {
   LineChart,
@@ -161,7 +162,7 @@ export default function ProductDashboard() {
   const { user } = useAuth();
 
   // Check if user is SuperAdmin
-  const isAdmin = user?.role === "Employer"; // Employer users have admin-like capabilities
+  const isAdmin = user?.role === USER_ROLES.SUPER_ADMIN; // Only SuperAdmin users can access product dashboard
 
   useEffect(() => {
     if (isAdmin) {
@@ -172,18 +173,8 @@ export default function ProductDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/ProductDashboard", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load dashboard data");
-      }
-
-      const result = await response.json();
-      setDashboardData(result.data);
+      const response = await apiClient.get<ProductDashboardData>("/ProductDashboard");
+      setDashboardData(response.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -195,7 +186,7 @@ export default function ProductDashboard() {
     try {
       const response = await fetch(`/api/ProductDashboard/export/${format}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
         },
       });
 

@@ -37,8 +37,7 @@ export default function Sidebar({
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
 
-  // Check if user is Admin (using the actual role values)
-  const isAdmin = user?.role === USER_ROLES.EMPLOYER; // Employer users have admin-like capabilities
+
 
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },
@@ -61,8 +60,8 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
-    // Admin only navigation
-    ...(isAdmin
+    // SuperAdmin only navigation
+    ...(user?.role === USER_ROLES.SUPER_ADMIN
       ? [
           {
             name: "Product Dashboard",

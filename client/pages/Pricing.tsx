@@ -77,7 +77,7 @@ export default function Pricing() {
   // Persona state
   const [persona, setPersona] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
 
-  const personaCopy: Record<
+  const personaCopy: Partial<Record<
     UserRole,
     {
       label: string;
@@ -88,7 +88,7 @@ export default function Pricing() {
       unitLabel: string; // e.g., per seat / month
       userCountLabel: string; // label for the user count selector
     }
-  > = {
+  >> = {
     [USER_ROLES.JOB_SEEKER]: {
       label: "Job Seeker",
       freeDescription:
@@ -166,24 +166,7 @@ export default function Pricing() {
       unitLabel: "per user / month",
       userCountLabel: "Users",
     },
-    [USER_ROLES.BUSINESS]: {
-      label: "Business",
-      freeDescription: "Manage hiring and team workflows for your business.",
-      premiumDescription:
-        "Advanced HR, recruiting, and analytics for growing teams.",
-      freeFeatures: [
-        "Company profile",
-        "Basic ATS & CRM",
-        "1 admin user",
-      ],
-      premiumFeatures: [
-        "Unlimited users",
-        "Advanced analytics & API",
-        "Team collaboration tools",
-      ],
-      unitLabel: "per user / month",
-      userCountLabel: "Users",
-    },
+
 
     [USER_ROLES.AFFILIATE]: {
       label: "Affiliate",
@@ -224,6 +207,8 @@ export default function Pricing() {
       unitLabel: "per admin / month",
       userCountLabel: "Admins",
     },
+
+
   };
 
   const [selectedUsers, setSelectedUsers] = useState(1);

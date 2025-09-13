@@ -32,7 +32,6 @@ export const RegisterRequestSchema = z.object({
     USER_ROLES.JOB_SEEKER,
     USER_ROLES.RECRUITER,
     USER_ROLES.EMPLOYER,
-    USER_ROLES.BUSINESS,
     USER_ROLES.AFFILIATE,
     USER_ROLES.ADMIN,
   ]).optional(),

@@ -205,13 +205,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
+      // Filter out SuperAdmin from registration - it's internal only
+      const registrationRole = role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN : role;
       await authService.register({
         email,
         password,
         confirmPassword: password,
         firstName,
         lastName,
-        role,
+        role: registrationRole,
         referralCode,
       });
       const profile = authService.getStoredUser();
