@@ -160,8 +160,7 @@ export default function People() {
       avatar: person.avatar,
       headline: person.headline,
       location: person.location || "",
-      role:
-        typeof person.role === "number" ? person.role.toString() : person.role,
+      role: person.role, // Keep original role value for proper processing
       visibility: "public", // Default for tracked users
       status: "active", // Default status
       companyId: "", // Not available in UserMetadataDTO
@@ -469,10 +468,7 @@ export default function People() {
                           headline: person.headline || "",
                           bio: (person as any).bio || person.headline || "",
                           location: person.location || "Location not specified",
-                          role:
-                            typeof person.role === "number"
-                              ? person.role.toString()
-                              : person.role,
+                          role: person.role, // Keep original role value for proper processing
                           skills: person.skills,
                           openToWork: person.openToWork,
                           visibility: "public" as const,
@@ -647,10 +643,7 @@ export default function People() {
                     avatar: person.avatar,
                     headline: person.headline,
                     location: person.location || "",
-                    role:
-                      typeof person.role === "number"
-                        ? person.role.toString()
-                        : person.role || "0",
+                    role: person.role, // Keep original role value for proper processing
                     visibility: "public" as const, // Default for public users
                     status: "active" as const, // Default status
                     companyId: "", // Not available in PublicUser

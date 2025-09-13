@@ -24,7 +24,8 @@ import {
   BarChart3,
   PieChart,
 } from "lucide-react";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
 import { apiClient } from "@/lib/api-client";
 
 import {
@@ -161,8 +162,9 @@ export default function ProductDashboard() {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  // Check if user is SuperAdmin
-  const isAdmin = user?.role === USER_ROLES.SUPER_ADMIN; // Only SuperAdmin users can access product dashboard
+  // Check if user has admin permissions
+  const rolePermissions = createRolePermissions(user?.role);
+  const isAdmin = rolePermissions.isSuperAdmin; // Only SuperAdmin users can access product dashboard
 
   useEffect(() => {
     if (isAdmin) {
@@ -416,9 +418,7 @@ export default function ProductDashboard() {
                         data={Object.entries(
                           dashboardData.userMetrics.usersByRole,
                         ).map(([role, count]) => ({
-                          name: role
-                            .replace("_", " ")
-                            .replace(/\b\w/g, (l) => l.toUpperCase()),
+                          name: getRoleDisplayLabel(role),
                           value: count,
                           isPaid: role === "employer" || role === "recruiter", // Assume employer and recruiter are paid
                         }))}
@@ -475,9 +475,7 @@ export default function ProductDashboard() {
                             <div
                               className={`w-3 h-3 rounded-full ${isPaid ? "bg-green-500" : "bg-gray-400"}`}
                             />
-                            {role
-                              .replace("_", " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                            {getRoleDisplayLabel(role)}
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${isPaid ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
                             >

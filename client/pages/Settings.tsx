@@ -48,6 +48,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 
 export default function Settings() {
@@ -315,8 +316,8 @@ export default function Settings() {
                   Manage your account settings and preferences
                 </p>
               </div>
-              <Badge variant="secondary" className="capitalize">
-                {user.role?.replace("_", " ")}
+              <Badge variant="secondary">
+                {getRoleDisplayLabel(user.role)}
               </Badge>
             </div>
 

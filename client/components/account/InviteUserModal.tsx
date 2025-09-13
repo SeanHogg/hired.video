@@ -22,9 +22,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   InviteUserRequest,
-  getRoleDisplayName,
   getAvailableRolesForInvite,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 interface InviteUserModalProps {
   open: boolean;
@@ -240,7 +240,7 @@ export function InviteUserModal({
                         htmlFor={`role-${role}`}
                         className="text-sm font-medium cursor-pointer"
                       >
-                        {getRoleDisplayName(role)}
+                        {getRoleDisplayLabel(role)}
                       </Label>
                       <p className="text-xs text-gray-600 mt-1">
                         {getRoleDescription(role)}
@@ -258,7 +258,7 @@ export function InviteUserModal({
                   <div className="flex flex-wrap gap-1">
                     {selectedRoles.map((role) => (
                       <Badge key={role} variant="secondary">
-                        {getRoleDisplayName(role)}
+                        {getRoleDisplayLabel(role)}
                       </Badge>
                     ))}
                   </div>

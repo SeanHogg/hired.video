@@ -25,9 +25,9 @@ import {
   BulkInviteUsersRequest,
   BulkInviteUserItem,
   BulkInviteUsersResponse,
-  getRoleDisplayName,
   getAvailableRolesForInvite,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 interface BulkInviteModalProps {
   open: boolean;
@@ -312,7 +312,7 @@ export function BulkInviteModal({
                       className="cursor-pointer"
                       onClick={() => handleRoleToggle(role)}
                     >
-                      {getRoleDisplayName(role)}
+                      {getRoleDisplayLabel(role)}
                     </Badge>
                   ))}
                 </div>

@@ -13,7 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { accountService } from "@/lib/services/account-service";
-import { AccountOption, getRoleDisplayName } from "@/types/account";
+import { AccountOption } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 interface AccountSwitcherProps {
   className?: string;
@@ -131,7 +132,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
                 >
                   {getRoleIcon(currentAccount.role)}
                   <span className="ml-1">
-                    {getRoleDisplayName(currentAccount.role)}
+                    {getRoleDisplayLabel(currentAccount.role)}
                   </span>
                 </Badge>
               )}
@@ -172,7 +173,7 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
                 >
                   {getRoleIcon(account.role)}
                   <span className="ml-1">
-                    {getRoleDisplayName(account.role)}
+                    {getRoleDisplayLabel(account.role)}
                   </span>
                 </Badge>
                 {account.isOwner && (

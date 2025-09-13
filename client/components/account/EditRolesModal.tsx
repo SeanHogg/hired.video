@@ -21,9 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AccountUser,
-  getRoleDisplayName,
   getAvailableRolesForInvite,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 interface EditRolesModalProps {
   open: boolean;
@@ -137,7 +137,7 @@ export function EditRolesModal({
                     </span>
                     {user.rolesAssigned?.map((role) => (
                       <Badge key={role} variant="outline" className="text-xs">
-                        {getRoleDisplayName(role)}
+                        {getRoleDisplayLabel(role)}
                       </Badge>
                     ))}
                   </div>
@@ -171,7 +171,7 @@ export function EditRolesModal({
                         htmlFor={`edit-role-${role}`}
                         className="text-sm font-medium cursor-pointer"
                       >
-                        {getRoleDisplayName(role)}
+                        {getRoleDisplayLabel(role)}
                       </Label>
                       <p className="text-xs text-gray-600 mt-1">
                         {getRoleDescription(role)}
@@ -189,7 +189,7 @@ export function EditRolesModal({
                   <div className="flex flex-wrap gap-1">
                     {selectedRoles.map((role) => (
                       <Badge key={role} variant="secondary">
-                        {getRoleDisplayName(role)}
+                        {getRoleDisplayLabel(role)}
                       </Badge>
                     ))}
                   </div>

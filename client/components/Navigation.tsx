@@ -19,6 +19,7 @@ import ShoppingCart from "@/components/ShoppingCart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { cn } from "@/lib/utils";
 
 interface NavigationProps {
@@ -384,8 +385,8 @@ export default function Navigation({
                       <p className="text-sm font-medium">
                         Welcome, {user?.name}
                       </p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {user?.role?.replace("_", " ")}
+                      <p className="text-xs text-muted-foreground">
+                        {getRoleDisplayLabel(user?.role)}
                       </p>
                     </div>
                     <Button

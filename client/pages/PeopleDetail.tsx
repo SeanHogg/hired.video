@@ -148,14 +148,15 @@ export default function PeopleDetail() {
           `${userProfile.firstName}-${userProfile.lastName}`
             .toLowerCase()
             .replace(/\s+/g, "-"),
+        role: userProfile.role, // Add role property for proper role display
         data: {
           firstName: userProfile.firstName,
           lastName: userProfile.lastName,
           avatar: userProfile.profilePicture,
-          headline: `${userProfile.role} | ${userProfile.location || "Remote"}`,
+          headline: `${getRoleDisplayLabel(userProfile.role)} | ${userProfile.location || "Remote"}`,
           summary:
             userProfile.bio ||
-            `${userProfile.firstName} ${userProfile.lastName} is a ${userProfile.role} professional.`,
+            `${userProfile.firstName} ${userProfile.lastName} is a ${getRoleDisplayLabel(userProfile.role)} professional.`,
           location: {
             city: userProfile.location?.split(",")[0]?.trim() || "",
             state: userProfile.location?.split(",")[1]?.trim() || "",
@@ -453,11 +454,7 @@ export default function PeopleDetail() {
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
                               <span>
-                                {getRoleDisplayLabel(
-                                  (person as any).role ||
-                                    (person as any).roleSelected ||
-                                    "JobSeeker",
-                                )}
+                                {getRoleDisplayLabel(person?.role || "JobSeeker")}
                               </span>
                             </div>
                             <div className="flex items-center gap-1">

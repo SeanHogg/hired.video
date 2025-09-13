@@ -50,8 +50,8 @@ import {
   InviteStatus,
   getInviteStatusDisplayName,
   getInviteStatusColor,
-  getRoleDisplayName,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { accountService } from "@/lib/services/account-service";
 import { toast } from "@/hooks/use-toast";
 
@@ -94,7 +94,7 @@ export function InvitationManagement({
       roleFilter === "all" ||
       (user.rolesAssigned?.some(
         (role) =>
-          getRoleDisplayName(role).toLowerCase() === roleFilter.toLowerCase(),
+          getRoleDisplayLabel(role).toLowerCase() === roleFilter.toLowerCase(),
       ) ??
         false);
 
@@ -443,7 +443,7 @@ export function InvitationManagement({
                               variant="outline"
                               className="text-xs"
                             >
-                              {getRoleDisplayName(role)}
+                              {getRoleDisplayLabel(role)}
                             </Badge>
                           ))}
                         </div>

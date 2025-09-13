@@ -207,21 +207,8 @@ export interface RoleEditFormData {
   roles: string[];
 }
 
-// Utility functions for role management
-export const getRoleDisplayName = (role: string): string => {
-  switch (role) {
-    case "Admin":
-      return "Admin";
-    case "JobSeeker":
-      return "Job Seeker";
-    case "Recruiter":
-      return "Recruiter";
-    case "Employer":
-      return "Employer";
-    default:
-      return role || "Unknown";
-  }
-};
+// Note: getRoleDisplayName has been moved to @/lib/role-utils.ts for centralized role management
+// Import { getRoleDisplayLabel } from "@/lib/role-utils" instead
 
 export const getInviteStatusDisplayName = (status: InviteStatus): string => {
   switch (status) {

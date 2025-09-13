@@ -74,20 +74,24 @@ export const UserProfileDTOSchema = z.object({
 // ============================================================================
 
 // Map backend role (string or number) to client role keys used by the UI
-// - Server may return enum number (0=JobSeeker, 1=Recruiter, 2=Employer)
+// - Server returns enum numbers from MyVideoResumeRoles: JobSeeker=30, Recruiter=40, Employer=20
 // - Or PascalCase strings (JobSeeker/Recruiter/Employer)
 // - Our UI expects USER_ROLES constants: "JobSeeker" | "Recruiter" | "Employer"
-// Note: Backend supports 3 roles: JobSeeker, Recruiter, Employer
+// Note: Backend supports roles: JobSeeker=30, Recruiter=40, Employer=20, Admin=0, SuperAdmin=-1
 function mapServerRole(role: string | number | undefined | null): string {
   if (role === undefined || role === null) return USER_ROLES.JOB_SEEKER;
   if (typeof role === "number") {
     switch (role) {
-      case 0:
+      case 30:
         return USER_ROLES.JOB_SEEKER;
-      case 1:
+      case 40:
         return USER_ROLES.RECRUITER;
-      case 2:
-        return USER_ROLES.EMPLOYER; // Backend enum value 2 = Employer
+      case 20:
+        return USER_ROLES.EMPLOYER;
+      case 0:
+        return USER_ROLES.ADMIN;
+      case -1:
+        return USER_ROLES.SUPER_ADMIN;
       default:
         return USER_ROLES.JOB_SEEKER;
     }

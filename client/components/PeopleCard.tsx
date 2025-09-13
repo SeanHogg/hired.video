@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
-import { formatRoleForDisplay } from "@/lib/role-utils";
+import { formatRoleForDisplay, normalizeRole } from "@/lib/role-utils";
+import { USER_ROLES } from "@shared/user-roles";
 import type {
   UserMetadata,
   UserWithOwnership,
@@ -99,13 +100,17 @@ export default function PeopleCard({
     }
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "job_seeker":
+  const getRoleIcon = (role: string | number | undefined | null) => {
+    const normalizedRole = normalizeRole(role);
+    switch (normalizedRole) {
+      case USER_ROLES.JOB_SEEKER:
         return <Users className="h-3 w-3" />;
-      case "recruiter":
+      case USER_ROLES.RECRUITER:
         return <UserCheck className="h-3 w-3" />;
-      case "employer":
+      case USER_ROLES.EMPLOYER:
+        return <Building2 className="h-3 w-3" />;
+      case USER_ROLES.ADMIN:
+      case USER_ROLES.SUPER_ADMIN:
         return <Building2 className="h-3 w-3" />;
       default:
         return <Users className="h-3 w-3" />;

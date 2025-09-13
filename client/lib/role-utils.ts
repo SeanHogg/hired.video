@@ -92,12 +92,17 @@ export function normalizeRole(
     case "recruiter":
       return USER_ROLES.RECRUITER;
     case "employer":
+    case "business": // Legacy role, maps to Employer
       return USER_ROLES.EMPLOYER;
     case "affiliate":
       return USER_ROLES.AFFILIATE;
     case "admin":
     case "administrator":
       return USER_ROLES.ADMIN;
+    case "superadmin":
+    case "super_admin":
+    case "super admin":
+      return USER_ROLES.SUPER_ADMIN;
     default:
       // Try exact match with USER_ROLES values
       const upperRole = roleStr.toUpperCase();

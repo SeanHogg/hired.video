@@ -19,7 +19,8 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { USER_ROLES } from "@shared/user-roles";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 

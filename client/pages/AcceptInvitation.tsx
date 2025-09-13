@@ -23,8 +23,8 @@ import { accountService } from "@/lib/services/account-service";
 import {
   InvitationDetailsResponse,
   AcceptInvitationResponse,
-  getRoleDisplayName,
 } from "@/types/account";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { toast } from "@/hooks/use-toast";
 
 export default function AcceptInvitation() {
@@ -201,7 +201,7 @@ export default function AcceptInvitation() {
             <div className="flex flex-wrap gap-2">
               {invitationDetails.rolesToAssign.map((role) => (
                 <Badge key={role} variant="secondary">
-                  {getRoleDisplayName(role)}
+                  {getRoleDisplayLabel(role)}
                 </Badge>
               ))}
             </div>
