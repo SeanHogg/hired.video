@@ -128,6 +128,14 @@ export class NetworkError extends AppError {
 }
 
 /**
+ * Unverified account error - for login attempts where email is not verified
+ */
+export class UnverifiedAccountError extends AppError {
+  readonly code = "ACCOUNT_UNVERIFIED";
+  readonly statusCode = 400;
+}
+
+/**
  * Internal error - for unexpected application errors
  */
 export class InternalError extends AppError {

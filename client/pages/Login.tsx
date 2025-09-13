@@ -21,6 +21,8 @@ import { useAuth } from "@/lib/auth";
 
 export default function Login() {
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get("redirect") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -66,6 +68,13 @@ export default function Login() {
         return;
       }
 
+      if (typeof result === "object" && result && (result as any).requiresEmailVerification) {
+        console.log("Login.handleSubmit: Email verification required, redirecting to verify page", result);
+        const params = new URLSearchParams({ email, redirect: redirectParam });
+        navigate(`/verify-email?${params.toString()}`);
+        return;
+      }
+
       if (typeof result === "object" && result && (result as any).requiresTwoFactor) {
         console.log("Login.handleSubmit: Two-factor required", result);
         setTwoFactor(result as { requiresTwoFactor: true; email: string; expiresAt: string });
@@ -93,6 +102,9 @@ export default function Login() {
       const success = await login(demoEmail, demoPassword);
       if (success === true) {
         navigate("/dashboard");
+      } else if (typeof success === "object" && success && (success as any).requiresEmailVerification) {
+        const params = new URLSearchParams({ email: demoEmail, redirect: redirectParam });
+        navigate(`/verify-email?${params.toString()}`);
       } else if (typeof success === "object" && success && (success as any).requiresTwoFactor) {
         setTwoFactor(success as { requiresTwoFactor: true; email: string; expiresAt: string });
       }

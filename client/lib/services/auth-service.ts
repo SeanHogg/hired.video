@@ -154,6 +154,17 @@ const TwoFactorChallengeSchema = z.object({
 });
 export type TwoFactorChallenge = z.infer<typeof TwoFactorChallengeSchema>;
 
+export const VerificationStatusSchema = z.object({
+  email: z.string().email().optional(),
+  emailConfirmed: z.boolean(),
+  isEmailVerified: z.boolean(),
+  sentAt: z.string().optional(),
+  sendCount: z.number().int().nonnegative().optional(),
+});
+export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
+
+export type EmailVerificationChallenge = { requiresEmailVerification: true; email?: string };
+
 export class AuthService {
   private tokenKey = "auth_token";
   private refreshTokenKey = "refresh_token";
@@ -184,53 +195,65 @@ export class AuthService {
 
   /**
    * Login user with email and password
-   * Returns either a LoginResponse (success) or a TwoFactorChallenge (requires step 2)
+   * Returns either a LoginResponse (success), a TwoFactorChallenge (requires step 2),
+   * or an EmailVerificationChallenge (email verification required before access)
    */
-  async login(credentials: LoginRequest): Promise<LoginResponse | TwoFactorChallenge> {
+  async login(
+    credentials: LoginRequest,
+  ): Promise<LoginResponse | TwoFactorChallenge | EmailVerificationChallenge> {
     console.log("AuthService.login: Starting login process");
 
-    // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge)
-    const response = await apiClient.post<any>("/api/Auth/login", credentials);
-
-    console.log("AuthService.login: API response received", response);
-
-    const data = response.data as unknown;
-
-    // Check for 2FA challenge shape
-    const tfValidation = TwoFactorChallengeSchema.safeParse(data);
-    if (tfValidation.success) {
-      const challenge = tfValidation.data;
-      this.clearTwoFactorState();
-      this.storeTwoFactorState(challenge);
-      console.log("AuthService.login: Two-factor required", challenge);
-      return challenge;
-    }
-
-    // Otherwise validate as successful login response
-    const lrValidation = LoginResponseSchema.safeParse(data);
-    if (!lrValidation.success) {
-      throw new Error(
-        `Unexpected login response shape: ${
-          (lrValidation as any).error?.message || "validation failed"
-        }`,
-      );
-    }
-
-    const loginData = lrValidation.data;
-
-    // Store authentication data then fetch full profile to normalize user fields
-    this.storeAuthData(loginData);
-    console.log("AuthService.login: Auth data stored");
-
     try {
-      await this.getCurrentUser();
-      console.log("AuthService.login: Current user fetched successfully");
-    } catch (e) {
-      console.warn("Failed to load full profile after login", e);
-    }
+      // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge)
+      const response = await apiClient.post<any>("/api/Auth/login", credentials);
 
-    console.log("AuthService.login: Login completed successfully");
-    return loginData;
+      console.log("AuthService.login: API response received", response);
+
+      const data = response.data as unknown;
+
+      // Check for 2FA challenge shape
+      const tfValidation = TwoFactorChallengeSchema.safeParse(data);
+      if (tfValidation.success) {
+        const challenge = tfValidation.data;
+        this.clearTwoFactorState();
+        this.storeTwoFactorState(challenge);
+        console.log("AuthService.login: Two-factor required", challenge);
+        return challenge;
+      }
+
+      // Otherwise validate as successful login response
+      const lrValidation = LoginResponseSchema.safeParse(data);
+      if (!lrValidation.success) {
+        throw new Error(
+          `Unexpected login response shape: ${
+            (lrValidation as any).error?.message || "validation failed"
+          }`,
+        );
+      }
+
+      const loginData = lrValidation.data;
+
+      // Store authentication data then fetch full profile to normalize user fields
+      this.storeAuthData(loginData);
+      console.log("AuthService.login: Auth data stored");
+
+      try {
+        await this.getCurrentUser();
+        console.log("AuthService.login: Current user fetched successfully");
+      } catch (e) {
+        console.warn("Failed to load full profile after login", e);
+      }
+
+      console.log("AuthService.login: Login completed successfully");
+      return loginData;
+    } catch (error: any) {
+      // Detect unverified account error bubbled from ApiClient
+      if (error && (error.code === "ACCOUNT_UNVERIFIED" || /Email not verified/i.test(String(error.message)))) {
+        console.warn("AuthService.login: Email verification required for", credentials.email);
+        return { requiresEmailVerification: true, email: credentials.email };
+      }
+      throw error;
+    }
   }
 
   /**
@@ -278,6 +301,30 @@ export class AuthService {
       return true;
     } catch (e) {
       console.error("AuthService.resendTwoFactorCode: failed", e);
+      return false;
+    }
+  }
+
+  /**
+   * Email verification status for the authenticated user
+   */
+  async getVerificationStatus(): Promise<VerificationStatus> {
+    const res = await apiClient.get<VerificationStatus>(
+      "/api/Auth/verification-status",
+      VerificationStatusSchema,
+    );
+    return res.data;
+  }
+
+  /**
+   * Resend verification email for the authenticated user
+   */
+  async resendEmailVerification(): Promise<boolean> {
+    try {
+      await apiClient.post("/api/Auth/resend-email-verification");
+      return true;
+    } catch (e) {
+      console.error("AuthService.resendEmailVerification: failed", e);
       return false;
     }
   }

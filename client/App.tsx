@@ -29,6 +29,7 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
+import VerifyEmail from "./pages/VerifyEmail";
 import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
@@ -179,6 +180,8 @@ const App = () => (
                         path="/reset-password"
                         element={<ResetPassword />}
                       />
+                          <Route path="/verify-email" element={<VerifyEmail />} />
+
                       <Route path="/confirm-email" element={<ConfirmEmail />} />
                       <Route
                         path="/accept-invitation"

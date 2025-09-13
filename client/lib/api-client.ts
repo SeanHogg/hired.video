@@ -23,6 +23,7 @@ import {
   AuthorizationError,
   NotFoundError,
   normalizeError,
+  UnverifiedAccountError,
 } from "./errors";
 import { logApiCall } from "./logger";
 
@@ -384,6 +385,9 @@ export class ApiClient {
     switch (error.code) {
       case "VALIDATION_ERROR":
         return new ValidationError(error.message, undefined, error.details);
+      case "ACCOUNT_UNVERIFIED":
+        // Do NOT clear auth or redirect; this is a special flow handled by UI
+        return new UnverifiedAccountError(error.message, error.details);
       case "AUTHENTICATION_ERROR":
       case "ACCOUNT_DELETED":
         console.log(

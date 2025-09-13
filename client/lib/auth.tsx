@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
-import { authService, type UserProfile } from "./services/auth-service";
+import { authService, type UserProfile, type EmailVerificationChallenge } from "./services/auth-service";
 import type { TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
@@ -34,15 +34,22 @@ interface TwoFactorChallengeUI {
   expiresAt: string;
 }
 
+interface EmailVerificationChallengeUI {
+  requiresEmailVerification: true;
+  email?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   login: (
     email: string,
     password: string,
     rememberMe?: boolean,
-  ) => Promise<boolean | TwoFactorChallengeUI>;
+  ) => Promise<boolean | TwoFactorChallengeUI | EmailVerificationChallengeUI>;
   verifyTwoFactor: (code: string) => Promise<boolean>;
   resendTwoFactorCode: () => Promise<boolean>;
+  resendEmailVerification: () => Promise<boolean>;
+  getVerificationStatus: () => Promise<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number }>;
   signup: (
     email: string,
     password: string,
@@ -177,13 +184,27 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     email: string,
     password: string,
     rememberMe = false,
-  ): Promise<boolean | TwoFactorChallengeUI> => {
+  ): Promise<boolean | TwoFactorChallengeUI | EmailVerificationChallengeUI> => {
     try {
       console.log("AuthContext.login: Starting login process");
       setIsLoading(true);
 
       const result = await authService.login({ email, password, rememberMe });
       console.log("AuthContext.login: AuthService.login completed", result);
+
+      // If email verification is required, surface that to the UI
+      if (
+        typeof result === "object" &&
+        (result as any).requiresEmailVerification
+      ) {
+        const r = result as { requiresEmailVerification: true; email?: string };
+        const ui: EmailVerificationChallengeUI = {
+          requiresEmailVerification: true,
+          email: r.email ?? email,
+        };
+        console.log("AuthContext.login: Email verification required", ui);
+        return ui;
+      }
 
       // If two-factor is required, return the minimal UI challenge info
       if (typeof result === "object" && (result as ServiceTwoFactorChallenge).requiresTwoFactor) {
@@ -370,11 +391,32 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
+  const resendEmailVerification = async (): Promise<boolean> => {
+    try {
+      return await authService.resendEmailVerification();
+    } catch (error) {
+      console.error("AuthContext.resendEmailVerification: failed", error);
+      return false;
+    }
+  };
+
+  const getVerificationStatus = async (): Promise<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number }> => {
+    try {
+      return await authService.getVerificationStatus();
+    } catch (error) {
+      console.error("AuthContext.getVerificationStatus: failed", error);
+      throw error;
+    }
+  };
+
+
   const value: AuthContextType = {
     user,
     login,
     verifyTwoFactor,
     resendTwoFactorCode,
+    resendEmailVerification,
+    getVerificationStatus,
     signup,
     logout,
     updateUserRole,
