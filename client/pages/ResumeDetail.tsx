@@ -290,7 +290,7 @@ export default function ResumeDetail() {
           {!isAuthenticated && (
             <AuthOverlay
               contentType="resume"
-              title={(resume as any)?.metaResume?.basics?.name}
+              title={resume?.data?.Basics?.Name || resume?.name || "Resume"}
             />
           )}
           {/* Header with Video */}
@@ -366,10 +366,10 @@ export default function ResumeDetail() {
                   <div className="flex items-center gap-4">
                     <Avatar className="w-20 h-20 border-4 border-white/30">
                       <AvatarImage
-                        src={(resume as any).metaResume?.basics?.image}
+                        src={resume?.data?.Basics?.Image || ""}
                       />
                       <AvatarFallback className="text-2xl bg-white/20">
-                        {(resume as any).metaResume?.basics?.name
+                        {resume?.data?.Basics?.Name
                           ?.split(" ")
                           .map((n: string) => n[0])
                           .join("") || "??"}
@@ -377,11 +377,10 @@ export default function ResumeDetail() {
                     </Avatar>
                     <div>
                       <h1 className="text-4xl font-bold">
-                        {(resume as any).metaResume?.basics?.name ||
-                          "Untitled Resume"}
+                        {resume?.data?.Basics?.Name || resume?.name || "Untitled Resume"}
                       </h1>
                       <p className="text-xl opacity-90">
-                        {(resume as any).metaResume?.basics?.label || ""}
+                        {resume?.data?.Basics?.Label || ""}
                       </p>
                     </div>
                   </div>

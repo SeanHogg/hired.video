@@ -697,6 +697,15 @@ export class ResumeService {
       }
     }
 
+    // Debug: Log the actual API response structure to understand what we're getting
+    console.log("API Response Structure:", {
+      hasMetaResume: !!apiResponse.metaResume,
+      hasResumeSerialized: !!apiResponse.resumeSerialized,
+      metaResumeKeys: apiResponse.metaResume ? Object.keys(apiResponse.metaResume) : [],
+      basicsKeys: basics ? Object.keys(basics) : [],
+      apiResponseKeys: Object.keys(apiResponse)
+    });
+
     // Map privacy enum values
     const mapPrivacy = (privacyValue: number): ResumePrivacy => {
       switch (privacyValue) {
