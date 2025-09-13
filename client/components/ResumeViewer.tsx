@@ -63,7 +63,16 @@ export default function ResumeViewer({
 
   // Ensure resume.data exists and has required structure
   const resumeData = resume.data || {
-    Basics: { Name: "", Label: "", Email: "", Phone: "", Summary: "", Location: null },
+    Basics: {
+      Name: "",
+      Label: "",
+      Image: "",
+      Email: "",
+      Phone: "",
+      Url: "",
+      Summary: "",
+      Location: null
+    },
     Work: [],
     Education: [],
     Skills: [],

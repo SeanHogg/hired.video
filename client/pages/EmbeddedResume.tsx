@@ -9,7 +9,7 @@ import ShareModal from "@/components/ShareModal";
 import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import type { UserProfile } from "@/lib/services/user-service";
-import type { Resume } from "@/lib/services/resume-service";
+import type { Resume } from "@/types/resume";
 
 export default function EmbeddedResume() {
   const { identifier } = useParams<{ identifier: string }>();

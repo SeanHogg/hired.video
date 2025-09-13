@@ -7,7 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume } from "@/types/resume";
 
 // ============================================================================
 // SCHEMAS
@@ -401,7 +401,7 @@ export class ResumeService {
   /**
    * Get specific resume by ID
    */
-  async getResumeById(id: string): Promise<Resume> {
+  async getResumeById(id: string): Promise<FrontendResume> {
     const response = await apiClient.get<any>(
       `/api/Resume/${id}`,
       z.any(), // Use any for now since we need to transform the response
@@ -627,7 +627,7 @@ export class ResumeService {
   /**
    * Transform API resume response to frontend Resume interface
    */
-  private transformApiResumeToResume(apiResponse: any): Resume {
+  private transformApiResumeToResume(apiResponse: any): FrontendResume {
     const metaResume = apiResponse.metaResume || {};
     const basics = metaResume.basics || {};
     const work = metaResume.work || [];
