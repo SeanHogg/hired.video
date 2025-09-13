@@ -20,6 +20,13 @@ import {
   Users,
   Lock,
   Star,
+  BookOpen,
+  Languages,
+  Lightbulb,
+  UserCheck,
+  FolderOpen,
+  Trophy,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -620,6 +627,351 @@ export default function ResumeDetail() {
                   </Card>
                 </section>
               )}
+
+            {/* Skills */}
+            {resume?.data?.Skills && resume.data.Skills.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Star className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Skills</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {resume.data.Skills.map((skill, index) => (
+                        <div key={index} className="p-4 border rounded-lg">
+                          <h3 className="font-semibold text-lg mb-2">
+                            {skill.Name}
+                          </h3>
+                          {skill.Level && (
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Level: {skill.Level}
+                            </p>
+                          )}
+                          {skill.Keywords && skill.Keywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {skill.Keywords.map((keyword, keywordIndex) => (
+                                <span
+                                  key={keywordIndex}
+                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
+                                >
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Languages */}
+            {resume?.data?.Languages && resume.data.Languages.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Languages className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Languages</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {resume.data.Languages.map((language, index) => (
+                        <div key={index} className="p-4 border rounded-lg">
+                          <h3 className="font-semibold text-lg">
+                            {language.Language}
+                          </h3>
+                          {language.Fluency && (
+                            <p className="text-sm text-muted-foreground">
+                              {language.Fluency}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Projects */}
+            {resume?.data?.Projects && resume.data.Projects.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <FolderOpen className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Projects</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-6">
+                      {resume.data.Projects.map((project, index) => (
+                        <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-semibold text-lg">
+                              {project.Name}
+                            </h3>
+                            {project.Url && (
+                              <a
+                                href={project.Url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+
+                          {(project.StartDate || project.EndDate) && (
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {project.StartDate} - {project.EndDate || "Present"}
+                            </p>
+                          )}
+
+                          {project.Entity && (
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {project.Entity}
+                            </p>
+                          )}
+
+                          {project.Description && (
+                            <p className="text-sm mb-3">{project.Description}</p>
+                          )}
+
+                          {project.Highlights && project.Highlights.length > 0 && (
+                            <ul className="list-disc list-inside text-sm mb-3 space-y-1">
+                              {project.Highlights.map((highlight, highlightIndex) => (
+                                <li key={highlightIndex}>{highlight}</li>
+                              ))}
+                            </ul>
+                          )}
+
+                          {project.Keywords && project.Keywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {project.Keywords.map((keyword, keywordIndex) => (
+                                <span
+                                  key={keywordIndex}
+                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
+                                >
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Awards */}
+            {resume?.data?.Awards && resume.data.Awards.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Trophy className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Awards</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Awards.map((award, index) => (
+                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                          <h3 className="font-semibold text-lg">{award.Title}</h3>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            {award.Awarder && <span>{award.Awarder}</span>}
+                            {award.Date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {award.Date}
+                              </span>
+                            )}
+                          </div>
+                          {award.Summary && (
+                            <p className="text-sm">{award.Summary}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Certificates */}
+            {resume?.data?.Certificates && resume.data.Certificates.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Award className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Certificates</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Certificates.map((certificate, index) => (
+                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-semibold text-lg">{certificate.Name}</h3>
+                            {certificate.Url && (
+                              <a
+                                href={certificate.Url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            {certificate.Issuer && <span>{certificate.Issuer}</span>}
+                            {certificate.Date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {certificate.Date}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Publications */}
+            {resume?.data?.Publications && resume.data.Publications.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Publications</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.Publications.map((publication, index) => (
+                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-semibold text-lg">{publication.Name}</h3>
+                            {publication.Url && (
+                              <a
+                                href={publication.Url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            {publication.Publisher && <span>{publication.Publisher}</span>}
+                            {publication.ReleaseDate && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {publication.ReleaseDate}
+                              </span>
+                            )}
+                          </div>
+                          {publication.Summary && (
+                            <p className="text-sm">{publication.Summary}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* Interests */}
+            {resume?.data?.Interests && resume.data.Interests.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Lightbulb className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">Interests</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {resume.data.Interests.map((interest, index) => (
+                        <div key={index} className="p-4 border rounded-lg">
+                          <h3 className="font-semibold text-lg mb-2">
+                            {interest.Name}
+                          </h3>
+                          {interest.Keywords && interest.Keywords.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {interest.Keywords.map((keyword, keywordIndex) => (
+                                <span
+                                  key={keywordIndex}
+                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
+                                >
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {/* References */}
+            {resume?.data?.References && resume.data.References.length > 0 && (
+              <section>
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <UserCheck className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="text-3xl font-bold">References</h2>
+                </div>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {resume.data.References.map((reference, index) => (
+                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                          <h3 className="font-semibold text-lg">{reference.Name}</h3>
+                          {reference.Reference && (
+                            <p className="text-sm text-muted-foreground">
+                              {reference.Reference}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
           </div>
 
           <Footer />
