@@ -26,6 +26,7 @@ import {
   X,
   Send,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -59,6 +60,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import ResumeCard from "@/components/ResumeCard";
 
 export default function PeopleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -212,7 +214,7 @@ export default function PeopleDetail() {
 
         if (userPublicResumes.length > 0) {
           // Find active resume or use the first public one
-          const activeResume = userPublicResumes.find(r => r.isActive) || userPublicResumes[0];
+          const activeResume = userPublicResumes.find(r => (r as any).isActive) || userPublicResumes[0];
           setActivePublicResume(activeResume);
           setHasActivePublicResume(true);
         } else {
@@ -668,6 +670,34 @@ export default function PeopleDetail() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
+                          {/* Active Public Resume Card */}
+                          {activePublicResume && (
+                            <div className="mb-6">
+                              <div className="flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-primary" />
+                                <h3 className="font-medium text-sm">Professional Resume</h3>
+                              </div>
+                              <div className="max-w-md">
+                                <ResumeCard
+                                  id={activePublicResume.Id || activePublicResume.id}
+                                  name={activePublicResume.Name || activePublicResume.name || "Resume"}
+                                  title={activePublicResume.title}
+                                  summary={activePublicResume.Description || activePublicResume.description || "Professional resume"}
+                                  createdAt={activePublicResume.CreationDateTimeFormatted || activePublicResume.createdAt || new Date().toISOString()}
+                                  views={activePublicResume.Views || activePublicResume.views || 0}
+                                  privacy="public"
+                                  isMaster={activePublicResume.IsMaster || (activePublicResume as any).isMaster || false}
+                                  isActive={(activePublicResume as any).isActive || false}
+                                  ownership="tracked"
+                                  onView={() => {
+                                    const resumeId = activePublicResume.Id || activePublicResume.id;
+                                    window.open(`/resumes/${resumeId}`, '_blank');
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
                           {person.data.experience.map((exp, index) => (
                             <div key={index} className="flex gap-4">
                               <div className="flex-shrink-0">
