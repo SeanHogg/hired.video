@@ -8,6 +8,13 @@ import {
   Trash2,
   Save,
   X,
+  Heart,
+  FolderOpen,
+  Globe,
+  Trophy,
+  BookOpen,
+  Lightbulb,
+  UserCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +38,28 @@ import type {
   WorkExperience,
   Education,
   Skill,
+  VolunteerExperience,
+  Language,
+  Interest,
+  Reference,
+  Project,
+  Award as AwardType,
+  Certificate,
+  Publication,
 } from "@/types/resume";
+import {
+  WorkExperienceSection,
+  EducationSection,
+  SkillsSection,
+  VolunteerSection,
+  LanguagesSection,
+  ProjectsSection,
+  AwardsSection,
+  CertificatesSection,
+  PublicationsSection,
+  InterestsSection,
+  ReferencesSection,
+} from "@/components/resume-sections";
 
 interface ResumeBuilderProps {
   onSave: (request: CreateResumeRequest) => void;
@@ -627,23 +655,53 @@ export default function ResumeBuilder({
         </TabsContent>
 
         <TabsContent value="work">
+          <WorkExperienceSection
+            work={work}
+            onAdd={addWorkExperience}
+            onUpdate={updateWorkExperience}
+            onRemove={removeWorkExperience}
+            onAddHighlight={addHighlight}
+            onUpdateHighlight={updateHighlight}
+            onRemoveHighlight={removeHighlight}
+          />
+        </TabsContent>
+
+        <TabsContent value="education">
+          <EducationSection
+            education={education}
+            onAdd={addEducation}
+            onUpdate={updateEducation}
+            onRemove={removeEducation}
+          />
+        </TabsContent>
+
+        <TabsContent value="skills">
+          <SkillsSection
+            skills={skills}
+            onAdd={addSkill}
+            onUpdate={updateSkill}
+            onRemove={removeSkill}
+          />
+        </TabsContent>
+
+        <TabsContent value="volunteer">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Work Experience</CardTitle>
-              <Button onClick={addWorkExperience} size="sm">
+              <CardTitle>Volunteer Experience</CardTitle>
+              <Button onClick={addVolunteer} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Experience
+                Add Volunteer Experience
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {work.map((exp, index) => (
+              {volunteer.map((vol, index) => (
                 <div key={index} className="space-y-4 p-4 border rounded-lg">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Experience {index + 1}</h4>
+                    <h4 className="font-medium">Volunteer Experience {index + 1}</h4>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeWorkExperience(index)}
+                      onClick={() => removeVolunteer(index)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -651,142 +709,104 @@ export default function ResumeBuilder({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Company</Label>
+                      <Label>Organization</Label>
                       <Input
-                        value={exp.Name}
+                        value={vol.Organization}
                         onChange={(e) =>
-                          updateWorkExperience(index, "Name", e.target.value)
+                          updateVolunteer(index, "Organization", e.target.value)
                         }
-                        placeholder="Company Name"
+                        placeholder="Red Cross"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Position</Label>
                       <Input
-                        value={exp.Position}
+                        value={vol.Position}
                         onChange={(e) =>
-                          updateWorkExperience(
-                            index,
-                            "Position",
-                            e.target.value,
-                          )
+                          updateVolunteer(index, "Position", e.target.value)
                         }
-                        placeholder="Job Title"
+                        placeholder="Volunteer Coordinator"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Start Date</Label>
                       <Input
-                        type="month"
-                        value={exp.StartDate}
+                        type="date"
+                        value={vol.StartDate}
                         onChange={(e) =>
-                          updateWorkExperience(
-                            index,
-                            "StartDate",
-                            e.target.value,
-                          )
+                          updateVolunteer(index, "StartDate", e.target.value)
                         }
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>End Date</Label>
                       <Input
-                        type="month"
-                        value={exp.EndDate}
+                        type="date"
+                        value={vol.EndDate}
                         onChange={(e) =>
-                          updateWorkExperience(index, "EndDate", e.target.value)
+                          updateVolunteer(index, "EndDate", e.target.value)
                         }
-                        placeholder="Leave empty if current"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Job Summary</Label>
-                    <Textarea
-                      value={exp.Summary}
+                    <Label>Website</Label>
+                    <Input
+                      value={vol.Url}
                       onChange={(e) =>
-                        updateWorkExperience(index, "Summary", e.target.value)
+                        updateVolunteer(index, "Url", e.target.value)
                       }
-                      placeholder="Brief description of your role and responsibilities..."
-                      rows={2}
+                      placeholder="https://redcross.org"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Key Achievements</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addHighlight(index)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Achievement
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {exp.Highlights.map((highlight, highlightIndex) => (
-                        <div key={highlightIndex} className="flex gap-2">
-                          <Input
-                            value={highlight}
-                            onChange={(e) =>
-                              updateHighlight(
-                                index,
-                                highlightIndex,
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Achievement or responsibility..."
-                            className="flex-1"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              removeHighlight(index, highlightIndex)
-                            }
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
+                    <Label>Summary</Label>
+                    <Textarea
+                      value={vol.Summary}
+                      onChange={(e) =>
+                        updateVolunteer(index, "Summary", e.target.value)
+                      }
+                      placeholder="Describe your volunteer work..."
+                      rows={3}
+                    />
                   </div>
                 </div>
               ))}
 
-              {work.length === 0 && (
+              {volunteer.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No work experience added yet.</p>
-                  <p className="text-sm">
-                    Click "Add Experience" to get started.
-                  </p>
+                  <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No volunteer experience added yet.</p>
+                  <p className="text-sm">Click "Add Volunteer Experience" to get started.</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="education">
+        <TabsContent value="languages">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Education</CardTitle>
-              <Button onClick={addEducation} size="sm">
+              <CardTitle>Languages</CardTitle>
+              <Button onClick={addLanguage} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Education
+                Add Language
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {education.map((edu, index) => (
+              {languages.map((lang, index) => (
                 <div key={index} className="space-y-4 p-4 border rounded-lg">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Education {index + 1}</h4>
+                    <h4 className="font-medium">Language {index + 1}</h4>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeEducation(index)}
+                      onClick={() => removeLanguage(index)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -794,146 +814,31 @@ export default function ResumeBuilder({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Institution</Label>
+                      <Label>Language</Label>
                       <Input
-                        value={edu.Institution}
+                        value={lang.Language}
                         onChange={(e) =>
-                          updateEducation(index, "Institution", e.target.value)
+                          updateLanguage(index, "Language", e.target.value)
                         }
-                        placeholder="University Name"
+                        placeholder="English"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Degree Type</Label>
+                      <Label>Fluency Level</Label>
                       <Select
-                        value={edu.StudyType}
+                        value={lang.Fluency}
                         onValueChange={(value) =>
-                          updateEducation(index, "StudyType", value)
+                          updateLanguage(index, "Fluency", value)
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select degree type" />
+                          <SelectValue placeholder="Select fluency" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Bachelor">Bachelor's</SelectItem>
-                          <SelectItem value="Master">Master's</SelectItem>
-                          <SelectItem value="PhD">PhD</SelectItem>
-                          <SelectItem value="Associate">Associate</SelectItem>
-                          <SelectItem value="Certificate">
-                            Certificate
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Field of Study</Label>
-                      <Input
-                        value={edu.Area}
-                        onChange={(e) =>
-                          updateEducation(index, "Area", e.target.value)
-                        }
-                        placeholder="Computer Science"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>GPA/Score</Label>
-                      <Input
-                        value={edu.Score}
-                        onChange={(e) =>
-                          updateEducation(index, "Score", e.target.value)
-                        }
-                        placeholder="3.8 / 4.0"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Start Date</Label>
-                      <Input
-                        type="month"
-                        value={edu.StartDate}
-                        onChange={(e) =>
-                          updateEducation(index, "StartDate", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Date</Label>
-                      <Input
-                        type="month"
-                        value={edu.EndDate}
-                        onChange={(e) =>
-                          updateEducation(index, "EndDate", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {education.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No education added yet.</p>
-                  <p className="text-sm">
-                    Click "Add Education" to get started.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="skills">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Skills</CardTitle>
-              <Button onClick={addSkill} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Skill
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {skills.map((skill, index) => (
-                <div key={index} className="space-y-4 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Skill {index + 1}</h4>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeSkill(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Skill Name</Label>
-                      <Input
-                        value={skill.Name}
-                        onChange={(e) =>
-                          updateSkill(index, "Name", e.target.value)
-                        }
-                        placeholder="JavaScript"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Proficiency Level</Label>
-                      <Select
-                        value={skill.Level}
-                        onValueChange={(value) =>
-                          updateSkill(index, "Level", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Beginner">Beginner</SelectItem>
-                          <SelectItem value="Intermediate">
-                            Intermediate
-                          </SelectItem>
-                          <SelectItem value="Advanced">Advanced</SelectItem>
-                          <SelectItem value="Expert">Expert</SelectItem>
+                          <SelectItem value="Native">Native</SelectItem>
+                          <SelectItem value="Fluent">Fluent</SelectItem>
+                          <SelectItem value="Conversational">Conversational</SelectItem>
+                          <SelectItem value="Basic">Basic</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -941,11 +846,11 @@ export default function ResumeBuilder({
                 </div>
               ))}
 
-              {skills.length === 0 && (
+              {languages.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No skills added yet.</p>
-                  <p className="text-sm">Click "Add Skill" to get started.</p>
+                  <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No languages added yet.</p>
+                  <p className="text-sm">Click "Add Language" to get started.</p>
                 </div>
               )}
             </CardContent>
