@@ -144,27 +144,82 @@ export type UserProfile = {
 // AUTH SERVICE CLASS
 // ============================================================================
 
+// Two-Factor (step-up) auth support
+const TwoFactorChallengeSchema = z.object({
+  requiresTwoFactor: z.literal(true),
+  tempAuthToken: z.string().min(1),
+  expiresAt: z.string(),
+  email: z.string(),
+  attemptsLeft: z.number().optional(),
+});
+export type TwoFactorChallenge = z.infer<typeof TwoFactorChallengeSchema>;
+
 export class AuthService {
   private tokenKey = "auth_token";
   private refreshTokenKey = "refresh_token";
   private userKey = "current_user";
 
+
+  private twoFactorKey = "twofactor_state";
+
+  private storeTwoFactorState(challenge: TwoFactorChallenge): void {
+    sessionStorage.setItem(this.twoFactorKey, JSON.stringify(challenge));
+  }
+
+  getTwoFactorState(): TwoFactorChallenge | null {
+    const raw = sessionStorage.getItem(this.twoFactorKey);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      const validation = TwoFactorChallengeSchema.safeParse(parsed);
+      return validation.success ? validation.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  clearTwoFactorState(): void {
+    sessionStorage.removeItem(this.twoFactorKey);
+  }
+
   /**
    * Login user with email and password
+   * Returns either a LoginResponse (success) or a TwoFactorChallenge (requires step 2)
    */
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
+  async login(credentials: LoginRequest): Promise<LoginResponse | TwoFactorChallenge> {
     console.log("AuthService.login: Starting login process");
 
-    const response = await apiClient.post<LoginResponse>(
-      "/api/Auth/login",
-      credentials,
-      LoginResponseSchema, // shared + optional refreshToken
-    );
+    // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge)
+    const response = await apiClient.post<any>("/api/Auth/login", credentials);
 
     console.log("AuthService.login: API response received", response);
 
+    const data = response.data as unknown;
+
+    // Check for 2FA challenge shape
+    const tfValidation = TwoFactorChallengeSchema.safeParse(data);
+    if (tfValidation.success) {
+      const challenge = tfValidation.data;
+      this.clearTwoFactorState();
+      this.storeTwoFactorState(challenge);
+      console.log("AuthService.login: Two-factor required", challenge);
+      return challenge;
+    }
+
+    // Otherwise validate as successful login response
+    const lrValidation = LoginResponseSchema.safeParse(data);
+    if (!lrValidation.success) {
+      throw new Error(
+        `Unexpected login response shape: ${
+          (lrValidation as any).error?.message || "validation failed"
+        }`,
+      );
+    }
+
+    const loginData = lrValidation.data;
+
     // Store authentication data then fetch full profile to normalize user fields
-    this.storeAuthData(response.data);
+    this.storeAuthData(loginData);
     console.log("AuthService.login: Auth data stored");
 
     try {
@@ -175,7 +230,56 @@ export class AuthService {
     }
 
     console.log("AuthService.login: Login completed successfully");
-    return response.data;
+    return loginData;
+  }
+
+  /**
+   * Verify a two-factor code using the stored temporary auth state
+   */
+  async verifyTwoFactor(code: string): Promise<LoginResponse> {
+    const state = this.getTwoFactorState();
+    if (!state) {
+      throw new Error("No pending two-factor challenge");
+    }
+
+    const payload = { tempAuthToken: state.tempAuthToken, code } as const;
+
+    const result = await apiClient.post<LoginResponse>(
+      "/api/Auth/verify-2fa",
+      payload,
+      LoginResponseSchema,
+    );
+
+    // On success, clear 2FA state, store auth, and load profile
+    this.clearTwoFactorState();
+    this.storeAuthData(result.data);
+    try {
+      await this.getCurrentUser();
+    } catch (e) {
+      console.warn("Failed to load full profile after 2FA verify", e);
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Resend the two-factor code for the current challenge
+   */
+  async resendTwoFactorCode(): Promise<boolean> {
+    const state = this.getTwoFactorState();
+    if (!state) {
+      throw new Error("No pending two-factor challenge");
+    }
+
+    try {
+      await apiClient.post("/api/Auth/resend-2fa", {
+        tempAuthToken: state.tempAuthToken,
+      });
+      return true;
+    } catch (e) {
+      console.error("AuthService.resendTwoFactorCode: failed", e);
+      return false;
+    }
   }
 
   /**

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
 import { authService, type UserProfile } from "./services/auth-service";
+import type { TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
@@ -27,13 +28,21 @@ export interface User {
   openToWork?: boolean;
 }
 
+interface TwoFactorChallengeUI {
+  requiresTwoFactor: true;
+  email: string;
+  expiresAt: string;
+}
+
 interface AuthContextType {
   user: User | null;
   login: (
     email: string,
     password: string,
     rememberMe?: boolean,
-  ) => Promise<boolean>;
+  ) => Promise<boolean | TwoFactorChallengeUI>;
+  verifyTwoFactor: (code: string) => Promise<boolean>;
+  resendTwoFactorCode: () => Promise<boolean>;
   signup: (
     email: string,
     password: string,
@@ -168,7 +177,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     email: string,
     password: string,
     rememberMe = false,
-  ): Promise<boolean> => {
+  ): Promise<boolean | TwoFactorChallengeUI> => {
     try {
       console.log("AuthContext.login: Starting login process");
       setIsLoading(true);
@@ -176,6 +185,19 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       const result = await authService.login({ email, password, rememberMe });
       console.log("AuthContext.login: AuthService.login completed", result);
 
+      // If two-factor is required, return the minimal UI challenge info
+      if (typeof result === "object" && (result as ServiceTwoFactorChallenge).requiresTwoFactor) {
+        const challenge = result as ServiceTwoFactorChallenge;
+        const uiChallenge: TwoFactorChallengeUI = {
+          requiresTwoFactor: true,
+          email: challenge.email,
+          expiresAt: challenge.expiresAt,
+        };
+        console.log("AuthContext.login: Two-factor challenge returned", uiChallenge);
+        return uiChallenge;
+      }
+
+      // Otherwise normal login success; set user from stored profile if available
       const profile = authService.getStoredUser();
       console.log("AuthContext.login: Retrieved stored user profile", profile);
 
@@ -324,9 +346,35 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     return response.json();
   };
 
+  const verifyTwoFactor = async (code: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      await authService.verifyTwoFactor(code);
+      const profile = authService.getStoredUser();
+      if (profile) setUser(userProfileToUser(profile));
+      return true;
+    } catch (error) {
+      console.error("AuthContext.verifyTwoFactor: failed", error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendTwoFactorCode = async (): Promise<boolean> => {
+    try {
+      return await authService.resendTwoFactorCode();
+    } catch (error) {
+      console.error("AuthContext.resendTwoFactorCode: failed", error);
+      return false;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     login,
+    verifyTwoFactor,
+    resendTwoFactorCode,
     signup,
     logout,
     updateUserRole,
@@ -337,6 +385,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     refreshUser,
     apiCall,
   };
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

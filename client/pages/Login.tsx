@@ -27,6 +27,13 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [twoFactor, setTwoFactor] = useState<
+    | { requiresTwoFactor: true; email: string; expiresAt: string }
+    | null
+  >(null);
+  const [code, setCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
   // SEO for login page
   useSEO(location.pathname);
   const {
@@ -37,7 +44,7 @@ export default function Login() {
     toggleSidebar,
   } = useSidebar();
 
-  const { login } = useAuth();
+  const { login, verifyTwoFactor, resendTwoFactorCode } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,18 +55,26 @@ export default function Login() {
 
     try {
       console.log("Login.handleSubmit: Calling login with", { email });
-      const success = await login(email, password);
-      console.log("Login.handleSubmit: Login result:", success);
+      const result = await login(email, password);
+      console.log("Login.handleSubmit: Login result:", result);
 
-      if (success) {
+      if (result === true) {
         console.log(
           "Login.handleSubmit: Login successful, navigating to dashboard",
         );
         navigate("/dashboard");
-      } else {
-        console.log("Login.handleSubmit: Login failed, setting error");
-        setError("Invalid email or password. Please try again.");
+        return;
       }
+
+      if (typeof result === "object" && result && (result as any).requiresTwoFactor) {
+        console.log("Login.handleSubmit: Two-factor required", result);
+        setTwoFactor(result as { requiresTwoFactor: true; email: string; expiresAt: string });
+        setError("");
+        return;
+      }
+
+      console.log("Login.handleSubmit: Login failed, setting error");
+      setError("Invalid email or password. Please try again.");
     } catch (err) {
       console.error("Login.handleSubmit: Exception caught:", err);
       setError("An error occurred. Please try again.");
@@ -76,13 +91,42 @@ export default function Login() {
 
     try {
       const success = await login(demoEmail, demoPassword);
-      if (success) {
+      if (success === true) {
         navigate("/dashboard");
+      } else if (typeof success === "object" && success && (success as any).requiresTwoFactor) {
+        setTwoFactor(success as { requiresTwoFactor: true; email: string; expiresAt: string });
       }
     } catch (err) {
       setError("Demo login failed. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!twoFactor) return;
+    setIsVerifying(true);
+    setError("");
+    try {
+      const ok = await verifyTwoFactor(code.trim());
+      if (ok) {
+        navigate("/dashboard");
+      } else {
+        setError("Invalid or expired verification code. Please try again.");
+      }
+    } catch (err) {
+      setError("Verification failed. Please try again.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setError("");
+    const sent = await resendTwoFactorCode();
+    if (!sent) {
+      setError("Failed to resend code. Please wait a moment and try again.");
     }
   };
 
@@ -116,104 +160,139 @@ export default function Login() {
                   </Alert>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
+                {!twoFactor ? (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
                       <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Signing in..." : "Sign in"}
+                    </Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifySubmit} className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      We've sent a verification code to {twoFactor.email}. Enter it below to finish signing in.
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="code">Verification Code</Label>
+                      <Input
+                        id="code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="Enter the 6-digit code"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="submit" disabled={isVerifying} className="flex-1">
+                        {isVerifying ? "Verifying..." : "Verify"}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={handleResend}>
+                        Resend code
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={() => setTwoFactor(null)}>
+                        Back
                       </Button>
                     </div>
-                  </div>
+                  </form>
+                )}
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Signing in..." : "Sign in"}
-                  </Button>
-                </form>
+                {!twoFactor && (
+                  <>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Or try demo accounts
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or try demo accounts
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      handleDemoLogin("john.seeker@example.com", "Password123!")
-                    }
-                    disabled={isLoading}
-                    className="text-left justify-start"
-                  >
-                    Demo Job Seeker (john.seeker@example.com)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      handleDemoLogin(
-                        "sarah.recruiter@example.com",
-                        "Password123!",
-                      )
-                    }
-                    disabled={isLoading}
-                    className="text-left justify-start"
-                  >
-                    Demo Recruiter (sarah.recruiter@example.com)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      handleDemoLogin(
-                        "michael.business@example.com",
-                        "Password123!",
-                      )
-                    }
-                    disabled={isLoading}
-                    className="text-left justify-start"
-                  >
-                    Demo Employer (michael.business@example.com)
-                  </Button>
-                </div>
+                    <div className="grid gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          handleDemoLogin("john.seeker@example.com", "Password123!")
+                        }
+                        disabled={isLoading}
+                        className="text-left justify-start"
+                      >
+                        Demo Job Seeker (john.seeker@example.com)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          handleDemoLogin(
+                            "sarah.recruiter@example.com",
+                            "Password123!",
+                          )
+                        }
+                        disabled={isLoading}
+                        className="text-left justify-start"
+                      >
+                        Demo Recruiter (sarah.recruiter@example.com)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          handleDemoLogin(
+                            "michael.business@example.com",
+                            "Password123!",
+                          )
+                        }
+                        disabled={isLoading}
+                        className="text-left justify-start"
+                      >
+                        Demo Employer (michael.business@example.com)
+                      </Button>
+                    </div>
+                  </>
+                )}
 
                 <div className="text-center space-y-2">
                   <p className="text-sm text-muted-foreground">
