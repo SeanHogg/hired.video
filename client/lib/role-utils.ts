@@ -14,6 +14,7 @@ export const BACKEND_ROLE_VALUES = {
   JOB_SEEKER: 30,
   RECRUITER: 40,
   EMPLOYER: 20,
+  AFFILIATE: 50,
   ADMIN: 0,
   SUPER_ADMIN: -1,
 } as const;
@@ -23,6 +24,7 @@ export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
   [USER_ROLES.RECRUITER]: "Recruiter",
   [USER_ROLES.EMPLOYER]: "Employer",
+  [USER_ROLES.AFFILIATE]: "Affiliate",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
 } as const;
@@ -32,6 +34,7 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.JOB_SEEKER]: "Looking for job opportunities",
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
   [USER_ROLES.EMPLOYER]: "Managing company and hiring",
+  [USER_ROLES.AFFILIATE]: "Partner or affiliate marketer",
   [USER_ROLES.ADMIN]: "System administration",
   [USER_ROLES.SUPER_ADMIN]: "Full system control and product management",
 } as const;
@@ -68,6 +71,8 @@ export function normalizeRole(
         return USER_ROLES.RECRUITER;
       case BACKEND_ROLE_VALUES.EMPLOYER: // 20
         return USER_ROLES.EMPLOYER;
+      case BACKEND_ROLE_VALUES.AFFILIATE: // 50
+        return USER_ROLES.AFFILIATE;
       case BACKEND_ROLE_VALUES.ADMIN: // 0
         return USER_ROLES.ADMIN;
       case BACKEND_ROLE_VALUES.SUPER_ADMIN: // -1
@@ -88,6 +93,8 @@ export function normalizeRole(
       return USER_ROLES.RECRUITER;
     case "employer":
       return USER_ROLES.EMPLOYER;
+    case "affiliate":
+      return USER_ROLES.AFFILIATE;
     case "admin":
     case "administrator":
       return USER_ROLES.ADMIN;
