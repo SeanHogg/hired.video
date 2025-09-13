@@ -108,7 +108,7 @@ export default function ResumeBuilder({
   const [projects, setProjects] = useState<Project[]>(
     initialData?.Projects || [],
   );
-  const [awards, setAwards] = useState<Award[]>(initialData?.Awards || []);
+  const [awards, setAwards] = useState<AwardType[]>(initialData?.Awards || []);
   const [certificates, setCertificates] = useState<Certificate[]>(
     initialData?.Certificates || [],
   );
@@ -353,7 +353,7 @@ export default function ResumeBuilder({
 
   const updateAward = (
     index: number,
-    field: keyof Award,
+    field: keyof AwardType,
     value: string,
   ) => {
     const updatedAwards = [...awards];
