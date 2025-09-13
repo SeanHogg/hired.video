@@ -168,20 +168,20 @@ export default function EmbeddedResume() {
       <div className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {resume?.metaResume?.basics?.image && (
+            {resume?.data?.Basics?.Image && (
               <img
-                src={resume.metaResume.basics.image}
-                alt={resume.metaResume.basics?.name || "Profile"}
+                src={resume.data.Basics.Image}
+                alt={resume.data.Basics?.Name || "Profile"}
                 className="w-10 h-10 rounded-full object-cover"
               />
             )}
             <div>
               <h1 className="font-semibold text-lg">
-                {resume?.metaResume?.basics?.name || resume?.name || "Resume"}
+                {resume?.data?.Basics?.Name || resume?.name || "Resume"}
               </h1>
-              {resume?.metaResume?.basics?.label && (
+              {resume?.data?.Basics?.Label && (
                 <p className="text-sm text-muted-foreground">
-                  {resume.metaResume.basics.label}
+                  {resume.data.Basics.Label}
                 </p>
               )}
             </div>
@@ -195,7 +195,7 @@ export default function EmbeddedResume() {
 
       {/* Resume Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {resume && resume.metaResume ? (
+        {resume && resume.data ? (
           <div className="space-y-8">
             {/* Personal Information */}
             <Card>
