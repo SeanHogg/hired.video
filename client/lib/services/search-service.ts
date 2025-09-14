@@ -81,33 +81,135 @@ export class SearchService {
    * Search across all content types with unified pagination
    */
   async searchPublicContent(filters: SearchFilters): Promise<SearchResponse> {
+    // Build query parameters
+    const params = new URLSearchParams();
+
+    if (filters.search) params.append("search", filters.search);
+    if (filters.category && filters.category !== "all")
+      params.append("category", filters.category);
+    if (filters.location) params.append("location", filters.location);
+    if (filters.industry) params.append("industry", filters.industry);
+    if (filters.experienceLevel)
+      params.append("experienceLevel", filters.experienceLevel);
+    if (filters.employmentType)
+      params.append("employmentType", filters.employmentType);
+    if (filters.datePosted) params.append("datePosted", filters.datePosted);
+
+    params.append("page", filters.page.toString());
+    params.append("limit", filters.limit.toString());
+
+    // Prefer the unified Dashboard endpoint; fall back to legacy Search endpoint
+    const unifiedUrl = `/api/dashboard/search/public?${params.toString()}`;
+    const legacyUrl = `/api/search/public?${params.toString()}`;
+
+    // Helper schemas for legacy shape (jobs/companies paginated collections)
+    const LegacyJobItemSchema = z.object({
+      id: z.string(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      creationDateTimeFormatted: z.string().optional(),
+      views: z.number().optional(),
+      applications: z.number().optional(),
+      userId: z.string().optional(),
+      atsApplyUrl: z.string().optional(),
+    });
+
+    const LegacyCompanyItemSchema = z.object({
+      id: z.string(),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      industry: z.string().optional(),
+      location: z.string().optional(),
+      logo: z.string().optional(),
+      logoUrl: z.string().optional(),
+      creationDateTime: z.string().optional(),
+      views: z.number().optional(),
+    });
+
+    const PaginatedSchema = <T extends z.ZodTypeAny>(item: T) =>
+      z.object({
+        items: z.array(item).default([]),
+        total: z.number().default(0),
+        page: z.number().default(1),
+        limit: z.number().default(0),
+      });
+
+    const LegacySearchSchema = z.object({
+      jobs: PaginatedSchema(LegacyJobItemSchema),
+      companies: PaginatedSchema(LegacyCompanyItemSchema).optional(),
+    });
+
     try {
-      // Build query parameters
-      const params = new URLSearchParams();
-
-      if (filters.search) params.append("search", filters.search);
-      if (filters.category && filters.category !== "all")
-        params.append("category", filters.category);
-      if (filters.location) params.append("location", filters.location);
-      if (filters.industry) params.append("industry", filters.industry);
-      if (filters.experienceLevel)
-        params.append("experienceLevel", filters.experienceLevel);
-      if (filters.employmentType)
-        params.append("employmentType", filters.employmentType);
-      if (filters.datePosted) params.append("datePosted", filters.datePosted);
-
-      params.append("page", filters.page.toString());
-      params.append("limit", filters.limit.toString());
-
+      // First try unified search
       const response = await apiClient.get<SearchResponse>(
-        `/api/search/public?${params.toString()}`,
+        unifiedUrl,
         SearchResponseSchema,
       );
-
       return response.data;
-    } catch (error) {
-      console.error("Failed to search public content:", error);
-      throw error;
+    } catch (unifiedError) {
+      // Fallback: try legacy public search and normalize to SearchResponse
+      try {
+        const legacyResponse = await apiClient.get<z.infer<typeof LegacySearchSchema>>(
+          legacyUrl,
+          LegacySearchSchema,
+        );
+        const legacy = legacyResponse.data;
+
+        const items: SearchResultItem[] = [
+          // Map jobs to unified items
+          ...legacy.jobs.items.map((j) => ({
+            id: j.id,
+            type: "job" as const,
+            title: j.title || "Untitled Job",
+            summary: j.description || "",
+            postedDate: j.creationDateTimeFormatted,
+            createdAt: j.creationDateTimeFormatted,
+            views: j.views ?? 0,
+          })),
+          // Map companies if present
+          ...((legacy.companies?.items || []).map((c) => ({
+            id: c.id,
+            type: "company" as const,
+            title: c.name || "Unnamed Company",
+            name: c.name || "Unnamed Company",
+            summary: c.description || "",
+            description: c.description || "",
+            industry: c.industry,
+            location: c.location,
+            logo: c.logo || c.logoUrl,
+            createdAt: c.creationDateTime,
+            views: c.views ?? 0,
+          })) || []),
+        ];
+
+        const total = (legacy.jobs.total ?? 0) + (legacy.companies?.total ?? 0);
+        const page = Math.max(legacy.jobs.page ?? 1, legacy.companies?.page ?? 1);
+        const limit = Math.max(
+          legacy.jobs.limit ?? 0,
+          legacy.companies?.limit ?? 0,
+        );
+        const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
+
+        const normalized: SearchResponse = {
+          items,
+          total,
+          page,
+          limit: limit || (filters.limit || 20),
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        };
+
+        // Validate final shape to be safe
+        const validated = SearchResponseSchema.parse(normalized);
+        return validated;
+      } catch (legacyError) {
+        console.error("Failed to search public content (both unified and legacy):", {
+          unifiedError,
+          legacyError,
+        });
+        throw legacyError;
+      }
     }
   }
 
