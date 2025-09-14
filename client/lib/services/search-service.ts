@@ -5,6 +5,8 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { userService, type PaginatedPublicUsers } from "./user-service";
+import { resumeService, type PaginatedResumes } from "./resume-service";
 
 // ============================================================================
 // SCHEMAS
@@ -139,78 +141,130 @@ export class SearchService {
       companies: PaginatedSchema(LegacyCompanyItemSchema).optional(),
     });
 
-    try {
-      // First try unified search
-      const response = await apiClient.get<SearchResponse>(
-        unifiedUrl,
-        SearchResponseSchema,
-      );
-      return response.data;
-    } catch (unifiedError) {
-      // Fallback: try legacy public search and normalize to SearchResponse
+    // Feature flag: disable unified dashboard endpoint while it's returning 500s
+    const preferUnified = false;
+
+    if (preferUnified) {
       try {
-        const legacyResponse = await apiClient.get<z.infer<typeof LegacySearchSchema>>(
-          legacyUrl,
-          LegacySearchSchema,
+        // Try unified search ONCE (no retries) to avoid 4x 500s due to auto-retry
+        const response = await apiClient.request<SearchResponse>(
+          unifiedUrl,
+          { method: "GET", retries: 0 },
+          SearchResponseSchema,
         );
-        const legacy = legacyResponse.data;
-
-        const items: SearchResultItem[] = [
-          // Map jobs to unified items
-          ...legacy.jobs.items.map((j) => ({
-            id: j.id,
-            type: "job" as const,
-            title: j.title || "Untitled Job",
-            summary: j.description || "",
-            postedDate: j.creationDateTimeFormatted,
-            createdAt: j.creationDateTimeFormatted,
-            views: j.views ?? 0,
-          })),
-          // Map companies if present
-          ...((legacy.companies?.items || []).map((c) => ({
-            id: c.id,
-            type: "company" as const,
-            title: c.name || "Unnamed Company",
-            name: c.name || "Unnamed Company",
-            summary: c.description || "",
-            description: c.description || "",
-            industry: c.industry,
-            location: c.location,
-            logo: c.logo || c.logoUrl,
-            createdAt: c.creationDateTime,
-            views: c.views ?? 0,
-          })) || []),
-        ];
-
-        const total = (legacy.jobs.total ?? 0) + (legacy.companies?.total ?? 0);
-        const page = Math.max(legacy.jobs.page ?? 1, legacy.companies?.page ?? 1);
-        const limit = Math.max(
-          legacy.jobs.limit ?? 0,
-          legacy.companies?.limit ?? 0,
-        );
-        const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
-
-        const normalized: SearchResponse = {
-          items,
-          total,
-          page,
-          limit: limit || (filters.limit || 20),
-          totalPages,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1,
-        };
-
-        // Validate final shape to be safe
-        const validated = SearchResponseSchema.parse(normalized);
-        return validated;
-      } catch (legacyError) {
-        console.error("Failed to search public content (both unified and legacy):", {
-          unifiedError,
-          legacyError,
-        });
-        throw legacyError;
+        return response.data;
+      } catch (unifiedError) {
+        // Fall through to legacy normalization
+        console.warn("Unified search failed; falling back to legacy public search.", unifiedError);
       }
     }
+
+    // Legacy public search and normalize to unified SearchResponse
+    const legacyResponse = await apiClient.get<z.infer<typeof LegacySearchSchema>>(
+      legacyUrl,
+      LegacySearchSchema,
+    );
+    const legacy = legacyResponse.data;
+
+    // Pull additional people and resumes to enrich homepage content
+    const [publicUsers, publicResumes] = await Promise.all([
+      // People
+      userService
+        .getPublicUsers({ page: filters.page, limit: filters.limit })
+        .catch(() => ({ items: [], total: 0 } as PaginatedPublicUsers)),
+      // Resumes
+      resumeService
+        .getPublicResumes(filters.page, filters.limit)
+        .catch(() => ({ items: [], total: 0 } as PaginatedResumes)),
+    ]);
+
+    const items: SearchResultItem[] = [
+      // Jobs
+      ...legacy.jobs.items.map((j) => ({
+        id: j.id,
+        type: "job" as const,
+        title: j.title || "Untitled Job",
+        summary: j.description || "",
+        postedDate: j.creationDateTimeFormatted,
+        createdAt: j.creationDateTimeFormatted,
+        views: j.views ?? 0,
+      })),
+      // Companies
+      ...((legacy.companies?.items || []).map((c) => ({
+        id: c.id,
+        type: "company" as const,
+        title: c.name || "Unnamed Company",
+        name: c.name || "Unnamed Company",
+        summary: c.description || "",
+        description: c.description || "",
+        industry: c.industry,
+        location: c.location,
+        logo: c.logo || c.logoUrl,
+        createdAt: c.creationDateTime,
+        views: c.views ?? 0,
+      })) || []),
+      // People (Public Users)
+      ...((publicUsers.items || []).map((u) => ({
+        id: (u as any).id || "",
+        type: "people" as const,
+        title: (u as any).fullName || "",
+        name: (u as any).fullName || "",
+        headline: (u as any).headline || undefined,
+        summary: (u as any).headline || undefined,
+        avatar: (u as any).avatar || undefined,
+        location: (u as any).location || undefined,
+        views: (u as any).profileViews || 0,
+        createdAt: (u as any).createdAt || undefined,
+      })) as SearchResultItem[]),
+      // Resumes
+      ...((publicResumes.items || []).map((r) => ({
+        id: (r as any).id || "",
+        type: "resume" as const,
+        title: (r as any).title || (r as any).name || "Untitled Resume",
+        name: (r as any).name || (r as any).title || "Untitled Resume",
+        summary: (r as any).summary || (r as any).description || "",
+        location: (r as any).location || undefined,
+        createdAt:
+          (r as any).creationDateTimeFormatted || (r as any).createdAt || undefined,
+        views: (r as any).views || 0,
+        isPublic: (r as any).isPublic ?? true,
+      })) as SearchResultItem[]),
+    ];
+
+    const jobsTotal = legacy.jobs.total ?? 0;
+    const companiesTotal = legacy.companies?.total ?? 0;
+    const peopleTotal = (publicUsers.total as number) || 0;
+    // PaginatedResumes may not include total; fall back to length
+    const resumesTotal =
+      (publicResumes.total as number) || (publicResumes.items?.length ?? 0);
+
+    const total = jobsTotal + companiesTotal + peopleTotal + resumesTotal;
+    const page = Math.max(
+      legacy.jobs.page ?? 1,
+      legacy.companies?.page ?? 1,
+      (publicUsers.page as number) || 1,
+      (publicResumes.page as number) || 1,
+    );
+    const limit = Math.max(
+      legacy.jobs.limit ?? 0,
+      legacy.companies?.limit ?? 0,
+      (publicUsers.limit as number) || 0,
+      (publicResumes.limit as number) || 0,
+      filters.limit || 0,
+    );
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
+
+    const normalized: SearchResponse = {
+      items,
+      total,
+      page,
+      limit: limit || (filters.limit || 20),
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    };
+
+    return SearchResponseSchema.parse(normalized);
   }
 
   /**
