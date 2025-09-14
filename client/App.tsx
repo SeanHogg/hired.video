@@ -219,6 +219,7 @@ const App = () => (
                         element={<ResumeEditPage />}
                       />
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
+	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />
                       <Route path="/jobs/create" element={<JobCreatePage />} />
                       <Route

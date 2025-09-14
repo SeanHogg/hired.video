@@ -43,12 +43,17 @@ export default function EmbeddedResume() {
       let userData: UserProfile | null = null;
       let resumeData: Resume | null = null;
 
-      if (isUUID) {
-        // Try to get resume by ID first (most likely case for embedded resumes)
+      // First attempt: use the embed endpoint which bypasses auth/privacy
+      try {
+        resumeData = await resumeService.getResumeForEmbed(identifier);
+      } catch (err) {
+        console.log("Embedded endpoint failed, will try fallback logic", err);
+      }
+
+      if (!resumeData && isUUID) {
         try {
           resumeData = await resumeService.getResumeById(identifier);
           if (resumeData) {
-            // Get the user who owns this resume
             try {
               userData = await userService.getUserById(resumeData.userId);
             } catch (err) {
@@ -59,16 +64,12 @@ export default function EmbeddedResume() {
           }
         } catch (err) {
           console.log("Failed to get resume by ID:", err);
-          setError("Resume not found");
-          setLoading(false);
-          return;
         }
-      } else {
-        // If not a UUID, try to get user by slug and then their default resume
+      } else if (!resumeData) {
+        // If not a UUID and embed endpoint failed, try to derive via user slug
         try {
           userData = await userService.getUserBySlug(identifier);
           if (userData) {
-            // Try to get user's default resume
             try {
               const userResumes = await resumeService.getUserResumes();
               const defaultResume =
@@ -88,9 +89,6 @@ export default function EmbeddedResume() {
           }
         } catch (err) {
           console.log("Failed to get user by slug:", err);
-          setError("User not found");
-          setLoading(false);
-          return;
         }
       }
 
@@ -164,34 +162,7 @@ export default function EmbeddedResume() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with Share Button */}
-      <div className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {resume?.data?.Basics?.Image && (
-              <img
-                src={resume.data.Basics.Image}
-                alt={resume.data.Basics?.Name || "Profile"}
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            )}
-            <div>
-              <h1 className="font-semibold text-lg">
-                {resume?.data?.Basics?.Name || resume?.name || "Resume"}
-              </h1>
-              {resume?.data?.Basics?.Label && (
-                <p className="text-sm text-muted-foreground">
-                  {resume.data.Basics.Label}
-                </p>
-              )}
-            </div>
-          </div>
-          <Button onClick={handleShare} variant="outline" size="sm">
-            <Share2 className="w-4 h-4 mr-2" />
-            Share
-          </Button>
-        </div>
-      </div>
+
 
       {/* Resume Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">

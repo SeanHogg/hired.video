@@ -417,6 +417,18 @@ export class ResumeService {
     return this.transformApiResumeToResume(response.data);
   }
 
+	  /**
+	   * Get resume for embedding (server bypasses privacy checks for this endpoint)
+	   */
+	  async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
+	    const response = await apiClient.get<any>(
+	      `/api/Resume/embedded/${identifier}`,
+	      z.any(),
+	    );
+	    return this.transformApiResumeToResume(response.data);
+	  }
+
+
   /**
    * Create new resume from CreateResumeRequest
    */
