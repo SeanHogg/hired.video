@@ -30,7 +30,7 @@ interface Message {
 }
 
 export default function AIChatPanel() {
-  const { isAIChatOpen, closeAIChat } = useAI();
+  const { isAIChatOpen, closeAIChat, currentContext } = useAI();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -144,7 +144,7 @@ export default function AIChatPanel() {
             <div>
               <h3 className="font-semibold">AI HR Assistant</h3>
               <p className="text-xs text-muted-foreground">
-                Always here to help
+                {currentContext?.hint || "Always here to help"}
               </p>
             </div>
           </div>

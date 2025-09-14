@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   FileImage,
   Plus,
+  Brain,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -44,6 +45,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
+import { useAI, type AIContextPayload } from "@/lib/ai-context";
 
 
 // Job creation form schema
@@ -97,7 +99,7 @@ const jobCreateSchema = z.object({
 type JobCreateForm = z.infer<typeof jobCreateSchema>;
 
 // Types for different input methods
-type JobCreationMethod = "manual" | "excel" | "document";
+type JobCreationMethod = "manual" | "excel" | "document" | "ai";
 
 interface ParsedJobData {
   title: string;
@@ -133,6 +135,7 @@ export default function JobCreatePage() {
     toggleSidebar,
   } = useSidebar();
   const { user, isAuthenticated, apiCall } = useAuth();
+  const { openAIWithContext } = useAI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [excelError, setExcelError] = useState<string | null>(null);
@@ -504,12 +507,23 @@ export default function JobCreatePage() {
             {/* Input Method Tabs */}
             <Tabs
               value={activeMethod}
-              onValueChange={(value) =>
-                setActiveMethod(value as JobCreationMethod)
-              }
+              onValueChange={(value) => {
+                const method = value as JobCreationMethod;
+                setActiveMethod(method);
+                if (method === "ai") {
+                  const payload: AIContextPayload<JobCreateForm> = {
+                    source: "jobs.create",
+                    task: "open_panel",
+                    hint: "Use AI to help complete this job posting",
+                    target: { type: "section", formId: "jobs.create" },
+                    meta: watchedValues,
+                  };
+                  openAIWithContext(payload);
+                }
+              }}
               className="mb-8"
             >
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="manual" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Manual Entry
@@ -524,6 +538,10 @@ export default function JobCreatePage() {
                 >
                   <Upload className="h-4 w-4" />
                   Document Upload
+                </TabsTrigger>
+                <TabsTrigger value="ai" className="flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Use AI
                 </TabsTrigger>
               </TabsList>
 
@@ -700,6 +718,43 @@ export default function JobCreatePage() {
                         </Card>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Use AI Tab */}
+              <TabsContent value="ai" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5" />
+                      Use AI
+                    </CardTitle>
+                    <CardDescription>
+                      Open the AI side panel to generate or refine parts of this job posting.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const payload: AIContextPayload<JobCreateForm> = {
+                          source: "jobs.create",
+                          task: "open_panel",
+                          hint: "Use AI to help complete this job posting",
+                          target: { type: "section", formId: "jobs.create" },
+                          meta: watchedValues,
+                        };
+                        openAIWithContext(payload);
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Brain className="h-4 w-4" />
+                      Open AI Side Panel
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      The AI receives your current form values as context and can populate fields for you.
+                    </p>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -897,7 +952,30 @@ export default function JobCreatePage() {
 
                       {/* Job Description */}
                       <div className="space-y-2">
-                        <Label htmlFor="description">Job Description *</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="description">Job Description *</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const payload: AIContextPayload<JobCreateForm> = {
+                                source: "jobs.create",
+                                task: "generate_job_description",
+                                hint: "AI will draft a compelling Job Description",
+                                target: {
+                                  type: "form-field",
+                                  formId: "jobs.create",
+                                  field: "description",
+                                },
+                                meta: watchedValues,
+                              };
+                              openAIWithContext(payload);
+                            }}
+                          >
+                            Use AI
+                          </Button>
+                        </div>
                         <Textarea
                           id="description"
                           placeholder="Provide a detailed description of the role, responsibilities, and what makes this opportunity exciting..."
@@ -918,9 +996,32 @@ export default function JobCreatePage() {
 
                       {/* Requirements */}
                       <div className="space-y-2">
-                        <Label htmlFor="requirements">
-                          Requirements (Optional)
-                        </Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="requirements">
+                            Requirements (Optional)
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const payload: AIContextPayload<JobCreateForm> = {
+                                source: "jobs.create",
+                                task: "generate_requirements",
+                                hint: "AI will suggest clear, well-structured requirements",
+                                target: {
+                                  type: "form-field",
+                                  formId: "jobs.create",
+                                  field: "requirements",
+                                },
+                                meta: watchedValues,
+                              };
+                              openAIWithContext(payload);
+                            }}
+                          >
+                            Use AI
+                          </Button>
+                        </div>
                         <Textarea
                           id="requirements"
                           placeholder="List the key requirements, one per line:&#10;• Bachelor's degree in Computer Science&#10;• 3+ years of React experience&#10;• Strong communication skills"
