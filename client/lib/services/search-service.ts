@@ -100,8 +100,7 @@ export class SearchService {
     params.append("page", filters.page.toString());
     params.append("limit", filters.limit.toString());
 
-    // Prefer the unified Dashboard endpoint; fall back to legacy Search endpoint
-    const unifiedUrl = `/api/dashboard/search/public?${params.toString()}`;
+    // Use the working public search endpoint (legacy) and normalize to unified SearchResponse
     const legacyUrl = `/api/search/public?${params.toString()}`;
 
     // Helper schemas for legacy shape (jobs/companies paginated collections)
@@ -140,24 +139,6 @@ export class SearchService {
       jobs: PaginatedSchema(LegacyJobItemSchema),
       companies: PaginatedSchema(LegacyCompanyItemSchema).optional(),
     });
-
-    // Feature flag: disable unified dashboard endpoint while it's returning 500s
-    const preferUnified = false;
-
-    if (preferUnified) {
-      try {
-        // Try unified search ONCE (no retries) to avoid 4x 500s due to auto-retry
-        const response = await apiClient.request<SearchResponse>(
-          unifiedUrl,
-          { method: "GET", retries: 0 },
-          SearchResponseSchema,
-        );
-        return response.data;
-      } catch (unifiedError) {
-        // Fall through to legacy normalization
-        console.warn("Unified search failed; falling back to legacy public search.", unifiedError);
-      }
-    }
 
     // Legacy public search and normalize to unified SearchResponse
     const legacyResponse = await apiClient.get<z.infer<typeof LegacySearchSchema>>(
