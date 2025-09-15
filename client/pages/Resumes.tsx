@@ -81,6 +81,16 @@ import {
   ResumePrivacy,
   ResumeSearchFilters,
 } from "@/types/resume";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Resumes() {
   const location = useLocation();
@@ -134,6 +144,12 @@ export default function Resumes() {
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(
     new Set(),
   );
+
+  // Delete confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null }>({
+    open: false,
+    target: null,
+  });
 
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
@@ -466,7 +482,7 @@ export default function Resumes() {
     if (resume) {
       const item = {
         id: resume.id,
-        ownerId: user?.id,
+        ownerId: resume.userId,
         type: "resume" as const,
         contentType: "text" as const,
         ...resume,
@@ -496,11 +512,46 @@ export default function Resumes() {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleDelete = (item: ResumeWithOwnership) => {
-    // Remove from local state (in real app, this would be an API call)
-    setResumes(resumes.filter((r) => r.id !== item.id));
-    setSuccessMessage("Resume deleted successfully!");
-    setTimeout(() => setSuccessMessage(null), 3000);
+  const handleDelete = async (item: ResumeWithOwnership) => {
+    // Optimistic update: remove from UI immediately
+    const prevResumes = [...resumes];
+    const prevGroups = [...masterResumeGroups];
+    const nextResumes = prevResumes.filter((r) => r.id !== item.id);
+
+    // Also remove from master groups if present
+    const nextGroups = prevGroups.map((g) => ({
+      ...g,
+      variations: g.variations.filter((v) => v.id !== item.id),
+      masterResume:
+        g.masterResume.id === item.id
+          ? { ...g.masterResume, deletedAt: new Date().toISOString() } // marker; list filters by ids
+          : g.masterResume,
+    }));
+
+    setResumes(nextResumes);
+    optimisticActions.updateState({ resumes: nextResumes, masterGroups: nextGroups });
+
+    try {
+      await resumeService.deleteResume(item.id);
+      toast({ title: "Deleted", description: "Resume deleted successfully." });
+
+      // If we deleted a master in collections view, reload groups from server
+      await loadResumes();
+    } catch (err) {
+      console.error("Failed to delete resume", err);
+      // Rollback optimistic change
+      setResumes(prevResumes);
+      optimisticActions.updateState({ resumes: prevResumes, masterGroups: prevGroups });
+
+      // Friendly error message
+      toast({
+        title: "Delete failed",
+        description:
+          (err as Error)?.message ||
+          "Could not delete resume. If this is a master with variations, delete variations first.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleTrack = async (item: ResumeWithOwnership) => {
@@ -1254,7 +1305,9 @@ export default function Resumes() {
                         onEditResume={(id) => navigate(`/resumes/edit/${id}`)}
                         onDeleteResume={(resumeId) => {
                           const resume = displayResumes.find(r => r.id === resumeId);
-                          if (resume) handleDelete(resume);
+                          if (resume) {
+                            setDeleteDialog({ open: true, target: resume });
+                          }
                         }}
                         onTrackResume={(resumeId) => {
                           const resume = displayResumes.find(r => r.id === resumeId);
@@ -1493,9 +1546,39 @@ export default function Resumes() {
         onDownload={() =>
           actionsModal.item && handleDownload(actionsModal.item)
         }
-        onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
+        onDelete={() =>
+          actionsModal.item && setDeleteDialog({ open: true, target: actionsModal.item })
+        }
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
       />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => {
+        if (!open) setDeleteDialog({ open: false, target: null });
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete resume?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog.target ? `Are you sure you want to delete “${deleteDialog.target.name}”? This action cannot be undone.` : "This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteDialog({ open: false, target: null })}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={async () => {
+                if (deleteDialog.target) {
+                  await handleDelete(deleteDialog.target);
+                }
+                setDeleteDialog({ open: false, target: null });
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create Variation Dialog */}
       <CreateVariationDialog
