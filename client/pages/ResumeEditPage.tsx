@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import type { Resume, UpdateResumeRequest } from "@/types/resume";
 
 export default function ResumeEditPage() {
@@ -22,6 +23,7 @@ export default function ResumeEditPage() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,15 +58,29 @@ export default function ResumeEditPage() {
     loadResume();
   }, [id, navigate]);
 
-  const handleUpdateResume = (request: UpdateResumeRequest) => {
-    if (resume) {
-      // In a real app, this would update the backend
-      const updatedResume = { ...resume, ...request };
-      setResume(updatedResume);
+  const handleUpdateResume = async (request: UpdateResumeRequest) => {
+    if (!resume) return;
 
-      // Navigate back to view mode
-      navigate(`/resumes/${resume.id}`);
+    // Handle privacy change immediately via backend API, but do not navigate away
+    if (request.privacy && request.privacy !== resume.privacy) {
+      const previous = resume.privacy;
+      // Optimistic UI update
+      setResume({ ...resume, privacy: request.privacy });
+      try {
+        const ok = await resumeService.setResumePrivacy(resume.id, request.privacy);
+        if (!ok) throw new Error("Server rejected privacy change");
+        toast({ title: "Visibility updated", description: `Set to ${request.privacy.replace("_", " ")}.` });
+      } catch (err) {
+        // Revert on failure
+        setResume({ ...resume, privacy: previous });
+        toast({ title: "Failed to update visibility", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+      }
+      return;
     }
+
+    // For other updates (name/data), keep user on this page; no redirect
+    const updatedResume = { ...resume, ...request };
+    setResume(updatedResume);
   };
 
   const handleCancel = () => {
