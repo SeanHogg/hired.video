@@ -1565,25 +1565,27 @@ export default function Resumes() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={promoteDialog.submitting} onClick={() => setPromoteDialog({ open: false, target: null, submitting: false })}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
-                if (!promoteDialog.target || promoteDialog.submitting) return;
-                setPromoteDialog((s) => ({ ...s, submitting: true }));
-                try {
-                  const ok = await resumeService.promoteVariantToMaster(promoteDialog.target.id);
-                  if (ok) {
-                    toast({ title: "Promoted", description: "Variation promoted to a new Master Resume." });
-                    await loadResumes();
-                  } else {
-                    toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+              onClick={() => {
+                if (!promoteDialog.target) return;
+                const id = promoteDialog.target.id;
+                // Close dialog immediately to avoid any lingering overlays blocking the UI
+                setPromoteDialog({ open: false, target: null, submitting: false });
+                (async () => {
+                  try {
+                    const ok = await resumeService.promoteVariantToMaster(id);
+                    if (ok) {
+                      toast({ title: "Promoted", description: "Variation promoted to a new Master Resume." });
+                      await loadResumes();
+                    } else {
+                      toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+                    }
+                  } catch (e) {
+                    toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
                   }
-                } catch (e) {
-                  toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
-                } finally {
-                  setPromoteDialog({ open: false, target: null, submitting: false });
-                }
+                })();
               }}
             >
-              {promoteDialog.submitting ? "Promoting..." : "Promote"}
+              Promote
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
