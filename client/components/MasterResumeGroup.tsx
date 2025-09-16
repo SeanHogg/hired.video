@@ -23,6 +23,7 @@ interface MasterResumeGroupProps {
   onEditResume: (resumeId: string) => void;
   onDeleteResume: (resumeId: string) => void;
   onTrackResume?: (resumeId: string) => void;
+  onPromoteVariant?: (resumeId: string) => void;
 }
 
 export default function MasterResumeGroupComponent({
@@ -35,6 +36,7 @@ export default function MasterResumeGroupComponent({
   onEditResume,
   onDeleteResume,
   onTrackResume,
+  onPromoteVariant,
 }: MasterResumeGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -251,6 +253,10 @@ export default function MasterResumeGroupComponent({
                               Set as Active
                             </DropdownMenuItem>
                           )}
+                          {/* Promote variant to independent master */}
+                          <DropdownMenuItem onClick={() => onPromoteVariant && onPromoteVariant(variation.id)}>
+                            Promote to Master
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onDeleteResume(variation.id)}
                             className="text-red-600"

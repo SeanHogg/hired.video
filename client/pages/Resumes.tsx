@@ -149,6 +149,13 @@ export default function Resumes() {
     target: null,
   });
 
+  // Promote to Master confirmation dialog state
+  const [promoteDialog, setPromoteDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null; submitting: boolean }>({
+    open: false,
+    target: null,
+    submitting: false,
+  });
+
   // Actions modal state
   const [actionsModal, setActionsModal] = useState<{
     isOpen: boolean;
@@ -1259,6 +1266,12 @@ export default function Resumes() {
                           const resume = displayResumes.find(r => r.id === resumeId);
                           if (resume) handleTrack(resume);
                         }}
+                        onPromoteVariant={(variantId) => {
+                          const resume = displayResumes.find(r => r.id === variantId);
+                          if (resume) {
+                            setPromoteDialog({ open: true, target: resume, submitting: false });
+                          }
+                        }}
                       />
                     ))}
                   </div>
@@ -1533,6 +1546,44 @@ export default function Resumes() {
               }}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Promote to Master Confirmation */}
+      <AlertDialog open={promoteDialog.open} onOpenChange={(open) => {
+        if (!open && !promoteDialog.submitting) setPromoteDialog({ open: false, target: null, submitting: false });
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promote to Master?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {promoteDialog.target ? `This will convert “${promoteDialog.target.name}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?` : "Proceed to promote this variant to a new Master Resume?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={promoteDialog.submitting} onClick={() => setPromoteDialog({ open: false, target: null, submitting: false })}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!promoteDialog.target || promoteDialog.submitting) return;
+                setPromoteDialog((s) => ({ ...s, submitting: true }));
+                try {
+                  const ok = await resumeService.promoteVariantToMaster(promoteDialog.target.id);
+                  if (ok) {
+                    toast({ title: "Promoted", description: "Variation promoted to a new Master Resume." });
+                    await loadResumes();
+                  } else {
+                    toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+                  }
+                } catch (e) {
+                  toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+                } finally {
+                  setPromoteDialog({ open: false, target: null, submitting: false });
+                }
+              }}
+            >
+              {promoteDialog.submitting ? "Promoting..." : "Promote"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
