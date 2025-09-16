@@ -122,7 +122,7 @@ export interface ResumeData {
   };
 }
 
-export type ResumePrivacy = "public" | "recruiter_only" | "private" | "draft";
+export type ResumePrivacy = "public" | "recruiter_only" | "connections" | "private" | "draft";
 
 export interface Resume {
   id: string;

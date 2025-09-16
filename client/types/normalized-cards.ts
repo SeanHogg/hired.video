@@ -126,7 +126,7 @@ export interface NormalizedResumeData extends BaseCardData {
   name: string;
   title?: string;
   summary: string;
-  privacy: "public" | "recruiter_only" | "private" | "draft";
+  privacy: "public" | "recruiter_only" | "connections" | "private" | "draft";
   status?: "active" | "draft" | "archived";
   isMaster?: boolean;
   isActive?: boolean;

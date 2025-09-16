@@ -50,6 +50,8 @@ export default function MasterResumeGroupComponent({
         return "bg-green-100 text-green-800";
       case "recruiter_only":
         return "bg-blue-100 text-blue-800";
+      case "connections":
+        return "bg-indigo-100 text-indigo-800";
       case "private":
         return "bg-gray-100 text-gray-800";
       case "draft":

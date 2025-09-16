@@ -418,8 +418,12 @@ export default function Resumes() {
     const targetId = actionsModal.item?.id;
     if (!targetId) return;
 
-    // Pre-compute which owned resumes will be demoted due to exclusivity
-    const demotedCandidates = displayResumes.filter(r => r.ownership === "owned" && r.id !== targetId && (privacy === "public" ? r.privacy === "public" : privacy === "recruiter_only" ? r.privacy === "recruiter_only" : false));
+    // Pre-compute which owned resumes will be demoted due to exclusivity (Public, Recruiter Only, Connections)
+    const demotedCandidates = displayResumes.filter(r => r.ownership === "owned" && r.id !== targetId && (
+      (privacy === "public" && r.privacy === "public") ||
+      (privacy === "recruiter_only" && r.privacy === "recruiter_only") ||
+      (privacy === "connections" && r.privacy === "connections")
+    ));
 
     // Optimistic update
     optimisticActions.setPrivacyOptimistic(targetId, privacy);

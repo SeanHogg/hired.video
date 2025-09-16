@@ -28,7 +28,7 @@ interface ResumeCardProps {
   summary: string;
   createdAt: string;
   views?: number;
-  privacy?: "public" | "recruiter_only" | "private" | "draft";
+  privacy?: "public" | "recruiter_only" | "connections" | "private" | "draft";
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
@@ -65,6 +65,8 @@ export default function ResumeCard({
         return <Globe className="w-3 h-3" />;
       case "recruiter_only":
         return <Users className="w-3 h-3" />;
+      case "connections":
+        return <Users className="w-3 h-3" />;
       case "private":
         return <Lock className="w-3 h-3" />;
       case "draft":
@@ -80,6 +82,8 @@ export default function ResumeCard({
         return "Public";
       case "recruiter_only":
         return "Recruiter Only";
+      case "connections":
+        return "Connections";
       case "private":
         return "Private";
       case "draft":
@@ -95,6 +99,8 @@ export default function ResumeCard({
         return "bg-green-100 text-green-800";
       case "recruiter_only":
         return "bg-blue-100 text-blue-800";
+      case "connections":
+        return "bg-indigo-100 text-indigo-800";
       case "private":
         return "bg-gray-100 text-gray-800";
       case "draft":

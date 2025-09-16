@@ -9,7 +9,7 @@ interface OptimisticState {
 interface OptimisticActions {
   setMasterOptimistic: (resumeId: string) => void;
   setActiveOptimistic: (resumeId: string) => void;
-  setPrivacyOptimistic: (resumeId: string, privacy: "public" | "recruiter_only" | "private" | "draft") => void;
+  setPrivacyOptimistic: (resumeId: string, privacy: "public" | "recruiter_only" | "connections" | "private" | "draft") => void;
   revertOptimistic: () => void;
   updateState: (newState: OptimisticState) => void;
 }
@@ -90,12 +90,12 @@ export function useOptimisticResumes(
     });
   }, []);
 
-  const setPrivacyOptimistic = useCallback((resumeId: string, privacy: "public" | "recruiter_only" | "private" | "draft") => {
+  const setPrivacyOptimistic = useCallback((resumeId: string, privacy: "public" | "recruiter_only" | "connections" | "private" | "draft") => {
     setState((prevState): OptimisticState => {
       // Store original state for potential revert
       setOriginalState(prevState);
 
-      // Enforce exclusivity for public and recruiter_only across all resumes
+      // Enforce exclusivity for public, recruiter_only, and connections across all resumes
       const updatedResumes: ResumeWithOwnership[] = prevState.resumes.map(resume => {
         if (resume.id === resumeId) {
           return { ...resume, privacy } as ResumeWithOwnership;
@@ -104,6 +104,9 @@ export function useOptimisticResumes(
           return { ...resume, privacy: "private" } as ResumeWithOwnership;
         }
         if (privacy === "recruiter_only" && resume.privacy === "recruiter_only") {
+          return { ...resume, privacy: "private" } as ResumeWithOwnership;
+        }
+        if (privacy === "connections" && resume.privacy === "connections") {
           return { ...resume, privacy: "private" } as ResumeWithOwnership;
         }
         return resume;
@@ -126,6 +129,9 @@ export function useOptimisticResumes(
               return { ...variation, privacy: "private" } as any;
             }
             if (privacy === "recruiter_only" && variation.privacy === "recruiter_only") {
+              return { ...variation, privacy: "private" } as any;
+            }
+            if (privacy === "connections" && variation.privacy === "connections") {
               return { ...variation, privacy: "private" } as any;
             }
             return variation;

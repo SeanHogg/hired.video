@@ -10,6 +10,8 @@ export function mapDisplayPrivacyToResumePrivacy(value: number): ResumePrivacy {
       return "public";
     case 1:
       return "recruiter_only";
+    case 2:
+      return "connections";
     case 10:
       return "private";
     default:
@@ -23,6 +25,8 @@ export function mapResumePrivacyToDisplayPrivacy(priv: ResumePrivacy): number {
       return 0;
     case "recruiter_only":
       return 1;
+    case "connections":
+      return 2;
     case "private":
     case "draft":
     default:

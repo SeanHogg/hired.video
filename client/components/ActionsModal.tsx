@@ -147,6 +147,16 @@ export default function ActionsModal({
         variant: "outline",
       });
       actions.push({
+        id: "privacy-connections",
+        label: "Connections",
+        icon: Users,
+        onClick: () => {
+          onChangePrivacy?.("connections");
+          onClose();
+        },
+        variant: "outline",
+      });
+      actions.push({
         id: "privacy-private",
         label: "Make Private",
         icon: Lock,

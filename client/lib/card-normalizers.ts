@@ -243,18 +243,18 @@ function determineOwnership(
 function normalizeResumePrivacy(
   item: RawApiItem,
   context: CardContext,
-): "public" | "recruiter_only" | "private" | "draft" {
+): "public" | "recruiter_only" | "connections" | "private" | "draft" {
   // Handle the inconsistency between "Latest Resumes" and "All" sections
   if (context.section === "latest") {
     return (
-      (item.privacy as "public" | "private" | "draft" | "recruiter_only") ||
+      (item.privacy as "public" | "private" | "draft" | "recruiter_only" | "connections") ||
       "public"
     );
   }
 
   // For "All" section, don't override with hardcoded "public"
   return (
-    (item.privacy as "public" | "private" | "draft" | "recruiter_only") ||
+    (item.privacy as "public" | "private" | "draft" | "recruiter_only" | "connections") ||
     "draft"
   );
 }

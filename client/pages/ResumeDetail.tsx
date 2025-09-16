@@ -195,6 +195,8 @@ export default function ResumeDetail() {
         return <Globe className="w-4 h-4" />;
       case "recruiter_only":
         return <Users className="w-4 h-4" />;
+      case "connections":
+        return <Users className="w-4 h-4" />;
       case "private":
         return <Lock className="w-4 h-4" />;
       default:
@@ -208,6 +210,8 @@ export default function ResumeDetail() {
         return "Public";
       case "recruiter_only":
         return "Recruiter Only";
+      case "connections":
+        return "Connections";
       case "private":
         return "Private";
       default:
