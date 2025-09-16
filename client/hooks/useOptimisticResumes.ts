@@ -9,6 +9,7 @@ interface OptimisticState {
 interface OptimisticActions {
   setMasterOptimistic: (resumeId: string) => void;
   setActiveOptimistic: (resumeId: string) => void;
+  setPrivacyOptimistic: (resumeId: string, privacy: "public" | "recruiter_only" | "private" | "draft") => void;
   revertOptimistic: () => void;
   updateState: (newState: OptimisticState) => void;
 }
@@ -61,27 +62,81 @@ export function useOptimisticResumes(
       // Store original state for potential revert
       setOriginalState(prevState);
 
+      // Only one active master at a time; variations inherit from master
       const updatedResumes = prevState.resumes.map(resume => ({
         ...resume,
         isActive: resume.id === resumeId ? true : false,
       }));
 
-      const updatedMasterGroups = prevState.masterGroups.map(group => ({
-        ...group,
-        masterResume: {
-          ...group.masterResume,
-          isActive: group.masterResume.id === resumeId ? true : false,
-        },
-        variations: group.variations.map(variation => ({
-          ...variation,
-          isActive: variation.id === resumeId ? true : false,
-        })),
-      }));
+      const updatedMasterGroups = prevState.masterGroups.map(group => {
+        const isTargetMaster = group.masterResume?.id === resumeId;
+        return {
+          ...group,
+          masterResume: group.masterResume ? {
+            ...group.masterResume,
+            isActive: isTargetMaster,
+          } : group.masterResume,
+          variations: group.variations.map(variation => ({
+            ...variation,
+            isActive: isTargetMaster ? true : false,
+          })),
+        };
+      });
 
       return {
         resumes: updatedResumes,
         masterGroups: updatedMasterGroups,
       };
+    });
+  }, []);
+
+  const setPrivacyOptimistic = useCallback((resumeId: string, privacy: "public" | "recruiter_only" | "private" | "draft") => {
+    setState((prevState): OptimisticState => {
+      // Store original state for potential revert
+      setOriginalState(prevState);
+
+      // Enforce exclusivity for public and recruiter_only across all resumes
+      const updatedResumes: ResumeWithOwnership[] = prevState.resumes.map(resume => {
+        if (resume.id === resumeId) {
+          return { ...resume, privacy } as ResumeWithOwnership;
+        }
+        if (privacy === "public" && resume.privacy === "public") {
+          return { ...resume, privacy: "private" } as ResumeWithOwnership;
+        }
+        if (privacy === "recruiter_only" && resume.privacy === "recruiter_only") {
+          return { ...resume, privacy: "private" } as ResumeWithOwnership;
+        }
+        return resume;
+      });
+
+      const updatedMasterGroups: MasterResumeGroup[] = prevState.masterGroups.map(group => {
+        const isTargetMaster = group.masterResume?.id === resumeId;
+        return {
+          ...group,
+          masterResume: group.masterResume ? {
+            ...group.masterResume,
+            privacy: isTargetMaster ? privacy : (group.masterResume.privacy as any),
+          } : group.masterResume,
+          variations: group.variations.map(variation => {
+            if (variation.id === resumeId) {
+              return { ...variation, privacy } as any;
+            }
+            // Demote others with same privacy when exclusivity applies
+            if (privacy === "public" && variation.privacy === "public") {
+              return { ...variation, privacy: "private" } as any;
+            }
+            if (privacy === "recruiter_only" && variation.privacy === "recruiter_only") {
+              return { ...variation, privacy: "private" } as any;
+            }
+            return variation;
+          }),
+        } as MasterResumeGroup;
+      });
+
+      return {
+        resumes: updatedResumes,
+        masterGroups: updatedMasterGroups,
+      } as OptimisticState;
     });
   }, []);
 
@@ -99,6 +154,7 @@ export function useOptimisticResumes(
     {
       setMasterOptimistic,
       setActiveOptimistic,
+      setPrivacyOptimistic,
       revertOptimistic,
       updateState,
     },

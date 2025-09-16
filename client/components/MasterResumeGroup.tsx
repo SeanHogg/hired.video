@@ -99,6 +99,9 @@ export default function MasterResumeGroupComponent({
                   {group.masterResume.name}
                 </Link>
               </CardTitle>
+              {group.masterResume.slug && (
+                <span className="text-xs text-muted-foreground">Slug: <span className="font-mono text-foreground">{group.masterResume.slug}</span></span>
+              )}
               {group.masterResume.isActive && (
                 <Badge variant="secondary" className="bg-green-100 text-green-800">
                   Active
@@ -205,6 +208,9 @@ export default function MasterResumeGroupComponent({
                           {variation.name}
                         </Link>
                       </h5>
+                      {variation.slug && (
+                        <span className="text-xs text-muted-foreground">Slug: <span className="font-mono text-foreground">{variation.slug}</span></span>
+                      )}
                       {variation.isActive && (
                         <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
                           Active

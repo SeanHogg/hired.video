@@ -22,6 +22,7 @@ import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface ResumeCardProps {
   id: string;
+  slug?: string;
   name: string;
   title?: string;
   summary: string;
@@ -41,6 +42,7 @@ interface ResumeCardProps {
 
 export default function ResumeCard({
   id,
+  slug,
   name,
   title,
   summary,
@@ -226,6 +228,9 @@ export default function ResumeCard({
               <span className="font-medium text-foreground">
                 {formatDate(createdAt)}
               </span>
+              {slug && (
+                <span className="ml-3 text-muted-foreground">Slug: <span className="font-mono text-foreground">{slug}</span></span>
+              )}
             </div>
 
             {views > 0 && (

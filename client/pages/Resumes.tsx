@@ -77,9 +77,7 @@ import type {
 import type { MasterResumeGroup } from "@/lib/services/resume-service";
 import { useOptimisticResumes } from "@/hooks/useOptimisticResumes";
 import {
-  ResumeMetadata,
   ResumePrivacy,
-  ResumeSearchFilters,
 } from "@/types/resume";
 import {
   AlertDialog,
@@ -166,25 +164,12 @@ export default function Resumes() {
     item: null,
   });
 
-  // Get user's resumes from API
-  const getUserResumes = async (): Promise<ResumeWithOwnership[]> => {
+  // Consolidated fetch
+  const getResumesForDisplay = async (): Promise<ResumeWithOwnership[]> => {
     try {
-      // Use the new API endpoint that includes ownership information
-      const resumesWithOwnership = await resumeService.getResumesWithOwnership();
-      return resumesWithOwnership;
+      return await resumeService.getResumesForDisplay();
     } catch (error) {
-      console.error("Error fetching user resumes:", error);
-      return [];
-    }
-  };
-
-  // Get master resume groups
-  const getMasterResumeGroups = async (): Promise<MasterResumeGroup[]> => {
-    try {
-      const groups = await resumeService.getMasterResumeGroups();
-      return groups;
-    } catch (error) {
-      console.error("Error fetching master resume groups:", error);
+      console.error("Error fetching resumes:", error);
       return [];
     }
   };
@@ -211,83 +196,10 @@ export default function Resumes() {
     setLoading(true);
     setError(null);
     try {
-      const [userResumes, masterGroups] = await Promise.all([
-        getUserResumes(),
-        getMasterResumeGroups(),
+      const [masterGroups, finalResumes] = await Promise.all([
+        resumeService.getMasterResumeGroups(),
+        getResumesForDisplay(),
       ]);
-
-      let finalResumes = userResumes;
-
-      // Helper function to map privacy numbers to strings
-      const mapPrivacyFromNumber = (privacyValue: number): "public" | "recruiter_only" | "private" | "draft" => {
-        switch (privacyValue) {
-          case 0: return "private";
-          case 1: return "public";
-          case 2: return "recruiter_only";
-          case 3: return "draft";
-          default: return "private";
-        }
-      };
-
-      // Helper function to extract summary from resume data
-      const extractSummary = (resumeSerialized?: string): string => {
-        try {
-          if (resumeSerialized) {
-            const resumeData = JSON.parse(resumeSerialized);
-            return resumeData?.Basics?.Summary || resumeData?.basics?.summary || "";
-          }
-        } catch (error) {
-          console.warn("Failed to parse resume data for summary:", error);
-        }
-        return "";
-      };
-
-      // If userResumes is empty but we have master groups, create resume entries from master groups
-      if (userResumes.length === 0 && masterGroups.length > 0) {
-        finalResumes = [];
-
-        for (const group of masterGroups) {
-          // Add master resume
-          if (group.masterResume) {
-            finalResumes.push({
-              id: group.masterResume.id || "",
-              slug: group.masterResume.slug || "",
-              name: group.masterResume.name || "",
-              privacy: mapPrivacyFromNumber(group.masterResume.privacy_ShowResume || 0),
-              isMaster: group.masterResume.isMaster || false,
-              isActive: group.masterResume.isActive || false,
-              parentId: group.masterResume.parentId || undefined,
-              createdAt: group.masterResume.creationDateTime || group.masterResume.createdAt || new Date().toISOString(),
-              updatedAt: group.masterResume.updateDateTime || group.masterResume.updatedAt || new Date().toISOString(),
-              views: group.masterResume.views || 0,
-              summary: extractSummary(group.masterResume.resumeSerialized),
-              title: group.masterResume.name || "",
-              userId: group.masterResume.userId || "",
-              ownership: "owned" as const,
-            });
-          }
-
-          // Add variations
-          for (const variation of group.variations) {
-            finalResumes.push({
-              id: variation.id || "",
-              slug: variation.slug || "",
-              name: variation.name || "",
-              privacy: mapPrivacyFromNumber(variation.privacy_ShowResume || 0),
-              isMaster: variation.isMaster || false,
-              isActive: variation.isActive || false,
-              parentId: variation.parentId || undefined,
-              createdAt: variation.creationDateTime || variation.createdAt || new Date().toISOString(),
-              updatedAt: variation.updateDateTime || variation.updatedAt || new Date().toISOString(),
-              views: variation.views || 0,
-              summary: extractSummary(variation.resumeSerialized),
-              title: variation.name || "",
-              userId: variation.userId || "",
-              ownership: "owned" as const,
-            });
-          }
-        }
-      }
 
       setResumes(finalResumes);
       setMasterResumeGroups(masterGroups);
@@ -295,7 +207,7 @@ export default function Resumes() {
       // Update optimistic state with fresh data
       optimisticActions.updateState({
         resumes: finalResumes,
-        masterGroups: masterGroups,
+        masterGroups,
       });
     } catch (error) {
       console.error("Failed to load resumes:", error);
@@ -310,8 +222,8 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const userResumes = await getUserResumes();
-      const resumeMetadata = userResumes.find((r) => r.id === resumeId);
+      const candidateResumes = await resumeService.getResumesForDisplay();
+      const resumeMetadata = candidateResumes.find((r) => r.id === resumeId);
       const mockResume: Resume = {
         id: resumeId,
         slug: resumeMetadata?.slug || "software-engineer-resume",
@@ -495,6 +407,42 @@ export default function Resumes() {
     setActionsModal({ isOpen: false, item: null });
   };
 
+  const handleChangePrivacy = async (privacy: ResumePrivacy) => {
+    const targetId = actionsModal.item?.id;
+    if (!targetId) return;
+
+    // Pre-compute which owned resumes will be demoted due to exclusivity
+    const demotedCandidates = displayResumes.filter(r => r.ownership === "owned" && r.id !== targetId && (privacy === "public" ? r.privacy === "public" : privacy === "recruiter_only" ? r.privacy === "recruiter_only" : false));
+
+    // Optimistic update
+    optimisticActions.setPrivacyOptimistic(targetId, privacy);
+
+    try {
+      const ok = await resumeService.setResumePrivacy(targetId, privacy);
+      if (!ok) throw new Error("Server rejected privacy change");
+
+      toast({
+        title: "Privacy updated",
+        description: demotedCandidates.length > 0
+          ? `${demotedCandidates.length} resume${demotedCandidates.length === 1 ? "" : "s"} set to Private due to exclusivity.`
+          : `Visibility set to ${privacy.replace("_", " ")}.`,
+      });
+
+      // Refresh from server to ensure consistency with backend rules
+      await loadResumes();
+    } catch (error) {
+      console.error("Failed to update privacy", error);
+      optimisticActions.revertOptimistic();
+      toast({
+        title: "Failed to update privacy",
+        description: (error as Error)?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      handleCloseActions();
+    }
+  };
+
   const handleShare = (item: ResumeWithOwnership) => {
     const shareUrl = `${window.location.origin}/resumes/${item.id}`;
     navigator.clipboard.writeText(shareUrl);
@@ -518,15 +466,13 @@ export default function Resumes() {
     const prevGroups = [...masterResumeGroups];
     const nextResumes = prevResumes.filter((r) => r.id !== item.id);
 
-    // Also remove from master groups if present
-    const nextGroups = prevGroups.map((g) => ({
-      ...g,
-      variations: g.variations.filter((v) => v.id !== item.id),
-      masterResume:
-        g.masterResume.id === item.id
-          ? { ...g.masterResume, deletedAt: new Date().toISOString() } // marker; list filters by ids
-          : g.masterResume,
-    }));
+    // Also remove from master groups if present; drop entire group if its master was deleted
+    const nextGroups = prevGroups
+      .filter((g) => g.masterResume.id !== item.id)
+      .map((g) => ({
+        ...g,
+        variations: g.variations.filter((v) => v.id !== item.id),
+      }));
 
     setResumes(nextResumes);
     optimisticActions.updateState({ resumes: nextResumes, masterGroups: nextGroups });
@@ -582,8 +528,8 @@ export default function Resumes() {
         });
       }
       // Refresh the resume list
-      const userResumes = await getUserResumes();
-      setResumes(userResumes);
+      const refreshed = await resumeService.getResumesForDisplay();
+      setResumes(refreshed);
     }
   };
 
@@ -1335,6 +1281,7 @@ export default function Resumes() {
                               <ResumeCard
                                 key={resume.id}
                                 id={resume.id}
+                                slug={resume.slug}
                                 name={resume.name}
                                 title={resume.title}
                                 summary={resume.summary}
@@ -1409,6 +1356,7 @@ export default function Resumes() {
                               <ResumeCard
                                 key={resume.id}
                                 id={resume.id}
+                                slug={resume.slug}
                                 name={resume.name}
                                 title={resume.title}
                                 summary={resume.summary}
@@ -1538,18 +1486,28 @@ export default function Resumes() {
               }
             : null
         }
-        onView={() =>
-          actionsModal.item && handleResumeView(actionsModal.item.id)
-        }
+        onView={() => actionsModal.item && handleResumeView(actionsModal.item.id)}
         onShare={() => actionsModal.item && handleShare(actionsModal.item)}
         onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
-        onDownload={() =>
-          actionsModal.item && handleDownload(actionsModal.item)
-        }
-        onDelete={() =>
-          actionsModal.item && setDeleteDialog({ open: true, target: actionsModal.item })
-        }
+        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
+        onDelete={() => actionsModal.item && setDeleteDialog({ open: true, target: actionsModal.item })}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+        onChangePrivacy={(p) => handleChangePrivacy(p)}
+        onPromoteToMaster={async () => {
+          const id = actionsModal.item?.id;
+          if (!id) return;
+          try {
+            const ok = await resumeService.promoteVariantToMaster(id);
+            if (ok) {
+              toast({ title: "Promoted", description: "Variant promoted to master." });
+              await loadResumes();
+            } else {
+              toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+            }
+          } catch (e) {
+            toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+          }
+        }}
       />
 
       {/* Delete Confirmation */}

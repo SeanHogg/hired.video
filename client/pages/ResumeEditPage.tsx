@@ -177,7 +177,12 @@ export default function ResumeEditPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Edit Resume</h1>
-                <p className="text-muted-foreground">{resume.name}</p>
+                <div className="text-muted-foreground flex items-center gap-2">
+                  <span>{resume.name}</span>
+                  {resume.slug && (
+                    <span className="text-xs text-muted-foreground/80">Slug: <span className="font-mono text-foreground">{resume.slug}</span></span>
+                  )}
+                </div>
               </div>
               <Button variant="outline" onClick={handleCancel}>
                 <ArrowLeft className="w-4 h-4 mr-2" />

@@ -1,4 +1,4 @@
-import { Eye, Share2, Edit, Download, Trash2, UserPlus, X } from "lucide-react";
+import { Eye, Share2, Edit, Download, Trash2, UserPlus, X, Globe, Lock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -7,12 +7,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { User, USER_ROLES } from "@/lib/auth";
+import type { ResumePrivacy } from "@/types/resume";
+import type { ComponentType } from "react";
 
 interface ContentItem {
   id: string;
   ownerId?: string;
   type: "resume" | "job_description";
   contentType: "video" | "text";
+}
+
+type ActionVariant = "outline" | "default" | "destructive";
+interface ModalAction {
+  id: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  onClick: () => void;
+  variant: ActionVariant;
 }
 
 interface ActionsModalProps {
@@ -26,6 +37,8 @@ interface ActionsModalProps {
   onDownload?: () => void;
   onDelete?: () => void;
   onTrack?: () => void;
+  onChangePrivacy?: (privacy: ResumePrivacy) => void;
+  onPromoteToMaster?: () => void;
 }
 
 export default function ActionsModal({
@@ -39,6 +52,8 @@ export default function ActionsModal({
   onDownload,
   onDelete,
   onTrack,
+  onChangePrivacy,
+  onPromoteToMaster,
 }: ActionsModalProps) {
   // Early return if modal is not open or item is null
   if (!isOpen || !item) {
@@ -57,8 +72,8 @@ export default function ActionsModal({
   const isRecruiter = user && user.role === USER_ROLES.RECRUITER;
   const isAuthenticated = !!user;
 
-  const getAvailableActions = () => {
-    const actions = [];
+  const getAvailableActions = (): ModalAction[] => {
+    const actions: Array<{ id: string; label: string; icon: any; onClick: () => void; variant: "outline" | "default" | "destructive" }>= [];
 
     // View - available to everyone
     actions.push({
@@ -69,7 +84,7 @@ export default function ActionsModal({
         onView?.();
         onClose();
       },
-      variant: "outline" as const,
+      variant: "outline",
     });
 
     // Share - available to everyone
@@ -81,7 +96,7 @@ export default function ActionsModal({
         onShare?.();
         onClose();
       },
-      variant: "default" as const,
+      variant: "default",
     });
 
     // Owner actions
@@ -94,7 +109,7 @@ export default function ActionsModal({
           onEdit?.();
           onClose();
         },
-        variant: "outline" as const,
+        variant: "outline",
       });
 
       actions.push({
@@ -105,8 +120,56 @@ export default function ActionsModal({
           onDownload?.();
           onClose();
         },
-        variant: "outline" as const,
+        variant: "outline",
       });
+
+      // Privacy options group
+      actions.push({ id: "separator-privacy", label: "", icon: () => null, onClick: () => {}, variant: "outline" });
+
+      actions.push({
+        id: "privacy-public",
+        label: "Make Public",
+        icon: Globe,
+        onClick: () => {
+          onChangePrivacy?.("public");
+          onClose();
+        },
+        variant: "outline",
+      });
+      actions.push({
+        id: "privacy-recruiter",
+        label: "Recruiters Only",
+        icon: Users,
+        onClick: () => {
+          onChangePrivacy?.("recruiter_only");
+          onClose();
+        },
+        variant: "outline",
+      });
+      actions.push({
+        id: "privacy-private",
+        label: "Make Private",
+        icon: Lock,
+        onClick: () => {
+          onChangePrivacy?.("private");
+          onClose();
+        },
+        variant: "outline",
+      });
+
+      // Promote to master if this is a variant the user owns
+      if ((item as any).parentId) {
+        actions.push({
+          id: "promote",
+          label: "Promote to Master",
+          icon: UserPlus,
+          onClick: () => {
+            onPromoteToMaster?.();
+            onClose();
+          },
+          variant: "outline",
+        });
+      }
 
       actions.push({
         id: "delete",
@@ -116,7 +179,7 @@ export default function ActionsModal({
           onDelete?.();
           onClose();
         },
-        variant: "destructive" as const,
+        variant: "destructive",
       });
     }
 
@@ -130,7 +193,7 @@ export default function ActionsModal({
           onDownload?.();
           onClose();
         },
-        variant: "outline" as const,
+        variant: "outline",
       });
 
       actions.push({
@@ -141,7 +204,7 @@ export default function ActionsModal({
           onTrack?.();
           onClose();
         },
-        variant: "default" as const,
+        variant: "default",
       });
     }
 
@@ -168,7 +231,7 @@ export default function ActionsModal({
         </DialogHeader>
 
         <div className="space-y-3 pt-4">
-          {actions.map((action) => (
+          {actions.filter(a => !a.id.startsWith("separator")).map((action) => (
             <Button
               key={action.id}
               variant={action.variant}

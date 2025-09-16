@@ -5,9 +5,9 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume } from "@/types/resume";
+import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 
 // ============================================================================
 // SCHEMAS
@@ -718,16 +718,8 @@ export class ResumeService {
       apiResponseKeys: Object.keys(apiResponse)
     });
 
-    // Map privacy enum values
-    const mapPrivacy = (privacyValue: number): ResumePrivacy => {
-      switch (privacyValue) {
-        case 0: return "private";
-        case 1: return "public";
-        case 2: return "recruiter_only";
-        case 3: return "draft";
-        default: return "private";
-      }
-    };
+    // Centralized privacy mapping
+    const mapPrivacy = mapDisplayPrivacyToResumePrivacy;
 
     // Transform to ResumeData format
     const resumeData: ResumeData = {
@@ -784,12 +776,12 @@ export class ResumeService {
     // Return the transformed Resume object
     return {
       id: apiResponse.id || "",
-      slug: apiResponse.slug || "",
-      name: apiResponse.name || "",
+      slug: apiResponse.slug || apiResponse.Slug || "",
+      name: apiResponse.name || apiResponse.Name || "",
       data: resumeData,
-      privacy: mapPrivacy(apiResponse.privacy_ShowResume || 0),
-      isMaster: apiResponse.isMaster || false,
-      isActive: apiResponse.isActive || false,
+      privacy: mapPrivacy(apiResponse.privacy_ShowResume || apiResponse.Privacy_ShowResume || 0),
+      isMaster: apiResponse.isMaster || apiResponse.IsMaster || false,
+      isActive: apiResponse.isActive || apiResponse.IsActive || false,
       parentId: apiResponse.parentId || undefined,
       createdAt: apiResponse.creationDateTime || new Date().toISOString(),
       updatedAt: apiResponse.updateDateTime || new Date().toISOString(),
@@ -887,6 +879,35 @@ export class ResumeService {
   }
 
   /**
+   * Set resume privacy with backend-enforced exclusivity rules
+   */
+  async setResumePrivacy(id: string, privacy: ResumePrivacy): Promise<boolean> {
+    const response = await apiClient.post<boolean>(
+      `/api/Resume/${id}/setPrivacy`,
+      { privacy },
+      z.boolean()
+    );
+    return response.data === true;
+  }
+
+  /** Promote a variant to be the new master resume */
+  async promoteVariantToMaster(id: string): Promise<boolean> {
+    try {
+      const response = await apiClient.post<boolean>(
+        `/api/Resume/${id}/promote`,
+        {},
+        z.boolean(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error promoting variant to master:", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to promote variant to master. Please try again."
+      );
+    }
+  }
+
+  /**
    * Create a variation of a master resume
    */
   async createResumeVariation(parentId: string, name: string): Promise<Resume> {
@@ -926,6 +947,77 @@ export class ResumeService {
       );
     }
   }
+
+  /**
+   * Consolidated fetch for the /resumes page
+   * - Returns normalized ResumeWithOwnership[]
+   * - If withOwnership is empty, falls back to master groups (masters + variations)
+   */
+  async getResumesForDisplay(): Promise<ResumeWithOwnership[]> {
+    const [owned, groups] = await Promise.all([
+      this.getResumesWithOwnership().catch(() => []),
+      this.getMasterResumeGroups().catch(() => []),
+    ]);
+
+    if (owned.length > 0) return owned;
+
+    // Fallback: flatten master groups into ResumeWithOwnership entries
+    const items: ResumeWithOwnership[] = [];
+
+    const extractSummary = (resumeSerialized?: string): string => {
+      try {
+        if (!resumeSerialized) return "";
+        const obj = JSON.parse(resumeSerialized);
+        return obj?.Basics?.Summary || obj?.basics?.summary || "";
+      } catch {
+        return "";
+      }
+    };
+
+    for (const group of groups) {
+      const master = group.masterResume;
+      if (master) {
+        items.push({
+          id: master.id || "",
+          slug: master.slug || "",
+          name: master.name || "",
+          privacy: mapDisplayPrivacyToResumePrivacy(master.privacy_ShowResume || 10),
+          isMaster: master.isMaster || false,
+          isActive: master.isActive || false,
+          parentId: master.parentId || undefined,
+          createdAt: master.creationDateTime || master.createdAt || new Date().toISOString(),
+          updatedAt: master.updateDateTime || master.updatedAt || new Date().toISOString(),
+          views: master.views || 0,
+          summary: extractSummary(master.resumeSerialized || undefined),
+          title: master.metaResume?.basics?.label || "",
+          userId: master.userId || "",
+          ownership: "owned",
+        });
+      }
+
+      for (const v of group.variations) {
+        items.push({
+          id: v.id || "",
+          slug: v.slug || "",
+          name: v.name || "",
+          privacy: mapDisplayPrivacyToResumePrivacy(v.privacy_ShowResume || 10),
+          isMaster: v.isMaster || false,
+          isActive: v.isActive || false,
+          parentId: v.parentId || undefined,
+          createdAt: v.creationDateTime || v.createdAt || new Date().toISOString(),
+          updatedAt: v.updateDateTime || v.updatedAt || new Date().toISOString(),
+          views: v.views || 0,
+          summary: extractSummary(v.resumeSerialized || undefined),
+          title: v.metaResume?.basics?.label || "",
+          userId: v.userId || "",
+          ownership: "owned",
+        });
+      }
+    }
+
+    return items;
+  }
+
 
   /**
    * Get resumes with ownership information
