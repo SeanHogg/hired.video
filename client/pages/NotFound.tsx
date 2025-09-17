@@ -1,8 +1,19 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
 
 const NotFound = () => {
   const location = useLocation();
+
+  // SEO: mark as noindex and set canonical to homepage to avoid indexation of 404 paths
+  useSEO(location.pathname, {
+    title: "404 Not Found - MyVideoResu.me",
+    description: "This page could not be found.",
+    robots: "noindex, nofollow",
+    canonical: "https://myvideoresu.me/",
+    ogTitle: "404 Not Found - MyVideoResu.me",
+    ogDescription: "This page could not be found.",
+  });
 
   useEffect(() => {
     console.error(

@@ -31,7 +31,7 @@ import {
   type Company,
 } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import type { CompanyWithOwnership } from "@/types/company";
 

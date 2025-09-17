@@ -43,6 +43,8 @@ import { jobService } from "@/lib/services/job-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { useLocation } from "react-router-dom";
+import { useSEO, generateStructuredData } from "@/lib/seo";
 
 type UIJobRequirement = { skill: string; level: string; required: boolean };
 type UIJobBenefit = { type: string; description: string };
@@ -178,6 +180,7 @@ export default function JobDetail() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+  const location = useLocation();
 
   const [expandedSections, setExpandedSections] = useState<{
     [key: string]: boolean;
@@ -211,6 +214,33 @@ export default function JobDetail() {
         if (isMounted) setLoading(false);
       }
     };
+  // SEO: update when job is loaded
+  useEffect(() => {
+    if (!job) return;
+    const title = `${job.data.title} at ${job.data.company.name} | MyVideoResu.me`;
+    const description = `${job.data.title} at ${job.data.company.name}${job.data.location?.remote ? " (Remote)" : job.data.location?.city ? ` in ${job.data.location.city}, ${job.data.location.state}` : ""}. ${job.data.description?.slice(0, 150)}`;
+    useSEO(location.pathname, {
+      title,
+      description,
+      ogTitle: title,
+      ogDescription: description,
+      structuredData: generateStructuredData.jobPosting({
+        title: job.data.title,
+        description: job.data.description,
+        postedDate: job.createdAt,
+        employmentType: job.data.employmentType,
+        companyName: job.data.company.name,
+        location: job.data.location.remote
+          ? "Remote"
+          : `${job.data.location.city || ""}, ${job.data.location.state || ""}`,
+        salaryRange:
+          job.data.salaryMin && job.data.salaryMax
+            ? `${(job.data.salaryMin / 1000).toFixed(0)}k-${(job.data.salaryMax / 1000).toFixed(0)}k`
+            : undefined,
+      }),
+    });
+  }, [job, location.pathname]);
+
     run();
     return () => {
       isMounted = false;
@@ -250,7 +280,7 @@ export default function JobDetail() {
             <div className="max-w-4xl mx-auto">
               <Card>
                 <CardHeader>
-                  <CardTitle>Loading job...</CardTitle>
+                  <h1 className="text-2xl font-bold">Loading job...</h1>
                   <CardDescription>Please wait</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -364,9 +394,9 @@ export default function JobDetail() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-2xl">
+                            <h1 className="text-2xl font-bold">
                               {job.data.title}
-                            </CardTitle>
+                            </h1>
                             <Badge className={getStatusColor(job.status)}>
                               {job.status}
                             </Badge>

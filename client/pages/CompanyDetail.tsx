@@ -47,6 +47,9 @@ import { Separator } from "@/components/ui/separator";
 import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useLocation } from "react-router-dom";
+import { useSEO, generateStructuredData } from "@/lib/seo";
+
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +62,7 @@ export default function CompanyDetail() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+  const location = useLocation();
 
   const [expandedSections, setExpandedSections] = useState<{
     [key: string]: boolean;
@@ -89,6 +93,28 @@ export default function CompanyDetail() {
         console.error("Failed to fetch company:", err);
         setError("Failed to load company. Please try again.");
       } finally {
+  // SEO: when company loads, set page metadata and structured data
+  useEffect(() => {
+    if (!company) return;
+    const title = `${company.data.name} Company Profile | MyVideoResu.me`;
+    const description = company.data.tagline || company.data.description?.slice(0, 160) || "Company profile on MyVideoResu.me";
+    useSEO(location.pathname, {
+      title,
+      description,
+      ogTitle: title,
+      ogDescription: description,
+      structuredData: generateStructuredData.organization({
+        name: company.data.name,
+        description: company.data.description,
+        website: company.data.contact?.website,
+        logo: company.data.logo,
+        address: company.data.headquarters
+          ? `${company.data.headquarters.city}, ${company.data.headquarters.state}`
+          : undefined,
+      }),
+    });
+  }, [company, location.pathname]);
+
         setIsLoading(false);
       }
     };
@@ -282,9 +308,9 @@ export default function CompanyDetail() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-2xl">
+                            <h1 className="text-2xl font-bold">
                               {company.data.name}
-                            </CardTitle>
+                            </h1>
                             <Badge className={getStatusColor(company.status)}>
                               {company.status}
                             </Badge>

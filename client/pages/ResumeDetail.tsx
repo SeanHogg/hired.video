@@ -53,6 +53,9 @@ import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
 import { ResumeData } from "@/types/resume";
 
+import { useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
+
 interface TimelineItemProps {
   title: string;
   subtitle: string;
@@ -180,6 +183,20 @@ export default function ResumeDetail() {
 
     loadResume();
   }, [id]);
+  // SEO: when resume loads, update metadata and structured data
+  useEffect(() => {
+    if (!resume) return;
+    const personName = resume?.data?.Basics?.Name || resume?.name || "Resume";
+    const title = `${personName} | Resume on MyVideoResu.me`;
+    const description = resume?.data?.Basics?.Summary?.slice(0, 160) || `View ${personName}'s professional resume.`;
+    useSEO(location.pathname, {
+      title,
+      description,
+      ogTitle: title,
+      ogDescription: description,
+    });
+  }, [resume, location.pathname]);
+
 
   const handleUpdateResume = (updateData: any) => {
     if (resume) {

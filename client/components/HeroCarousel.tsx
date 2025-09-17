@@ -179,9 +179,9 @@ export default function HeroCarousel({
             {currentSlideData.badge}
           </Badge>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 leading-tight">
+          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 leading-tight">
             {currentSlideData.title}
-          </h1>
+          </p>
 
           <p className="text-base text-muted-foreground mb-4 max-w-2xl mx-auto line-clamp-2">
             {currentSlideData.description}

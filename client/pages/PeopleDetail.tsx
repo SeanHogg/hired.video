@@ -60,6 +60,9 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { useLocation } from "react-router-dom";
+import { useSEO, generateStructuredData } from "@/lib/seo";
+
 import ResumeCard from "@/components/ResumeCard";
 
 export default function PeopleDetail() {
@@ -73,6 +76,7 @@ export default function PeopleDetail() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+  const location = useLocation();
 
   const [expandedSections, setExpandedSections] = useState<{
     [key: string]: boolean;
@@ -214,6 +218,27 @@ export default function PeopleDetail() {
         );
 
         if (userPublicResumes.length > 0) {
+  // SEO: when profile loads, update title/description and structured data
+  useEffect(() => {
+    if (!userProfile) return;
+    const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
+    const title = `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | MyVideoResu.me`;
+    const description = userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`;
+    useSEO(location.pathname, {
+      title,
+      description,
+      ogTitle: title,
+      ogDescription: description,
+      structuredData: generateStructuredData.person({
+        name: fullName,
+        title: getRoleDisplayLabel(userProfile.role),
+        bio: userProfile.bio,
+        avatar: userProfile.profilePicture,
+        id: userProfile.id,
+      }),
+    });
+  }, [userProfile, location.pathname]);
+
           // Find active resume or use the first public one
           const activeResume = userPublicResumes.find(r => (r as any).isActive) || userPublicResumes[0];
           setActivePublicResume(activeResume);
@@ -435,11 +460,11 @@ export default function PeopleDetail() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-3xl">
+                            <h1 className="text-3xl font-bold">
                               {person.data.firstName && person.data.lastName
                                 ? `${person.data.firstName} ${person.data.lastName}`
                                 : person.data.firstName || person.data.lastName || "User"}
-                            </CardTitle>
+                            </h1>
                             {(person as any).isVerified && (
                               <CheckCircle className="h-6 w-6 text-blue-600" />
                             )}

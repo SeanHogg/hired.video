@@ -576,6 +576,9 @@ export default function Index() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
+        {/* Page H1 for semantic SEO */}
+        <h1 className="sr-only">MyVideoResume — Discover Jobs, Companies, People, and Resumes</h1>
+
         {/* Hero Carousel */}
         <HeroCarousel
           totalViews={formatTotalViews(totalViews)}

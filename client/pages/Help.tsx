@@ -35,6 +35,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocation } from "react-router-dom";
+import { useSEO } from "@/lib/seo";
+
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -46,6 +49,8 @@ export default function Help() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+  const location = useLocation();
+  useSEO(location.pathname);
   const { user, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 

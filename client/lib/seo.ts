@@ -91,6 +91,13 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "about us, company mission, video resume platform, recruitment innovation",
   },
+  "/careers": {
+    title: "Careers at MyVideoResu.me",
+    description:
+      "Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.",
+    keywords:
+      "careers, jobs at MyVideoResu.me, hiring, open roles, work with us",
+  },
   "/resumes": {
     title: "Video Resumes - MyVideoResu.me",
     description:
@@ -148,20 +155,20 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/privacy-policy": {
     title: "Privacy Policy - MyVideoResu.me",
     description:
-      "Learn how MyVideoResu.me protects your personal information and respects your privacy. Comprehensive privacy policy with multi-jurisdiction compliance.",
+      "Learn how we protect your data and respect your privacy across our platform. Review our policies and your rights.",
     keywords:
       "privacy policy, data protection, GDPR compliance, user privacy, data security",
   },
   "/terms-of-service": {
     title: "Terms of Service - MyVideoResu.me",
     description:
-      "Read our comprehensive terms of service. Understand your rights and responsibilities when using MyVideoResu.me.",
+      "Understand your rights and responsibilities when using MyVideoResu.me. Review our platform terms and conditions.",
     keywords: "terms of service, user agreement, legal terms, platform rules",
   },
   "/help": {
     title: "Help & Support - MyVideoResu.me",
     description:
-      "Get help with MyVideoResu.me. Find answers to common questions and learn how to make the most of our platform.",
+      "Find answers, browse guides, and contact support to get the most from MyVideoResu.me.",
     keywords: "help, support, FAQ, user guide, customer service",
   },
   "/tools": {
@@ -184,10 +191,46 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Find the perfect match between jobs and resumes using our advanced AI matching algorithm.",
     keywords: "job matching, resume matching, AI matching, career fit analysis",
   },
+  "/tools/ai-resume-scorer": {
+    title: "AI Resume Scorer - MyVideoResu.me",
+    description:
+      "Score your resume with AI to identify strengths and areas to improve for better job matches.",
+    keywords: "AI resume score, resume grading, resume quality, career tools",
+  },
+  "/tools/resume-optimizer": {
+    title: "Resume Optimizer - MyVideoResu.me",
+    description:
+      "Optimize your resume for ATS and recruiters with AI suggestions tailored to your target roles.",
+    keywords: "resume optimizer, ATS optimization, resume improvement, AI tools",
+  },
+  "/tools/salary-calculator": {
+    title: "Salary Calculator - MyVideoResu.me",
+    description:
+      "Estimate fair salary ranges by title, experience, and location to negotiate your next offer confidently.",
+    keywords: "salary calculator, compensation, pay range, negotiate salary",
+  },
+  "/tools/summarize-resume": {
+    title: "Resume Summarizer - MyVideoResu.me",
+    description:
+      "Generate concise professional summaries from your resume to use on profiles and applications.",
+    keywords: "resume summary, professional summary, AI resume tools",
+  },
+  "/tools/pdf-to-json": {
+    title: "PDF to JSON - MyVideoResu.me",
+    description:
+      "Convert resume PDFs into structured JSON data for analysis and quick editing.",
+    keywords: "pdf to json, resume parsing, data extraction, AI tools",
+  },
+  "/tools/value-proposition": {
+    title: "Value Proposition Builder - MyVideoResu.me",
+    description:
+      "Craft a compelling value proposition tailored to your target role using your resume and job description.",
+    keywords: "value proposition, career branding, elevator pitch, AI tools",
+  },
   "/contact": {
     title: "Contact Us - MyVideoResu.me",
     description:
-      "Get in touch with MyVideoResu.me support team. We're here to help you succeed in your career journey with video resumes and AI-powered job matching.",
+      "Get in touch with MyVideoResu.me support. We're here to help you succeed in your career journey.",
     keywords:
       "contact us, customer support, help, video resume support, career assistance, MyVideoResu.me contact",
     structuredData: {
@@ -210,8 +253,31 @@ export const PAGE_SEO: Record<string, SEOData> = {
         },
       },
     },
-  },
+  }
+
 };
+
+// Canonical origin (prefer apex domain over www)
+const CANONICAL_ORIGIN = "https://myvideoresu.me";
+
+// Map legacy/duplicate routes to canonical equivalents
+export function canonicalizePath(pathname: string): string {
+  const p = pathname || "/";
+  const aliasMap: Record<string, string> = {
+    "/Tools/SentimentAnalysis": "/tools/sentiment-analysis",
+    "/Tools/JobResumeMatch": "/tools/job-resume-match",
+    "/Tools/SummarizeResume": "/tools/summarize-resume",
+    "/Tools/pdftojson": "/tools/pdf-to-json",
+    "/privacy": "/privacy-policy",
+    "/terms": "/terms-of-service",
+  };
+
+  if (aliasMap[p]) return aliasMap[p];
+  if (p.startsWith("/resume/")) return "/resumes/" + p.slice("/resume/".length);
+  if (p.startsWith("/Tools/")) return p.replace(/^\/Tools\//, "/tools/");
+  return p;
+}
+
 
 /**
  * Update document meta tags
@@ -293,8 +359,11 @@ export function updateMetaTags(seoData: SEOData): void {
  */
 export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
   useEffect(() => {
+    // Canonicalize route path and normalize origin
+    const canonicalPath = canonicalizePath(pathname);
+
     // Get page-specific SEO or use defaults
-    const pageSEO = PAGE_SEO[pathname] || {};
+    const pageSEO = PAGE_SEO[canonicalPath] || {};
 
     // Merge default, page-specific, and custom SEO data
     const seoData: SEOData = {
@@ -303,14 +372,14 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
       ...customSEO,
     };
 
-    // Update canonical URL if not provided
-    if (!seoData.canonical) {
-      seoData.canonical = `https://myvideoresu.me${pathname}`;
-    }
+    // Build canonical and og:url consistently
+    const url = `${CANONICAL_ORIGIN}${canonicalPath}`;
 
-    // Update Open Graph URL if not provided
+    if (!seoData.canonical) {
+      seoData.canonical = url;
+    }
     if (!seoData.ogUrl) {
-      seoData.ogUrl = `https://myvideoresu.me${pathname}`;
+      seoData.ogUrl = url;
     }
 
     // Update meta tags
