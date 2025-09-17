@@ -93,7 +93,7 @@ export default function Careers() {
       "careers, jobs, MyVideoResu.me, software engineer, product designer, devops, remote work, tech jobs",
     );
     addMetaTag("robots", "index, follow");
-    addMetaTag("canonical", "https://myvideoresu.me/careers");
+    // Canonical is handled by useSEO/prerender; do not add invalid meta name="canonical"
 
     // Add structured data for Organization and FAQ
     const structuredData = [
