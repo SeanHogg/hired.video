@@ -92,6 +92,12 @@ export default function Navigation({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Only apply the outside-click close behavior for the desktop mega menu.
+      // On mobile, this would immediately close the menu before the Link's click
+      // event can fire, preventing navigation (especially on iOS Safari).
+      const isDesktop = typeof window !== "undefined" && window.innerWidth >= 768;
+      if (!isDesktop) return;
+
       if (
         featuresRef.current &&
         !featuresRef.current.contains(event.target as Node)
