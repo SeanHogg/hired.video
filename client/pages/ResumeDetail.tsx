@@ -3,7 +3,6 @@ import {
   Edit,
   Play,
   Calendar,
-  MapPin,
   Mail,
   Phone,
   ExternalLink,
@@ -14,7 +13,6 @@ import {
   Share2,
   Download,
   ChevronRight,
-  User,
   Target,
   Globe,
   Users,
@@ -26,19 +24,17 @@ import {
   UserCheck,
   FolderOpen,
   Trophy,
-  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
-import ResumeViewer from "@/components/ResumeViewer";
 import Sidebar from "@/components/Sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -46,15 +42,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import type { Resume } from "@/types/resume";
-import { ResumeData } from "@/types/resume";
-
 import { useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
+
+import type { Resume } from "@/types/resume";
 
 interface TimelineItemProps {
   title: string;
@@ -161,7 +155,6 @@ export default function ResumeDetail() {
   const { isAuthenticated, user } = useAuth();
 
   const [resume, setResume] = useState<Resume | null>(null);
-  const [rawResume, setRawResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [showVideo, setShowVideo] = useState(false);
 
@@ -172,8 +165,7 @@ export default function ResumeDetail() {
       setLoading(true);
       try {
         const foundResume = await resumeService.getResumeById(id);
-        setRawResume(foundResume as any);
-        setResume(foundResume as any);
+        setResume(foundResume);
       } catch (error) {
         console.error("Failed to load resume:", error);
       } finally {
@@ -181,30 +173,41 @@ export default function ResumeDetail() {
       }
     };
 
-    loadResume();
-  }, [id]);
-  // SEO: when resume loads, update metadata and structured data
+  const location = useLocation();
+
+  // Set SEO after resume is loaded; defensive guards against missing fields
   useEffect(() => {
     if (!resume) return;
-    const personName = resume?.data?.Basics?.Name || resume?.name || "Resume";
-    const title = `${personName} | Resume on MyVideoResu.me`;
-    const description = resume?.data?.Basics?.Summary?.slice(0, 160) || `View ${personName}'s professional resume.`;
-    useSEO(location.pathname, {
-      title,
-      description,
-      ogTitle: title,
-      ogDescription: description,
-    });
-  }, [resume, location.pathname]);
-
-
-  const handleUpdateResume = (updateData: any) => {
-    if (resume) {
-      setResume({ ...resume, ...updateData });
+    try {
+      const personName = (resume.data && resume.data.Basics && resume.data.Basics.Name) || resume.name || "Resume";
+      const summary = (resume.data && resume.data.Basics && resume.data.Basics.Summary) || "";
+      const title = `${personName} | Resume on MyVideoResu.me`;
+      const description = summary ? String(summary).slice(0, 160) : `View ${personName}'s professional resume.`;
+      useSEO(location?.pathname || "/resumes", {
+        title,
+        description,
+        ogTitle: title,
+        ogDescription: description,
+      });
+    } catch (err) {
+      console.error("SEO meta generation failed", err);
     }
-  };
+  }, [resume, location?.pathname]);
+
+    loadResume();
+  }, [id]);
+
+  // No inline update handler needed here; editing is in the dedicated edit page
 
   const isOwner = user?.id === resume?.userId;
+
+  // Safe date parser for sorting that handles missing/"Present"/invalid dates
+  const safeTime = (value: string): number => {
+    if (!value) return 0;
+    if (value === "Present") return Number.MAX_SAFE_INTEGER;
+    const t = Date.parse(value);
+    return Number.isNaN(t) ? 0 : t;
+  };
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
@@ -541,9 +544,7 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Work
                           .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
+                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
                           )
                           .map((work, index) => (
                             <TimelineItem
@@ -582,9 +583,7 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Education
                           .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
+                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
                           )
                           .map((edu, index) => (
                             <TimelineItem
@@ -624,9 +623,7 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Volunteer
                           .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
+                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
                           )
                           .map((volunteer, index) => (
                             <TimelineItem
