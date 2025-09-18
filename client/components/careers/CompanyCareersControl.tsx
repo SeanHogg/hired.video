@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   MapPin,
@@ -100,10 +101,6 @@ export function CompanyCareersControl({
   onApplyClick,
   className = "",
 }: CompanyCareersControlProps) {
-  const [jobs, setJobs] = useState<CompanyJob[]>([]);
-  const [company, setCompany] = useState<CompanyInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [employmentTypeFilter, setEmploymentTypeFilter] =
     useState<string>("all");
@@ -113,213 +110,106 @@ export function CompanyCareersControl({
 
   const { user, isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    loadCompanyAndJobs();
-  }, [companyId, companySlug]);
-
-  const loadCompanyAndJobs = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load company data
-      let companyData: CompanyInfo | null = null;
-
-      if (companyId) {
-        try {
-          const companyResponse =
-            await companyService.getCompanyById(companyId);
-          companyData = {
-            id: companyResponse.id || companyId,
-            name: companyResponse.name || "Company",
-            logo: companyResponse.logo || "/logo.png",
-            tagline: companyResponse.tagline || "",
-            description: companyResponse.description ?? "",
-            website: companyResponse.website ?? "",
-            industry: companyResponse.industry || "",
-            size: companyResponse.size || "",
-            location: companyResponse.location || "",
-          };
-        } catch (err) {
-          console.warn("Failed to load company data:", err);
-        }
-      } else if (companySlug) {
-        try {
-          const companyResponse =
-            await companyService.getCompanyBySlug(companySlug);
-          companyData = {
-            id: companyResponse.id || "company",
-            name: companyResponse.name || "Company",
-            logo: companyResponse.logo || "/logo.png",
-            tagline: companyResponse.tagline || "",
-            description: companyResponse.description ?? "",
-            website: companyResponse.website ?? "",
-            industry: companyResponse.industry || "",
-            size: companyResponse.size || "",
-            location: companyResponse.location || "",
-          };
-        } catch (err) {
-          console.warn("Failed to load company data by slug:", err);
-        }
-      }
-
-      // Fallback to MyVideoResu.me if no company data loaded
-      if (!companyData) {
-        companyData = {
-          id: companyId || companySlug || "myvideoresume-company",
-          name: "MyVideoResu.me",
-          logo: "/logo.png",
-          tagline:
-            "Revolutionizing the way people find and showcase their talents",
-          description:
-            "MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.",
-          website: "https://myvideoresu.me",
-          industry: "Technology",
-          size: "11-50",
-          location: "San Francisco, CA",
-        };
-      }
-
-      // Load jobs data from API
-      let jobsData: CompanyJob[] = [];
-
+  // Fetch company (by id or slug) using React Query with caching
+  const companyQuery = useQuery({
+    queryKey: ["company", companyId ?? companySlug ?? "myvideoresume-company"],
+    queryFn: async (): Promise<CompanyInfo> => {
       try {
-        const jobsResponse = await jobService.getPublicJobs({
-          companyId: companyData.id,
-          limit: maxJobs || 50,
-        });
-
-        jobsData = (jobsResponse.items ?? []).map((job) => ({
-          id: job.id,
-          title: job.title,
-          description: job.title, // no description on JobSummary; use title as placeholder
-          summary: job.title,
-          responsibilities: [],
-          requirements: [],
-          employmentType: job.employmentType,
-          experienceLevel: "mid",
-          location: job.location,
-          salaryMin: job.salaryMin,
-          salaryMax: job.salaryMax,
-          currency: "USD",
-          workSetting: job.isRemote ? "Remote" : "Onsite",
-          status: "Open",
-          createdAt: job.postedDate ?? new Date().toISOString(),
-          applications: 0,
-          views: 0,
-          slug: job.id,
-          atsApplyUrl: undefined,
-        }));
-      } catch (err) {
-        console.warn("Failed to load jobs from API, using fallback data:", err);
-
-        // Fallback mock jobs for demonstration
-        jobsData = [
-          {
-            id: "1",
-            title: "Senior Full Stack Developer",
-            description:
-              "Join our team to build the next generation of video resume technology. You'll work with React, Node.js, and cutting-edge AI technologies.",
-            summary: "Build innovative video resume platform features",
-            responsibilities: [
-              "Develop and maintain frontend applications using React and TypeScript",
-              "Build scalable backend services with Node.js and C#",
-              "Collaborate with AI team to integrate machine learning features",
-              "Optimize application performance and user experience",
-            ],
-            requirements: [
-              "5+ years of full-stack development experience",
-              "Expert knowledge of React, TypeScript, and Node.js",
-              "Experience with cloud platforms (Azure/AWS)",
-              "Strong problem-solving and communication skills",
-            ],
-            employmentType: "full-time",
-            experienceLevel: "senior",
-            location: "San Francisco, CA",
-            salaryMin: 120000,
-            salaryMax: 180000,
-            currency: "USD",
-            workSetting: "Hybrid",
-            status: "Open",
-            createdAt: "2024-01-15",
-            applications: 23,
-            views: 156,
-            slug: "senior-full-stack-developer",
-          },
-          {
-            id: "2",
-            title: "Product Designer",
-            description:
-              "Shape the user experience of our video resume platform. Create intuitive designs that help users showcase their talents effectively.",
-            summary: "Design user-centric video resume experiences",
-            responsibilities: [
-              "Design user interfaces for web and mobile applications",
-              "Conduct user research and usability testing",
-              "Create wireframes, prototypes, and design systems",
-              "Collaborate with engineering and product teams",
-            ],
-            requirements: [
-              "3+ years of product design experience",
-              "Proficiency in Figma, Sketch, or similar tools",
-              "Strong portfolio demonstrating UX/UI skills",
-              "Experience with design systems and accessibility",
-            ],
-            employmentType: "full-time",
-            experienceLevel: "mid",
-            location: "San Francisco, CA",
-            salaryMin: 90000,
-            salaryMax: 130000,
-            currency: "USD",
-            workSetting: "Remote",
-            status: "Open",
-            createdAt: "2024-01-10",
-            applications: 18,
-            views: 89,
-            slug: "product-designer",
-          },
-          {
-            id: "3",
-            title: "DevOps Engineer",
-            description:
-              "Build and maintain our cloud infrastructure. Ensure our platform scales reliably to serve millions of users worldwide.",
-            summary: "Scale infrastructure for global video platform",
-            responsibilities: [
-              "Manage cloud infrastructure on Azure and AWS",
-              "Implement CI/CD pipelines and automation",
-              "Monitor system performance and reliability",
-              "Ensure security and compliance standards",
-            ],
-            requirements: [
-              "4+ years of DevOps/Infrastructure experience",
-              "Experience with Kubernetes, Docker, and Terraform",
-              "Knowledge of monitoring tools (Prometheus, Grafana)",
-              "Strong scripting skills (Python, Bash)",
-            ],
-            employmentType: "full-time",
-            experienceLevel: "senior",
-            location: "Remote",
-            salaryMin: 110000,
-            salaryMax: 160000,
-            currency: "USD",
-            workSetting: "Remote",
-            status: "Open",
-            createdAt: "2024-01-08",
-            applications: 31,
-            views: 124,
-            slug: "devops-engineer",
-          },
-        ];
+        if (companyId) {
+          const c = await companyService.getCompanyById(companyId);
+          return {
+            id: c.id || companyId,
+            name: c.name || "Company",
+            logo: c.logo || "/logo.png",
+            tagline: c.tagline || "",
+            description: c.description ?? "",
+            website: c.website ?? "",
+            industry: c.industry || "",
+            size: c.size || "",
+            location: c.location || "",
+          };
+        } else if (companySlug) {
+          const c = await companyService.getCompanyBySlug(companySlug);
+          return {
+            id: c.id || companySlug,
+            name: c.name || "Company",
+            logo: c.logo || "/logo.png",
+            tagline: c.tagline || "",
+            description: c.description ?? "",
+            website: c.website ?? "",
+            industry: c.industry || "",
+            size: c.size || "",
+            location: c.location || "",
+          };
+        }
+      } catch (e) {
+        // swallow to use fallback
       }
+      // Fallback to MyVideoResu.me if no company data loaded
+      return {
+        id: companyId || companySlug || "myvideoresume-company",
+        name: "MyVideoResu.me",
+        logo: "/logo.png",
+        tagline:
+          "Revolutionizing the way people find and showcase their talents",
+        description:
+          "MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.",
+        website: "https://myvideoresu.me",
+        industry: "Technology",
+        size: "11-50",
+        location: "San Francisco, CA",
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-      setCompany(companyData);
-      setJobs(maxJobs ? jobsData.slice(0, maxJobs) : jobsData);
-    } catch (err) {
-      setError("Failed to load jobs. Please try again later.");
-      console.error("Error loading company jobs:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch jobs using React Query, keyed by company id (from query data)
+  const jobsQuery = useQuery({
+    enabled: !!companyQuery.data?.id,
+    queryKey: [
+      "company-jobs",
+      (companyQuery.data?.id as string) ?? (companyId || companySlug || "myvideoresume-company"),
+      maxJobs ?? null,
+    ],
+    queryFn: async (): Promise<CompanyJob[]> => {
+      const cId = companyQuery.data?.id || companyId || companySlug || "myvideoresume-company";
+      const jobsResponse = await jobService.getPublicJobs({
+        companyId: cId,
+        limit: maxJobs || 50,
+      });
+
+      const items = jobsResponse.items ?? [];
+      return items.map((job) => ({
+        id: job.id,
+        title: job.title,
+        description: job.title,
+        summary: job.title,
+        responsibilities: [],
+        requirements: [],
+        employmentType: job.employmentType,
+        experienceLevel: "mid",
+        location: job.location,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        currency: "USD",
+        workSetting: job.isRemote ? "Remote" : "Onsite",
+        status: "Open",
+        createdAt: job.postedDate ?? new Date().toISOString(),
+        applications: 0,
+        views: 0,
+        slug: job.id,
+        atsApplyUrl: undefined,
+      }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const loading = companyQuery.isLoading || jobsQuery.isLoading;
+  const error = (companyQuery.error || jobsQuery.error) ? "Failed to load jobs. Please try again later." : null;
+  const company = companyQuery.data ?? null;
+  const jobs = (jobsQuery.data ?? []) as CompanyJob[];
+
+
 
   // Filter jobs based on search and filters
   const filteredJobs = jobs.filter((job) => {
@@ -434,11 +324,16 @@ export function CompanyCareersControl({
     );
   }
 
+  const handleRetry = () => {
+    void companyQuery.refetch();
+    void jobsQuery.refetch();
+  };
+
   if (error) {
     return (
       <div className={`text-center py-12 ${className}`}>
         <div className="text-red-600 mb-4">{error}</div>
-        <Button onClick={loadCompanyAndJobs} variant="outline">
+        <Button onClick={handleRetry} variant="outline">
           Try Again
         </Button>
       </div>

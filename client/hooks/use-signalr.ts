@@ -196,18 +196,18 @@ export function useSignalR(): UseSignalRReturn {
     };
   }, [isConnected, isAuthenticated, updateStatus]);
 
-  // Handle beforeunload to set status to offline
+  // Handle pagehide instead of beforeunload to preserve BFCache
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handlePageHide = () => {
       if (isConnected && isAuthenticated) {
         updateStatus("offline");
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, [isConnected, isAuthenticated, updateStatus]);
 

@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       sourcemap: sourceMapsEnabled,
+      target: "es2019",
+      cssMinify: "lightningcss",
       rollupOptions: {
         output: {
           manualChunks: {

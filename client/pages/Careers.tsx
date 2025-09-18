@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useLocation } from "react-router-dom";
 import {
   Building2,
@@ -21,13 +21,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CompanyCareersControl } from "@/components/careers/CompanyCareersControl";
+// Lazy-load the heavy jobs control to avoid blocking LCP
+const CompanyCareersControl = React.lazy(() =>
+  import("@/components/careers/CompanyCareersControl").then((m) => ({
+    default: m.CompanyCareersControl,
+  }))
+);
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
+// Lightweight skeleton for jobs section
+function JobsSkeleton() {
+  return (
+    <div className="space-y-4 mb-12" aria-busy="true" aria-live="polite">
+      <div className="h-8 bg-muted/60 rounded" />
+      <div className="h-24 bg-muted/50 rounded" />
+      <div className="h-24 bg-muted/50 rounded" />
+      <div className="h-24 bg-muted/50 rounded" />
+    </div>
+  );
+}
+
+function DeferredJobs() {
+  const [show, setShow] = React.useState(false);
+  useEffect(() => {
+    const run = () => setShow(true);
+    // Defer until idle or next tick to avoid blocking LCP
+    if (typeof (window as any).requestIdleCallback === "function") {
+      (window as any).requestIdleCallback(run);
+    } else {
+      setTimeout(run, 1);
+    }
+  }, []);
+
+  if (!show) return <JobsSkeleton />;
+  return (
+    <Suspense fallback={<JobsSkeleton />}>
+      <CompanyCareersControl
+        companyId="myvideoresume-company"
+        showCompanyHeader={false}
+        showFilters={true}
+        showSearch={true}
+        viewMode="table"
+        className="mb-12"
+      />
+    </Suspense>
+  );
+}
 
 export default function Careers() {
   const location = useLocation();
@@ -41,7 +83,6 @@ export default function Careers() {
 
   // SEO for careers page
   useSEO(location.pathname);
-  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     document.title = "Careers - Join Our Team | MyVideoResu.me";
@@ -490,14 +531,8 @@ export default function Careers() {
                 </p>
               </div>
 
-              <CompanyCareersControl
-                companyId="myvideoresume-company"
-                showCompanyHeader={false}
-                showFilters={true}
-                showSearch={true}
-                viewMode="table"
-                className="mb-12"
-              />
+              {/* Defer heavy jobs section to after first paint */}
+              <DeferredJobs />
             </section>
 
             {/* Application Process */}

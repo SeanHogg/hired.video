@@ -118,6 +118,7 @@ export default function Navigation({
               size="icon"
               onClick={onMenuClick}
               className="lg:hidden"
+              aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -128,6 +129,7 @@ export default function Navigation({
               onClick={onSidebarToggle}
               className="hidden lg:flex h-10 w-10 px-2 py-2 justify-center -ml-4"
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               <Menu className="h-4 w-4" />
             </Button>
@@ -273,6 +275,7 @@ export default function Navigation({
               variant="ghost"
               size="icon"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
             >
               {isMenuOpen ? (
                 <X className="h-6 w-6" />
