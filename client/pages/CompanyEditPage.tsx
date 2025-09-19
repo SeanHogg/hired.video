@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { companyService } from "@/lib/services/company-service";
+import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -27,7 +28,7 @@ export default function CompanyEditPage() {
   } = useSidebar();
   const { user } = useAuth();
 
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +40,7 @@ export default function CompanyEditPage() {
       try {
         setIsLoading(true);
         setError(null);
-        const companyData = await companyService.getCompanyById(id);
+        const companyData = await companyService.getCompanyProfileById(id);
         setCompany(companyData);
       } catch (err) {
         console.error("Failed to fetch company:", err);

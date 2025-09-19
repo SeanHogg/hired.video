@@ -17,10 +17,7 @@ import {
   Briefcase,
   Award,
   Target,
-  DollarSign,
   CheckCircle,
-  AlertCircle,
-  Clock,
   Star,
   Linkedin,
   Twitter,
@@ -45,11 +42,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { companyService } from "@/lib/services/company-service";
+import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "react-router-dom";
 import { useSEO, generateStructuredData } from "@/lib/seo";
-
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -74,7 +71,7 @@ export default function CompanyDetail() {
     onboarding: true,
   });
 
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState(false);
@@ -87,17 +84,26 @@ export default function CompanyDetail() {
       try {
         setIsLoading(true);
         setError(null);
-        const companyData = await companyService.getCompanyById(id);
+        const companyData = await companyService.getCompanyProfileById(id);
         setCompany(companyData);
       } catch (err) {
         console.error("Failed to fetch company:", err);
         setError("Failed to load company. Please try again.");
       } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, [id]);
+
   // SEO: when company loads, set page metadata and structured data
   useEffect(() => {
     if (!company) return;
     const title = `${company.data.name} Company Profile | MyVideoResu.me`;
-    const description = company.data.tagline || company.data.description?.slice(0, 160) || "Company profile on MyVideoResu.me";
+    const description =
+      company.data.tagline ||
+      (company.data.description ? company.data.description.slice(0, 160) : "Company profile on MyVideoResu.me");
     useSEO(location.pathname, {
       title,
       description,
@@ -108,19 +114,12 @@ export default function CompanyDetail() {
         description: company.data.description,
         website: company.data.contact?.website,
         logo: company.data.logo,
-        address: company.data.headquarters
+        address: company.data.headquarters && company.data.headquarters.city && company.data.headquarters.state
           ? `${company.data.headquarters.city}, ${company.data.headquarters.state}`
           : undefined,
       }),
     });
   }, [company, location.pathname]);
-
-        setIsLoading(false);
-      }
-    };
-
-    fetchCompany();
-  }, [id]);
 
   const isOwner = user && company && company.userId === user.id;
 
@@ -311,8 +310,8 @@ export default function CompanyDetail() {
                             <h1 className="text-2xl font-bold">
                               {company.data.name}
                             </h1>
-                            <Badge className={getStatusColor(company.status)}>
-                              {company.status}
+                            <Badge className={getStatusColor(company.status as string)}>
+                              {String(company.status)}
                             </Badge>
                           </div>
                           {company.data.tagline && (
@@ -508,7 +507,7 @@ export default function CompanyDetail() {
                           </div>
 
                           {onboardingProgress === 100 &&
-                            company?.status !== "active" && (
+                            String(company?.status) !== "active" && (
                               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                                 <div className="flex items-center gap-2 text-green-800">
                                   <CheckCircle className="h-5 w-5" />

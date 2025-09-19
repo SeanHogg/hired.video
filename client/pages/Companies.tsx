@@ -28,7 +28,7 @@ import {
 import {
   companyService,
   type CompanyFilters,
-  type Company,
+  type CompanyMetadata as Company,
 } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";

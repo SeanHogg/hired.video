@@ -325,19 +325,19 @@ export default function Pricing() {
                         className="gap-1"
                       >
                         <ToggleGroupItem
-                          value="job_seeker"
+                          value={USER_ROLES.JOB_SEEKER}
                           className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                         >
                           <Users className="h-4 w-4 mr-2" /> Job Seeker
                         </ToggleGroupItem>
                         <ToggleGroupItem
-                          value="recruiter"
+                          value={USER_ROLES.RECRUITER}
                           className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                         >
                           <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                         </ToggleGroupItem>
                         <ToggleGroupItem
-                          value="employer"
+                          value={USER_ROLES.EMPLOYER}
                           className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
                         >
                           <Building2 className="h-4 w-4 mr-2" /> Employer

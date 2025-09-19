@@ -5,12 +5,30 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
+
+// Helpers to normalize enum values from backend (string or number)
+const mapCompanyStatus = (val: unknown): string => {
+  if (typeof val === "string") return val.toLowerCase();
+  if (typeof val === "number") {
+    const map = ["draft", "onboarding", "active", "paused", "inactive"];
+    return map[val] ?? "draft";
+  }
+  return "draft";
+};
+
+const mapCompanyVisibility = (val: unknown): string => {
+  if (typeof val === "string") return val.toLowerCase();
+  if (typeof val === "number") {
+    const map = ["public", "private", "draft"];
+    return map[val] ?? "private";
+  }
+  return "private";
+};
 
 // Metadata item returned by GET /api/Companies/public
 export const CompanyMetadataSchema = z.object({
@@ -24,16 +42,12 @@ export const CompanyMetadataSchema = z.object({
   industry: nullableString(),
   size: nullableString(),
   location: nullableString(),
-  status: z
-    .union([z.string(), z.number()])
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
-  visibility: z
-    .union([z.string(), z.number()])
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
+  status: z.union([z.string(), z.number()]).nullable().transform((val) =>
+    val === null ? undefined : mapCompanyStatus(val),
+  ).optional(),
+  visibility: z.union([z.string(), z.number()]).nullable().transform((val) =>
+    val === null ? undefined : mapCompanyVisibility(val),
+  ).optional(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
   views: nullableNumber(),
@@ -42,6 +56,136 @@ export const CompanyMetadataSchema = z.object({
   activeJobCount: nullableNumber(),
   userId: nullableString(),
   onboardingProgress: nullableNumber(),
+});
+
+// Full Company Profile (GET /api/Companies/{id})
+const CompanyLocationSchema = z
+  .object({
+    address: nullableString(),
+    city: nullableString(),
+    state: nullableString(),
+    country: nullableString(),
+    postalCode: nullableString(),
+    timezone: nullableString(),
+    remote: z.boolean().optional(),
+  })
+  .optional()
+  .default({});
+
+const CompanyContactSchema = z.object({
+  email: nullableString(),
+  phone: nullableString(),
+  website: nullableString(),
+  linkedin: nullableString(),
+  twitter: nullableString(),
+  facebook: nullableString(),
+});
+
+const CompanyFinancialsSchema = z
+  .object({
+    fundingStage: nullableString(),
+    fundingAmount: nullableNumber(),
+    totalFunding: nullableNumber(),
+    currency: nullableString(),
+    valuation: nullableNumber(),
+    revenue: nullableNumber(),
+    profitability: nullableString(),
+    investors: z.array(z.string()).optional().default([]),
+  })
+  .optional();
+
+const CompanyBenefitsSchema = z.object({
+  healthInsurance: nullableBoolean(),
+  dentalInsurance: nullableBoolean(),
+  visionInsurance: nullableBoolean(),
+  retirement401k: nullableBoolean(),
+  retirementPlan: nullableBoolean(),
+  stockOptions: nullableBoolean(),
+  paidTimeOff: nullableBoolean(),
+  parentalLeave: nullableBoolean(),
+  flexibleSchedule: nullableBoolean(),
+  remoteWork: nullableBoolean(),
+  learningBudget: nullableBoolean(),
+  professionalDevelopment: nullableBoolean(),
+  gymMembership: nullableBoolean(),
+  freeFood: nullableBoolean(),
+  commuteBenefits: nullableBoolean(),
+  other: z.array(z.string()).optional().default([]),
+});
+
+const CompanyDataSchema = z.object({
+  name: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  logo: nullableString(),
+  website: nullableString(),
+  tagline: nullableString(),
+  description: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  industry: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  size: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  founded: nullableNumber(),
+  headquarters: CompanyLocationSchema.default({}),
+  locations: z.array(CompanyLocationSchema).optional().default([]),
+  contact: CompanyContactSchema.default({}),
+  financials: CompanyFinancialsSchema,
+  benefits: CompanyBenefitsSchema.default({
+    healthInsurance: false,
+    dentalInsurance: false,
+    visionInsurance: false,
+    retirement401k: false,
+    retirementPlan: false,
+    stockOptions: false,
+    paidTimeOff: false,
+    parentalLeave: false,
+    flexibleSchedule: false,
+    remoteWork: false,
+    learningBudget: false,
+    professionalDevelopment: false,
+    gymMembership: false,
+    freeFood: false,
+    commuteBenefits: false,
+    other: [],
+  }),
+  culture: z.array(z.string()).optional().default([]),
+  technologies: z.array(z.string()).optional().default([]),
+  techStack: z.array(z.string()).optional(),
+  perks: z.array(z.string()).optional().default([]),
+  mission: nullableString(),
+  vision: nullableString(),
+  values: z.array(z.string()).optional().default([]),
+});
+
+export const CompanyProfileSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  data: CompanyDataSchema,
+  status: z.union([z.string(), z.number()]).transform(mapCompanyStatus),
+  visibility: z
+    .union([z.string(), z.number()])
+    .transform(mapCompanyVisibility),
+  onboardingTasks: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        description: z.string(),
+        completed: z.boolean(),
+        required: z.boolean(),
+        order: z.number(),
+      }),
+    )
+    .optional()
+    .default([]),
+  createdAt: nullableString(),
+  updatedAt: nullableString(),
+  views: z.number().optional().default(0),
+  followers: z.number().optional().default(0),
+  jobCount: z.number().optional().default(0),
+  activeJobCount: z.number().optional().default(0),
+  userId: nullableString(),
+  teamMembers: z.array(z.string()).optional().default([]),
+  canEdit: z.boolean().optional(),
+  isOwner: z.boolean().optional(),
+  isFollowing: z.boolean().optional(),
+  isAuthenticated: z.boolean().optional(),
 });
 
 export const CompanyFiltersSchema = z.object({
@@ -67,7 +211,8 @@ export const PaginatedCompaniesSchema = z.object({
 // TYPES
 // ============================================================================
 
-export type Company = z.infer<typeof CompanyMetadataSchema>;
+export type CompanyMetadata = z.infer<typeof CompanyMetadataSchema>;
+export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
 export type CompanyFilters = z.infer<typeof CompanyFiltersSchema>;
 export type PaginatedCompanies = z.infer<typeof PaginatedCompaniesSchema>;
 
@@ -106,10 +251,22 @@ export class CompanyService {
   }
 
   /**
-   * Get specific company by ID
+   * Get specific company by ID (full profile)
    */
-  async getCompanyById(id: string): Promise<Company> {
-    const response = await apiClient.get<Company>(
+  async getCompanyProfileById(id: string): Promise<CompanyProfile> {
+    const response = await apiClient.get<CompanyProfile>(
+      `/api/Companies/${id}`,
+      CompanyProfileSchema,
+    );
+    return response.data;
+  }
+
+  /**
+   * Get specific company by ID (legacy metadata-only)
+   * Note: Many pages use full profile; prefer getCompanyProfileById for details pages
+   */
+  async getCompanyById(id: string): Promise<CompanyMetadata> {
+    const response = await apiClient.get<CompanyMetadata>(
       `/api/Companies/${id}`,
       CompanyMetadataSchema,
     );
@@ -150,8 +307,8 @@ export class CompanyService {
   /**
    * Get companies followed by current user
    */
-  async getFollowedCompanies(): Promise<Company[]> {
-    const response = await apiClient.get<Company[]>(
+  async getFollowedCompanies(): Promise<CompanyMetadata[]> {
+    const response = await apiClient.get<CompanyMetadata[]>(
       "/api/Companies/me/followed",
       z.array(CompanyMetadataSchema),
     );
@@ -209,8 +366,8 @@ export class CompanyService {
   /**
    * Get trending/popular companies
    */
-  async getTrendingCompanies(limit = 10): Promise<Company[]> {
-    const response = await apiClient.get<Company[]>(
+  async getTrendingCompanies(limit = 10): Promise<CompanyMetadata[]> {
+    const response = await apiClient.get<CompanyMetadata[]>(
       `/api/Companies/trending?limit=${limit}`,
       z.array(CompanyMetadataSchema),
     );
@@ -249,10 +406,10 @@ export class CompanyService {
   }
 
   /**
-   * Get company by slug (for SEO-friendly URLs)
+   * Get company by slug (for SEO-friendly URLs) - returns metadata
    */
-  async getCompanyBySlug(slug: string): Promise<Company> {
-    const response = await apiClient.get<Company>(
+  async getCompanyBySlug(slug: string): Promise<CompanyMetadata> {
+    const response = await apiClient.get<CompanyMetadata>(
       `/api/Companies/slug/${slug}`,
       CompanyMetadataSchema,
     );

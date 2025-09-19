@@ -45,9 +45,6 @@ import {
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
-
 import type { Resume } from "@/types/resume";
 
 interface TimelineItemProps {
@@ -164,50 +161,27 @@ export default function ResumeDetail() {
 
       setLoading(true);
       try {
+        // Primary: standard endpoint (respects privacy/auth)
         const foundResume = await resumeService.getResumeById(id);
         setResume(foundResume);
       } catch (error) {
-        console.error("Failed to load resume:", error);
+        console.error("Failed to load resume via /api/Resume/{id}, attempting embedded endpoint:", error);
+        try {
+          // Fallback: embedded endpoint allows public viewing by slug or GUID
+          const embedded = await resumeService.getResumeForEmbed(id);
+          setResume(embedded);
+        } catch (embeddedErr) {
+          console.error("Failed to load resume via embedded endpoint:", embeddedErr);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-  const location = useLocation();
-
-  // Set SEO after resume is loaded; defensive guards against missing fields
-  useEffect(() => {
-    if (!resume) return;
-    try {
-      const personName = (resume.data && resume.data.Basics && resume.data.Basics.Name) || resume.name || "Resume";
-      const summary = (resume.data && resume.data.Basics && resume.data.Basics.Summary) || "";
-      const title = `${personName} | Resume on MyVideoResu.me`;
-      const description = summary ? String(summary).slice(0, 160) : `View ${personName}'s professional resume.`;
-      useSEO(location?.pathname || "/resumes", {
-        title,
-        description,
-        ogTitle: title,
-        ogDescription: description,
-      });
-    } catch (err) {
-      console.error("SEO meta generation failed", err);
-    }
-  }, [resume, location?.pathname]);
-
     loadResume();
   }, [id]);
 
-  // No inline update handler needed here; editing is in the dedicated edit page
-
   const isOwner = user?.id === resume?.userId;
-
-  // Safe date parser for sorting that handles missing/"Present"/invalid dates
-  const safeTime = (value: string): number => {
-    if (!value) return 0;
-    if (value === "Present") return Number.MAX_SAFE_INTEGER;
-    const t = Date.parse(value);
-    return Number.isNaN(t) ? 0 : t;
-  };
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
@@ -544,7 +518,9 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Work
                           .sort(
-                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
+                            (a, b) =>
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((work, index) => (
                             <TimelineItem
@@ -583,7 +559,9 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Education
                           .sort(
-                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
+                            (a, b) =>
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((edu, index) => (
                             <TimelineItem
@@ -623,7 +601,9 @@ export default function ResumeDetail() {
                       <div className="space-y-4">
                         {resume.data.Volunteer
                           .sort(
-                            (a, b) => safeTime(b.StartDate || "") - safeTime(a.StartDate || ""),
+                            (a, b) =>
+                              new Date(b.StartDate || "").getTime() -
+                              new Date(a.StartDate || "").getTime(),
                           )
                           .map((volunteer, index) => (
                             <TimelineItem
