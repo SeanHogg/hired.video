@@ -112,6 +112,22 @@ export const LoginResponseSchema = z.object({
     .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid datetime"),
 });
 
+// Two-factor challenge (step-up authentication)
+export const TwoFactorChallengeSchema = z.object({
+  requiresTwoFactor: z.literal(true),
+  tempAuthToken: z.string().min(1),
+  expiresAt: z.string(),
+  email: z.string(),
+  attemptsLeft: z.number().optional(),
+});
+
+// Registration result when email verification is required
+export const EmailVerificationChallengeSchema = z.object({
+  requiresEmailVerification: z.literal(true),
+  email: z.string().email().optional(),
+  sentAt: z.string().optional(),
+});
+
 export const SignupRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -126,6 +142,10 @@ export const SignupRequestSchema = z.object({
     ])
     .optional(),
 });
+
+// Exported types for shared schemas
+export type TwoFactorChallenge = z.infer<typeof TwoFactorChallengeSchema>;
+export type EmailVerificationChallenge = z.infer<typeof EmailVerificationChallengeSchema>;
 
 /**
  * User Profile Endpoints

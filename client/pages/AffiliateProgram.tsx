@@ -40,8 +40,8 @@ export default function AffiliateProgram() {
     const ref = params.get("ref") || undefined;
     const ok = await signup(email, password, firstName, lastName, USER_ROLES.AFFILIATE, ref);
     if (ok) {
-      setSuccess("Registration successful! Redirecting to your affiliate dashboard...");
-      setTimeout(() => navigate("/affiliate/dashboard"), 1200);
+      setSuccess("Registration successful! Please confirm your email to continue.");
+      setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
     } else {
       setError("Registration failed. Please verify your details or try again later.");
     }

@@ -13,9 +13,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { authService } from "@/lib/services/auth-service";
+import { useState } from "react";
 
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
   const email = searchParams.get("email") || "your email address";
   const firstName = searchParams.get("firstName") || "";
   const {
@@ -90,12 +94,31 @@ export default function SignupSuccess() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.location.reload()}
+                        disabled={resending}
+                        onClick={async () => {
+                          setResendMsg(null);
+                          setResending(true);
+                          try {
+                            const ok = await authService.resendEmailVerification();
+                            setResendMsg(ok ? "Verification email sent." : "Please sign in first to resend the verification email.");
+                          } catch (e) {
+                            setResendMsg("Unable to resend right now. Please try again later.");
+                          } finally {
+                            setResending(false);
+                          }
+                        }}
                         className="flex-1"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        Resend Email
+                        {resending ? "Sending..." : "Resend Email"}
                       </Button>
+
+                      {resendMsg && (
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                          {resendMsg}
+                        </p>
+                      )}
+
 
                       <Button
                         variant="outline"

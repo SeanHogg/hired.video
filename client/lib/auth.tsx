@@ -250,6 +250,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       setIsLoading(true);
       // Filter out SuperAdmin from registration - it's internal only
       const registrationRole = role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN : role;
+
+      // Register now returns a verification challenge; do not set any auth state here
       await authService.register({
         email,
         password,
@@ -259,8 +261,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         role: registrationRole,
         referralCode,
       });
-      const profile = authService.getStoredUser();
-      if (profile) setUser(userProfileToUser(profile));
+
       return true;
     } catch (error) {
       console.error("Signup failed:", error);

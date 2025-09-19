@@ -8,7 +8,11 @@ import { logger } from "../logger";
 import { apiClient } from "../api-client";
 import {
   LoginResponseSchema as SharedLoginResponseSchema,
+  TwoFactorChallengeSchema,
+  EmailVerificationChallengeSchema,
   type LoginResponse as SharedLoginResponse,
+  type TwoFactorChallenge,
+  type EmailVerificationChallenge,
 } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
 
@@ -144,15 +148,9 @@ export type UserProfile = {
 // AUTH SERVICE CLASS
 // ============================================================================
 
-// Two-Factor (step-up) auth support
-const TwoFactorChallengeSchema = z.object({
-  requiresTwoFactor: z.literal(true),
-  tempAuthToken: z.string().min(1),
-  expiresAt: z.string(),
-  email: z.string(),
-  attemptsLeft: z.number().optional(),
-});
-export type TwoFactorChallenge = z.infer<typeof TwoFactorChallengeSchema>;
+// Two-Factor (step-up) auth support (use shared schemas for consistency)
+export { TwoFactorChallengeSchema } from "@shared/api";
+export type { TwoFactorChallenge } from "@shared/api";
 
 export const VerificationStatusSchema = z.object({
   email: z.string().email().optional(),
@@ -163,7 +161,8 @@ export const VerificationStatusSchema = z.object({
 });
 export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 
-export type EmailVerificationChallenge = { requiresEmailVerification: true; email?: string };
+export { EmailVerificationChallengeSchema } from "@shared/api";
+export type { EmailVerificationChallenge } from "@shared/api";
 
 export class AuthService {
   private tokenKey = "auth_token";
@@ -225,9 +224,7 @@ export class AuthService {
       const lrValidation = LoginResponseSchema.safeParse(data);
       if (!lrValidation.success) {
         throw new Error(
-          `Unexpected login response shape: ${
-            (lrValidation as any).error?.message || "validation failed"
-          }`,
+          `Unexpected login response shape: ${lrValidation.error?.message ?? "validation failed"}`,
         );
       }
 
@@ -331,24 +328,17 @@ export class AuthService {
 
   /**
    * Register new user
+   * Returns an EmailVerificationChallenge payload when verification email is sent.
    */
-  async register(userData: RegisterRequest): Promise<LoginResponse> {
-    // Server uses email as username; no need to derive or send userName
+  async register(userData: RegisterRequest): Promise<EmailVerificationChallenge> {
     const payload = { ...userData } as const;
 
-    const response = await apiClient.post<LoginResponse>(
+    // Return a strongly-typed and validated payload via ApiClient
+    const response = await apiClient.post<EmailVerificationChallenge>(
       "/api/Auth/register",
       payload,
-      LoginResponseSchema,
+      EmailVerificationChallengeSchema,
     );
-
-    // Store authentication data then fetch full profile to normalize user fields
-    this.storeAuthData(response.data);
-    try {
-      await this.getCurrentUser();
-    } catch (e) {
-      console.warn("Failed to load full profile after register", e);
-    }
 
     return response.data;
   }
