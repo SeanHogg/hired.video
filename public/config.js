@@ -3,7 +3,7 @@
 window.APP_CONFIG = {
   // API Configuration
   API_URL: "https://api.myvideoresu.me/api",
-  
+
   // Error Tracking (GlitchTip/Sentry)
   ERROR_REPORTING: {
     ENABLED: true,
@@ -11,7 +11,7 @@ window.APP_CONFIG = {
     ENVIRONMENT: "production", // development, staging, production
     SAMPLE_RATE: 0.1, // 10% of transactions for performance monitoring
   },
-  
+
   // Feature Flags
   FEATURES: {
     AI_CHAT: true,
@@ -19,21 +19,21 @@ window.APP_CONFIG = {
     ANALYTICS: false,
     NOTIFICATIONS: true,
   },
-  
+
   // Performance Monitoring
   PERFORMANCE: {
     MONITORING: false,
     SAMPLE_RATE: 0.1,
   },
-  
+
   // Logging
   LOGGING: {
     LEVEL: "info", // debug, info, warn, error
     MAX_ENTRIES: 100,
   },
-  
+
   // App Version (update this with each deployment)
   VERSION: "1.2.0",
-  
+
 
 };

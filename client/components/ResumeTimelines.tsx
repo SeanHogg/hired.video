@@ -415,7 +415,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                         <div key={index} className="relative flex-shrink-0 w-64 sm:w-72">
                                             {/* Timeline connector line */}
                                             {index < comprehensiveTimeline.length - 1 && (
-                                                <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                             )}
 
                                             {/* Timeline item */}
@@ -481,7 +481,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             <div key={index} className="relative flex-shrink-0 w-72">
                                                 {/* Timeline connector line */}
                                                 {index < sortedWork.length - 1 && (
-                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                    <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
 
                                                 {/* Timeline item */}
@@ -549,7 +549,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             <div key={index} className="relative flex-shrink-0 w-72">
                                                 {/* Timeline connector line */}
                                                 {index < sortedVolunteer.length - 1 && (
-                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                    <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
 
                                                 {/* Timeline item */}
@@ -608,14 +608,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             <div key={index} className="relative flex-shrink-0 w-72">
                                                 {/* Timeline connector line */}
                                                 {index < sortedEducation.length - 1 && (
-                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                    <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-blue-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <GraduationCap className="w-2 h-2 text-background" />
+                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-blue-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <GraduationCap className="w-3 h-3 text-background" />
                                                     </div>
 
                                                     {/* Content */}
@@ -663,14 +663,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             <div key={index} className="relative flex-shrink-0 w-64">
                                                 {/* Timeline connector line */}
                                                 {index < sortedCertificates.length - 1 && (
-                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                    <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-green-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <FileText className="w-2 h-2 text-background" />
+                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-green-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <FileText className="w-3 h-3 text-background" />
                                                     </div>
 
                                                     {/* Content */}
@@ -712,14 +712,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             <div key={index} className="relative flex-shrink-0 w-72">
                                                 {/* Timeline connector line */}
                                                 {index < sortedAwards.length - 1 && (
-                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                    <div className="absolute top-9 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-yellow-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Award className="w-2 h-2 text-background" />
+                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-yellow-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Award className="w-3 h-3 text-background" />
                                                     </div>
 
                                                     {/* Content */}
