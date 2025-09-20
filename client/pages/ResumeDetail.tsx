@@ -46,6 +46,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
+import ResumeTimelines from "@/components/ResumeTimelines";
+
 
 interface TimelineItemProps {
   title: string;
@@ -108,12 +110,12 @@ function TimelineItem({
                   {(() => {
                     const formattedStart = formatDate(startDate);
                     const formattedEnd = formatDate(endDate);
-                    
+
                     // If no start date but has end date, show only end date
                     if (formattedStart === "No date" && formattedEnd !== "No date") {
                       return formattedEnd;
                     }
-                    
+
                     // Otherwise show the range
                     return `${formattedStart} - ${formattedEnd}`;
                   })()}
@@ -513,6 +515,9 @@ export default function ResumeDetail() {
 
           {/* Content */}
           <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
+            {/* Resume Timeline */}
+            <ResumeTimelines resumeData={resume.data} />
+
             {/* Work Experience Timeline */}
             {resume?.data?.Work &&
               resume.data.Work.length > 0 && (
