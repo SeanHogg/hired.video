@@ -35,6 +35,5 @@ window.APP_CONFIG = {
   // App Version
   VERSION: "1.2.0-dev",
   
-  // Build timestamp
-  BUILD_TIME: new Date().toISOString(),
+
 };

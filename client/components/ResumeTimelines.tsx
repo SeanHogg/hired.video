@@ -421,8 +421,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             {/* Timeline item */}
                                             <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                 {/* Timeline dot */}
-                                                <div className="absolute -top-2 left-4 w-4 h-4 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                    <div className="w-2 h-2 bg-background rounded-full" />
+                                                <div className="absolute -top-2 left-4 w-6 h-6 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                    <div className="text-background text-xs">
+                                                        {item.icon}
+                                                    </div>
                                                 </div>
 
                                                 {/* Content */}
@@ -485,8 +487,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Briefcase className="w-2 h-2 text-background" />
+                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Briefcase className="w-3 h-3 text-background" />
                                                     </div>
 
                                                     {/* Content */}
@@ -553,8 +555,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-red-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Heart className="w-2 h-2 text-background" />
+                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-red-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Heart className="w-3 h-3 text-background" />
                                                     </div>
 
                                                     {/* Content */}

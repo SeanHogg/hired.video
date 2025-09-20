@@ -35,6 +35,5 @@ window.APP_CONFIG = {
   // App Version (update this with each deployment)
   VERSION: "1.2.0",
   
-  // Build timestamp (will be updated by build process)
-  BUILD_TIME: new Date().toISOString(),
+
 };

@@ -27,7 +27,7 @@ interface AppConfig {
     MAX_ENTRIES: number;
   };
   VERSION: string;
-  BUILD_TIME: string;
+
 }
 
 declare global {
@@ -76,7 +76,7 @@ class RuntimeConfig {
         MAX_ENTRIES: parseInt(import.meta.env.VITE_LOG_MAX_ENTRIES || "100"),
       },
       VERSION: import.meta.env.VITE_APP_VERSION || "unknown",
-      BUILD_TIME: new Date().toISOString(),
+
     };
   }
 
@@ -105,9 +105,7 @@ class RuntimeConfig {
     return this.config.VERSION;
   }
 
-  get buildTime(): string {
-    return this.config.BUILD_TIME;
-  }
+
 
   get isProduction(): boolean {
     return this.config.ERROR_REPORTING.ENVIRONMENT === "production";

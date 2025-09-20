@@ -64,10 +64,7 @@ jobs:
 
       - name: Configure for production
         run: |
-          # Generate build timestamp
-          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
-          
-          # Create production config with actual timestamp
+          # Create production config
           cat > dist/config.js << EOF
           // Runtime configuration for production deployment
           window.APP_CONFIG = {
@@ -104,9 +101,6 @@ jobs:
             
             // App Version (updated by build process)
             VERSION: "1.2.0",
-            
-            // Build timestamp (updated by build process)
-            BUILD_TIME: "${BUILD_TIMESTAMP}",
           };
           EOF
 
