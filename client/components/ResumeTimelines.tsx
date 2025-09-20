@@ -29,18 +29,18 @@ interface TimelineItem {
 export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     // Calculate duration between two dates
     const calculateDuration = (startDate: string, endDate: string): string => {
-        if (!startDate) return "Unknown duration";
+        if (!startDate) return "";
 
         const start = new Date(startDate);
         // Check if start date is valid
-        if (isNaN(start.getTime())) return "Unknown duration";
+        if (isNaN(start.getTime())) return "";
 
         // Use current date if no end date provided (current position)
         const end = (endDate && endDate !== '') ? new Date(endDate) : new Date();
 
         // Check if end date is valid (if provided)
         if (endDate && endDate !== '' && isNaN(end.getTime())) {
-            return "Unknown duration";
+            return "";
         }
 
         const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -69,6 +69,24 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             year: 'numeric',
             month: 'short'
         });
+    };
+
+    // Check if we should show date information
+    const shouldShowDates = (startDate: string, endDate: string): boolean => {
+        if (!startDate) return false;
+        const start = new Date(startDate);
+        if (isNaN(start.getTime())) return false;
+
+        // If both start and end are "Present", don't show
+        if (formatDate(startDate) === "Present" && formatDate(endDate) === "Present") return false;
+
+        return true;
+    };
+
+    // Format date range for display
+    const formatDateRange = (startDate: string, endDate: string): string => {
+        if (!shouldShowDates(startDate, endDate)) return "";
+        return `${formatDate(startDate)} - ${formatDate(endDate)}`;
     };
 
     // Create comprehensive timeline combining all experiences
@@ -417,10 +435,12 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                     </div>
                                                     <h4 className="font-medium text-sm mb-1 line-clamp-2">{item.title}</h4>
                                                     <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{item.organization}</p>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        <div>{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>
-                                                        {item.duration && <div className="font-medium text-primary mt-1">{item.duration}</div>}
-                                                    </div>
+                                                    {shouldShowDates(item.startDate, item.endDate) && (
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDateRange(item.startDate, item.endDate)}</div>
+                                                            {item.duration && <div className="font-medium text-primary mt-1">{item.duration}</div>}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -480,10 +500,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                         </div>
                                                         <h4 className="font-medium text-sm mb-1 line-clamp-2">{work.Position}</h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{work.Name}</p>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDate(work.StartDate)} - {formatDate(work.EndDate)}</div>
-                                                            <div className="font-medium text-primary mt-1">{calculateDuration(work.StartDate, work.EndDate)}</div>
-                                                        </div>
+                                                        {shouldShowDates(work.StartDate, work.EndDate) && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <div>{formatDateRange(work.StartDate, work.EndDate)}</div>
+                                                                {calculateDuration(work.StartDate, work.EndDate) && (
+                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(work.StartDate, work.EndDate)}</div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -544,10 +568,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                         </div>
                                                         <h4 className="font-medium text-sm mb-1 line-clamp-2">{vol.Position}</h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{vol.Organization}</p>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDate(vol.StartDate)} - {formatDate(vol.EndDate)}</div>
-                                                            <div className="font-medium text-primary mt-1">{calculateDuration(vol.StartDate, vol.EndDate)}</div>
-                                                        </div>
+                                                        {shouldShowDates(vol.StartDate, vol.EndDate) && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <div>{formatDateRange(vol.StartDate, vol.EndDate)}</div>
+                                                                {calculateDuration(vol.StartDate, vol.EndDate) && (
+                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(vol.StartDate, vol.EndDate)}</div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -595,10 +623,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                         {edu.Score && (
                                                             <p className="text-xs text-muted-foreground mb-2">GPA: {edu.Score}</p>
                                                         )}
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDate(edu.StartDate)} - {formatDate(edu.EndDate)}</div>
-                                                            <div className="font-medium text-primary mt-1">{calculateDuration(edu.StartDate, edu.EndDate)}</div>
-                                                        </div>
+                                                        {shouldShowDates(edu.StartDate, edu.EndDate) && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <div>{formatDateRange(edu.StartDate, edu.EndDate)}</div>
+                                                                {calculateDuration(edu.StartDate, edu.EndDate) && (
+                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(edu.StartDate, edu.EndDate)}</div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -643,9 +675,11 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                     <div className="pt-2">
                                                         <h4 className="font-medium text-sm mb-1 line-clamp-2">{cert.Name}</h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{cert.Issuer}</p>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDate(cert.Date)}</div>
-                                                        </div>
+                                                        {cert.Date && formatDate(cert.Date) !== "Present" && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <div>{formatDate(cert.Date)}</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -678,14 +712,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 {index < sortedAwards.length - 1 && (
                                                     <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
-                                                
+
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
                                                     {/* Timeline dot */}
                                                     <div className="absolute -top-2 left-4 w-4 h-4 bg-yellow-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
                                                         <Award className="w-2 h-2 text-background" />
                                                     </div>
-                                                    
+
                                                     {/* Content */}
                                                     <div className="pt-2">
                                                         <h4 className="font-medium text-sm mb-1 line-clamp-2">{award.Title}</h4>
@@ -693,16 +727,18 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                         {award.Summary && (
                                                             <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{award.Summary}</p>
                                                         )}
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDate(award.Date)}</div>
-                                                        </div>
+                                                        {award.Date && formatDate(award.Date) !== "Present" && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <div>{formatDate(award.Date)}</div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 {/* Scroll indicators */}
                                 <div className="flex justify-center mt-2">
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">

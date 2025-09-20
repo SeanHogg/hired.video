@@ -127,6 +127,20 @@ export default function ResumeViewer({
     );
   };
 
+  // Check if we should show date information
+  const shouldShowDatesInResume = (startDate: string, endDate: string): boolean => {
+    if (!startDate) return false;
+    
+    const formattedStart = formatDateForResume(startDate);
+    const formattedEnd = formatDateForResume(endDate);
+    
+    // Don't show if both are "Present" or if start date is invalid
+    if (formattedStart === "Present" && formattedEnd === "Present") return false;
+    if (formattedStart === "Invalid Date") return false;
+    
+    return true;
+  };
+
   const getPrivacyIcon = (privacy: ResumePrivacy) => {
     switch (privacy) {
       case "public":
@@ -356,11 +370,13 @@ export default function ResumeViewer({
                           <h3 className="text-lg font-semibold">
                             {work.Position}
                           </h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            {formatDateForResume(work.StartDate)} -{" "}
-                            {formatDateForResume(work.EndDate)}
-                          </div>
+                          {shouldShowDatesInResume(work.StartDate, work.EndDate) && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              {formatDateForResume(work.StartDate)} -{" "}
+                              {formatDateForResume(work.EndDate)}
+                            </div>
+                          )}
                         </div>
                         <p className="text-primary font-medium">{work.Name}</p>
                         {work.Summary && (
@@ -403,10 +419,12 @@ export default function ResumeViewer({
                             </p>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateForResume(edu.StartDate)} -{" "}
-                          {formatDateForResume(edu.EndDate)}
-                        </div>
+                        {shouldShowDatesInResume(edu.StartDate, edu.EndDate) && (
+                          <div className="text-sm text-muted-foreground">
+                            {formatDateForResume(edu.StartDate)} -{" "}
+                            {formatDateForResume(edu.EndDate)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
