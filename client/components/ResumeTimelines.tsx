@@ -449,22 +449,14 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                             {/* Timeline item */}
                                             <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                {/* Timeline dot */}
-                                                <div className="absolute -top-2 left-4 w-6 h-6 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                    <div className="text-background text-xs">
-                                                        {item.icon}
-                                                    </div>
-                                                </div>
-
                                                 {/* Content */}
                                                 <div className="pt-2">
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        {item.icon}
                                                         <span className="text-xs px-2 py-1 bg-muted rounded-full capitalize">
                                                             {item.type}
                                                         </span>
                                                     </div>
-                                                    <h4 className="font-medium text-sm mb-1 line-clamp-2">{item.title}</h4>
+                                                    <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">{item.icon}{item.title}</h4>
                                                     <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{item.organization}</p>
                                                     {shouldShowDates(item.startDate, item.endDate) && (
                                                         <div className="text-xs text-muted-foreground">
@@ -515,21 +507,20 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Briefcase className="w-3 h-3 text-background" />
-                                                    </div>
-
                                                     {/* Content */}
                                                     <div className="pt-2">
                                                         <div className="flex items-center gap-2 mb-2">
+                                                            <Briefcase className="w-3 h-3 text-muted-foreground" />
                                                             {(!work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present') && (
                                                                 <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
                                                                     Current
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{work.Position}</h4>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                                                            <Briefcase className="w-3 h-3" />
+                                                            {work.Position}
+                                                        </h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{work.Name}</p>
                                                         {shouldShowDates(work.StartDate, work.EndDate) && (
                                                             <div className="text-xs text-muted-foreground">
@@ -583,21 +574,20 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-red-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Heart className="w-3 h-3 text-background" />
-                                                    </div>
-
                                                     {/* Content */}
                                                     <div className="pt-2">
                                                         <div className="flex items-center gap-2 mb-2">
+                                                            <Heart className="w-3 h-3 text-muted-foreground" />
                                                             {(!vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present') && (
                                                                 <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">
                                                                     Active
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{vol.Position}</h4>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                                                            <Heart className="w-3 h-3" />
+                                                            {vol.Position}
+                                                        </h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{vol.Organization}</p>
                                                         {shouldShowDates(vol.StartDate, vol.EndDate) && (
                                                             <div className="text-xs text-muted-foreground">
@@ -642,14 +632,12 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-blue-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <GraduationCap className="w-3 h-3 text-background" />
-                                                    </div>
-
                                                     {/* Content */}
                                                     <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{edu.StudyType} in {edu.Area}</h4>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                                                            <GraduationCap className="w-3 h-3" />
+                                                            {edu.StudyType} in {edu.Area}
+                                                        </h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{edu.Institution}</p>
                                                         {edu.Score && (
                                                             <p className="text-xs text-muted-foreground mb-2">GPA: {edu.Score}</p>
@@ -697,14 +685,12 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-green-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <FileText className="w-3 h-3 text-background" />
-                                                    </div>
-
                                                     {/* Content */}
                                                     <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{cert.Name}</h4>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                                                            <FileText className="w-3 h-3" />
+                                                            {cert.Name}
+                                                        </h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{cert.Issuer}</p>
                                                         {cert.Date && formatDate(cert.Date) !== "Present" && (
                                                             <div className="text-xs text-muted-foreground">
@@ -746,14 +732,12 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                                                 {/* Timeline item */}
                                                 <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Timeline dot */}
-                                                    <div className="absolute -top-2 left-4 w-6 h-6 bg-yellow-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
-                                                        <Award className="w-3 h-3 text-background" />
-                                                    </div>
-
                                                     {/* Content */}
                                                     <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{award.Title}</h4>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                                                            <Award className="w-3 h-3" />
+                                                            {award.Title}
+                                                        </h4>
                                                         <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{award.Awarder}</p>
                                                         {award.Summary && (
                                                             <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{award.Summary}</p>

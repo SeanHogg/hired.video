@@ -23,24 +23,16 @@ try {
   // Read the config file
   let configContent = fs.readFileSync(configPath, 'utf8');
   
-  // Update build time and version
-  const buildTime = new Date().toISOString();
-  
-  // Replace the build time and version in the config
-  configContent = configContent.replace(
-    /BUILD_TIME: new Date\(\)\.toISOString\(\)/,
-    `BUILD_TIME: "${buildTime}"`
-  );
-  
+  // Update app version only
   configContent = configContent.replace(
     /VERSION: "[\d.]+"/,
     `VERSION: "${version}"`
   );
-  
+
   // Write the updated config
   fs.writeFileSync(configPath, configContent);
-  
-  console.log(`✅ Updated config.js with version ${version} and build time ${buildTime}`);
+
+  console.log(`✅ Updated config.js with version ${version}`);
 } catch (error) {
   console.error('❌ Failed to update config.js:', error.message);
   process.exit(1);
