@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Share,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
+import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
@@ -50,6 +51,7 @@ export default function CompanyCard({
   onActions,
 }: CompanyCardProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Early return if company is undefined
   if (!company) {
@@ -154,44 +156,46 @@ export default function CompanyCard({
     actions && actions.length > 0
       ? actions
       : [
-          {
-            id: "view",
-            label: "View",
-            variant: "outline" as const,
-            icon: Eye,
-            onClick: () => {
-              if (onView) {
-                onView();
-              } else {
-                window.location.href = `/companies/${company.id}`;
-              }
-            },
+        {
+          id: "view",
+          label: "View",
+          variant: "outline" as const,
+          icon: Eye,
+          onClick: () => {
+            if (onView) {
+              onView();
+            } else {
+              navigate(`/companies/${company.id}`);
+            }
           },
-          {
-            id: "share",
-            label: "Share",
-            variant: "default" as const,
-            icon: Share,
-            onClick: () => {
-              if (onActions) {
-                onActions();
-              } else {
-                // Default share functionality - copy link to clipboard
-                const url = `${window.location.origin}/companies/${company.id}`;
-                navigator.clipboard
-                  .writeText(url)
-                  .then(() => {
-                    // Could show a toast notification here
-                    alert("Company link copied to clipboard!");
-                  })
-                  .catch(() => {
-                    // Fallback for older browsers
-                    prompt("Copy this link:", url);
+        },
+        {
+          id: "share",
+          label: "Share",
+          variant: "default" as const,
+          icon: Share,
+          onClick: () => {
+            if (onActions) {
+              onActions();
+            } else {
+              // Default share functionality - copy link to clipboard
+              const url = `${window.location.origin}/companies/${company.id}`;
+              navigator.clipboard
+                .writeText(url)
+                .then(() => {
+                  toast({
+                    title: "Link copied!",
+                    description: "Company link has been copied to your clipboard.",
                   });
-              }
-            },
+                })
+                .catch(() => {
+                  // Fallback for older browsers
+                  prompt("Copy this link:", url);
+                });
+            }
           },
-        ];
+        },
+      ];
 
   return (
     <BaseCard>

@@ -73,32 +73,38 @@ export function normalizeCompanyData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedCompanyData {
+  // Handle nested data structure from API
+  const companyData = item.data || item;
+
   return {
-    id: item.id,
+    id: item.id || companyData.id,
     type: "company" as const,
-    name: item.name || item.title || "Unknown Company",
-    logo: item.logo || item.avatar,
-    tagline: item.tagline || item.summary,
-    industry: item.industry || "Technology", // Remove hardcoded assumption
-    size: item.size || "Unknown",
-    location: item.location || "Unknown",
-    status: item.status || "active",
-    visibility: item.visibility || item.privacy || "public",
-    createdAt: item.createdAt || new Date().toISOString(),
-    updatedAt: item.updatedAt || new Date().toISOString(),
-    views: item.views || 0,
-    followers: item.followers || 0,
-    jobCount: item.jobCount || 0,
-    activeJobCount: item.activeJobCount || 0,
+    name: companyData.name || item.name || item.title || "Unknown Company",
+    logo: companyData.logo || item.logo || item.avatar,
+    tagline: companyData.tagline || item.tagline || item.summary,
+    industry: companyData.industry || item.industry || "Not specified",
+    size: companyData.size || item.size || "Not specified",
+    location: companyData.location || item.location ||
+      (companyData.headquarters?.city && companyData.headquarters?.state
+        ? `${companyData.headquarters.city}, ${companyData.headquarters.state}`
+        : "Not specified"),
+    status: item.status || companyData.status || "active",
+    visibility: item.visibility || companyData.visibility || item.privacy || "public",
+    createdAt: item.createdAt || companyData.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || companyData.updatedAt || new Date().toISOString(),
+    views: item.views || companyData.views || 0,
+    followers: item.followers || companyData.followers || 0,
+    jobCount: item.jobCount || companyData.jobCount || 0,
+    activeJobCount: item.activeJobCount || companyData.activeJobCount || 0,
     ownership:
       determineOwnership(item, context) === "none"
         ? "tracked"
         : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
-    userId: item.userId || "unknown",
-    teamMembers: item.teamMembers || [],
-    onboardingProgress: item.onboardingProgress || 0,
-    slug: item.slug || `company-${item.id}`,
+    userId: item.userId || companyData.userId || "unknown",
+    teamMembers: item.teamMembers || companyData.teamMembers || [],
+    onboardingProgress: item.onboardingProgress || companyData.onboardingProgress || 0,
+    slug: item.slug || companyData.slug || `company-${item.id}`,
   };
 }
 
@@ -148,9 +154,9 @@ export function normalizePersonData(
       determineOwnership(item, context) === "none"
         ? "tracked"
         : (determineOwnership(item, context) as
-            | "owned"
-            | "tracked"
-            | "connected"),
+          | "owned"
+          | "tracked"
+          | "connected"),
     showOwnership: context.showOwnership || false,
     slug: item.slug || `person-${item.id}`,
   };

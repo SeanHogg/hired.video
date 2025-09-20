@@ -114,13 +114,13 @@ const CompanyBenefitsSchema = z.object({
 });
 
 const CompanyDataSchema = z.object({
-  name: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  name: z.string().nullable().transform((v) => v ?? "Unnamed Company").optional().default("Unnamed Company"),
   logo: nullableString(),
   website: nullableString(),
   tagline: nullableString(),
   description: z.string().nullable().transform((v) => v ?? "").optional().default(""),
-  industry: z.string().nullable().transform((v) => v ?? "").optional().default(""),
-  size: z.string().nullable().transform((v) => v ?? "").optional().default(""),
+  industry: z.string().nullable().transform((v) => v ?? "Not specified").optional().default("Not specified"),
+  size: z.string().nullable().transform((v) => v ?? "Not specified").optional().default("Not specified"),
   founded: nullableNumber(),
   headquarters: CompanyLocationSchema.default({}),
   locations: z.array(CompanyLocationSchema).optional().default([]),

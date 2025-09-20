@@ -243,113 +243,113 @@ export default function Index() {
   // Convert unified search results to content items
   const contentItems = searchResults
     ? searchResults.items
-        .map((item) => {
-          switch (item.type) {
-            case "people":
-              return {
-                id: item.id,
-                name: item.name ?? item.title ?? "",
-                title: item.headline || item.summary || "Professional",
-                summary: item.headline || item.summary || "Professional",
-                avatar: item.avatar,
-                views: item.views || 0,
-                type: "people" as const,
-                contentType: "profile" as const,
-                profession:
-                  item.headline?.split(" | ")[0] ||
-                  item.summary ||
-                  "Professional",
-                company: "Independent", // TODO: Get from user profile
-                createdAt: item.createdAt || new Date().toISOString(),
-                location: item.location,
-                role: "job_seeker" as const, // TODO: Get actual role
-                isVerified: false, // TODO: Get from user profile
-                isPremium: false, // TODO: Get from user profile
-              };
-            case "company":
-              return {
-                id: item.id,
-                name: item.name ?? item.title ?? "",
-                title: item.description || item.summary || "Company",
-                summary: item.description || item.summary || "Company",
-                logo: item.logo,
-                views: item.views || 0,
-                type: "company" as const,
-                contentType: "profile" as const,
-                profession: item.industry || "Technology",
-                company: item.name || item.title,
-                createdAt: item.createdAt || new Date().toISOString(),
-                location: item.location,
-                size: "Unknown", // TODO: Get from company profile
-                activeJobCount: 0, // TODO: Get from company profile
-                followers: 0, // TODO: Get from company profile
-              };
-            case "resume":
-              // Filter out DRAFT resumes - they should not be visible
-              if ((item as any).privacy === "draft") {
-                return null;
-              }
-              return {
-                id: item.id,
-                name: item.title || item.name || "Untitled Resume",
-                title: item.title || item.name || "Untitled Resume",
-                summary:
-                  item.summary || item.description || "No summary available",
-                views: item.views || 0,
-                type: "resume" as const,
-                contentType: "text" as const,
-                profession: item.skills?.[0] || "Professional",
-                company: "Independent", // TODO: Get from resume data
-                createdAt: item.createdAt || new Date().toISOString(),
-                ownerId: item.id, // TODO: Get actual owner ID
-                privacy: (item as any).privacy || "public",
-              };
-            case "job":
-              return {
+      .map((item) => {
+        switch (item.type) {
+          case "people":
+            return {
+              id: item.id,
+              name: item.name ?? item.title ?? "",
+              title: item.headline || item.summary || "Professional",
+              summary: item.headline || item.summary || "Professional",
+              avatar: item.avatar,
+              views: item.views || 0,
+              type: "people" as const,
+              contentType: "profile" as const,
+              profession:
+                item.headline?.split(" | ")[0] ||
+                item.summary ||
+                "Professional",
+              company: "Independent", // TODO: Get from user profile
+              createdAt: item.createdAt || new Date().toISOString(),
+              location: item.location,
+              role: "job_seeker" as const, // TODO: Get actual role
+              isVerified: false, // TODO: Get from user profile
+              isPremium: false, // TODO: Get from user profile
+            };
+          case "company":
+            return {
+              id: item.id,
+              name: item.name ?? item.title ?? "",
+              title: item.description || item.summary || "Company",
+              summary: item.description || item.summary || "Company",
+              logo: item.logo,
+              views: item.views || 0,
+              type: "company" as const,
+              contentType: "profile" as const,
+              profession: item.industry || "Technology",
+              company: item.name || item.title,
+              createdAt: item.createdAt || new Date().toISOString(),
+              location: item.location,
+              size: "Unknown", // TODO: Get from company profile
+              activeJobCount: 0, // TODO: Get from company profile
+              followers: 0, // TODO: Get from company profile
+            };
+          case "resume":
+            // Filter out DRAFT resumes - they should not be visible
+            if ((item as any).privacy === "draft") {
+              return null;
+            }
+            return {
+              id: item.id,
+              name: item.title || item.name || "Untitled Resume",
+              title: item.title || item.name || "Untitled Resume",
+              summary:
+                item.summary || item.description || "No summary available",
+              views: item.views || 0,
+              type: "resume" as const,
+              contentType: "text" as const,
+              profession: item.skills?.[0] || "Professional",
+              company: "Independent", // TODO: Get from resume data
+              createdAt: item.createdAt || new Date().toISOString(),
+              ownerId: item.id, // TODO: Get actual owner ID
+              privacy: (item as any).privacy || "public",
+            };
+          case "job":
+            return {
+              id: item.id,
+              title: item.title,
+              name: item.title,
+              summary: `${item.title} at ${item.company || "Unknown Company"}`,
+              views: item.views || 0,
+              applications: (item as any).applications || 0,
+              type: "job" as const,
+              contentType: "job" as const,
+              profession: item.title,
+              company: item.company || "Unknown Company",
+              createdAt:
+                item.postedDate || item.createdAt || new Date().toISOString(),
+              location: item.location,
+              employmentType: item.employmentType || "Full-time",
+              salaryMin: 0, // TODO: Get from job data
+              salaryMax: 0, // TODO: Get from job data
+              jobData: {
                 id: item.id,
                 title: item.title,
-                name: item.title,
-                summary: `${item.title} at ${item.company || "Unknown Company"}`,
-                views: item.views || 0,
-                applications: (item as any).applications || 0,
-                type: "job" as const,
-                contentType: "job" as const,
-                profession: item.title,
                 company: item.company || "Unknown Company",
-                createdAt:
-                  item.postedDate || item.createdAt || new Date().toISOString(),
-                location: item.location,
+                location: item.location || "Unknown Location",
                 employmentType: item.employmentType || "Full-time",
-                salaryMin: 0, // TODO: Get from job data
-                salaryMax: 0, // TODO: Get from job data
-                jobData: {
-                  id: item.id,
-                  title: item.title,
-                  company: item.company || "Unknown Company",
-                  location: item.location || "Unknown Location",
-                  employmentType: item.employmentType || "Full-time",
-                  postedDate:
-                    item.postedDate ||
-                    item.createdAt ||
-                    new Date().toISOString(),
-                  views: item.views || 0,
-                },
-              };
-            default:
-              return null;
-          }
-        })
-        .filter(Boolean)
+                postedDate:
+                  item.postedDate ||
+                  item.createdAt ||
+                  new Date().toISOString(),
+                views: item.views || 0,
+              },
+            };
+          default:
+            return null;
+        }
+      })
+      .filter(Boolean)
     : [];
 
   // Create user context for dynamic actions
   const userContext = user
     ? createUserContext({
-        userId: user.id,
-        role: user.role || "regular_user",
-        accountId: (user as any).accountId,
-        permissions: (user as any).permissions || [],
-      })
+      userId: user.id,
+      role: user.role || "regular_user",
+      accountId: (user as any).accountId,
+      permissions: (user as any).permissions || [],
+    })
     : getDefaultUserContext();
 
   // Create card renderers for different sections with user context
@@ -488,15 +488,15 @@ export default function Index() {
           // Sort by latest activity/updates (newest first)
           const aUpdate = new Date(
             (a as any).updatedAt ||
-              (a as any).createdAt ||
-              (a as any).postedDate ||
-              0,
+            (a as any).createdAt ||
+            (a as any).postedDate ||
+            0,
           );
           const bUpdate = new Date(
             (b as any).updatedAt ||
-              (b as any).createdAt ||
-              (b as any).postedDate ||
-              0,
+            (b as any).createdAt ||
+            (b as any).postedDate ||
+            0,
           );
           return bUpdate.getTime() - aUpdate.getTime();
 
@@ -746,14 +746,14 @@ export default function Index() {
                             )}
                             {(item.type === "resume" ||
                               item.type === "job") && (
-                              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                                {item.type === "resume" ? (
-                                  <User className="w-6 h-6 text-primary" />
-                                ) : (
-                                  <Briefcase className="w-6 h-6 text-primary" />
-                                )}
-                              </div>
-                            )}
+                                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                  {item.type === "resume" ? (
+                                    <User className="w-6 h-6 text-primary" />
+                                  ) : (
+                                    <Briefcase className="w-6 h-6 text-primary" />
+                                  )}
+                                </div>
+                              )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between">
@@ -776,7 +776,7 @@ export default function Index() {
                                     navigate(`/people/${item.id}`);
                                   else if (item.type === "company")
                                     navigate(
-                                      `/companies/view/${(item as any).id}`,
+                                      `/companies/${(item as any).id}`,
                                     );
                                   else if (item.type === "resume")
                                     navigate(`/resumes/${item.id}`);
@@ -841,12 +841,12 @@ export default function Index() {
         user={
           user
             ? {
-                ...user,
-                role:
-                  user.role === USER_ROLES.EMPLOYER
-                    ? USER_ROLES.RECRUITER
-                    : user.role || USER_ROLES.JOB_SEEKER,
-              }
+              ...user,
+              role:
+                user.role === USER_ROLES.EMPLOYER
+                  ? USER_ROLES.RECRUITER
+                  : user.role || USER_ROLES.JOB_SEEKER,
+            }
             : null
         }
         onView={() => actionsModal.item && handleView(actionsModal.item)}

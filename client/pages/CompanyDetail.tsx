@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import AuthOverlay from "@/components/AuthOverlay";
+
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -40,13 +40,14 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
+
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "react-router-dom";
 import { useSEO, generateStructuredData } from "@/lib/seo";
+import { toast } from "@/components/ui/use-toast";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -61,15 +62,7 @@ export default function CompanyDetail() {
   } = useSidebar();
   const location = useLocation();
 
-  const [expandedSections, setExpandedSections] = useState<{
-    [key: string]: boolean;
-  }>({
-    overview: true,
-    culture: true,
-    benefits: false,
-    locations: false,
-    onboarding: true,
-  });
+
 
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,8 +79,8 @@ export default function CompanyDetail() {
         setError(null);
         const companyData = await companyService.getCompanyProfileById(id);
         setCompany(companyData);
-      } catch (err) {
-        console.error("Failed to fetch company:", err);
+      } catch {
+        // Error already handled by setting error state
         setError("Failed to load company. Please try again.");
       } finally {
         setIsLoading(false);
@@ -123,12 +116,7 @@ export default function CompanyDetail() {
 
   const isOwner = user && company && company.userId === user.id;
 
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
+
 
   const handleTrackCompany = async () => {
     if (!isAuthenticated) {
@@ -154,14 +142,14 @@ export default function CompanyDetail() {
         await companyService.followCompany(company.id);
         setIsTracked(true);
       }
-    } catch (err) {
-      console.error("Failed to update company tracking:", err);
+    } catch {
+      // Error handling could be improved with user feedback
     }
   };
 
-  const handleOnboardingTaskToggle = (taskId: string, completed: boolean) => {
+  const handleOnboardingTaskToggle = (_taskId: string, _completed: boolean) => {
     // TODO: Implement onboarding task API when available
-    console.log("Onboarding task toggle:", taskId, completed);
+    // Placeholder for onboarding task toggle functionality
   };
 
   if (isLoading) {
@@ -320,21 +308,28 @@ export default function CompanyDetail() {
                             </CardDescription>
                           )}
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Building2 className="h-4 w-4" />
-                              <span>{company.data.industry}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              <span>{company.data.size} employees</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              <span>
-                                {company.data.headquarters.city},{" "}
-                                {company.data.headquarters.state}
-                              </span>
-                            </div>
+                            {company.data.industry && company.data.industry !== "Not specified" && (
+                              <div className="flex items-center gap-1">
+                                <Building2 className="h-4 w-4" />
+                                <span>{company.data.industry}</span>
+                              </div>
+                            )}
+                            {company.data.size && company.data.size !== "Not specified" && (
+                              <div className="flex items-center gap-1">
+                                <Users className="h-4 w-4" />
+                                <span>{company.data.size} employees</span>
+                              </div>
+                            )}
+                            {(company.data.headquarters?.city || company.data.headquarters?.state) && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-4 w-4" />
+                                <span>
+                                  {[company.data.headquarters.city, company.data.headquarters.state]
+                                    .filter(Boolean)
+                                    .join(", ") || "Location not specified"}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -371,7 +366,25 @@ export default function CompanyDetail() {
                               )}
                             </Button>
                           )}
-                          <Button variant="outline" size="icon">
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => {
+                              const url = `${window.location.origin}/companies/${company.id}`;
+                              navigator.clipboard
+                                .writeText(url)
+                                .then(() => {
+                                  toast({
+                                    title: "Link copied!",
+                                    description: "Company link has been copied to your clipboard.",
+                                  });
+                                })
+                                .catch(() => {
+                                  // Fallback for older browsers
+                                  prompt("Copy this link:", url);
+                                });
+                            }}
+                          >
                             <Share className="h-4 w-4" />
                           </Button>
                         </div>
@@ -533,11 +546,17 @@ export default function CompanyDetail() {
                     <CardTitle>About {company.data.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="whitespace-pre-line text-sm leading-relaxed">
-                      {company.data.description}
-                    </p>
+                    {company.data.description ? (
+                      <p className="whitespace-pre-line text-sm leading-relaxed">
+                        {company.data.description}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No company description available.
+                      </p>
+                    )}
 
-                    {company.data.mission && (
+                    {company.data.mission && company.data.mission.trim() && (
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                         <h4 className="font-medium text-blue-900 mb-2">
                           Our Mission
@@ -548,7 +567,7 @@ export default function CompanyDetail() {
                       </div>
                     )}
 
-                    {company.data.vision && (
+                    {company.data.vision && company.data.vision.trim() && (
                       <div className="mt-4 p-4 bg-purple-50 rounded-lg">
                         <h4 className="font-medium text-purple-900 mb-2">
                           Our Vision
@@ -562,14 +581,14 @@ export default function CompanyDetail() {
                 </Card>
 
                 {/* Company Culture & Values */}
-                {(company.data.culture.length > 0 ||
+                {(company.data.culture?.length > 0 ||
                   company.data.values?.length > 0) && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Culture & Values</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {company.data.culture.length > 0 && (
+                      {company.data.culture?.length > 0 && (
                         <div className="mb-6">
                           <h4 className="font-medium mb-3">Our Culture</h4>
                           <div className="flex flex-wrap gap-2">
@@ -604,7 +623,7 @@ export default function CompanyDetail() {
                 )}
 
                 {/* Technologies */}
-                {company.data.technologies.length > 0 && (
+                {company.data.technologies?.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Technologies We Use</CardTitle>
@@ -656,7 +675,7 @@ export default function CompanyDetail() {
                       )}
                     </div>
 
-                    {company.data.perks.length > 0 && (
+                    {company.data.perks?.length > 0 && (
                       <div>
                         <h4 className="font-medium mb-3">Additional Perks</h4>
                         <div className="flex flex-wrap gap-2">
@@ -669,7 +688,7 @@ export default function CompanyDetail() {
                       </div>
                     )}
 
-                    {company.data.benefits.other &&
+                    {company.data.benefits?.other &&
                       company.data.benefits.other.length > 0 && (
                         <div className="mt-4">
                           <h4 className="font-medium mb-2">Special Benefits</h4>
@@ -726,7 +745,7 @@ export default function CompanyDetail() {
                     <CardTitle>Contact Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {company.data.contact.website && (
+                    {company.data.contact?.website && (
                       <div className="flex items-center gap-3">
                         <Globe className="h-4 w-4 text-muted-foreground" />
                         <a
@@ -743,7 +762,7 @@ export default function CompanyDetail() {
                       </div>
                     )}
 
-                    {company.data.contact.email && (
+                    {company.data.contact?.email && (
                       <div className="flex items-center gap-3">
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <a
@@ -755,16 +774,19 @@ export default function CompanyDetail() {
                       </div>
                     )}
 
-                    {company.data.contact.phone && (
+                    {company.data.contact?.phone && (
                       <div className="flex items-center gap-3">
                         <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
+                        <a
+                          href={`tel:${company.data.contact.phone}`}
+                          className="text-sm text-primary hover:underline"
+                        >
                           {company.data.contact.phone}
-                        </span>
+                        </a>
                       </div>
                     )}
 
-                    {company.data.contact.linkedin && (
+                    {company.data.contact?.linkedin && (
                       <div className="flex items-center gap-3">
                         <Linkedin className="h-4 w-4 text-muted-foreground" />
                         <a
@@ -778,7 +800,7 @@ export default function CompanyDetail() {
                       </div>
                     )}
 
-                    {company.data.contact.twitter && (
+                    {company.data.contact?.twitter && (
                       <div className="flex items-center gap-3">
                         <Twitter className="h-4 w-4 text-muted-foreground" />
                         <a
@@ -790,6 +812,17 @@ export default function CompanyDetail() {
                           Twitter
                         </a>
                       </div>
+                    )}
+
+                    {/* Show empty state if no contact info */}
+                    {!company.data.contact?.website && 
+                     !company.data.contact?.email && 
+                     !company.data.contact?.phone && 
+                     !company.data.contact?.linkedin && 
+                     !company.data.contact?.twitter && (
+                      <p className="text-sm text-muted-foreground italic">
+                        No contact information available.
+                      </p>
                     )}
                   </CardContent>
                 </Card>
