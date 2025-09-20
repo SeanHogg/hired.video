@@ -151,7 +151,9 @@ class AppLogger implements Logger {
       try {
         // Dynamic import to avoid circular dependencies
         import("./error-tracking").then(({ reportMessage }) => {
-          reportMessage(entry.message, entry.level, {
+          // Map log levels to error tracking levels
+          const errorTrackingLevel = entry.level === "warn" ? "warning" : entry.level;
+          reportMessage(entry.message, errorTrackingLevel as "error" | "info" | "warning", {
             ...entry.context,
             userId: entry.userId,
             sessionId: entry.sessionId,
