@@ -79,6 +79,7 @@ import { jobService } from "@/lib/services/job-service";
 import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import type { CompanyWithOwnership } from "@/types/company";
+import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -267,9 +268,16 @@ export default function Index() {
               isPremium: false, // TODO: Get from user profile
             };
           case "company":
+            // Filter out companies with invalid names
+            const companyName = item.name ?? item.title ?? "";
+            
+            if (!isValidCompanyName(companyName)) {
+              return null; // Filter out invalid companies
+            }
+            
             return {
               id: item.id,
-              name: item.name ?? item.title ?? "",
+              name: companyName,
               title: item.description || item.summary || "Company",
               summary: item.description || item.summary || "Company",
               logo: item.logo,
@@ -277,7 +285,7 @@ export default function Index() {
               type: "company" as const,
               contentType: "profile" as const,
               profession: item.industry || "Technology",
-              company: item.name || item.title,
+              company: companyName,
               createdAt: item.createdAt || new Date().toISOString(),
               location: item.location,
               size: "Unknown", // TODO: Get from company profile

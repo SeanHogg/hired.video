@@ -34,6 +34,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import type { CompanyWithOwnership } from "@/types/company";
+import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 export default function Companies() {
   const location = useLocation();
@@ -311,7 +312,9 @@ export default function Companies() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {companies.map((company) => {
+                        {companies
+                          .filter((company) => isValidCompanyName(company.name))
+                          .map((company) => {
                           const companyMetadata = {
                             id: company.id || "",
                             slug: (company as any).slug || "",
@@ -484,7 +487,10 @@ export default function Companies() {
                 Featured Companies
               </h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {companies.slice(0, 3).map((company) => {
+                {companies
+                  .filter((company) => isValidCompanyName((company as any).name))
+                  .slice(0, 3)
+                  .map((company) => {
                   const companyMetadata = {
                     id: company.id || "",
                     slug: company.slug || "",

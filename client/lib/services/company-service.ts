@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+import { isValidCompanyName } from "../utils/company-validation";
 
 // ============================================================================
 // SCHEMAS
@@ -221,6 +222,8 @@ export type PaginatedCompanies = z.infer<typeof PaginatedCompaniesSchema>;
 // ============================================================================
 
 export class CompanyService {
+
+
   /**
    * Get all public companies with optional filters
    */
@@ -246,6 +249,15 @@ export class CompanyService {
       endpoint,
       PaginatedCompaniesSchema,
     );
+
+    // Filter out companies with invalid names
+    if (response.data.items) {
+      response.data.items = response.data.items.filter(company => 
+        isValidCompanyName(company.name)
+      );
+      // Update the total count to reflect filtered results
+      response.data.total = response.data.items.length;
+    }
 
     return response.data;
   }
