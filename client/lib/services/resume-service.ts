@@ -132,6 +132,114 @@ export const ResumeSchema = z
           .nullable()
           .transform((val) => (val === null ? undefined : val))
           .optional(),
+        awards: z
+          .array(
+            z.object({
+              id: nullableString(),
+              title: nullableString(),
+              date: nullableString(),
+              awarder: nullableString(),
+              summary: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        certificates: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              date: nullableString(),
+              issuer: nullableString(),
+              url: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        publications: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              publisher: nullableString(),
+              releaseDate: nullableString(),
+              url: nullableString(),
+              summary: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        languages: z
+          .array(
+            z.object({
+              id: nullableString(),
+              language: nullableString(),
+              fluency: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        interests: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              keywords: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        references: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              reference: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
+        projects: z
+          .array(
+            z.object({
+              id: nullableString(),
+              name: nullableString(),
+              description: nullableString(),
+              highlights: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              keywords: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              startDate: nullableString(),
+              endDate: nullableString(),
+              url: nullableString(),
+              roles: z
+                .array(z.string())
+                .nullable()
+                .transform((val) => (val === null ? undefined : val))
+                .optional(),
+              entity: nullableString(),
+              type: nullableString(),
+            }),
+          )
+          .nullable()
+          .transform((val) => (val === null ? undefined : val))
+          .optional(),
         skills: z
           .array(
             z.object({
@@ -417,16 +525,16 @@ export class ResumeService {
     return this.transformApiResumeToResume(response.data);
   }
 
-	  /**
-	   * Get resume for embedding (server bypasses privacy checks for this endpoint)
-	   */
-	  async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
-	    const response = await apiClient.get<any>(
-	      `/api/Resume/embedded/${identifier}`,
-	      z.any(),
-	    );
-	    return this.transformApiResumeToResume(response.data);
-	  }
+  /**
+   * Get resume for embedding (server bypasses privacy checks for this endpoint)
+   */
+  async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
+    const response = await apiClient.get<any>(
+      `/api/Resume/embedded/${identifier}`,
+      z.any(),
+    );
+    return this.transformApiResumeToResume(response.data);
+  }
 
 
   /**
@@ -502,43 +610,43 @@ export class ResumeService {
           Summary: parsedData.basics?.summary ?? "",
           Location: parsedData.basics?.location
             ? {
-                Address: parsedData.basics.location.address ?? "",
-                PostalCode: parsedData.basics.location.postalCode ?? "",
-                City: parsedData.basics.location.city ?? "",
-                CountryCode: parsedData.basics.location.countryCode ?? "",
-                Region: parsedData.basics.location.region ?? "",
-              }
+              Address: parsedData.basics.location.address ?? "",
+              PostalCode: parsedData.basics.location.postalCode ?? "",
+              City: parsedData.basics.location.city ?? "",
+              CountryCode: parsedData.basics.location.countryCode ?? "",
+              Region: parsedData.basics.location.region ?? "",
+            }
             : null,
         },
         Work: Array.isArray(parsedData.work)
           ? parsedData.work.map((w: any) => ({
-              Name: w?.name ?? w?.company ?? "",
-              Position: w?.position ?? "",
-              Summary: w?.summary ?? "",
-              StartDate: w?.startDate ?? "",
-              EndDate: w?.endDate ?? "",
-              Highlights: Array.isArray(w?.highlights) ? w.highlights : [],
-              Url: w?.url ?? "",
-            }))
+            Name: w?.name ?? w?.company ?? "",
+            Position: w?.position ?? "",
+            Summary: w?.summary ?? "",
+            StartDate: w?.startDate ?? "",
+            EndDate: w?.endDate ?? "",
+            Highlights: Array.isArray(w?.highlights) ? w.highlights : [],
+            Url: w?.url ?? "",
+          }))
           : [],
         Education: Array.isArray(parsedData.education)
           ? parsedData.education.map((e: any) => ({
-              Institution: e?.institution ?? "",
-              Area: e?.area ?? "",
-              StudyType: e?.studyType ?? "",
-              StartDate: e?.startDate ?? "",
-              EndDate: e?.endDate ?? "",
-              Score: e?.score ?? "",
-              Courses: Array.isArray(e?.courses) ? e.courses : null,
-              Url: e?.url ?? "",
-            }))
+            Institution: e?.institution ?? "",
+            Area: e?.area ?? "",
+            StudyType: e?.studyType ?? "",
+            StartDate: e?.startDate ?? "",
+            EndDate: e?.endDate ?? "",
+            Score: e?.score ?? "",
+            Courses: Array.isArray(e?.courses) ? e.courses : null,
+            Url: e?.url ?? "",
+          }))
           : [],
         Skills: Array.isArray(parsedData.skills)
           ? parsedData.skills.map((s: any) => ({
-              Name: s?.name ?? "",
-              Level: s?.level ?? "",
-              Keywords: Array.isArray(s?.keywords) ? s.keywords : [],
-            }))
+            Name: s?.name ?? "",
+            Level: s?.level ?? "",
+            Keywords: Array.isArray(s?.keywords) ? s.keywords : [],
+          }))
           : [],
         Volunteer: [],
         Awards: [],
@@ -597,6 +705,42 @@ export class ResumeService {
   }
 
   /**
+   * Update resume with new data structure
+   */
+  async updateResumeData(
+    id: string,
+    updates: {
+      name?: string;
+      data?: ResumeData;
+      privacy?: ResumePrivacy;
+      isMaster?: boolean;
+    },
+  ): Promise<FrontendResume> {
+    // Convert ResumeData to JSON string format expected by backend
+    const payload: any = {};
+
+    if (updates.name) payload.name = updates.name;
+    if (updates.privacy) payload.privacy = updates.privacy;
+    if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
+    if (updates.data) payload.resumeSerialized = JSON.stringify(updates.data);
+
+    const response = await apiClient.request<any>(
+      `/api/Resume/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+      z.any(),
+    );
+
+    // Transform the response back to frontend format
+    return this.transformApiResumeToResume(response.data);
+  }
+
+  /**
    * Delete resume
    */
   async deleteResume(id: string): Promise<void> {
@@ -651,7 +795,15 @@ export class ResumeService {
     let basics = metaResume.basics || {};
     let work = metaResume.work || [];
     let education = metaResume.education || [];
+    let volunteer = metaResume.volunteer || [];
+    let awards = metaResume.awards || [];
+    let certificates = metaResume.certificates || [];
+    let publications = metaResume.publications || [];
     let skills = metaResume.skills || [];
+    let languages = metaResume.languages || [];
+    let interests = metaResume.interests || [];
+    let references = metaResume.references || [];
+    let projects = metaResume.projects || [];
 
     // Fallback: If metaResume is incomplete but resumeSerialized exists, use that
     if ((!basics.name && !basics.label) && apiResponse.resumeSerialized) {
@@ -663,7 +815,15 @@ export class ResumeService {
           const serializedBasics = serializedData.Basics || serializedData.basics;
           const serializedWork = serializedData.Work || serializedData.work || [];
           const serializedEducation = serializedData.Education || serializedData.education || [];
+          const serializedVolunteer = serializedData.Volunteer || serializedData.volunteer || [];
+          const serializedAwards = serializedData.Awards || serializedData.awards || [];
+          const serializedCertificates = serializedData.Certificates || serializedData.certificates || [];
+          const serializedPublications = serializedData.Publications || serializedData.publications || [];
           const serializedSkills = serializedData.Skills || serializedData.skills || [];
+          const serializedLanguages = serializedData.Languages || serializedData.languages || [];
+          const serializedInterests = serializedData.Interests || serializedData.interests || [];
+          const serializedReferences = serializedData.References || serializedData.references || [];
+          const serializedProjects = serializedData.Projects || serializedData.projects || [];
 
           // Convert PascalCase to camelCase for consistency with existing logic
           basics = {
@@ -698,15 +858,135 @@ export class ResumeService {
             url: e.Url || e.url || ""
           }));
 
+          volunteer = serializedVolunteer.map((v: any) => ({
+            organization: v.Organization || v.organization || "",
+            position: v.Position || v.position || "",
+            summary: v.Summary || v.summary || "",
+            startDate: v.StartDate || v.startDate || "",
+            endDate: v.EndDate || v.endDate || "",
+            highlights: v.Highlights || v.highlights || null,
+            url: v.Url || v.url || ""
+          }));
+
+          awards = serializedAwards.map((a: any) => ({
+            title: a.Title || a.title || "",
+            date: a.Date || a.date || "",
+            awarder: a.Awarder || a.awarder || "",
+            summary: a.Summary || a.summary || ""
+          }));
+
+          certificates = serializedCertificates.map((c: any) => ({
+            name: c.Name || c.name || "",
+            date: c.Date || c.date || "",
+            issuer: c.Issuer || c.issuer || "",
+            url: c.Url || c.url || ""
+          }));
+
+          publications = serializedPublications.map((p: any) => ({
+            name: p.Name || p.name || "",
+            publisher: p.Publisher || p.publisher || "",
+            releaseDate: p.ReleaseDate || p.releaseDate || "",
+            url: p.Url || p.url || "",
+            summary: p.Summary || p.summary || ""
+          }));
+
           skills = serializedSkills.map((s: any) => ({
             name: s.Name || s.name || "",
             level: s.Level || s.level || "",
             keywords: s.Keywords || s.keywords || []
           }));
+
+          languages = serializedLanguages.map((l: any) => ({
+            language: l.Language || l.language || "",
+            fluency: l.Fluency || l.fluency || ""
+          }));
+
+          interests = serializedInterests.map((i: any) => ({
+            name: i.Name || i.name || "",
+            keywords: i.Keywords || i.keywords || []
+          }));
+
+          references = serializedReferences.map((r: any) => ({
+            name: r.Name || r.name || "",
+            reference: r.Reference || r.reference || ""
+          }));
+
+          projects = serializedProjects.map((p: any) => ({
+            name: p.Name || p.name || "",
+            description: p.Description || p.description || "",
+            highlights: p.Highlights || p.highlights || [],
+            keywords: p.Keywords || p.keywords || [],
+            startDate: p.StartDate || p.startDate || "",
+            endDate: p.EndDate || p.endDate || "",
+            url: p.Url || p.url || "",
+            roles: p.Roles || p.roles || [],
+            entity: p.Entity || p.entity || "",
+            type: p.Type || p.type || ""
+          }));
         }
       } catch (error) {
         console.error("transformApiResumeToResume - Error parsing resumeSerialized:", error);
       }
+    }
+
+    // If metaResume has data but we haven't processed it yet, process it now
+    if (!basics.name && metaResume.basics) {
+      basics = {
+        name: metaResume.basics.name || "",
+        label: metaResume.basics.label || "",
+        image: metaResume.basics.image || "",
+        email: metaResume.basics.email || "",
+        phone: metaResume.basics.phone || "",
+        url: metaResume.basics.url || "",
+        summary: metaResume.basics.summary || "",
+        location: metaResume.basics.location || null
+      };
+    }
+
+    // Process other sections from metaResume if they exist
+    if (metaResume.work && work.length === 0) {
+      work = metaResume.work.map((w: any) => ({
+        name: w.name || "",
+        position: w.position || "",
+        summary: w.summary || "",
+        startDate: w.startDate || "",
+        endDate: w.endDate || "",
+        highlights: w.highlights || [],
+        url: w.url || ""
+      }));
+    }
+
+    if (metaResume.education && education.length === 0) {
+      education = metaResume.education.map((e: any) => ({
+        institution: e.institution || "",
+        area: e.area || "",
+        studyType: e.studyType || "",
+        startDate: e.startDate || "",
+        endDate: e.endDate || "",
+        score: e.score || "",
+        courses: e.courses || null,
+        url: e.url || ""
+      }));
+    }
+
+    if (metaResume.volunteer && volunteer.length === 0) {
+      volunteer = metaResume.volunteer.map((v: any) => ({
+        organization: v.organization || "",
+        position: v.position || "",
+        summary: v.summary || "",
+        startDate: v.startDate || "",
+        endDate: v.endDate || "",
+        highlights: v.highlights || null,
+        url: v.url || ""
+      }));
+    }
+
+    if (metaResume.skills && skills.length === 0) {
+      skills = metaResume.skills.map((s: any) => ({
+        name: s.name || "",
+        level: s.level || "",
+        keywords: s.keywords || []
+      }));
     }
 
     // Debug: Log the actual API response structure to understand what we're getting
@@ -763,14 +1043,58 @@ export class ResumeService {
         Level: s.level || "",
         Keywords: Array.isArray(s.keywords) ? s.keywords : [],
       })),
-      Volunteer: [],
-      Awards: [],
-      Certificates: [],
-      Publications: [],
-      Languages: [],
-      Interests: [],
-      References: [],
-      Projects: [],
+      Volunteer: volunteer.map((v: any) => ({
+        Organization: v.organization || "",
+        Position: v.position || "",
+        Summary: v.summary || "",
+        StartDate: v.startDate || "",
+        EndDate: v.endDate || "",
+        Highlights: v.highlights || null,
+        Url: v.url || "",
+      })),
+      Awards: awards.map((a: any) => ({
+        Title: a.title || "",
+        Date: a.date || "",
+        Awarder: a.awarder || "",
+        Summary: a.summary || "",
+      })),
+      Certificates: certificates.map((c: any) => ({
+        Name: c.name || "",
+        Date: c.date || "",
+        Issuer: c.issuer || "",
+        Url: c.url || "",
+      })),
+      Publications: publications.map((p: any) => ({
+        Name: p.name || "",
+        Publisher: p.publisher || "",
+        ReleaseDate: p.releaseDate || "",
+        Url: p.url || "",
+        Summary: p.summary || "",
+      })),
+      Languages: languages.map((l: any) => ({
+        Language: l.language || "",
+        Fluency: l.fluency || "",
+      })),
+      Interests: interests.map((i: any) => ({
+        Name: i.name || "",
+        Keywords: i.keywords || [],
+      })),
+      References: references.map((r: any) => ({
+        Name: r.name || "",
+        Reference: r.reference || "",
+      })),
+      Projects: projects.map((p: any) => ({
+        Name: p.name || "",
+        Description: p.description || "",
+        Highlights: p.highlights || [],
+        Keywords: p.keywords || [],
+        StartDate: p.startDate || "",
+        EndDate: p.endDate || "",
+        Url: p.url || "",
+        Roles: p.roles || [],
+        Entity: p.entity || "",
+        Type: p.type || "",
+      })),
     };
 
     // Return the transformed Resume object

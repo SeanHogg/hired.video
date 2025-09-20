@@ -78,9 +78,34 @@ export default function ResumeEditPage() {
       return;
     }
 
-    // For other updates (name/data), keep user on this page; no redirect
-    const updatedResume = { ...resume, ...request };
-    setResume(updatedResume);
+    // For other updates (name/data), save to backend
+    try {
+      // Create the update payload
+      const updatePayload = {
+        name: request.name || resume.name,
+        data: request.data || resume.data,
+        privacy: request.privacy || resume.privacy,
+        isMaster: request.isMaster !== undefined ? request.isMaster : resume.isMaster,
+      };
+
+      // Update the resume via API
+      const updatedResume = await resumeService.updateResumeData(resume.id, updatePayload);
+      
+      // Update local state with the response
+      setResume(updatedResume);
+      
+      toast({ 
+        title: "Resume updated", 
+        description: "Your changes have been saved successfully." 
+      });
+    } catch (err) {
+      console.error("Failed to update resume:", err);
+      toast({ 
+        title: "Failed to update resume", 
+        description: err instanceof Error ? err.message : "Please try again.", 
+        variant: "destructive" 
+      });
+    }
   };
 
   const handleCancel = () => {

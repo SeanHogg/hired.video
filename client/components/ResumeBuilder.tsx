@@ -65,16 +65,22 @@ interface ResumeBuilderProps {
   onSave: (request: CreateResumeRequest) => void;
   onCancel: () => void;
   initialData?: Partial<ResumeData>;
+  initialName?: string;
+  initialPrivacy?: ResumePrivacy;
+  initialIsMaster?: boolean;
 }
 
 export default function ResumeBuilder({
   onSave,
   onCancel,
   initialData,
+  initialName = "",
+  initialPrivacy = "private",
+  initialIsMaster = false,
 }: ResumeBuilderProps) {
-  const [resumeName, setResumeName] = useState("");
-  const [privacy, setPrivacy] = useState<ResumePrivacy>("private");
-  const [isMaster, setIsMaster] = useState(false);
+  const [resumeName, setResumeName] = useState(initialName);
+  const [privacy, setPrivacy] = useState<ResumePrivacy>(initialPrivacy);
+  const [isMaster, setIsMaster] = useState(initialIsMaster);
 
   const [basics, setBasics] = useState({
     Name: "",
@@ -467,7 +473,9 @@ export default function ResumeBuilder({
   };
 
   const handleSave = () => {
-    if (!resumeName.trim() || !basics.Name.trim()) return;
+    // Allow saving if we have a resume name OR if we're editing an existing resume (initialName exists)
+    if (!resumeName.trim() && !initialName) return;
+    if (!basics.Name.trim()) return;
 
     const resumeData: ResumeData = {
       Basics: basics,
@@ -485,13 +493,18 @@ export default function ResumeBuilder({
     };
 
     const request: CreateResumeRequest = {
-      name: resumeName.trim(),
+      name: resumeName.trim() || initialName, // Use resumeName or fall back to initialName
       data: resumeData,
       privacy,
       isMaster,
     };
 
     onSave(request);
+  };
+
+  // Check if the form is valid for saving
+  const isFormValid = () => {
+    return basics.Name.trim() && (resumeName.trim() || initialName);
   };
 
   return (
@@ -789,7 +802,7 @@ export default function ResumeBuilder({
         </Button>
         <Button
           onClick={handleSave}
-          disabled={!resumeName.trim() || !basics.Name.trim()}
+          disabled={!isFormValid()}
         >
           <Save className="mr-2 h-4 w-4" />
           Save Resume
