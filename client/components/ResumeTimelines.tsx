@@ -73,20 +73,38 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Check if we should show date information
     const shouldShowDates = (startDate: string, endDate: string): boolean => {
-        if (!startDate) return false;
-        const start = new Date(startDate);
-        if (isNaN(start.getTime())) return false;
+        // Show dates if we have a valid start date
+        if (startDate) {
+            const start = new Date(startDate);
+            if (!isNaN(start.getTime())) {
+                // If both start and end are "Present", don't show
+                if (formatDate(startDate) === "Present" && formatDate(endDate) === "Present") return false;
+                return true;
+            }
+        }
+        
+        // Show dates if we have a valid end date (even without start date)
+        if (endDate && endDate !== '') {
+            const end = new Date(endDate);
+            if (!isNaN(end.getTime())) return true;
+        }
 
-        // If both start and end are "Present", don't show
-        if (formatDate(startDate) === "Present" && formatDate(endDate) === "Present") return false;
-
-        return true;
+        return false;
     };
 
     // Format date range for display
     const formatDateRange = (startDate: string, endDate: string): string => {
         if (!shouldShowDates(startDate, endDate)) return "";
-        return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+        
+        const formattedStart = formatDate(startDate);
+        const formattedEnd = formatDate(endDate);
+        
+        // If no start date but has end date, show only end date
+        if ((!startDate || startDate === '') && endDate && endDate !== '') {
+            return formattedEnd;
+        }
+        
+        return `${formattedStart} - ${formattedEnd}`;
     };
 
     // Create comprehensive timeline combining all experiences

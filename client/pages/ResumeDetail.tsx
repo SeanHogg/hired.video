@@ -105,7 +105,18 @@ function TimelineItem({
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
                 <span>
-                  {formatDate(startDate)} - {formatDate(endDate)}
+                  {(() => {
+                    const formattedStart = formatDate(startDate);
+                    const formattedEnd = formatDate(endDate);
+                    
+                    // If no start date but has end date, show only end date
+                    if (formattedStart === "No date" && formattedEnd !== "No date") {
+                      return formattedEnd;
+                    }
+                    
+                    // Otherwise show the range
+                    return `${formattedStart} - ${formattedEnd}`;
+                  })()}
                 </span>
               </div>
               <ChevronRight
