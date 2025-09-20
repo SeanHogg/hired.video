@@ -69,13 +69,13 @@ class AppLogger implements Logger {
 
   private getLogLevel(): LogLevel {
     try {
-      // In production, default to 'info', in development default to 'debug'
-      const defaultLevel =
-        import.meta.env.MODE === "production" ? "info" : "debug";
-      return (import.meta.env.VITE_LOG_LEVEL as LogLevel) || defaultLevel;
+      // Use runtime config for log level
+      const { runtimeConfig } = require("@/lib/runtime-config");
+      return (runtimeConfig.logging.LEVEL as LogLevel) || "info";
     } catch (error) {
-      // Fallback if import.meta.env is not available
-      return "info";
+      // Fallback if runtime config is not available
+      const defaultLevel = import.meta.env.MODE === "production" ? "info" : "debug";
+      return (import.meta.env.VITE_LOG_LEVEL as LogLevel) || defaultLevel;
     }
   }
 
@@ -146,9 +146,26 @@ class AppLogger implements Logger {
   }
 
   private sendToExternalService(entry: LogEntry): void {
-    // TODO: Integrate with external logging service (e.g., LogRocket, Datadog, etc.)
-    // This is where you would send logs to your logging infrastructure
-    // Example implementation:
+    // Send to error tracking service for errors and warnings
+    if (entry.level === "error" || entry.level === "warn") {
+      try {
+        // Dynamic import to avoid circular dependencies
+        import("./error-tracking").then(({ reportMessage }) => {
+          reportMessage(entry.message, entry.level, {
+            ...entry.context,
+            userId: entry.userId,
+            sessionId: entry.sessionId,
+            requestId: entry.requestId,
+          });
+        }).catch(() => {
+          // Silently fail to avoid infinite logging loops
+        });
+      } catch {
+        // Silently fail if error tracking is not available
+      }
+    }
+
+    // TODO: Send all logs to external logging service if needed
     // fetch('/api/logs', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
@@ -161,7 +178,15 @@ class AppLogger implements Logger {
   private storeLocally(entry: LogEntry): void {
     try {
       const storageKey = "app_logs";
-      const maxEntries = 100;
+      let maxEntries = 100;
+      
+      // Use runtime config for max entries
+      try {
+        const { runtimeConfig } = require("@/lib/runtime-config");
+        maxEntries = runtimeConfig.logging.MAX_ENTRIES;
+      } catch {
+        // Use default if runtime config not available
+      }
 
       const existingLogs = JSON.parse(
         localStorage.getItem(storageKey) || "[]",

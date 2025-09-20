@@ -12,9 +12,10 @@ import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart-context";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
-import { isProduction } from "@/lib/config";
+import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
+import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error-tracking";
 
 // Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
@@ -96,24 +97,39 @@ const PageLoader = () => (
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: isProduction ? 3 : 1,
+      retry: runtimeConfig.isProduction ? 3 : 1,
       staleTime: 5 * 60 * 1000, // 5 minutes
       gcTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: isProduction,
+      refetchOnWindowFocus: runtimeConfig.isProduction,
     },
     mutations: {
-      retry: isProduction ? 2 : 0,
+      retry: runtimeConfig.isProduction ? 2 : 0,
       onError: (error) => {
         logger.error("Mutation error", {
           error: error instanceof Error ? error.message : String(error),
         });
+        
+        // Report to error tracking
+        if (error instanceof Error) {
+          reportError(error, { type: "mutation" });
+        } else {
+          reportMessage(`Mutation error: ${String(error)}`, "error", { type: "mutation" });
+        }
       },
     },
   },
 });
 
+// Initialize error tracking (GlitchTip/Sentry compatible)
+initializeErrorTracking();
+
+// Log current configuration in development
+if (runtimeConfig.isDevelopment) {
+  runtimeConfig.logConfig();
+}
+
 // Initialize performance monitoring
-if (isProduction) {
+if (runtimeConfig.performance.MONITORING) {
   performanceMonitor.recordMemoryUsage();
 
   // Record memory usage periodically
@@ -124,9 +140,16 @@ if (isProduction) {
 
 // Global error handler for unhandled promise rejections
 window.addEventListener("unhandledrejection", (event) => {
+  const error = new Error(`Unhandled promise rejection: ${event.reason}`);
   logger.error("Unhandled promise rejection", {
     reason: event.reason,
     promise: event.promise,
+  });
+  
+  // Report to error tracking
+  reportError(error, {
+    type: "unhandledrejection",
+    reason: event.reason,
   });
 
   // Prevent the default browser behavior
@@ -142,6 +165,16 @@ window.addEventListener("error", (event) => {
     colno: event.colno,
     error: event.error,
   });
+  
+  // Report to error tracking
+  if (event.error) {
+    reportError(event.error, {
+      type: "uncaughterror",
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  }
 });
 
 const App = () => (
@@ -149,7 +182,13 @@ const App = () => (
     level="critical"
     onError={(error, errorInfo) => {
       logger.error("Critical application error", {
-        error: error.toJSON(),
+        error: error.message,
+        errorInfo,
+      });
+      
+      // Report to error tracking
+      reportError(error, {
+        type: "react-error-boundary",
         errorInfo,
       });
     }}

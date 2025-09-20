@@ -12,7 +12,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node ./scripts/prerender.mjs",
+    "build": "vite build && node ./scripts/update-config.mjs && node ./scripts/prerender.mjs",
     "start": "vite preview",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@microsoft/signalr": "^9.0.6",
+    "@sentry/react": "^10.12.0",
     "dotenv": "^17.2.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

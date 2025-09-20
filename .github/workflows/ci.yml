@@ -62,12 +62,58 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Configure for production
+        run: |
+          cat > dist/config.js << 'EOF'
+          // Runtime configuration for production deployment
+          window.APP_CONFIG = {
+            // API Configuration
+            API_URL: "https://api.myvideoresu.me/api",
+            
+            // Error Tracking (GlitchTip/Sentry)
+            ERROR_REPORTING: {
+              ENABLED: true,
+              DSN: "https://43cf169b17fc4c1780849f0dd708ef39@app.glitchtip.com/12926",
+              ENVIRONMENT: "production",
+              SAMPLE_RATE: 0.1,
+            },
+            
+            // Feature Flags
+            FEATURES: {
+              AI_CHAT: true,
+              VIDEO_RESUMES: true,
+              ANALYTICS: false,
+              NOTIFICATIONS: true,
+            },
+            
+            // Performance Monitoring
+            PERFORMANCE: {
+              MONITORING: false,
+              SAMPLE_RATE: 0.1,
+            },
+            
+            // Logging
+            LOGGING: {
+              LEVEL: "warn", // Only warnings and errors in production
+              MAX_ENTRIES: 50,
+            },
+            
+            // App Version (updated by build process)
+            VERSION: "1.2.0",
+            
+            // Build timestamp (updated by build process)
+            BUILD_TIME: "$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")",
+          };
+          EOF
+
       - name: Verify build artifacts
         run: |
           echo "Build artifacts:"
           ls -la dist/
           echo "SPA build size:"
           du -sh dist/
+          echo "Production config:"
+          head -20 dist/config.js
 
       - name: Deploy to SmarterASP.NET via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
