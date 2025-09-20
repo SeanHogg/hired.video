@@ -250,10 +250,10 @@ export class CompanyService {
       PaginatedCompaniesSchema,
     );
 
-    // Filter out companies with invalid names
+    // Filter out companies with invalid names and demo companies
     if (response.data.items) {
       response.data.items = response.data.items.filter(company => 
-        isValidCompanyName(company.name)
+        isValidCompanyName(company.name) && !(company as any).isDemo
       );
       // Update the total count to reflect filtered results
       response.data.total = response.data.items.length;

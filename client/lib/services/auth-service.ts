@@ -69,6 +69,7 @@ export const UserProfileDTOSchema = z.object({
   }),
   role: z.union([z.string(), z.number()]),
   isPremium: z.boolean().optional(),
+  isDemo: z.boolean().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -139,6 +140,7 @@ export type UserProfile = {
   currentCompany?: string;
   skills?: string[];
   openToWork?: boolean;
+  isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
   subscription?: "free" | "pro" | "enterprise";
@@ -396,6 +398,7 @@ export class AuthService {
       currentCompany: dto.data.currentCompany,
       skills: undefined,
       openToWork: undefined,
+      isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
       subscription: dto.isPremium ? "pro" : "free",
@@ -455,6 +458,7 @@ export class AuthService {
       currentCompany: dto.data.currentCompany,
       skills: undefined,
       openToWork: undefined,
+      isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
       subscription: dto.isPremium ? "pro" : "free",

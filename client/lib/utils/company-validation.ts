@@ -34,18 +34,22 @@ export function isValidCompanyName(name: string | null | undefined): boolean {
 }
 
 /**
- * Filter an array of companies to only include those with valid names
+ * Filter an array of companies to only include those with valid names and exclude demo companies
  * @param companies - Array of companies to filter
  * @param nameProperty - Property name that contains the company name (default: 'name')
+ * @param excludeDemo - Whether to exclude demo companies (default: true)
  * @returns Filtered array of companies with valid names
  */
 export function filterValidCompanies<T extends Record<string, any>>(
   companies: T[], 
-  nameProperty: string = 'name'
+  nameProperty: string = 'name',
+  excludeDemo: boolean = true
 ): T[] {
-  return companies.filter(company => 
-    isValidCompanyName(company[nameProperty])
-  );
+  return companies.filter(company => {
+    const hasValidName = isValidCompanyName(company[nameProperty]);
+    const isNotDemo = !excludeDemo || !company.isDemo;
+    return hasValidName && isNotDemo;
+  });
 }
 
 /**

@@ -26,6 +26,7 @@ export interface User {
   phone?: string;
   skills?: string[];
   openToWork?: boolean;
+  isDemo?: boolean; // Demo user designation
 }
 
 interface TwoFactorChallengeUI {
@@ -90,6 +91,7 @@ function userProfileToUser(profile: UserProfile): User {
     phone: profile.phone,
     skills: profile.skills,
     openToWork: profile.openToWork,
+    isDemo: profile.isDemo,
   };
 }
 

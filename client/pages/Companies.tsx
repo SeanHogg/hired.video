@@ -256,26 +256,26 @@ export default function Companies() {
                 {("tracked" in companiesData
                   ? companiesData.tracked.length > 0
                   : false) && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      Following ({(companiesData as any).tracked.length})
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(companiesData as any).tracked.map(
-                        (company: CompanyWithOwnership) => (
-                          <CompanyCard
-                            key={company.id}
-                            company={company}
-                            showOwnership
-                            onTrack={handleTrackCompany}
-                            onUntrack={handleUntrackCompany}
-                          />
-                        ),
-                      )}
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        Following ({(companiesData as any).tracked.length})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {(companiesData as any).tracked.map(
+                          (company: CompanyWithOwnership) => (
+                            <CompanyCard
+                              key={company.id}
+                              company={company}
+                              showOwnership
+                              onTrack={handleTrackCompany}
+                              onUntrack={handleUntrackCompany}
+                            />
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* All Available Companies (for job seekers) or Discover Companies (for others) */}
                 {(isJobSeeker ||
@@ -283,93 +283,93 @@ export default function Companies() {
                     ("owned" in companiesData
                       ? companiesData.owned.length === 0
                       : true))) && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Search className="h-5 w-5" />
-                      {isJobSeeker ? "Discover Companies" : "Explore Companies"}
-                    </h2>
-                    {isLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <div key={index} className="animate-pulse">
-                            <div className="bg-gray-200 rounded-lg h-48" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : error ? (
-                      <div className="text-center py-12">
-                        <p className="text-red-600 mb-4">{error}</p>
-                        <Button onClick={fetchCompanies}>Try Again</Button>
-                      </div>
-                    ) : companies.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="text-gray-600 mb-4">
-                          No companies found matching your criteria.
-                        </p>
-                        <Button onClick={() => setSearchFilters({})}>
-                          Clear Filters
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {companies
-                          .filter((company) => isValidCompanyName(company.name))
-                          .map((company) => {
-                          const companyMetadata = {
-                            id: company.id || "",
-                            slug: (company as any).slug || "",
-                            name: company.name || "",
-                            logo: company.logo || "",
-                            description: (company as any).description || "",
-                            tagline: company.tagline || "",
-                            industry: company.industry || "",
-                            size: company.size || "",
-                            location: company.location || "",
-                            website: (company as any).website || "",
-                            founded: (company as any).founded || "",
-                            followersCount:
-                              (company as any).followersCount || 0,
-                            jobsCount: (company as any).jobCount || 0,
-                            isPublic: (company as any).isPublic || true,
-                            status: (company.status as any) || "active",
-                            visibility: (company.visibility as any) || "public",
-                            createdAt: company.createdAt || "",
-                            updatedAt: company.updatedAt || "",
-                            teamMembers: (company as any).teamMembers || [],
-                            onboardingProgress: company.onboardingProgress || 0,
-                            views: (company as any).views || 0,
-                            followers: (company as any).followers || 0,
-                            jobCount: (company as any).jobCount || 0,
-                            activeJobCount:
-                              (company as any).activeJobCount || 0,
-                            userId: (company as any).userId || "",
-                            ownership: "tracked" as const,
-                          };
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Search className="h-5 w-5" />
+                        {isJobSeeker ? "Discover Companies" : "Explore Companies"}
+                      </h2>
+                      {isLoading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {Array.from({ length: 6 }).map((_, index) => (
+                            <div key={index} className="animate-pulse">
+                              <div className="bg-gray-200 rounded-lg h-48" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : error ? (
+                        <div className="text-center py-12">
+                          <p className="text-red-600 mb-4">{error}</p>
+                          <Button onClick={fetchCompanies}>Try Again</Button>
+                        </div>
+                      ) : companies.length === 0 ? (
+                        <div className="text-center py-12">
+                          <p className="text-gray-600 mb-4">
+                            No companies found matching your criteria.
+                          </p>
+                          <Button onClick={() => setSearchFilters({})}>
+                            Clear Filters
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {companies
+                            .filter((company) => isValidCompanyName(company.name))
+                            .map((company) => {
+                              const companyMetadata = {
+                                id: company.id || "",
+                                slug: (company as any).slug || "",
+                                name: company.name || "",
+                                logo: company.logo || "",
+                                description: (company as any).description || "",
+                                tagline: company.tagline || "",
+                                industry: company.industry || "",
+                                size: company.size || "",
+                                location: company.location || "",
+                                website: (company as any).website || "",
+                                founded: (company as any).founded || "",
+                                followersCount:
+                                  (company as any).followersCount || 0,
+                                jobsCount: (company as any).jobCount || 0,
+                                isPublic: (company as any).isPublic || true,
+                                status: (company.status as any) || "active",
+                                visibility: (company.visibility as any) || "public",
+                                createdAt: company.createdAt || "",
+                                updatedAt: company.updatedAt || "",
+                                teamMembers: (company as any).teamMembers || [],
+                                onboardingProgress: company.onboardingProgress || 0,
+                                views: (company as any).views || 0,
+                                followers: (company as any).followers || 0,
+                                jobCount: (company as any).jobCount || 0,
+                                activeJobCount:
+                                  (company as any).activeJobCount || 0,
+                                userId: (company as any).userId || "",
+                                ownership: "tracked" as const,
+                              };
 
-                          return (
-                            <CompanyCard
-                              key={company.id}
-                              company={companyMetadata}
-                              onTrack={handleFollowCompany}
-                              onUntrack={handleUnfollowCompany}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
+                              return (
+                                <CompanyCard
+                                  key={company.id}
+                                  company={companyMetadata}
+                                  onTrack={handleFollowCompany}
+                                  onUntrack={handleUnfollowCompany}
+                                />
+                              );
+                            })}
+                        </div>
+                      )}
 
-                    {/* Pagination */}
-                    {!isLoading && !error && companies.length > 0 && (
-                      <Pagination
-                        currentPage={currentPage}
-                        totalItems={totalCompanies}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
-                        onItemsPerPageChange={handleItemsPerPageChange}
-                      />
-                    )}
-                  </div>
-                )}
+                      {/* Pagination */}
+                      {!isLoading && !error && companies.length > 0 && (
+                        <Pagination
+                          currentPage={currentPage}
+                          totalItems={totalCompanies}
+                          itemsPerPage={itemsPerPage}
+                          onPageChange={setCurrentPage}
+                          onItemsPerPageChange={handleItemsPerPageChange}
+                        />
+                      )}
+                    </div>
+                  )}
 
                 {/* Empty State for Job Seekers with no tracked companies */}
                 {isJobSeeker &&
@@ -491,33 +491,33 @@ export default function Companies() {
                   .filter((company) => isValidCompanyName((company as any).name))
                   .slice(0, 3)
                   .map((company) => {
-                  const companyMetadata = {
-                    id: company.id || "",
-                    slug: company.slug || "",
-                    name: (company as any).name || "",
-                    logo: (company as any).logo || "",
-                    tagline: company.tagline || "",
-                    industry: company.industry || "",
-                    size: company.size || "",
-                    location: company.location || "",
-                    status: (company.status as any) || "active",
-                    visibility: (company.visibility as any) || "public",
-                    createdAt: company.createdAt || "",
-                    updatedAt: company.updatedAt || "",
-                    views: (company as any).views || 0,
-                    followers: (company as any).followers || 0,
-                    jobCount: (company as any).jobCount || 0,
-                    activeJobCount: (company as any).activeJobCount || 0,
-                    userId: (company as any).userId || "",
-                    teamMembers: (company as any).teamMembers || [],
-                    onboardingProgress: company.onboardingProgress || 100,
-                    ownership: "tracked" as const,
-                  };
+                    const companyMetadata = {
+                      id: company.id || "",
+                      slug: company.slug || "",
+                      name: (company as any).name || "",
+                      logo: (company as any).logo || "",
+                      tagline: company.tagline || "",
+                      industry: company.industry || "",
+                      size: company.size || "",
+                      location: company.location || "",
+                      status: (company.status as any) || "active",
+                      visibility: (company.visibility as any) || "public",
+                      createdAt: company.createdAt || "",
+                      updatedAt: company.updatedAt || "",
+                      views: (company as any).views || 0,
+                      followers: (company as any).followers || 0,
+                      jobCount: (company as any).jobCount || 0,
+                      activeJobCount: (company as any).activeJobCount || 0,
+                      userId: (company as any).userId || "",
+                      teamMembers: (company as any).teamMembers || [],
+                      onboardingProgress: company.onboardingProgress || 100,
+                      ownership: "tracked" as const,
+                    };
 
-                  return (
-                    <CompanyCard key={company.id} company={companyMetadata} />
-                  );
-                })}
+                    return (
+                      <CompanyCard key={company.id} company={companyMetadata} />
+                    );
+                  })}
               </div>
               <div className="text-center mt-8">
                 <Link to="/signup">

@@ -247,6 +247,11 @@ export default function Index() {
       .map((item) => {
         switch (item.type) {
           case "people":
+            // Filter out demo users from public results
+            if ((item as any).isDemo) {
+              return null;
+            }
+            
             return {
               id: item.id,
               name: item.name ?? item.title ?? "",
@@ -268,11 +273,11 @@ export default function Index() {
               isPremium: false, // TODO: Get from user profile
             };
           case "company":
-            // Filter out companies with invalid names
+            // Filter out companies with invalid names and demo companies
             const companyName = item.name ?? item.title ?? "";
             
-            if (!isValidCompanyName(companyName)) {
-              return null; // Filter out invalid companies
+            if (!isValidCompanyName(companyName) || (item as any).isDemo) {
+              return null; // Filter out invalid or demo companies
             }
             
             return {
@@ -860,9 +865,7 @@ export default function Index() {
         onView={() => actionsModal.item && handleView(actionsModal.item)}
         onShare={() => actionsModal.item && handleShare(actionsModal.item)}
         onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
-        onDownload={() =>
-          actionsModal.item && handleDownload(actionsModal.item)
-        }
+        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
         onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
       />
