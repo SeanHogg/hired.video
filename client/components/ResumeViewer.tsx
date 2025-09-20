@@ -316,7 +316,29 @@ export default function ResumeViewer({
               <section>
                 <h2 className="text-2xl font-bold mb-6">Work Experience</h2>
                 <div className="space-y-6">
-                  {resumeData.Work.map((work, index) => (
+                  {resumeData.Work
+                    .slice()
+                    .sort((a, b) => {
+                      // Current positions (no end date) come first
+                      const aIsCurrent = !a.EndDate || a.EndDate === '';
+                      const bIsCurrent = !b.EndDate || b.EndDate === '';
+                      
+                      if (aIsCurrent && !bIsCurrent) return -1;
+                      if (!aIsCurrent && bIsCurrent) return 1;
+                      
+                      // For positions with end dates, sort by end date descending (most recent first)
+                      if (!aIsCurrent && !bIsCurrent) {
+                        const aEndDate = new Date(a.EndDate);
+                        const bEndDate = new Date(b.EndDate);
+                        return bEndDate.getTime() - aEndDate.getTime();
+                      }
+                      
+                      // For current positions, sort by start date descending (most recent first)
+                      const aStartDate = new Date(a.StartDate);
+                      const bStartDate = new Date(b.StartDate);
+                      return bStartDate.getTime() - aStartDate.getTime();
+                    })
+                    .map((work, index) => (
                     <div
                       key={index}
                       className="border-l-2 border-primary/20 pl-6 relative"

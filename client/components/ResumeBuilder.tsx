@@ -89,6 +89,30 @@ export default function ResumeBuilder({
   });
 
   const [work, setWork] = useState<WorkExperience[]>(initialData?.Work || []);
+
+  // Sort work experience chronologically (current positions first, then by most recent)
+  const sortWorkExperience = (workArray: WorkExperience[]) => {
+    return workArray.slice().sort((a, b) => {
+      // Current positions (no end date) come first
+      const aIsCurrent = !a.EndDate || a.EndDate === '';
+      const bIsCurrent = !b.EndDate || b.EndDate === '';
+      
+      if (aIsCurrent && !bIsCurrent) return -1;
+      if (!aIsCurrent && bIsCurrent) return 1;
+      
+      // For positions with end dates, sort by end date descending (most recent first)
+      if (!aIsCurrent && !bIsCurrent) {
+        const aEndDate = new Date(a.EndDate);
+        const bEndDate = new Date(b.EndDate);
+        return bEndDate.getTime() - aEndDate.getTime();
+      }
+      
+      // For current positions, sort by start date descending (most recent first)
+      const aStartDate = new Date(a.StartDate);
+      const bStartDate = new Date(b.StartDate);
+      return bStartDate.getTime() - aStartDate.getTime();
+    });
+  };
   const [education, setEducation] = useState<Education[]>(
     initialData?.Education || [],
   );
@@ -657,6 +681,7 @@ export default function ResumeBuilder({
         <TabsContent value="work">
           <WorkExperienceSection
             work={work}
+            sortedWork={sortWorkExperience(work)}
             onAdd={addWorkExperience}
             onUpdate={updateWorkExperience}
             onRemove={removeWorkExperience}
