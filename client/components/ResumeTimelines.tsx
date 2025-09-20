@@ -26,6 +26,7 @@ interface TimelineItem {
     icon: React.ReactNode;
 }
 
+
 export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     // Calculate duration between two dates
     const calculateDuration = (startDate: string, endDate: string): string => {
@@ -35,11 +36,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         // Check if start date is valid
         if (isNaN(start.getTime())) return "";
 
-        // Use current date if no end date provided (current position)
-        const end = (endDate && endDate !== '') ? new Date(endDate) : new Date();
+        // Use current date if no end date provided or marked "Present" (current position)
+        const end = !endDate || endDate.trim() === '' || endDate.trim().toLowerCase() === 'present'
+            ? new Date()
+            : new Date(endDate);
 
-        // Check if end date is valid (if provided)
-        if (endDate && endDate !== '' && isNaN(end.getTime())) {
+        // Check if end date is valid (if provided and not current)
+        if (endDate && endDate.trim() !== '' && endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) {
             return "";
         }
 
@@ -61,7 +64,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Format date for display
     const formatDate = (dateString: string): string => {
-        if (!dateString || dateString === '') return "Present";
+        if (!dateString || dateString.trim() === '' || dateString.trim().toLowerCase() === 'present') return "Present";
         const date = new Date(dateString);
         // Check if the date is valid
         if (isNaN(date.getTime())) return "Present";
@@ -82,7 +85,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                 return true;
             }
         }
-        
+
         // Show dates if we have a valid end date (even without start date)
         if (endDate && endDate !== '') {
             const end = new Date(endDate);
@@ -95,15 +98,15 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     // Format date range for display
     const formatDateRange = (startDate: string, endDate: string): string => {
         if (!shouldShowDates(startDate, endDate)) return "";
-        
+
         const formattedStart = formatDate(startDate);
         const formattedEnd = formatDate(endDate);
-        
+
         // If no start date but has end date, show only end date
         if ((!startDate || startDate === '') && endDate && endDate !== '') {
             return formattedEnd;
         }
-        
+
         return `${formattedStart} - ${formattedEnd}`;
     };
 
@@ -193,11 +196,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                 // Check if start date is valid
                 if (isNaN(start.getTime())) return;
 
-                // Use current date if no end date (current position)
-                const end = (work.EndDate && work.EndDate !== '') ? new Date(work.EndDate) : new Date();
+                // Use current date if no end date or marked Present (current position)
+                const end = !work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present'
+                    ? new Date()
+                    : new Date(work.EndDate);
 
-                // Check if end date is valid (if provided)
-                if (work.EndDate && work.EndDate !== '' && isNaN(end.getTime())) return;
+                // Check if end date is valid (if provided and not current)
+                if (work.EndDate && work.EndDate.trim() !== '' && work.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -230,11 +235,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                 // Check if start date is valid
                 if (isNaN(start.getTime())) return;
 
-                // Use current date if no end date (still volunteering)
-                const end = (vol.EndDate && vol.EndDate !== '') ? new Date(vol.EndDate) : new Date();
+                // Use current date if no end date or marked Present (still volunteering)
+                const end = !vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present'
+                    ? new Date()
+                    : new Date(vol.EndDate);
 
-                // Check if end date is valid (if provided)
-                if (vol.EndDate && vol.EndDate !== '' && isNaN(end.getTime())) return;
+                // Check if end date is valid (if provided and not current)
+                if (vol.EndDate && vol.EndDate.trim() !== '' && vol.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -258,8 +265,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Sort work experience chronologically
     const sortedWork = resumeData.Work?.slice().sort((a, b) => {
-        const aIsCurrent = !a.EndDate || a.EndDate === '';
-        const bIsCurrent = !b.EndDate || b.EndDate === '';
+        const aEnd = (a.EndDate || '').trim().toLowerCase();
+        const bEnd = (b.EndDate || '').trim().toLowerCase();
+        const aIsCurrent = aEnd === '' || aEnd === 'present';
+        const bIsCurrent = bEnd === '' || bEnd === 'present';
 
         if (aIsCurrent && !bIsCurrent) return -1;
         if (!aIsCurrent && bIsCurrent) return 1;
@@ -285,8 +294,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Sort volunteer experience chronologically
     const sortedVolunteer = resumeData.Volunteer?.slice().sort((a, b) => {
-        const aIsCurrent = !a.EndDate || a.EndDate === '';
-        const bIsCurrent = !b.EndDate || b.EndDate === '';
+        const aEnd = (a.EndDate || '').trim().toLowerCase();
+        const bEnd = (b.EndDate || '').trim().toLowerCase();
+        const aIsCurrent = aEnd === '' || aEnd === 'present';
+        const bIsCurrent = bEnd === '' || bEnd === 'present';
 
         if (aIsCurrent && !bIsCurrent) return -1;
         if (!aIsCurrent && bIsCurrent) return 1;
@@ -512,7 +523,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                     {/* Content */}
                                                     <div className="pt-2">
                                                         <div className="flex items-center gap-2 mb-2">
-                                                            {(!work.EndDate || work.EndDate === '') && (
+                                                            {(!work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present') && (
                                                                 <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
                                                                     Current
                                                                 </span>
@@ -580,7 +591,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                     {/* Content */}
                                                     <div className="pt-2">
                                                         <div className="flex items-center gap-2 mb-2">
-                                                            {(!vol.EndDate || vol.EndDate === '') && (
+                                                            {(!vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present') && (
                                                                 <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">
                                                                     Active
                                                                 </span>

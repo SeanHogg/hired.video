@@ -533,11 +533,30 @@ export default function ResumeDetail() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         {resume.data.Work
-                          .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
-                          )
+                          .sort((a, b) => {
+                            const aIsCurrent = !a.EndDate || a.EndDate === "" || a.EndDate === "Present";
+                            const bIsCurrent = !b.EndDate || b.EndDate === "" || b.EndDate === "Present";
+
+                            if (aIsCurrent && !bIsCurrent) return -1;
+                            if (!aIsCurrent && bIsCurrent) return 1;
+
+                            // If both not current, sort by end date desc when valid
+                            if (!aIsCurrent && !bIsCurrent) {
+                              const aEnd = new Date(a.EndDate || "");
+                              const bEnd = new Date(b.EndDate || "");
+                              if (!isNaN(aEnd.getTime()) && !isNaN(bEnd.getTime())) {
+                                return bEnd.getTime() - aEnd.getTime();
+                              }
+                            }
+
+                            // Otherwise sort by start date desc when valid
+                            const aStart = new Date(a.StartDate || "");
+                            const bStart = new Date(b.StartDate || "");
+                            if (!isNaN(aStart.getTime()) && !isNaN(bStart.getTime())) {
+                              return bStart.getTime() - aStart.getTime();
+                            }
+                            return 0;
+                          })
                           .map((work, index) => (
                             <TimelineItem
                               key={index}
