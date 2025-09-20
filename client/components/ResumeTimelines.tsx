@@ -32,7 +32,16 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         if (!startDate) return "Unknown duration";
 
         const start = new Date(startDate);
-        const end = endDate ? new Date(endDate) : new Date();
+        // Check if start date is valid
+        if (isNaN(start.getTime())) return "Unknown duration";
+
+        // Use current date if no end date provided (current position)
+        const end = (endDate && endDate !== '') ? new Date(endDate) : new Date();
+
+        // Check if end date is valid (if provided)
+        if (endDate && endDate !== '' && isNaN(end.getTime())) {
+            return "Unknown duration";
+        }
 
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -52,8 +61,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Format date for display
     const formatDate = (dateString: string): string => {
-        if (!dateString) return "Present";
+        if (!dateString || dateString === '') return "Present";
         const date = new Date(dateString);
+        // Check if the date is valid
+        if (isNaN(date.getTime())) return "Present";
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short'
@@ -143,7 +154,15 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         resumeData.Work.forEach(work => {
             if (work.StartDate) {
                 const start = new Date(work.StartDate);
-                const end = work.EndDate ? new Date(work.EndDate) : new Date();
+                // Check if start date is valid
+                if (isNaN(start.getTime())) return;
+
+                // Use current date if no end date (current position)
+                const end = (work.EndDate && work.EndDate !== '') ? new Date(work.EndDate) : new Date();
+
+                // Check if end date is valid (if provided)
+                if (work.EndDate && work.EndDate !== '' && isNaN(end.getTime())) return;
+
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
                 totalMonths += months;
@@ -157,8 +176,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             return `${years}y ${remainingMonths}m`;
         } else if (years > 0) {
             return `${years}y`;
-        } else {
+        } else if (remainingMonths > 0) {
             return `${remainingMonths}m`;
+        } else {
+            return "< 1m";
         }
     };
 
@@ -170,7 +191,15 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         resumeData.Volunteer.forEach(vol => {
             if (vol.StartDate) {
                 const start = new Date(vol.StartDate);
-                const end = vol.EndDate ? new Date(vol.EndDate) : new Date();
+                // Check if start date is valid
+                if (isNaN(start.getTime())) return;
+
+                // Use current date if no end date (still volunteering)
+                const end = (vol.EndDate && vol.EndDate !== '') ? new Date(vol.EndDate) : new Date();
+
+                // Check if end date is valid (if provided)
+                if (vol.EndDate && vol.EndDate !== '' && isNaN(end.getTime())) return;
+
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
                 totalMonths += months;
@@ -184,8 +213,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             return `${years}y ${remainingMonths}m`;
         } else if (years > 0) {
             return `${years}y`;
-        } else {
+        } else if (remainingMonths > 0) {
             return `${remainingMonths}m`;
+        } else {
+            return "< 1m";
         }
     };
 
@@ -200,11 +231,19 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         if (!aIsCurrent && !bIsCurrent) {
             const aEndDate = new Date(a.EndDate);
             const bEndDate = new Date(b.EndDate);
+            // Check for valid dates
+            if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
+                return 0; // Keep original order if dates are invalid
+            }
             return bEndDate.getTime() - aEndDate.getTime();
         }
 
         const aStartDate = new Date(a.StartDate);
         const bStartDate = new Date(b.StartDate);
+        // Check for valid dates
+        if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) {
+            return 0; // Keep original order if dates are invalid
+        }
         return bStartDate.getTime() - aStartDate.getTime();
     }) || [];
 
@@ -219,11 +258,19 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         if (!aIsCurrent && !bIsCurrent) {
             const aEndDate = new Date(a.EndDate);
             const bEndDate = new Date(b.EndDate);
+            // Check for valid dates
+            if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
+                return 0; // Keep original order if dates are invalid
+            }
             return bEndDate.getTime() - aEndDate.getTime();
         }
 
         const aStartDate = new Date(a.StartDate);
         const bStartDate = new Date(b.StartDate);
+        // Check for valid dates
+        if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) {
+            return 0; // Keep original order if dates are invalid
+        }
         return bStartDate.getTime() - aStartDate.getTime();
     }) || [];
 
@@ -231,6 +278,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     const sortedEducation = resumeData.Education?.slice().sort((a, b) => {
         const aEndDate = new Date(a.EndDate || a.StartDate);
         const bEndDate = new Date(b.EndDate || b.StartDate);
+        // Check for valid dates
+        if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
+            return 0; // Keep original order if dates are invalid
+        }
         return bEndDate.getTime() - aEndDate.getTime();
     }) || [];
 
@@ -238,6 +289,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     const sortedCertificates = resumeData.Certificates?.slice().sort((a, b) => {
         const aDate = new Date(a.Date);
         const bDate = new Date(b.Date);
+        // Check for valid dates
+        if (isNaN(aDate.getTime()) || isNaN(bDate.getTime())) {
+            return 0; // Keep original order if dates are invalid
+        }
         return bDate.getTime() - aDate.getTime();
     }) || [];
 
@@ -245,6 +300,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     const sortedAwards = resumeData.Awards?.slice().sort((a, b) => {
         const aDate = new Date(a.Date);
         const bDate = new Date(b.Date);
+        // Check for valid dates
+        if (isNaN(aDate.getTime()) || isNaN(bDate.getTime())) {
+            return 0; // Keep original order if dates are invalid
+        }
         return bDate.getTime() - aDate.getTime();
     }) || [];
 
@@ -330,22 +389,56 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                 </Badge>
                             )}
                         </div>
-                        <div className="space-y-3">
-                            {comprehensiveTimeline.map((item, index) => (
-                                <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        {item.icon}
-                                        <div className="min-w-0 flex-1">
-                                            <h4 className="font-medium truncate">{item.title}</h4>
-                                            <p className="text-sm text-muted-foreground truncate">{item.organization}</p>
+                        {/* Horizontal Timeline */}
+                        <div className="relative">
+                            <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent" style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}>
+                                <div className="flex gap-6 min-w-max px-4">
+                                    {comprehensiveTimeline.map((item, index) => (
+                                        <div key={index} className="relative flex-shrink-0 w-64 sm:w-72">
+                                            {/* Timeline connector line */}
+                                            {index < comprehensiveTimeline.length - 1 && (
+                                                <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                            )}
+
+                                            {/* Timeline item */}
+                                            <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                {/* Timeline dot */}
+                                                <div className="absolute -top-2 left-4 w-4 h-4 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                    <div className="w-2 h-2 bg-background rounded-full" />
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className="pt-2">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        {item.icon}
+                                                        <span className="text-xs px-2 py-1 bg-muted rounded-full capitalize">
+                                                            {item.type}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="font-medium text-sm mb-1 line-clamp-2">{item.title}</h4>
+                                                    <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{item.organization}</p>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        <div>{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>
+                                                        {item.duration && <div className="font-medium text-primary mt-1">{item.duration}</div>}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                        <div>{formatDate(item.startDate)} - {formatDate(item.endDate)}</div>
-                                        {item.duration && <div className="text-xs font-medium text-primary">{item.duration}</div>}
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* Scroll indicators */}
+                            <div className="flex justify-center mt-2">
+                                <div className="text-xs text-muted-foreground flex items-center gap-1 bg-muted/50 px-3 py-1 rounded-full">
+                                    <span className="hidden sm:inline">←</span>
+                                    <span className="sm:hidden">👈</span>
+                                    <span className="hidden sm:inline">Scroll to explore timeline</span>
+                                    <span className="sm:hidden">Swipe to explore</span>
+                                    <span className="hidden sm:inline">→</span>
+                                    <span className="sm:hidden">👉</span>
+                                </div>
+                            </div>
                         </div>
                     </TabsContent>
 
@@ -358,22 +451,57 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                     Total Experience: {calculateTotalWorkExperience()}
                                 </Badge>
                             </div>
-                            <div className="space-y-3">
-                                {sortedWork.map((work, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <Briefcase className="h-4 w-4 text-primary" />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium">{work.Position}</h4>
-                                                <p className="text-sm text-muted-foreground">{work.Name}</p>
+                            {/* Horizontal Work Timeline */}
+                            <div className="relative">
+                                <div className="overflow-x-auto pb-4">
+                                    <div className="flex gap-6 min-w-max px-4">
+                                        {sortedWork.map((work, index) => (
+                                            <div key={index} className="relative flex-shrink-0 w-72">
+                                                {/* Timeline connector line */}
+                                                {index < sortedWork.length - 1 && (
+                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                )}
+
+                                                {/* Timeline item */}
+                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    {/* Timeline dot */}
+                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-primary rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Briefcase className="w-2 h-2 text-background" />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="pt-2">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            {(!work.EndDate || work.EndDate === '') && (
+                                                                <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                                                    Current
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{work.Position}</h4>
+                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{work.Name}</p>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDate(work.StartDate)} - {formatDate(work.EndDate)}</div>
+                                                            <div className="font-medium text-primary mt-1">{calculateDuration(work.StartDate, work.EndDate)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                            <div>{formatDate(work.StartDate)} - {formatDate(work.EndDate)}</div>
-                                            <div className="text-xs font-medium text-primary">{calculateDuration(work.StartDate, work.EndDate)}</div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Scroll indicators */}
+                                <div className="flex justify-center mt-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1 bg-muted/50 px-3 py-1 rounded-full">
+                                        <span className="hidden sm:inline">←</span>
+                                        <span className="sm:hidden">👈</span>
+                                        <span className="hidden sm:inline">Scroll to explore work history</span>
+                                        <span className="sm:hidden">Swipe work history</span>
+                                        <span className="hidden sm:inline">→</span>
+                                        <span className="sm:hidden">👉</span>
+                                    </div>
+                                </div>
                             </div>
                         </TabsContent>
                     )}
@@ -387,22 +515,54 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                     Total Volunteer: {calculateTotalVolunteerExperience()}
                                 </Badge>
                             </div>
-                            <div className="space-y-3">
-                                {sortedVolunteer.map((vol, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <Heart className="h-4 w-4 text-red-500" />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium">{vol.Position}</h4>
-                                                <p className="text-sm text-muted-foreground">{vol.Organization}</p>
+                            {/* Horizontal Volunteer Timeline */}
+                            <div className="relative">
+                                <div className="overflow-x-auto pb-4">
+                                    <div className="flex gap-6 min-w-max px-4">
+                                        {sortedVolunteer.map((vol, index) => (
+                                            <div key={index} className="relative flex-shrink-0 w-72">
+                                                {/* Timeline connector line */}
+                                                {index < sortedVolunteer.length - 1 && (
+                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                )}
+
+                                                {/* Timeline item */}
+                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    {/* Timeline dot */}
+                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-red-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Heart className="w-2 h-2 text-background" />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="pt-2">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            {(!vol.EndDate || vol.EndDate === '') && (
+                                                                <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">
+                                                                    Active
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{vol.Position}</h4>
+                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{vol.Organization}</p>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDate(vol.StartDate)} - {formatDate(vol.EndDate)}</div>
+                                                            <div className="font-medium text-primary mt-1">{calculateDuration(vol.StartDate, vol.EndDate)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                            <div>{formatDate(vol.StartDate)} - {formatDate(vol.EndDate)}</div>
-                                            <div className="text-xs font-medium text-primary">{calculateDuration(vol.StartDate, vol.EndDate)}</div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Scroll indicators */}
+                                <div className="flex justify-center mt-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <span>←</span>
+                                        <span>Scroll to explore volunteer history</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
                             </div>
                         </TabsContent>
                     )}
@@ -410,25 +570,50 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                     {/* Education Timeline */}
                     {showEducationTab && (
                         <TabsContent value="education" className="space-y-4">
-                            <div className="space-y-3">
-                                {sortedEducation.map((edu, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <GraduationCap className="h-4 w-4 text-blue-500" />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium">{edu.StudyType} in {edu.Area}</h4>
-                                                <p className="text-sm text-muted-foreground">{edu.Institution}</p>
-                                                {edu.Score && (
-                                                    <p className="text-xs text-muted-foreground">GPA: {edu.Score}</p>
+                            {/* Horizontal Education Timeline */}
+                            <div className="relative">
+                                <div className="overflow-x-auto pb-4">
+                                    <div className="flex gap-6 min-w-max px-4">
+                                        {sortedEducation.map((edu, index) => (
+                                            <div key={index} className="relative flex-shrink-0 w-72">
+                                                {/* Timeline connector line */}
+                                                {index < sortedEducation.length - 1 && (
+                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
+
+                                                {/* Timeline item */}
+                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    {/* Timeline dot */}
+                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-blue-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <GraduationCap className="w-2 h-2 text-background" />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="pt-2">
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{edu.StudyType} in {edu.Area}</h4>
+                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{edu.Institution}</p>
+                                                        {edu.Score && (
+                                                            <p className="text-xs text-muted-foreground mb-2">GPA: {edu.Score}</p>
+                                                        )}
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDate(edu.StartDate)} - {formatDate(edu.EndDate)}</div>
+                                                            <div className="font-medium text-primary mt-1">{calculateDuration(edu.StartDate, edu.EndDate)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                            <div>{formatDate(edu.StartDate)} - {formatDate(edu.EndDate)}</div>
-                                            <div className="text-xs font-medium text-primary">{calculateDuration(edu.StartDate, edu.EndDate)}</div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Scroll indicators */}
+                                <div className="flex justify-center mt-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <span>←</span>
+                                        <span>Scroll to explore education history</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
                             </div>
                         </TabsContent>
                     )}
@@ -436,21 +621,46 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                     {/* Certificates Timeline */}
                     {showCertificatesTab && (
                         <TabsContent value="certificates" className="space-y-4">
-                            <div className="space-y-3">
-                                {sortedCertificates.map((cert, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <FileText className="h-4 w-4 text-green-500" />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium">{cert.Name}</h4>
-                                                <p className="text-sm text-muted-foreground">{cert.Issuer}</p>
+                            {/* Horizontal Certificates Timeline */}
+                            <div className="relative">
+                                <div className="overflow-x-auto pb-4">
+                                    <div className="flex gap-6 min-w-max px-4">
+                                        {sortedCertificates.map((cert, index) => (
+                                            <div key={index} className="relative flex-shrink-0 w-64">
+                                                {/* Timeline connector line */}
+                                                {index < sortedCertificates.length - 1 && (
+                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
+                                                )}
+
+                                                {/* Timeline item */}
+                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    {/* Timeline dot */}
+                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-green-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <FileText className="w-2 h-2 text-background" />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="pt-2">
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{cert.Name}</h4>
+                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{cert.Issuer}</p>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDate(cert.Date)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                            <div>{formatDate(cert.Date)}</div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Scroll indicators */}
+                                <div className="flex justify-center mt-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <span>←</span>
+                                        <span>Scroll to explore certifications</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
                             </div>
                         </TabsContent>
                     )}
@@ -458,24 +668,49 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                     {/* Awards Timeline */}
                     {showAwardsTab && (
                         <TabsContent value="awards" className="space-y-4">
-                            <div className="space-y-3">
-                                {sortedAwards.map((award, index) => (
-                                    <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <Award className="h-4 w-4 text-yellow-500" />
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium">{award.Title}</h4>
-                                                <p className="text-sm text-muted-foreground">{award.Awarder}</p>
-                                                {award.Summary && (
-                                                    <p className="text-xs text-muted-foreground mt-1">{award.Summary}</p>
+                            {/* Horizontal Awards Timeline */}
+                            <div className="relative">
+                                <div className="overflow-x-auto pb-4">
+                                    <div className="flex gap-6 min-w-max px-4">
+                                        {sortedAwards.map((award, index) => (
+                                            <div key={index} className="relative flex-shrink-0 w-72">
+                                                {/* Timeline connector line */}
+                                                {index < sortedAwards.length - 1 && (
+                                                    <div className="absolute top-8 left-full w-6 h-0.5 bg-border z-0" />
                                                 )}
+                                                
+                                                {/* Timeline item */}
+                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    {/* Timeline dot */}
+                                                    <div className="absolute -top-2 left-4 w-4 h-4 bg-yellow-500 rounded-full border-2 border-background shadow-sm flex items-center justify-center">
+                                                        <Award className="w-2 h-2 text-background" />
+                                                    </div>
+                                                    
+                                                    {/* Content */}
+                                                    <div className="pt-2">
+                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2">{award.Title}</h4>
+                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{award.Awarder}</p>
+                                                        {award.Summary && (
+                                                            <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{award.Summary}</p>
+                                                        )}
+                                                        <div className="text-xs text-muted-foreground">
+                                                            <div>{formatDate(award.Date)}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-left sm:text-right text-sm text-muted-foreground">
-                                            <div>{formatDate(award.Date)}</div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
+                                
+                                {/* Scroll indicators */}
+                                <div className="flex justify-center mt-2">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <span>←</span>
+                                        <span>Scroll to explore awards</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
                             </div>
                         </TabsContent>
                     )}
