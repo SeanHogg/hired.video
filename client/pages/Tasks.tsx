@@ -166,7 +166,8 @@ export default function Tasks() {
   };
   const closeTaskPanel = () => setTaskPanelOpen(false);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<ProductivityItemStatus | null>(null);
 
   const handleDelete = async () => {
     if (!selectedTask) return;
@@ -788,6 +789,13 @@ export default function Tasks() {
   const onDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
     e.dataTransfer.setData("text/plain", taskId);
     e.dataTransfer.effectAllowed = "move";
+    setDraggedTaskId(taskId);
+    
+    // Add visual feedback to the dragged element
+    const draggedElement = e.currentTarget;
+    draggedElement.style.opacity = "0.5";
+    draggedElement.style.transform = "rotate(5deg) scale(1.05)";
+    draggedElement.style.boxShadow = "0 10px 25px rgba(0,0,0,0.3)";
   };
 
   const onDropOnColumn = (
@@ -819,13 +827,32 @@ export default function Tasks() {
     }
   };
 
-  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+  const onDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    // Reset visual feedback
+    const draggedElement = e.currentTarget;
+    draggedElement.style.opacity = "";
+    draggedElement.style.transform = "";
+    draggedElement.style.boxShadow = "";
+    
+    // Clear drag state
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks(tasks.filter((task) => task.id !== taskId));
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>, column?: ProductivityItemStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    
+    if (column) {
+      setDragOverColumn(column);
+    }
+  };
+
+  const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    // Only clear if we're leaving the column entirely, not just moving to a child element
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverColumn(null);
+    }
   };
 
   return (
@@ -872,7 +899,7 @@ export default function Tasks() {
                       description: "",
                       type: TaskType.General,
                       priority: "medium",
-                      status: ProductivityItemStatus.ToDo,
+                      status: ProductivityItemStatus.Planning,
                       startDate: `${y}-${m}-${d}`,
                       dueDate: `${y}-${m}-${d}`,
                       createdAt: today.toISOString(),
@@ -919,6 +946,20 @@ export default function Tasks() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{tasks.length}</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Planning
+                    </CardTitle>
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.Planning).length}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1337,23 +1378,102 @@ export default function Tasks() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Planning Column */}
+                    <div
+                      className={`rounded-lg border p-3 transition-all duration-200 ${
+                        dragOverColumn === ProductivityItemStatus.Planning
+                          ? "bg-blue-50 border-blue-300 border-2 scale-105"
+                          : "bg-muted/30"
+                      }`}
+                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.Planning)}
+                      onDragLeave={onDragLeave}
+                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.Planning)}
+                    >
+                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
+                        dragOverColumn === ProductivityItemStatus.Planning ? "text-blue-600" : ""
+                      }`}>
+                        Planning
+                        {dragOverColumn === ProductivityItemStatus.Planning && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                            Drop here
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-2 min-h-24">
+                        {tasks
+                          .filter((t) => t.status === ProductivityItemStatus.Planning)
+                          .map((t) => (
+                            <div
+                              key={t.id}
+                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                draggedTaskId === t.id
+                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
+                                  : "hover:shadow-md hover:scale-102"
+                              }`}
+                              draggable
+                              onDragStart={(e) => onDragStart(e, t.id)}
+                              onDragEnd={onDragEnd}
+                              onClick={() => openTaskPanel(t)}
+                            >
+                              <div className="text-sm font-medium">
+                                {t.title}
+                              </div>
+                              {t.description && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {t.description.length > 60
+                                    ? `${t.description.substring(0, 60)}...`
+                                    : t.description}
+                                </div>
+                              )}
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge className={taskTypeColors[t.type]}>
+                                  {getTaskTypeDisplayName(t.type)}
+                                </Badge>
+                                <Badge className={priorityColors[t.priority]}>
+                                  {t.priority}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
                     {/* To Do Column */}
                     <div
-                      className="rounded-lg border p-3 bg-muted/30"
-                      onDragOver={onDragOver}
+                      className={`rounded-lg border p-3 transition-all duration-200 ${
+                        dragOverColumn === ProductivityItemStatus.ToDo
+                          ? "bg-yellow-50 border-yellow-300 border-2 scale-105"
+                          : "bg-muted/30"
+                      }`}
+                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.ToDo)}
+                      onDragLeave={onDragLeave}
                       onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.ToDo)}
                     >
-                      <div className="font-semibold mb-2">To Do</div>
+                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
+                        dragOverColumn === ProductivityItemStatus.ToDo ? "text-yellow-600" : ""
+                      }`}>
+                        To Do
+                        {dragOverColumn === ProductivityItemStatus.ToDo && (
+                          <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">
+                            Drop here
+                          </span>
+                        )}
+                      </div>
                       <div className="space-y-2 min-h-24">
                         {tasks
                           .filter((t) => t.status === ProductivityItemStatus.ToDo)
                           .map((t) => (
                             <div
                               key={t.id}
-                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                draggedTaskId === t.id
+                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
+                                  : "hover:shadow-md hover:scale-102"
+                              }`}
                               draggable
                               onDragStart={(e) => onDragStart(e, t.id)}
+                              onDragEnd={onDragEnd}
                               onClick={() => openTaskPanel(t)}
                               role="button"
                               tabIndex={0}
@@ -1383,20 +1503,39 @@ export default function Tasks() {
 
                     {/* In Progress Column */}
                     <div
-                      className="rounded-lg border p-3 bg-muted/30"
-                      onDragOver={onDragOver}
+                      className={`rounded-lg border p-3 transition-all duration-200 ${
+                        dragOverColumn === ProductivityItemStatus.InProgress
+                          ? "bg-orange-50 border-orange-300 border-2 scale-105"
+                          : "bg-muted/30"
+                      }`}
+                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.InProgress)}
+                      onDragLeave={onDragLeave}
                       onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.InProgress)}
                     >
-                      <div className="font-semibold mb-2">In Progress</div>
+                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
+                        dragOverColumn === ProductivityItemStatus.InProgress ? "text-orange-600" : ""
+                      }`}>
+                        In Progress
+                        {dragOverColumn === ProductivityItemStatus.InProgress && (
+                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
+                            Drop here
+                          </span>
+                        )}
+                      </div>
                       <div className="space-y-2 min-h-24">
                         {tasks
                           .filter((t) => t.status === ProductivityItemStatus.InProgress)
                           .map((t) => (
                             <div
                               key={t.id}
-                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                draggedTaskId === t.id
+                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
+                                  : "hover:shadow-md hover:scale-102"
+                              }`}
                               draggable
                               onDragStart={(e) => onDragStart(e, t.id)}
+                              onDragEnd={onDragEnd}
                               onClick={() => openTaskPanel(t)}
                             >
                               <div className="text-sm font-medium">
@@ -1424,20 +1563,39 @@ export default function Tasks() {
 
                     {/* Completed Column */}
                     <div
-                      className="rounded-lg border p-3 bg-muted/30"
-                      onDragOver={onDragOver}
+                      className={`rounded-lg border p-3 transition-all duration-200 ${
+                        dragOverColumn === ProductivityItemStatus.Completed
+                          ? "bg-green-50 border-green-300 border-2 scale-105"
+                          : "bg-muted/30"
+                      }`}
+                      onDragOver={(e) => onDragOver(e, ProductivityItemStatus.Completed)}
+                      onDragLeave={onDragLeave}
                       onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.Completed)}
                     >
-                      <div className="font-semibold mb-2">Completed</div>
+                      <div className={`font-semibold mb-2 flex items-center gap-2 ${
+                        dragOverColumn === ProductivityItemStatus.Completed ? "text-green-600" : ""
+                      }`}>
+                        Completed
+                        {dragOverColumn === ProductivityItemStatus.Completed && (
+                          <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                            Drop here
+                          </span>
+                        )}
+                      </div>
                       <div className="space-y-2 min-h-24">
                         {tasks
                           .filter((t) => t.status === ProductivityItemStatus.Completed)
                           .map((t) => (
                             <div
                               key={t.id}
-                              className="rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing"
+                              className={`rounded-md border bg-card p-3 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                                draggedTaskId === t.id
+                                  ? "opacity-50 transform rotate-2 scale-105 shadow-2xl"
+                                  : "hover:shadow-md hover:scale-102"
+                              }`}
                               draggable
                               onDragStart={(e) => onDragStart(e, t.id)}
+                              onDragEnd={onDragEnd}
                               onClick={() => openTaskPanel(t)}
                             >
                               <div className="text-sm font-medium">
