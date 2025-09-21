@@ -94,11 +94,8 @@ export class ErrorBoundary extends Component<
   };
 
   private handleRetry = (): void => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorId: null,
-    });
+    // Actually reload the current page to retry the failed operation
+    window.location.reload();
   };
 
   private handleGoHome = (): void => {
