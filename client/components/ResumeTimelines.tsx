@@ -177,11 +177,11 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             });
         });
 
-        // Sort by start date (most recent first)
+        // Sort by start date (earliest first for left-to-right progression)
         return items.sort((a, b) => {
             const dateA = new Date(a.startDate || '1900-01-01');
             const dateB = new Date(b.startDate || '1900-01-01');
-            return dateB.getTime() - dateA.getTime();
+            return dateA.getTime() - dateB.getTime();
         });
     };
 
