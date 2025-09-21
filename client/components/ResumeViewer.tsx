@@ -12,12 +12,17 @@ import {
   Phone,
   ExternalLink,
   CheckCircle2,
+  PlayCircle,
+  Image as ImageIcon,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MetaBadge } from "./MetaBadge";
 import {
   Select,
   SelectContent,
@@ -130,14 +135,14 @@ export default function ResumeViewer({
   // Check if we should show date information
   const shouldShowDatesInResume = (startDate: string, endDate: string): boolean => {
     if (!startDate) return false;
-    
+
     const formattedStart = formatDateForResume(startDate);
     const formattedEnd = formatDateForResume(endDate);
-    
+
     // Don't show if both are "Present" or if start date is invalid
     if (formattedStart === "Present" && formattedEnd === "Present") return false;
     if (formattedStart === "Invalid Date") return false;
-    
+
     return true;
   };
 
@@ -320,14 +325,26 @@ export default function ResumeViewer({
             {/* Summary */}
             {resumeData.Basics.Summary && (
               <section>
-                <h2 className="text-2xl font-bold mb-4">
-                  Professional Summary
-                </h2>
+                <h2 className="text-2xl font-bold mb-4">Professional Summary</h2>
                 <p className="text-muted-foreground leading-relaxed">
                   {resumeData.Basics.Summary}
                 </p>
               </section>
             )}
+
+            {/* Basics Metadata */}
+            {resume.metaData && resumeData.Basics.Id && (
+              <section>
+                <div className="flex flex-wrap gap-2">
+                  {resume.metaData
+                    .filter((m) => m.referenceId === resumeData.Basics.Id)
+                    .map((m) => (
+                      <MetaBadge key={m.id} meta={m} />
+                    ))}
+                </div>
+              </section>
+            )}
+
 
             {/* Timeline Section */}
             <ResumeTimelines resumeData={resumeData} />
@@ -343,17 +360,18 @@ export default function ResumeViewer({
                       // Current positions (no end date) come first
                       const aIsCurrent = !a.EndDate || a.EndDate === '';
                       const bIsCurrent = !b.EndDate || b.EndDate === '';
-                      
+
+
                       if (aIsCurrent && !bIsCurrent) return -1;
                       if (!aIsCurrent && bIsCurrent) return 1;
-                      
+
                       // For positions with end dates, sort by end date descending (most recent first)
                       if (!aIsCurrent && !bIsCurrent) {
                         const aEndDate = new Date(a.EndDate);
                         const bEndDate = new Date(b.EndDate);
                         return bEndDate.getTime() - aEndDate.getTime();
                       }
-                      
+
                       // For current positions, sort by start date descending (most recent first)
                       const aStartDate = new Date(a.StartDate);
                       const bStartDate = new Date(b.StartDate);
@@ -379,6 +397,18 @@ export default function ResumeViewer({
                           )}
                         </div>
                         <p className="text-primary font-medium">{work.Name}</p>
+
+	                    {/* Metadata for Work item */}
+	                    {resume.metaData && work.Id && (
+	                      <div className="mt-2 flex flex-wrap gap-2">
+	                        {resume.metaData
+	                          .filter(m => m.referenceId === work.Id)
+	                          .map((m) => (
+	                            <MetaBadge key={m.id} meta={m} />
+	                          ))}
+	                      </div>
+	                    )}
+
                         {work.Summary && (
                           <p className="text-muted-foreground">
                             {work.Summary}
@@ -400,12 +430,26 @@ export default function ResumeViewer({
               </section>
             )}
 
+
+	                  {/* Metadata for Education item */}
+	                  {resume.metaData && edu.Id && (
+	                    <div className="mt-2 flex flex-wrap gap-2">
+	                      {resume.metaData
+	                        .filter(m => m.referenceId === edu.Id)
+	                        .map((m) => (
+	                          <MetaBadge key={m.id} meta={m} />
+	                        ))}
+	                    </div>
+	                  )}
+
             {/* Education */}
             {resumeData.Education.length > 0 && (
               <section>
                 <h2 className="text-2xl font-bold mb-6">Education</h2>
                 <div className="space-y-4">
                   {resumeData.Education.map((edu, index) => (
+
+
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
@@ -422,9 +466,22 @@ export default function ResumeViewer({
                         {shouldShowDatesInResume(edu.StartDate, edu.EndDate) && (
                           <div className="text-sm text-muted-foreground">
                             {formatDateForResume(edu.StartDate)} -{" "}
+
+
                             {formatDateForResume(edu.EndDate)}
                           </div>
                         )}
+                        {/* Metadata for Education item */}
+                        {resume.metaData && edu.Id && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {resume.metaData
+                              .filter((m) => m.referenceId === edu.Id)
+                              .map((m) => (
+                                <MetaBadge key={m.id} meta={m} />
+                              ))}
+                          </div>
+                        )}
+
                       </div>
                     </div>
                   ))}
@@ -438,12 +495,20 @@ export default function ResumeViewer({
                 <h2 className="text-2xl font-bold mb-6">Skills</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {resumeData.Skills.map((skill, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <span className="font-medium">{skill.Name}</span>
-                      <Badge variant="secondary">{skill.Level}</Badge>
+                    <div key={index} className="flex flex-col gap-2 p-3 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{skill.Name}</span>
+                        <Badge variant="secondary">{skill.Level}</Badge>
+                      </div>
+                      {resume.metaData && skill.Id && (
+                        <div className="flex flex-wrap gap-2">
+                          {resume.metaData
+                            .filter((m) => m.referenceId === skill.Id)
+                            .map((m) => (
+                              <MetaBadge key={m.id} meta={m} />
+                            ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

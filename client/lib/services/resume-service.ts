@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MetaType } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 
 // ============================================================================
@@ -1001,9 +1001,10 @@ export class ResumeService {
     // Centralized privacy mapping
     const mapPrivacy = mapDisplayPrivacyToResumePrivacy;
 
-    // Transform to ResumeData format
+    // Transform to ResumeData format (preserve section Ids when present)
     const resumeData: ResumeData = {
       Basics: {
+        Id: basics.id || basics.Id || undefined,
         Name: basics.name || "",
         Label: basics.label || "",
         Image: basics.image || "",
@@ -1020,6 +1021,7 @@ export class ResumeService {
         } : null,
       },
       Work: work.map((w: any) => ({
+        Id: w.id || w.Id || undefined,
         Name: w.name || "",
         Position: w.position || "",
         Summary: w.summary || "",
@@ -1029,6 +1031,7 @@ export class ResumeService {
         Url: w.url || "",
       })),
       Education: education.map((e: any) => ({
+        Id: e.id || e.Id || undefined,
         Institution: e.institution || "",
         Area: e.area || "",
         StudyType: e.studyType || "",
@@ -1039,11 +1042,13 @@ export class ResumeService {
         Url: e.url || "",
       })),
       Skills: skills.map((s: any) => ({
+        Id: s.id || s.Id || undefined,
         Name: s.name || "",
         Level: s.level || "",
         Keywords: Array.isArray(s.keywords) ? s.keywords : [],
       })),
       Volunteer: volunteer.map((v: any) => ({
+        Id: v.id || v.Id || undefined,
         Organization: v.organization || "",
         Position: v.position || "",
         Summary: v.summary || "",
@@ -1053,18 +1058,21 @@ export class ResumeService {
         Url: v.url || "",
       })),
       Awards: awards.map((a: any) => ({
+        Id: a.id || a.Id || undefined,
         Title: a.title || "",
         Date: a.date || "",
         Awarder: a.awarder || "",
         Summary: a.summary || "",
       })),
       Certificates: certificates.map((c: any) => ({
+        Id: c.id || c.Id || undefined,
         Name: c.name || "",
         Date: c.date || "",
         Issuer: c.issuer || "",
         Url: c.url || "",
       })),
       Publications: publications.map((p: any) => ({
+        Id: p.id || p.Id || undefined,
         Name: p.name || "",
         Publisher: p.publisher || "",
         ReleaseDate: p.releaseDate || "",
@@ -1072,18 +1080,22 @@ export class ResumeService {
         Summary: p.summary || "",
       })),
       Languages: languages.map((l: any) => ({
+        Id: l.id || l.Id || undefined,
         Language: l.language || "",
         Fluency: l.fluency || "",
       })),
       Interests: interests.map((i: any) => ({
+        Id: i.id || i.Id || undefined,
         Name: i.name || "",
         Keywords: i.keywords || [],
       })),
       References: references.map((r: any) => ({
+        Id: r.id || r.Id || undefined,
         Name: r.name || "",
         Reference: r.reference || "",
       })),
       Projects: projects.map((p: any) => ({
+        Id: p.id || p.Id || undefined,
         Name: p.name || "",
         Description: p.description || "",
         Highlights: p.highlights || [],
@@ -1096,6 +1108,21 @@ export class ResumeService {
         Type: p.type || "",
       })),
     };
+
+    // Normalize MetaData list from API
+    const rawMeta: any[] | undefined = apiResponse.metaData || apiResponse.MetaData;
+    const metaData = Array.isArray(rawMeta)
+      ? rawMeta.map((m: any) => ({
+          id: m.id || m.Id || "",
+          userId: m.userId || m.UserId || "",
+          referenceId: m.referenceId || m.ReferenceId || "",
+          name: m.name || m.Name || "",
+          metaType: (typeof m.metaType === "number" ? m.metaType : parseInt(m.metaType, 10)) as number,
+          url: m.url || m.Url || "",
+          description: m.description || m.Description || undefined,
+          creationDateTime: m.creationDateTime || m.CreationDateTime || undefined,
+        }))
+      : undefined;
 
     // Return the transformed Resume object
     return {
@@ -1111,7 +1138,8 @@ export class ResumeService {
       updatedAt: apiResponse.updateDateTime || new Date().toISOString(),
       views: apiResponse.views || 0,
       userId: apiResponse.userId || "",
-    };
+      metaData,
+    } as FrontendResume;
   }
 
   /**

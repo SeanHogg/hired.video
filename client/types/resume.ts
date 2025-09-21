@@ -1,4 +1,15 @@
+// Meta types mirror backend enum MyVideoResume.Abstractions.Core.MetaType
+export enum MetaType {
+  Hyperlink = 0,
+  VideoMP4 = 1,
+  VideoWebM = 2,
+  Image = 5,
+  YouTube = 10,
+  HtmlContent = 15,
+}
+
 export interface ResumeBasics {
+  Id?: string; // Optional UUID for metadata association
   Name: string;
   Label: string;
   Image: string;
@@ -16,6 +27,7 @@ export interface ResumeBasics {
 }
 
 export interface WorkExperience {
+  Id?: string; // Optional UUID for metadata association
   Name: string;
   Position: string;
   Summary: string;
@@ -26,6 +38,7 @@ export interface WorkExperience {
 }
 
 export interface VolunteerExperience {
+  Id?: string;
   Organization: string;
   Position: string;
   Summary: string;
@@ -36,6 +49,7 @@ export interface VolunteerExperience {
 }
 
 export interface Education {
+  Id?: string;
   Institution: string;
   Area: string;
   StudyType: string;
@@ -47,6 +61,7 @@ export interface Education {
 }
 
 export interface Award {
+  Id?: string;
   Title: string;
   Date: string;
   Awarder: string;
@@ -54,6 +69,7 @@ export interface Award {
 }
 
 export interface Certificate {
+  Id?: string;
   Name: string;
   Date: string;
   Issuer: string;
@@ -61,6 +77,7 @@ export interface Certificate {
 }
 
 export interface Publication {
+  Id?: string;
   Name: string;
   Publisher: string;
   ReleaseDate: string;
@@ -69,27 +86,32 @@ export interface Publication {
 }
 
 export interface Skill {
+  Id?: string;
   Name: string;
   Level: string;
   Keywords: string[];
 }
 
 export interface Language {
+  Id?: string;
   Language: string;
   Fluency: string;
 }
 
 export interface Interest {
+  Id?: string;
   Name: string;
   Keywords: string[];
 }
 
 export interface Reference {
+  Id?: string;
   Name: string;
   Reference: string;
 }
 
 export interface Project {
+  Id?: string;
   Name: string;
   Description: string;
   Highlights: string[];
@@ -122,6 +144,17 @@ export interface ResumeData {
   };
 }
 
+export interface ResumeSectionMeta {
+  id: string;
+  userId: string;
+  referenceId: string; // UUID of the resume section this metadata is attached to
+  name: string;
+  metaType: MetaType; // Use enum for type safety
+  url: string;
+  description?: string;
+  creationDateTime?: string;
+}
+
 export type ResumePrivacy = "public" | "recruiter_only" | "connections" | "private" | "draft";
 
 export interface Resume {
@@ -137,6 +170,7 @@ export interface Resume {
   updatedAt: string;
   views: number;
   userId: string;
+  metaData?: ResumeSectionMeta[]; // Optional metadata entries for interactive UI
 }
 
 export interface ResumeMetadata {
