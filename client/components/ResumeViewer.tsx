@@ -423,24 +423,28 @@ export default function ResumeViewer({
                   {resumeData.Work
                     .slice()
                     .sort((a, b) => {
-                      // Current positions (no end date) come first
-                      const aIsCurrent = !a.EndDate || a.EndDate === '';
-                      const bIsCurrent = !b.EndDate || b.EndDate === '';
-
+                      const norm = (s?: string) => (s || '').trim().toLowerCase();
+                      // Current positions (no end date or 'present') come first
+                      const aEnd = norm(a.EndDate);
+                      const bEnd = norm(b.EndDate);
+                      const aIsCurrent = aEnd === '' || aEnd === 'present';
+                      const bIsCurrent = bEnd === '' || bEnd === 'present';
 
                       if (aIsCurrent && !bIsCurrent) return -1;
                       if (!aIsCurrent && bIsCurrent) return 1;
 
                       // For positions with end dates, sort by end date descending (most recent first)
                       if (!aIsCurrent && !bIsCurrent) {
-                        const aEndDate = new Date(a.EndDate);
-                        const bEndDate = new Date(b.EndDate);
+                        const aEndDate = new Date(a.EndDate || a.StartDate);
+                        const bEndDate = new Date(b.EndDate || b.StartDate);
+                        if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) return 0;
                         return bEndDate.getTime() - aEndDate.getTime();
                       }
 
                       // For current positions, sort by start date descending (most recent first)
                       const aStartDate = new Date(a.StartDate);
                       const bStartDate = new Date(b.StartDate);
+                      if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) return 0;
                       return bStartDate.getTime() - aStartDate.getTime();
                     })
                     .map((work, index) => (

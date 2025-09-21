@@ -29,8 +29,26 @@ export default function WorkExperienceSection({
   onUpdateHighlight,
   onRemoveHighlight,
 }: WorkExperienceSectionProps) {
-  // Use sorted work for display if provided, otherwise use original work array
-  const displayWork = sortedWork || work;
+  // Use sorted work for display if provided; otherwise compute a consistent order
+  const displayWork = (sortedWork || work.slice().sort((a, b) => {
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const aEnd = norm(a.EndDate);
+    const bEnd = norm(b.EndDate);
+    const aIsCurrent = aEnd === '' || aEnd === 'present';
+    const bIsCurrent = bEnd === '' || bEnd === 'present';
+    if (aIsCurrent && !bIsCurrent) return -1;
+    if (!aIsCurrent && bIsCurrent) return 1;
+    if (!aIsCurrent && !bIsCurrent) {
+      const aEndDate = new Date(a.EndDate || a.StartDate);
+      const bEndDate = new Date(b.EndDate || b.StartDate);
+      if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) return 0;
+      return bEndDate.getTime() - aEndDate.getTime();
+    }
+    const aStartDate = new Date(a.StartDate);
+    const bStartDate = new Date(b.StartDate);
+    if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) return 0;
+    return bStartDate.getTime() - aStartDate.getTime();
+  }));
   const emptyState = {
     icon: <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />,
     title: "No work experience added yet.",
