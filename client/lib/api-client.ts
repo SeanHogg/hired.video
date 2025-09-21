@@ -192,10 +192,13 @@ export class ApiClient {
 
       // Prepare body
       let body: string | FormData | undefined;
-      if (config.body) {
+      if (config.body !== undefined && config.body !== null) {
         if (config.body instanceof FormData) {
           // For FormData, don't set Content-Type (let browser set it with boundary)
           delete headers["Content-Type"];
+          body = config.body;
+        } else if (typeof config.body === "string") {
+          // If the caller already provided a string body, pass it through as-is
           body = config.body;
         } else {
           // For regular objects, stringify as JSON
@@ -203,7 +206,7 @@ export class ApiClient {
         }
       }
       // Avoid sending Content-Type on requests with no body (e.g., GET) to satisfy servers with strict content negotiation
-      if (!body) {
+      if (body === undefined) {
         delete headers["Content-Type"];
       }
 

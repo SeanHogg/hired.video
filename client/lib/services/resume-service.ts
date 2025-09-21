@@ -726,15 +726,9 @@ export class ResumeService {
     if (updates.data) payload.resumeSerialized = JSON.stringify(updates.data);
     if (updates.metaData) payload.metaData = updates.metaData;
 
-    const response = await apiClient.request<any>(
+    const response = await apiClient.put<any>(
       `/api/Resume/${id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(payload),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
+      payload,
       z.any(),
     );
 
