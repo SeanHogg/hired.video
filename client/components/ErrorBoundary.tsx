@@ -8,6 +8,7 @@ import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { normalizeError, handleError, type AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { reportError } from "@/lib/error-tracking";
 
 // ============================================================================
 // ERROR BOUNDARY PROPS AND STATE
@@ -92,8 +93,22 @@ export class ErrorBoundary extends Component<
       timestamp: new Date().toISOString(),
     });
 
-    // TODO: Integrate with error reporting service (e.g., Sentry, Bugsnag)
-    // This is where you would send the error to external monitoring services
+    // Report to Sentry/GlitchTip error tracking service
+    try {
+      reportError(error, {
+        errorBoundary: true,
+        level: this.props.level || "component",
+        errorInfo: {
+          componentStack: errorInfo.componentStack,
+        },
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (reportingError) {
+      // Silently fail if error reporting service is unavailable
+      console.warn("Failed to report error to external service:", reportingError);
+    }
   };
 
   private handleRetry = (): void => {
