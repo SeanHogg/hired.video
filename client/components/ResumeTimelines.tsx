@@ -110,6 +110,84 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         return `${formattedStart} - ${formattedEnd}`;
     };
 
+
+        // Reusable timeline card component for consistent rendering
+        interface TimelineCardProps {
+            type: 'work' | 'education' | 'volunteer' | 'certificate' | 'award';
+            icon: React.ReactNode;
+            title: string;
+            organization?: string;
+            startDate?: string;
+            endDate?: string;
+            showDuration?: boolean;
+            showTypeBadge?: boolean;
+            isCurrent?: boolean;
+        }
+
+        const TimelineCard: React.FC<TimelineCardProps> = ({
+            type,
+            icon,
+            title,
+            organization,
+            startDate = '',
+            endDate = '',
+            showDuration = true,
+            showTypeBadge = false,
+            isCurrent = false,
+        }) => {
+            const typeBadgeColor: Record<TimelineCardProps['type'], string> = {
+                work: 'bg-muted',
+                education: 'bg-muted',
+                volunteer: 'bg-muted',
+                certificate: 'bg-muted',
+                award: 'bg-muted',
+            };
+
+            const currentBadge = (() => {
+                if (type === 'work' && isCurrent) {
+                    return (
+                        <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">Current</span>
+                    );
+                }
+                if (type === 'volunteer' && isCurrent) {
+                    return (
+                        <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">Active</span>
+                    );
+                }
+                return null;
+            })();
+
+            return (
+                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="pt-2">
+                        <div className="flex items-center gap-2 mb-2">
+                            {showTypeBadge && (
+                                <span className={`text-xs px-2 py-1 rounded-full capitalize ${typeBadgeColor[type]}`}>
+                                    {type}
+                                </span>
+                            )}
+                            {currentBadge}
+                        </div>
+                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
+                            {icon}
+                            {title}
+                        </h4>
+                        {organization && (
+                            <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{organization}</p>
+                        )}
+                        {shouldShowDates(startDate, endDate) && (
+                            <div className="text-xs text-muted-foreground">
+                                <div>{formatDateRange(startDate, endDate)}</div>
+                                {showDuration && calculateDuration(startDate, endDate) && (
+                                    <div className="font-medium text-primary mt-1">{calculateDuration(startDate, endDate)}</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
     // Create comprehensive timeline combining all experiences
     const createComprehensiveTimeline = (): TimelineItem[] => {
         const items: TimelineItem[] = [];
@@ -448,24 +526,17 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                             )}
 
                                             {/* Timeline item */}
-                                            <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                {/* Content */}
-                                                <div className="pt-2">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-xs px-2 py-1 bg-muted rounded-full capitalize">
-                                                            {item.type}
-                                                        </span>
-                                                    </div>
-                                                    <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">{item.icon}{item.title}</h4>
-                                                    <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{item.organization}</p>
-                                                    {shouldShowDates(item.startDate, item.endDate) && (
-                                                        <div className="text-xs text-muted-foreground">
-                                                            <div>{formatDateRange(item.startDate, item.endDate)}</div>
-                                                            {item.duration && <div className="font-medium text-primary mt-1">{item.duration}</div>}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            <TimelineCard
+                                                type={item.type}
+                                                icon={item.icon}
+                                                title={item.title}
+                                                organization={item.organization}
+                                                startDate={item.startDate}
+                                                endDate={item.endDate}
+                                                showDuration={true}
+                                                showTypeBadge={true}
+                                                isCurrent={item.type === 'work' ? (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present') : (item.type === 'volunteer' ? (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present') : false)}
+                                            />
                                         </div>
                                     ))}
                                 </div>
@@ -506,32 +577,17 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 )}
 
                                                 {/* Timeline item */}
-                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Content */}
-                                                    <div className="pt-2">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Briefcase className="w-3 h-3 text-muted-foreground" />
-                                                            {(!work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present') && (
-                                                                <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                                                                    Current
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
-                                                            <Briefcase className="w-3 h-3" />
-                                                            {work.Position}
-                                                        </h4>
-                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{work.Name}</p>
-                                                        {shouldShowDates(work.StartDate, work.EndDate) && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <div>{formatDateRange(work.StartDate, work.EndDate)}</div>
-                                                                {calculateDuration(work.StartDate, work.EndDate) && (
-                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(work.StartDate, work.EndDate)}</div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <TimelineCard
+                                                    type="work"
+                                                    icon={<Briefcase className="w-3 h-3" />}
+                                                    title={work.Position}
+                                                    organization={work.Name}
+                                                    startDate={work.StartDate}
+                                                    endDate={work.EndDate}
+                                                    showDuration={true}
+                                                    showTypeBadge={false}
+                                                    isCurrent={!work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present'}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -573,32 +629,17 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 )}
 
                                                 {/* Timeline item */}
-                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Content */}
-                                                    <div className="pt-2">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <Heart className="w-3 h-3 text-muted-foreground" />
-                                                            {(!vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present') && (
-                                                                <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">
-                                                                    Active
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
-                                                            <Heart className="w-3 h-3" />
-                                                            {vol.Position}
-                                                        </h4>
-                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{vol.Organization}</p>
-                                                        {shouldShowDates(vol.StartDate, vol.EndDate) && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <div>{formatDateRange(vol.StartDate, vol.EndDate)}</div>
-                                                                {calculateDuration(vol.StartDate, vol.EndDate) && (
-                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(vol.StartDate, vol.EndDate)}</div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <TimelineCard
+                                                    type="volunteer"
+                                                    icon={<Heart className="w-3 h-3" />}
+                                                    title={vol.Position}
+                                                    organization={vol.Organization}
+                                                    startDate={vol.StartDate}
+                                                    endDate={vol.EndDate}
+                                                    showDuration={true}
+                                                    showTypeBadge={false}
+                                                    isCurrent={!vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present'}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -631,27 +672,16 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 )}
 
                                                 {/* Timeline item */}
-                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Content */}
-                                                    <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
-                                                            <GraduationCap className="w-3 h-3" />
-                                                            {edu.StudyType} in {edu.Area}
-                                                        </h4>
-                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{edu.Institution}</p>
-                                                        {edu.Score && (
-                                                            <p className="text-xs text-muted-foreground mb-2">GPA: {edu.Score}</p>
-                                                        )}
-                                                        {shouldShowDates(edu.StartDate, edu.EndDate) && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <div>{formatDateRange(edu.StartDate, edu.EndDate)}</div>
-                                                                {calculateDuration(edu.StartDate, edu.EndDate) && (
-                                                                    <div className="font-medium text-primary mt-1">{calculateDuration(edu.StartDate, edu.EndDate)}</div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <TimelineCard
+                                                    type="education"
+                                                    icon={<GraduationCap className="w-3 h-3" />}
+                                                    title={`${edu.StudyType} in ${edu.Area}`}
+                                                    organization={edu.Institution}
+                                                    startDate={edu.StartDate}
+                                                    endDate={edu.EndDate}
+                                                    showDuration={true}
+                                                    showTypeBadge={false}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -684,21 +714,16 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 )}
 
                                                 {/* Timeline item */}
-                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Content */}
-                                                    <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
-                                                            <FileText className="w-3 h-3" />
-                                                            {cert.Name}
-                                                        </h4>
-                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{cert.Issuer}</p>
-                                                        {cert.Date && formatDate(cert.Date) !== "Present" && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <div>{formatDate(cert.Date)}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <TimelineCard
+                                                    type="certificate"
+                                                    icon={<FileText className="w-3 h-3" />}
+                                                    title={cert.Name}
+                                                    organization={cert.Issuer}
+                                                    startDate={cert.Date}
+                                                    endDate={cert.Date}
+                                                    showDuration={false}
+                                                    showTypeBadge={false}
+                                                />
                                             </div>
                                         ))}
                                     </div>
@@ -731,24 +756,16 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 )}
 
                                                 {/* Timeline item */}
-                                                <div className="relative bg-background border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    {/* Content */}
-                                                    <div className="pt-2">
-                                                        <h4 className="font-medium text-sm mb-1 line-clamp-2 flex items-center gap-2">
-                                                            <Award className="w-3 h-3" />
-                                                            {award.Title}
-                                                        </h4>
-                                                        <p className="text-xs text-muted-foreground mb-2 line-clamp-1">{award.Awarder}</p>
-                                                        {award.Summary && (
-                                                            <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{award.Summary}</p>
-                                                        )}
-                                                        {award.Date && formatDate(award.Date) !== "Present" && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                <div>{formatDate(award.Date)}</div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                <TimelineCard
+                                                    type="award"
+                                                    icon={<Award className="w-3 h-3" />}
+                                                    title={award.Title}
+                                                    organization={award.Awarder}
+                                                    startDate={award.Date}
+                                                    endDate={award.Date}
+                                                    showDuration={false}
+                                                    showTypeBadge={false}
+                                                />
                                             </div>
                                         ))}
                                     </div>
