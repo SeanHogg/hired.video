@@ -70,6 +70,7 @@ function TimelineItem({
 }: TimelineItemProps) {
   const [expanded, setExpanded] = useState(false);
 
+
   const formatDate = (dateString: string) => {
     if (dateString === "Present") return "Present";
     if (!dateString) return "No date";
@@ -80,6 +81,14 @@ function TimelineItem({
       month: "short",
     });
   };
+
+  const formattedStart = formatDate(startDate);
+  const formattedEnd = formatDate(endDate);
+  const showDateRange = !(formattedStart === "No date" && formattedEnd === "No date");
+  const dateText = formattedStart === "No date" && formattedEnd !== "No date"
+    ? formattedEnd
+    : `${formattedStart} - ${formattedEnd}`;
+
 
   return (
     <div className="relative">
@@ -102,23 +111,12 @@ function TimelineItem({
               <p className="text-primary font-medium">{subtitle}</p>
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
-                <span>
-                  {(() => {
-                    const formattedStart = formatDate(startDate);
-                    const formattedEnd = formatDate(endDate);
-
-                    // If no start date but has end date, show only end date
-                    if (formattedStart === "No date" && formattedEnd !== "No date") {
-                      return formattedEnd;
-                    }
-
-                    // Otherwise show the range
-                    return `${formattedStart} - ${formattedEnd}`;
-                  })()}
-                </span>
-              </div>
+              {showDateRange && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
+                  <span>{dateText}</span>
+                </div>
+              )}
               <ChevronRight
                 className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
               />
