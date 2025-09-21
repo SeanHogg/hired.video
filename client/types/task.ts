@@ -65,7 +65,7 @@ export enum MyVideoResumeRoles {
 // Core task interfaces matching backend exactly
 export interface TaskItem {
   createdByUserId?: string;
-  assignedToUserId?: string;
+  assignedToUserId?: string; // Frontend sends as string, backend expects Guid?
   text: string;
   description?: string;
   start: string; // ISO date string
