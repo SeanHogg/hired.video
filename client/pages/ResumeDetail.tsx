@@ -47,6 +47,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
 import ResumeTimelines from "@/components/ResumeTimelines";
+import { MetaBadge } from "@/components/MetaBadge";
 
 
 interface TimelineItemProps {
@@ -463,6 +464,17 @@ export default function ResumeDetail() {
                   <p className="text-lg leading-relaxed opacity-95">
                     {resume?.data?.Basics?.Summary || ""}
                   </p>
+
+                      {resume.metaData && resume.data?.Basics?.Id && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {resume.metaData
+                            .filter((m) => m.referenceId === resume.data.Basics.Id)
+                            .map((m) => (
+                              <MetaBadge key={m.id} meta={m} />
+                            ))}
+                        </div>
+                      )}
+
                 </div>
 
                 {/* Video Preview */}
@@ -558,19 +570,27 @@ export default function ResumeDetail() {
                             return 0;
                           })
                           .map((work, index) => (
-                            <TimelineItem
-                              key={index}
-                              title={work.Position || ""}
-                              subtitle={work.Name || ""}
-                              startDate={work.StartDate || ""}
-                              endDate={work.EndDate || "Present"}
-                              description={work.Summary || ""}
-                              highlights={work.Highlights}
-                              icon={Building}
-                              isLast={
-                                index === resume.data.Work.length - 1
-                              }
-                            />
+                            <div key={index} className="pb-2">
+                              <TimelineItem
+                                title={work.Position || ""}
+                                subtitle={work.Name || ""}
+                                startDate={work.StartDate || ""}
+                                endDate={work.EndDate || "Present"}
+                                description={work.Summary || ""}
+                                highlights={work.Highlights}
+                                icon={Building}
+                                isLast={index === resume.data.Work.length - 1}
+                              />
+                              {resume.metaData && work.Id && (
+                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
+                                  {resume.metaData
+                                    .filter((m) => m.referenceId === work.Id)
+                                    .map((m) => (
+                                      <MetaBadge key={m.id} meta={m} />
+                                    ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                       </div>
                     </CardContent>
@@ -581,6 +601,7 @@ export default function ResumeDetail() {
             {/* Education Timeline */}
             {resume?.data?.Education &&
               resume.data.Education.length > 0 && (
+                <>
                 <section>
                   <div className="flex items-center gap-3 mb-8">
                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -599,25 +620,54 @@ export default function ResumeDetail() {
                               new Date(a.StartDate || "").getTime(),
                           )
                           .map((edu, index) => (
-                            <TimelineItem
-                              key={index}
-                              title={`${edu.StudyType || ""} in ${edu.Area || ""}`}
-                              subtitle={edu.Institution || ""}
-                              startDate={edu.StartDate || ""}
-                              endDate={edu.EndDate || ""}
-                              description={
-                                edu.Score ? `GPA: ${edu.Score}` : undefined
-                              }
-                              icon={GraduationCap}
-                              isLast={
-                                index === resume.data.Education.length - 1
-                              }
-                            />
+                            <div key={index}>
+                              <TimelineItem
+                                title={`${edu.StudyType || ""} in ${edu.Area || ""}`}
+                                subtitle={edu.Institution || ""}
+                                startDate={edu.StartDate || ""}
+                                endDate={edu.EndDate || ""}
+                                description={
+                                  edu.Score ? `GPA: ${edu.Score}` : undefined
+                                }
+                                icon={GraduationCap}
+                                isLast={index === resume.data.Education.length - 1}
+                              />
+                              {resume.metaData && edu.Id && (
+                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
+                                  {resume.metaData
+                                    .filter((m) => m.referenceId === edu.Id)
+                                    .map((m) => (
+                                      <MetaBadge key={m.id} meta={m} />
+                                    ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                       </div>
                     </CardContent>
                   </Card>
                 </section>
+
+	                      {/* Metadata for Education entries */}
+	                      {resume.metaData && (
+	                        <div className="mt-2">
+	                          {resume.data.Education.map((edu, eidx) => (
+	                            edu.Id ? (
+	                              <div key={eidx} className="mt-2">
+	                                <div className="flex flex-wrap gap-2">
+	                                  {resume.metaData
+	                                    .filter((m) => m.referenceId === edu.Id)
+	                                    .map((m) => (
+	                                      <MetaBadge key={m.id} meta={m} />
+	                                    ))}
+	                                </div>
+	                              </div>
+	                            ) : null
+	                          ))}
+	                        </div>
+	                      )}
+
+                </>
               )}
 
             {/* Volunteer Experience Timeline */}
@@ -641,19 +691,27 @@ export default function ResumeDetail() {
                               new Date(a.StartDate || "").getTime(),
                           )
                           .map((volunteer, index) => (
-                            <TimelineItem
-                              key={index}
-                              title={volunteer.Position || ""}
-                              subtitle={volunteer.Organization || ""}
-                              startDate={volunteer.StartDate || ""}
-                              endDate={volunteer.EndDate || "Present"}
-                              description={volunteer.Summary || ""}
-                              highlights={volunteer.Highlights || undefined}
-                              icon={Heart}
-                              isLast={
-                                index === resume.data.Volunteer.length - 1
-                              }
-                            />
+                            <div key={index}>
+                              <TimelineItem
+                                title={volunteer.Position || ""}
+                                subtitle={volunteer.Organization || ""}
+                                startDate={volunteer.StartDate || ""}
+                                endDate={volunteer.EndDate || "Present"}
+                                description={volunteer.Summary || ""}
+                                highlights={volunteer.Highlights || undefined}
+                                icon={Heart}
+                                isLast={index === resume.data.Volunteer.length - 1}
+                              />
+                              {resume.metaData && volunteer.Id && (
+                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
+                                  {resume.metaData
+                                    .filter((m) => m.referenceId === volunteer.Id)
+                                    .map((m) => (
+                                      <MetaBadge key={m.id} meta={m} />
+                                    ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                       </div>
                     </CardContent>
@@ -692,6 +750,26 @@ export default function ResumeDetail() {
                                   className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
                                 >
                                   {keyword}
+
+	                {/* Metadata for Volunteer entries */}
+	                {resume.metaData && (
+	                  <div className="mt-2">
+	                    {resume.data.Volunteer.map((vol, vidx) => (
+	                      vol.Id ? (
+	                        <div key={vidx} className="mt-2">
+	                          <div className="flex flex-wrap gap-2">
+	                            {resume.metaData
+	                              .filter((m) => m.referenceId === vol.Id)
+	                              .map((m) => (
+	                                <MetaBadge key={m.id} meta={m} />
+	                              ))}
+	                          </div>
+	                        </div>
+	                      ) : null
+	                    ))}
+	                  </div>
+	                )}
+
                                 </span>
                               ))}
                             </div>
@@ -714,6 +792,26 @@ export default function ResumeDetail() {
                   <h2 className="text-3xl font-bold">Languages</h2>
                 </div>
 
+
+	                {/* Metadata for Skills */}
+	                {resume.metaData && (
+	                  <div className="mt-2">
+	                    {resume.data.Skills.map((skill, sidx) => (
+	                      skill.Id ? (
+	                        <div key={sidx} className="mt-2">
+	                          <div className="flex flex-wrap gap-2">
+	                            {resume.metaData
+	                              .filter((m) => m.referenceId === skill.Id)
+	                              .map((m) => (
+	                                <MetaBadge key={m.id} meta={m} />
+	                              ))}
+	                          </div>
+	                        </div>
+	                      ) : null
+	                    ))}
+	                  </div>
+	                )}
+
                 <Card>
                   <CardContent className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -728,6 +826,7 @@ export default function ResumeDetail() {
                             </p>
                           )}
                         </div>
+
                       ))}
                     </div>
                   </CardContent>
@@ -789,6 +888,17 @@ export default function ResumeDetail() {
                               ))}
                             </ul>
                           )}
+
+	                          {resume.metaData && project.Id && (
+	                            <div className="mt-2 flex flex-wrap gap-2">
+	                              {resume.metaData
+	                                .filter((m) => m.referenceId === project.Id)
+	                                .map((m) => (
+	                                  <MetaBadge key={m.id} meta={m} />
+	                                ))}
+	                            </div>
+	                          )}
+
 
                           {project.Keywords && project.Keywords.length > 0 && (
                             <div className="flex flex-wrap gap-1">

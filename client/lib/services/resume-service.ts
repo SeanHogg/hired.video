@@ -934,6 +934,7 @@ export class ResumeService {
     // If metaResume has data but we haven't processed it yet, process it now
     if (!basics.name && metaResume.basics) {
       basics = {
+        id: metaResume.basics.id || metaResume.basics.Id,
         name: metaResume.basics.name || "",
         label: metaResume.basics.label || "",
         image: metaResume.basics.image || "",
@@ -948,6 +949,7 @@ export class ResumeService {
     // Process other sections from metaResume if they exist
     if (metaResume.work && work.length === 0) {
       work = metaResume.work.map((w: any) => ({
+        id: w.id || w.Id,
         name: w.name || "",
         position: w.position || "",
         summary: w.summary || "",
@@ -960,6 +962,7 @@ export class ResumeService {
 
     if (metaResume.education && education.length === 0) {
       education = metaResume.education.map((e: any) => ({
+        id: e.id || e.Id,
         institution: e.institution || "",
         area: e.area || "",
         studyType: e.studyType || "",
@@ -973,6 +976,7 @@ export class ResumeService {
 
     if (metaResume.volunteer && volunteer.length === 0) {
       volunteer = metaResume.volunteer.map((v: any) => ({
+        id: v.id || v.Id,
         organization: v.organization || "",
         position: v.position || "",
         summary: v.summary || "",
@@ -985,6 +989,7 @@ export class ResumeService {
 
     if (metaResume.skills && skills.length === 0) {
       skills = metaResume.skills.map((s: any) => ({
+        id: s.id || s.Id,
         name: s.name || "",
         level: s.level || "",
         keywords: s.keywords || []
