@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
 import { authService, type UserProfile, type EmailVerificationChallenge } from "./services/auth-service";
 import type { TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
+import { apiClient } from "./api-client";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
@@ -332,42 +333,31 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     url: string,
     options: RequestInit = {},
   ): Promise<any> => {
-    const token = authService.getToken();
+    try {
+      // Use the configured apiClient which handles the correct base URL
+      const method = (options.method as any) || "GET";
+      const config = {
+        method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+        headers: options.headers as Record<string, string>,
+        body: options.body,
+      };
 
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    };
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-
+      const response = await apiClient.request(url, config);
+      return response;
+    } catch (error: any) {
       // Handle password change required error
-      if (
-        response.status === 403 &&
-        errorData.error?.code === "PASSWORD_CHANGE_REQUIRED"
-      ) {
-        const error = new Error("PASSWORD_CHANGE_REQUIRED");
-        (error as any).response = errorData;
+      if (error.message === "PASSWORD_CHANGE_REQUIRED") {
         throw error;
       }
 
-      // Handle other authentication errors
-      if (response.status === 401) {
+      // Handle authentication errors
+      if (error.message?.includes("Authentication") || error.message?.includes("401")) {
         await logout();
         throw new Error("Authentication required");
       }
 
-      throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+      throw error;
     }
-
-    return response.json();
   };
 
   const verifyTwoFactor = async (code: string): Promise<boolean> => {
