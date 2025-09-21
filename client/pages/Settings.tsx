@@ -45,8 +45,9 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { settingsService, type PrivacySettings } from "@/lib/services/settings-service";
+import { settingsService, type PrivacySettings, type AccountSettings, type NotificationSettings } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
+import { userService } from "@/lib/services/user-service";
 
 function SettingsContent() {
   const {
@@ -71,6 +72,12 @@ function SettingsContent() {
     indexable: true,
     allowMessages: true,
     showActivity: true,
+  });
+  const [appearance, setAppearance] = useState<AccountSettings>({
+    theme: "system",
+    language: "en",
+    timezone: "UTC",
+    dateFormat: "MM/dd/yyyy",
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -102,6 +109,20 @@ function SettingsContent() {
       }))
       .catch((err) => {
         console.error("Failed to load notification settings", err);
+      });
+
+    // Load account (appearance) settings from API
+    settingsService
+      .getAccountSettings()
+      .then((a) => setAppearance((prev) => ({
+        ...prev,
+        theme: a.theme ?? prev.theme,
+        language: a.language ?? prev.language,
+        timezone: a.timezone ?? prev.timezone,
+        dateFormat: a.dateFormat ?? prev.dateFormat,
+      })))
+      .catch((err) => {
+        console.error("Failed to load account settings", err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -553,7 +574,14 @@ function SettingsContent() {
                       <Switch
                         checked={privacy.showEmail}
                         disabled={savingPrivacy}
-                        onCheckedChange={(checked) => savePrivacyPatch({ showEmail: checked })}
+                        onCheckedChange={async (checked) => {
+                          setPrivacy({ ...privacy, showEmail: checked });
+                          try {
+                            await userService.updateProfile({ showEmail: checked } as any);
+                          } catch (e) {
+                            console.error("Failed to save privacy (show email)", e);
+                          }
+                        }}
                       />
                     </div>
                     <Separator />
@@ -569,7 +597,14 @@ function SettingsContent() {
                       <Switch
                         checked={privacy.showPhone}
                         disabled={savingPrivacy}
-                        onCheckedChange={(checked) => savePrivacyPatch({ showPhone: checked })}
+                        onCheckedChange={async (checked) => {
+                          setPrivacy({ ...privacy, showPhone: checked });
+                          try {
+                            await userService.updateProfile({ showPhone: checked } as any);
+                          } catch (e) {
+                            console.error("Failed to save privacy (show phone)", e);
+                          }
+                        }}
                       />
                     </div>
                     <Separator />
@@ -606,7 +641,14 @@ function SettingsContent() {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label>Theme</Label>
-                      <Select defaultValue="system">
+                      <Select value={appearance.theme} onValueChange={async (value) => {
+                        setAppearance({ ...appearance, theme: value as AccountSettings["theme"] });
+                        try {
+                          await settingsService.updateAccountSettings({ theme: value as AccountSettings["theme"] });
+                        } catch (e) {
+                          console.error("Failed to save appearance (theme)", e);
+                        }
+                      }}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -619,7 +661,14 @@ function SettingsContent() {
                     </div>
                     <div className="space-y-2">
                       <Label>Language</Label>
-                      <Select defaultValue="en">
+                      <Select value={appearance.language} onValueChange={async (value) => {
+                        setAppearance({ ...appearance, language: value });
+                        try {
+                          await settingsService.updateAccountSettings({ language: value });
+                        } catch (e) {
+                          console.error("Failed to save appearance (language)", e);
+                        }
+                      }}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -633,21 +682,28 @@ function SettingsContent() {
                     </div>
                     <div className="space-y-2">
                       <Label>Timezone</Label>
-                      <Select defaultValue="utc-5">
+                      <Select value={appearance.timezone} onValueChange={async (value) => {
+                        setAppearance({ ...appearance, timezone: value });
+                        try {
+                          await settingsService.updateAccountSettings({ timezone: value });
+                        } catch (e) {
+                          console.error("Failed to save appearance (timezone)", e);
+                        }
+                      }}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="utc-8">
+                          <SelectItem value="UTC-8">
                             Pacific Time (UTC-8)
                           </SelectItem>
-                          <SelectItem value="utc-7">
+                          <SelectItem value="UTC-7">
                             Mountain Time (UTC-7)
                           </SelectItem>
-                          <SelectItem value="utc-6">
+                          <SelectItem value="UTC-6">
                             Central Time (UTC-6)
                           </SelectItem>
-                          <SelectItem value="utc-5">
+                          <SelectItem value="UTC-5">
                             Eastern Time (UTC-5)
                           </SelectItem>
                           <SelectItem value="utc+0">GMT (UTC+0)</SelectItem>
