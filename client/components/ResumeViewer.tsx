@@ -12,16 +12,12 @@ import {
   Phone,
   ExternalLink,
   CheckCircle2,
-  PlayCircle,
-  Image as ImageIcon,
-  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MetaBadge } from "./MetaBadge";
 import {
   Select,
@@ -113,6 +109,7 @@ export default function ResumeViewer({
       name: request.name,
       privacy: request.privacy,
       isMaster: request.isMaster,
+      metaData: request.metaData,
     });
     setIsEditing(false);
   };
@@ -192,6 +189,8 @@ export default function ResumeViewer({
         initialName={resume.name}
         initialPrivacy={resume.privacy}
         initialIsMaster={resume.isMaster}
+        initialMetaData={resume.metaData || []}
+        ownerUserId={resume.userId}
         onSave={handleEditComplete}
         onCancel={() => setIsEditing(false)}
       />
@@ -429,18 +428,6 @@ export default function ResumeViewer({
                 </div>
               </section>
             )}
-
-
-	                  {/* Metadata for Education item */}
-	                  {resume.metaData && edu.Id && (
-	                    <div className="mt-2 flex flex-wrap gap-2">
-	                      {resume.metaData
-	                        .filter(m => m.referenceId === edu.Id)
-	                        .map((m) => (
-	                          <MetaBadge key={m.id} meta={m} />
-	                        ))}
-	                    </div>
-	                  )}
 
             {/* Education */}
             {resumeData.Education.length > 0 && (

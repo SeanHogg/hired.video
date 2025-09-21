@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MetaType } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 
 // ============================================================================
@@ -714,6 +714,7 @@ export class ResumeService {
       data?: ResumeData;
       privacy?: ResumePrivacy;
       isMaster?: boolean;
+      metaData?: ResumeSectionMeta[];
     },
   ): Promise<FrontendResume> {
     // Convert ResumeData to JSON string format expected by backend
@@ -723,6 +724,7 @@ export class ResumeService {
     if (updates.privacy) payload.privacy = updates.privacy;
     if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
     if (updates.data) payload.resumeSerialized = JSON.stringify(updates.data);
+    if (updates.metaData) payload.metaData = updates.metaData;
 
     const response = await apiClient.request<any>(
       `/api/Resume/${id}`,

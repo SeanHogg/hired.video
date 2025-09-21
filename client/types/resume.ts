@@ -202,6 +202,7 @@ export interface CreateResumeRequest {
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
+  metaData?: ResumeSectionMeta[];
 }
 
 export interface UpdateResumeRequest {
@@ -210,6 +211,7 @@ export interface UpdateResumeRequest {
   privacy?: ResumePrivacy;
   isMaster?: boolean;
   isActive?: boolean;
+  metaData?: ResumeSectionMeta[];
 }
 
 export interface UploadResumeRequest {
