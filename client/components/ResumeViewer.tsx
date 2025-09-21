@@ -1,5 +1,4 @@
 import {
-  Edit,
   Eye,
   Share2,
   Copy,
@@ -12,12 +11,14 @@ import {
   Phone,
   ExternalLink,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { MetaBadge } from "./MetaBadge";
 import {
   Select,
@@ -30,16 +31,18 @@ import type {
   Resume,
   ResumePrivacy,
   UpdateResumeRequest,
-  CreateResumeRequest,
+  ResumeSectionMeta,
 } from "@/types/resume";
-import ResumeBuilder from "./ResumeBuilder";
-import { formatDate } from "@/lib/utils";
+import { MetaType } from "@/types/resume";
+
+
 
 interface ResumeViewerProps {
   resume: Resume;
   onUpdate: (_request: UpdateResumeRequest) => void;
   onCreateVariation?: (_parentId: string) => void;
   canEdit?: boolean;
+  showToolbar?: boolean; // show internal action toolbar (name, privacy, share, edit)
 }
 
 export default function ResumeViewer({
@@ -47,8 +50,8 @@ export default function ResumeViewer({
   onUpdate,
   onCreateVariation,
   canEdit = true,
+  showToolbar = true,
 }: ResumeViewerProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
 
@@ -102,16 +105,7 @@ export default function ResumeViewer({
     onUpdate({ privacy: newPrivacy });
   };
 
-  const handleEditComplete = (request: CreateResumeRequest) => {
-    onUpdate({
-      data: request.data,
-      name: request.name,
-      privacy: request.privacy,
-      isMaster: request.isMaster,
-      metaData: request.metaData,
-    });
-    setIsEditing(false);
-  };
+
 
   const handleShare = () => {
     const shareUrl = `${window.location.origin}/resumes/${resume.id}`;
@@ -179,97 +173,105 @@ export default function ResumeViewer({
     }
   };
 
-  if (isEditing) {
-    return (
-      <ResumeBuilder
-        initialData={resumeData}
-        initialName={resume.name}
-        initialPrivacy={resume.privacy}
-        initialIsMaster={resume.isMaster}
-        initialMetaData={resume.metaData || []}
-        ownerUserId={resume.userId}
-        onSave={handleEditComplete}
-        onCancel={() => setIsEditing(false)}
-      />
-    );
-  }
+
+
+  // Featured Video from metadata (match ResumeDetail behavior)
+  const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
+    const all = resume?.metaData || [];
+    const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
+    return all.filter((m) => videoTypes.has(m.metaType));
+  }, [resume?.metaData]);
+  const [videoIndex, setVideoIndex] = useState<number>(0);
+  useEffect(() => {
+    if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
+  }, [videoMetaItems.length, videoIndex]);
+  const currentVideoMeta = videoMetaItems.length > 0 ? videoMetaItems[videoIndex] : null;
+  const youTubeEmbed = (url: string): string => {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes("youtu.be")) {
+        const id = u.pathname.split("/").filter(Boolean)[0];
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
+      if (u.hostname.includes("youtube.com")) {
+        const v = u.searchParams.get("v");
+        if (v) return `https://www.youtube.com/embed/${v}`;
+        const parts = u.pathname.split("/").filter(Boolean);
+        const embedIdx = parts.indexOf("embed");
+        if (embedIdx >= 0 && parts[embedIdx + 1]) return `https://www.youtube.com/embed/${parts[embedIdx + 1]}`;
+      }
+    } catch {}
+    return url;
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{resume.name}</h1>
-          {resume.isMaster && (
-            <Badge
-              variant="secondary"
-              className="bg-yellow-100 text-yellow-800"
-            >
-              <Star className="h-3 w-3 mr-1" />
-              Master
+      {/* Toolbar (optional) */}
+      {showToolbar && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">{resume.name}</h1>
+            {resume.isMaster && (
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                <Star className="h-3 w-3 mr-1" />
+                Master
+              </Badge>
+            )}
+            <Badge className={getPrivacyColor(privacy)}>
+              {getPrivacyIcon(privacy)}
+              <span className="ml-1">{getPrivacyText(privacy)}</span>
             </Badge>
-          )}
-          <Badge className={getPrivacyColor(privacy)}>
-            {getPrivacyIcon(privacy)}
-            <span className="ml-1">{getPrivacyText(privacy)}</span>
-          </Badge>
-        </div>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <Select value={privacy} onValueChange={handlePrivacyChange}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="private">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Private
-                  </div>
-                </SelectItem>
-                <SelectItem value="recruiter_only">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Recruiter Only
-                  </div>
-                </SelectItem>
-                <SelectItem value="connections">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Connections
-                  </div>
-                </SelectItem>
-                <SelectItem value="public">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    Public
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <Select value={privacy} onValueChange={handlePrivacyChange}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Private
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="recruiter_only">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Recruiter Only
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="connections">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Connections
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="public">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Public
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
-          <Button variant="outline" onClick={handleShare}>
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-
-          {canEdit && (
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
+            <Button variant="outline" onClick={handleShare}>
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
             </Button>
-          )}
 
-          {resume.isMaster && onCreateVariation && (
-            <Button onClick={() => onCreateVariation(resume.id)}>
-              <Copy className="h-4 w-4 mr-2" />
-              Create Variation
-            </Button>
-          )}
+            {resume.isMaster && onCreateVariation && (
+              <Button onClick={() => onCreateVariation(resume.id)}>
+                <Copy className="h-4 w-4 mr-2" />
+                Create Variation
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Share Success Alert */}
       {showShareAlert && (
@@ -318,6 +320,78 @@ export default function ResumeViewer({
           </div>
 
           <div className="p-8 space-y-8">
+            {/* Featured Video */}
+            {currentVideoMeta && (
+              <section>
+                <div className="relative">
+                  <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
+                    {/* Prev */}
+                    {videoMetaItems.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label="Previous video"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+                        onClick={() => setVideoIndex((prev) => (prev - 1 + videoMetaItems.length) % videoMetaItems.length)}
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                    )}
+
+                    {/* Next */}
+                    {videoMetaItems.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label="Next video"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+                        onClick={() => setVideoIndex((prev) => (prev + 1) % videoMetaItems.length)}
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    )}
+
+                    {currentVideoMeta.metaType === MetaType.YouTube ? (
+                      <iframe
+                        className="absolute inset-0 w-full h-full"
+                        src={youTubeEmbed(currentVideoMeta.url)}
+                        title={currentVideoMeta.name || "Video Resume"}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <video className="absolute inset-0 w-full h-full" controls>
+                        <source
+                          src={currentVideoMeta.url}
+                          type={currentVideoMeta.metaType === MetaType.VideoWebM ? "video/webm" : "video/mp4"}
+                        />
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                  </div>
+
+                  {/* Footer pills */}
+                  <div className="mt-4 flex flex-col items-center gap-2">
+                    <div className="text-xs opacity-80">
+                      Video {videoIndex + 1} / {videoMetaItems.length}
+                    </div>
+                    {videoMetaItems.length > 1 && (
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {videoMetaItems.map((m, idx) => (
+                          <button
+                            key={m.id || `${m.referenceId}-${idx}`}
+                            type="button"
+                            className={`px-2 py-1 rounded text-xs border ${idx === videoIndex ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/30 text-foreground border-border"}`}
+                            onClick={() => setVideoIndex(idx)}
+                          >
+                            {m.name || `Video ${idx + 1}`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Summary */}
             {resumeData.Basics.Summary && (
               <section>
@@ -718,22 +792,15 @@ export default function ResumeViewer({
 
       {/* Resume Metadata */}
       <Card>
-        <CardHeader>
-          <CardTitle>Resume Information</CardTitle>
-        </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Created
-              </p>
-              <p>{formatDate(resume.createdAt)}</p>
+              <p className="text-sm font-medium text-muted-foreground">Created</p>
+              <p>{new Date(resume.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Last Updated
-              </p>
-              <p>{formatDate(resume.updatedAt)}</p>
+              <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
+              <p>{new Date(resume.updatedAt).toLocaleString()}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Views</p>
@@ -746,9 +813,7 @@ export default function ResumeViewer({
 
           {resume.parentId && (
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">
-                Variation of
-              </p>
+              <p className="text-sm font-medium text-muted-foreground mb-2">Variation of</p>
               <Badge variant="outline">Master Resume</Badge>
             </div>
           )}
