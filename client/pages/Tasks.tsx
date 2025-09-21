@@ -1255,7 +1255,7 @@ export default function Tasks() {
                                 <div
                                   key={task.id}
                                   onClick={() => openTaskPanel(task)}
-                                  className={`text-xs p-1 rounded text-white cursor-pointer ${
+                                  className={`text-xs p-1 rounded text-gray-900 cursor-pointer ${
                                     taskTypeColors[task.type] || "bg-gray-600"
                                   }`}
                                   title={task.description}
@@ -1307,7 +1307,7 @@ export default function Tasks() {
                                 <div
                                   key={task.id}
                                   onClick={() => openTaskPanel(task)}
-                                  className={`text-xs p-1 rounded text-white cursor-pointer ${
+                                  className={`text-xs p-1 rounded text-gray-900 cursor-pointer ${
                                     taskTypeColors[task.type] || "bg-gray-600"
                                   }`}
                                   title={task.description}
