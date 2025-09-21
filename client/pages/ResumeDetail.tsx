@@ -1,7 +1,7 @@
 import {
   ArrowLeft,
   Edit,
-  Play,
+
   Calendar,
   Mail,
   Phone,
@@ -25,7 +25,7 @@ import {
   FolderOpen,
   Trophy,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
@@ -35,17 +35,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
+import type { ResumeSectionMeta } from "@/types/resume";
+import { MetaType } from "@/types/resume";
 import ResumeTimelines from "@/components/ResumeTimelines";
 import { MetaBadge } from "@/components/MetaBadge";
 
@@ -167,7 +163,32 @@ export default function ResumeDetail() {
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showVideo, setShowVideo] = useState(false);
+
+  const primaryVideoMeta = useMemo<ResumeSectionMeta | null>(() => {
+    if (!resume?.metaData || resume.metaData.length === 0) return null;
+    const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
+    const found = resume.metaData.find((m) => videoTypes.has(m.metaType));
+    return found || null;
+  }, [resume]);
+
+  const youTubeEmbed = (url: string): string => {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes("youtu.be")) {
+        const id = u.pathname.split("/").filter(Boolean)[0];
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
+      if (u.hostname.includes("youtube.com")) {
+        const v = u.searchParams.get("v");
+        if (v) return `https://www.youtube.com/embed/${v}`;
+        const parts = u.pathname.split("/").filter(Boolean);
+        const embedIdx = parts.indexOf("embed");
+        if (embedIdx >= 0 && parts[embedIdx + 1]) return `https://www.youtube.com/embed/${parts[embedIdx + 1]}`;
+      }
+    } catch {}
+    return url;
+  };
+
 
   useEffect(() => {
     const loadResume = async () => {
@@ -477,50 +498,43 @@ export default function ResumeDetail() {
 
                 </div>
 
-                {/* Video Preview */}
-                <div className="relative">
-                  <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
-                    <CardContent className="p-6">
-                      <div className="aspect-video bg-black/20 rounded-lg flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
-                        <Dialog open={showVideo} onOpenChange={setShowVideo}>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="lg"
-                              variant="secondary"
-                              className="relative z-10"
-                            >
-                              <Play className="w-6 h-6 mr-2" />
-                              Play Video Resume
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                              <DialogTitle>
-                                Video Resume -{" "}
-                                {resume?.data?.Basics?.Name || resume?.name}
-                              </DialogTitle>
-                            </DialogHeader>
-                            <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                              <div className="text-center">
-                                <Play className="w-16 h-16 mx-auto mb-4 text-white/60" />
-                                <p className="text-white/80">
-                                  AI-Generated Video Resume
-                                </p>
-                                <p className="text-white/60 text-sm">
-                                  Video would be generated and displayed here
-                                </p>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <p className="text-center mt-4 text-sm opacity-80">
-                        AI-Generated Video Resume • 2:15 duration
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
+                {/* Featured Video (from metadata) */}
+                {primaryVideoMeta && (
+                  <div className="relative">
+                    <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
+                      <CardContent className="p-6">
+                        <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
+                          {primaryVideoMeta.metaType === MetaType.YouTube ? (
+                            <iframe
+                              className="absolute inset-0 w-full h-full"
+                              src={youTubeEmbed(primaryVideoMeta.url)}
+                              title={primaryVideoMeta.name || "Video Resume"}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <video className="absolute inset-0 w-full h-full" controls>
+                              <source
+                                src={primaryVideoMeta.url}
+                                type={
+                                  primaryVideoMeta.metaType === MetaType.VideoWebM
+                                    ? "video/webm"
+                                    : "video/mp4"
+                                }
+                              />
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                        </div>
+                        {primaryVideoMeta.name && (
+                          <p className="text-center mt-4 text-sm opacity-80">
+                            {primaryVideoMeta.name}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
               </div>
             </div>
           </div>
