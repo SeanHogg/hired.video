@@ -614,6 +614,8 @@ function AccountManagementContent() {
 
         <Footer />
       </div>
+    </div>
+  );
 }
 
 export default function AccountManagement() {

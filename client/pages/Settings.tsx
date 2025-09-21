@@ -51,7 +51,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { settingsService } from "@/lib/services/settings-service";
+import { settingsService, type PrivacySettings } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
 
 function SettingsContent() {
@@ -70,11 +70,13 @@ function SettingsContent() {
     marketing: true,
     weekly: true,
   });
-  const [privacy, setPrivacy] = useState({
+  const [privacy, setPrivacy] = useState<PrivacySettings>({
     profileVisible: true,
     showEmail: false,
     showPhone: false,
     indexable: true,
+    allowMessages: true,
+    showActivity: true,
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -84,15 +86,13 @@ function SettingsContent() {
     // Load privacy settings from API
     settingsService
       .getPrivacySettings()
-      .then((p) => setPrivacy({
+      .then((p) => setPrivacy((prev) => ({
+        ...prev,
         profileVisible: p.profileVisible,
-        // The following fields are UI-only toggles for now
-        showEmail: privacy.showEmail,
-        showPhone: privacy.showPhone,
         indexable: p.indexable,
-        allowMessages: p.allowMessages,
-        showActivity: p.showActivity,
-      }))
+        allowMessages: p.allowMessages ?? prev.allowMessages,
+        showActivity: p.showActivity ?? prev.showActivity,
+      })))
       .catch((err) => {
         console.error("Failed to load privacy settings", err);
       });
@@ -556,21 +556,18 @@ function SettingsContent() {
                           Allow search engines to index your profile
                         </p>
                       </div>
-                      <Switch
-                        checked={privacy.indexable}
-                        onCheckedChange={(checked) =>
-                        setPrivacy({ ...privacy, indexable: checked })
-                      }
-                    />
-                    <div className="pt-2">
-                      <Button onClick={savePrivacy} disabled={savingPrivacy}>
-                        <Save className="h-4 w-4" />
-                        {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
-                      </Button>
-                    </div
-                          setPrivacy({ ...privacy, indexable: checked })
-                        }
-                      />
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={privacy.indexable}
+                          onCheckedChange={(checked) =>
+                            setPrivacy({ ...privacy, indexable: checked })
+                          }
+                        />
+                        <Button onClick={savePrivacy} disabled={savingPrivacy}>
+                          <Save className="h-4 w-4" />
+                          {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -704,6 +701,8 @@ function SettingsContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
       />
+    </div>
+);
 }
 
 export default function Settings() {
