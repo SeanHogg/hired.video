@@ -92,6 +92,35 @@ const PageLoader = () => (
   </div>
 );
 
+// Simple route guards
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const { isAuthenticated } = useAuthSafe();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function RequireVerified({ children }: { children: JSX.Element }) {
+  const { isAuthenticated, isEmailVerified } = useAuthSafe();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (isEmailVerified === false) {
+    const intended = window.location.pathname + window.location.search;
+    const params = new URLSearchParams({ redirect: intended });
+    return <Navigate to={`/verify-email?${params.toString()}`} replace />;
+  }
+  return children;
+}
+
+function useAuthSafe() {
+  try {
+    // Lazy import to avoid circulars
+    const mod = require("./lib/auth");
+    return mod.useAuth();
+  } catch {
+    // Fallback shape matching AuthContextType subset
+    return { isAuthenticated: false, isEmailVerified: undefined } as { isAuthenticated: boolean; isEmailVerified?: boolean };
+  }
+}
+
 // Create a client with production-ready configuration
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -228,9 +257,9 @@ const App = () => (
                         path="/persona-selection"
                         element={<PersonaSelection />}
                       />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/onboarding" element={<Onboarding />} />
+                      <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
+                      <Route path="/dashboard" element={<RequireVerified><Dashboard /></RequireVerified>} />
+                      <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"
                         element={<Navigate to="/pricing" replace />}
@@ -242,10 +271,10 @@ const App = () => (
                       />
                       <Route path="/about" element={<About />} />
                       <Route path="/careers" element={<Careers />} />
-                      <Route path="/resumes" element={<Resumes />} />
+                      <Route path="/resumes" element={<RequireVerified><Resumes /></RequireVerified>} />
                       <Route
                         path="/resumes/upload"
-                        element={<ResumeUploadPage />}
+                        element={<RequireVerified><ResumeUploadPage /></RequireVerified>}
                       />
                       <Route
                         path="/resumes/create/:id"

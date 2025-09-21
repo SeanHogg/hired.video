@@ -66,6 +66,7 @@ interface AuthContextType {
   completeOnboarding: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isEmailVerified?: boolean;
   refreshUser: () => Promise<void>;
   apiCall: (url: string, options?: RequestInit) => Promise<any>;
 }
@@ -104,6 +105,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser || null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
 
   // Check auth consistency on every render - if we have a user but no auth token, clear the user
   useEffect(() => {
@@ -229,6 +231,13 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         const user = userProfileToUser(profile);
         console.log("AuthContext.login: Converted profile to user", user);
         setUser(user);
+        // After login, prime verification state lazily
+        try {
+          const status = await authService.getVerificationStatus();
+          setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+        } catch {
+          setIsEmailVerified(undefined);
+        }
       }
 
       console.log("AuthContext.login: Login successful, returning true");
@@ -417,6 +426,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     completeOnboarding,
     isAuthenticated: !!user,
     isLoading,
+    isEmailVerified,
     refreshUser,
     apiCall,
   };

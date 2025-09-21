@@ -48,6 +48,7 @@ import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { settingsService, type PrivacySettings, type AccountSettings, type NotificationSettings } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
 import { userService } from "@/lib/services/user-service";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function SettingsContent() {
   const {
@@ -57,7 +58,7 @@ function SettingsContent() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState({
     email: true,
@@ -81,9 +82,14 @@ function SettingsContent() {
   });
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number } | null>(null);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    // Load verification status for banner
+    getVerificationStatus().then(setVerification).catch(() => setVerification(null));
+
     // Load privacy settings from API
     settingsService
       .getPrivacySettings()
@@ -372,6 +378,13 @@ function SettingsContent() {
     );
   }
 
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => setResendCooldown((c) => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar
@@ -400,6 +413,28 @@ function SettingsContent() {
                 {getRoleDisplayLabel(user.role)}
               </Badge>
             </div>
+
+            {/* Verification Banner */}
+            {verification && !(verification.emailConfirmed || verification.isEmailVerified) && (
+              <Alert>
+                <AlertDescription>
+                  ⚠️ Your email is not verified. You won't appear in public search results until verified.
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        const ok = await resendEmailVerification();
+                        if (ok) setResendCooldown(60);
+                      }}
+                      disabled={resendCooldown > 0}
+                    >
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification Email"}
+                    </Button>
+                    <Link to="/verify-email" className="text-primary underline">Verify now</Link>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Settings Tabs */}
             <Tabs defaultValue="notifications" className="space-y-6">
@@ -724,6 +759,35 @@ function SettingsContent() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Email Verification Section */}
+                    <div className="rounded-md border p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">Email Verification</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {verification?.email}
+                          </p>
+                        </div>
+                        <Badge variant={verification && (verification.emailConfirmed || verification.isEmailVerified) ? "default" : "destructive"}>
+                          {verification && (verification.emailConfirmed || verification.isEmailVerified) ? "Verified ✅" : "Not Verified ❌"}
+                        </Badge>
+                      </div>
+                      {!verification || !(verification.emailConfirmed || verification.isEmailVerified) ? (
+                        <div className="mt-3 flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const ok = await resendEmailVerification();
+                              if (ok) setResendCooldown(60);
+                            }}
+                            disabled={resendCooldown > 0}
+                          >
+                            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification Email"}
+                          </Button>
+                          <Link to="/verify-email" className="text-primary underline text-sm">Go to verification page</Link>
+                        </div>
+                      ) : null}
+                    </div>
                     <div>
                       <h4 className="text-sm font-medium mb-2">Data Export</h4>
                       <p className="text-sm text-muted-foreground mb-4">
