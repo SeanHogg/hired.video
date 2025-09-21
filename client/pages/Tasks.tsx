@@ -151,6 +151,7 @@ export default function Tasks() {
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // API state management
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -166,7 +167,6 @@ export default function Tasks() {
   };
   const closeTaskPanel = () => setTaskPanelOpen(false);
 
-  const [isEditing, setIsEditing] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ProductivityItemStatus | null>(null);
 
