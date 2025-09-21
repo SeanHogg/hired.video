@@ -33,7 +33,6 @@ import type {
   CreateResumeRequest,
 } from "@/types/resume";
 import ResumeBuilder from "./ResumeBuilder";
-import ResumeTimelines from "./ResumeTimelines";
 import { formatDate } from "@/lib/utils";
 
 interface ResumeViewerProps {
@@ -343,10 +342,6 @@ export default function ResumeViewer({
                 </div>
               </section>
             )}
-
-
-            {/* Timeline Section */}
-            <ResumeTimelines resumeData={resumeData} />
 
             {/* Work Experience */}
             {resumeData.Work.length > 0 && (
