@@ -4,14 +4,9 @@ import {
   Bell,
   Shield,
   Palette,
-  Globe,
   CreditCard,
   Download,
-  Upload,
   Trash2,
-  Eye,
-  EyeOff,
-  Save,
   RefreshCw,
   ArrowRight,
   Sparkles,
@@ -35,7 +30,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -99,17 +93,25 @@ function SettingsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  const savePrivacy = async () => {
+
+
+  const savePrivacyPatch = async (patch: Partial<PrivacySettings>) => {
     try {
       setSavingPrivacy(true);
+      // Merge patch into local state first for responsive UI
+      const merged: PrivacySettings = { ...privacy, ...patch };
+      setPrivacy(merged);
+
+      // Persist only the fields supported by backend
       const updated = await settingsService.updatePrivacySettings({
-        profileVisible: privacy.profileVisible,
-        indexable: privacy.indexable,
-        allowMessages: privacy.allowMessages,
-        showActivity: privacy.showActivity,
+        profileVisible: merged.profileVisible,
+        indexable: merged.indexable,
+        allowMessages: merged.allowMessages,
+        showActivity: merged.showActivity,
       });
+
+      // Reflect backend-confirmed values; keep other local-only flags
       setPrivacy((prev) => ({ ...prev, ...updated }));
-      toast({ title: "Privacy settings saved" });
     } catch (error) {
       console.error("Failed to save privacy settings", error);
       toast({ title: "Failed to save privacy settings", variant: "destructive" });
@@ -507,9 +509,8 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={privacy.profileVisible}
-                        onCheckedChange={(checked) =>
-                          setPrivacy({ ...privacy, profileVisible: checked })
-                        }
+                        disabled={savingPrivacy}
+                        onCheckedChange={(checked) => savePrivacyPatch({ profileVisible: checked })}
                       />
                     </div>
                     <Separator />
@@ -524,9 +525,8 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={privacy.showEmail}
-                        onCheckedChange={(checked) =>
-                          setPrivacy({ ...privacy, showEmail: checked })
-                        }
+                        disabled={savingPrivacy}
+                        onCheckedChange={(checked) => savePrivacyPatch({ showEmail: checked })}
                       />
                     </div>
                     <Separator />
@@ -541,9 +541,8 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={privacy.showPhone}
-                        onCheckedChange={(checked) =>
-                          setPrivacy({ ...privacy, showPhone: checked })
-                        }
+                        disabled={savingPrivacy}
+                        onCheckedChange={(checked) => savePrivacyPatch({ showPhone: checked })}
                       />
                     </div>
                     <Separator />
@@ -559,14 +558,9 @@ function SettingsContent() {
                       <div className="flex items-center gap-3">
                         <Switch
                           checked={privacy.indexable}
-                          onCheckedChange={(checked) =>
-                            setPrivacy({ ...privacy, indexable: checked })
-                          }
+                          disabled={savingPrivacy}
+                          onCheckedChange={(checked) => savePrivacyPatch({ indexable: checked })}
                         />
-                        <Button onClick={savePrivacy} disabled={savingPrivacy}>
-                          <Save className="h-4 w-4" />
-                          {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
