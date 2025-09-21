@@ -12,6 +12,7 @@ import {
   Award,
   Share2,
   Download,
+  ChevronLeft,
   ChevronRight,
   Target,
   Globe,
@@ -164,12 +165,18 @@ export default function ResumeDetail() {
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const primaryVideoMeta = useMemo<ResumeSectionMeta | null>(() => {
-    if (!resume?.metaData || resume.metaData.length === 0) return null;
+  const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
+    if (!resume?.metaData || resume.metaData.length === 0) return [];
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    const found = resume.metaData.find((m) => videoTypes.has(m.metaType));
-    return found || null;
+    return resume.metaData.filter((m) => videoTypes.has(m.metaType));
   }, [resume]);
+
+  const [videoIndex, setVideoIndex] = useState<number>(0);
+  useEffect(() => {
+    if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
+  }, [videoMetaItems.length, videoIndex]);
+
+  const currentVideoMeta = videoMetaItems.length > 0 ? videoMetaItems[videoIndex] : null;
 
   const youTubeEmbed = (url: string): string => {
     try {
@@ -499,25 +506,49 @@ export default function ResumeDetail() {
                 </div>
 
                 {/* Featured Video (from metadata) */}
-                {primaryVideoMeta && (
+                {currentVideoMeta && (
                   <div className="relative">
                     <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
                       <CardContent className="p-6">
                         <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
-                          {primaryVideoMeta.metaType === MetaType.YouTube ? (
+                          {/* Prev control */}
+                          {videoMetaItems.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label="Previous video"
+                              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+                              onClick={() => setVideoIndex((prev) => (prev - 1 + videoMetaItems.length) % videoMetaItems.length)}
+                            >
+                              <ChevronLeft className="w-5 h-5" />
+                            </button>
+                          )}
+
+                          {/* Next control */}
+                          {videoMetaItems.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label="Next video"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
+                              onClick={() => setVideoIndex((prev) => (prev + 1) % videoMetaItems.length)}
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          )}
+
+                          {currentVideoMeta.metaType === MetaType.YouTube ? (
                             <iframe
                               className="absolute inset-0 w-full h-full"
-                              src={youTubeEmbed(primaryVideoMeta.url)}
-                              title={primaryVideoMeta.name || "Video Resume"}
+                              src={youTubeEmbed(currentVideoMeta.url)}
+                              title={currentVideoMeta.name || "Video Resume"}
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                               allowFullScreen
                             />
                           ) : (
                             <video className="absolute inset-0 w-full h-full" controls>
                               <source
-                                src={primaryVideoMeta.url}
+                                src={currentVideoMeta.url}
                                 type={
-                                  primaryVideoMeta.metaType === MetaType.VideoWebM
+                                  currentVideoMeta.metaType === MetaType.VideoWebM
                                     ? "video/webm"
                                     : "video/mp4"
                                 }
@@ -526,11 +557,27 @@ export default function ResumeDetail() {
                             </video>
                           )}
                         </div>
-                        {primaryVideoMeta.name && (
-                          <p className="text-center mt-4 text-sm opacity-80">
-                            {primaryVideoMeta.name}
-                          </p>
-                        )}
+
+                        {/* Footer controls */}
+                        <div className="mt-4 flex flex-col items-center gap-2">
+                          <div className="text-xs opacity-80">
+                            Video {videoIndex + 1} / {videoMetaItems.length}
+                          </div>
+                          {videoMetaItems.length > 1 && (
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              {videoMetaItems.map((m, idx) => (
+                                <button
+                                  key={m.id || `${m.referenceId}-${idx}`}
+                                  type="button"
+                                  className={`px-2 py-1 rounded text-xs border ${idx === videoIndex ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/30 text-foreground border-border"}`}
+                                  onClick={() => setVideoIndex(idx)}
+                                >
+                                  {m.name || `Video ${idx + 1}`}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
