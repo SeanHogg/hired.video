@@ -547,16 +547,17 @@ export class ResumeService {
     isMaster?: boolean;
     isActive?: boolean;
   }): Promise<Resume> {
-    // Convert ResumeData to JSON string format expected by backend
-    const resumeJson = JSON.stringify(request.data);
+    // Backend expects a JSON string literal ([FromBody] string)
+    const raw = JSON.stringify(request.data); // object -> JSON
+    const body = JSON.stringify(raw); // wrap as JSON string literal
 
     const response = await apiClient.request<Resume>(
       "/api/Resume/Save",
       {
         method: "POST",
-        body: resumeJson,
+        body,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       },
       ResumeSchema,
@@ -717,18 +718,13 @@ export class ResumeService {
       metaData?: ResumeSectionMeta[];
     },
   ): Promise<FrontendResume> {
-    // Convert ResumeData to JSON string format expected by backend
-    const payload: any = {};
-
-    if (updates.name) payload.name = updates.name;
-    if (updates.privacy) payload.privacy = updates.privacy;
-    if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
-    if (updates.data) payload.resumeSerialized = JSON.stringify(updates.data);
-    if (updates.metaData) payload.metaData = updates.metaData;
+    // Backend UpdateResume expects [FromBody] string of the raw resume JSON
+    const raw = updates.data ? JSON.stringify(updates.data) : undefined;
+    const body = raw !== undefined ? JSON.stringify(raw) : undefined; // JSON string literal
 
     const response = await apiClient.put<any>(
       `/api/Resume/${id}`,
-      payload,
+      body,
       z.any(),
     );
 
