@@ -8,25 +8,27 @@ import { AccountUsageType } from "./account";
 
 // Backend enums - must match exactly
 export enum TaskType {
-  General = 0,
-  Project = 1,
-  Email = 2,
-  Phone = 3,
-  Meeting = 4,
-  Interview = 5,
-  Onboarding = 10,
-  OnboardingProfile = 11,
-  OnboardingProfileSettings = 12,
-  OnboardingPrivacy = 13,
-  Recruiter = 20,
-  RecruiterPreferences = 21,
-  JobSeeker = 30,
-  JobSeekerPreferences = 31,
-  Company = 40,
-  CompanySettings = 41,
-  Profile = 50,
-  Job = 60,
-  Resume = 70,
+  General = 0, // All Roles
+  Project = 1, // All Roles
+  Email = 2, // All Roles
+  Phone = 3, // All Roles
+  Meeting = 4, // All Roles
+  Interview = 5, // All Roles
+  Recruiting = 6, // All Roles
+  Sales = 7, // All Roles
+  Onboarding = 10, // All Roles
+  OnboardingProfile = 11, // All Roles but created by the System
+  OnboardingProfileSettings = 12, // All Roles but created by the System
+  OnboardingPrivacy = 13, // All Roles but created by the System
+  Recruiter = 20, // Recruiter but created by the System
+  RecruiterPreferences = 21, // Recruiter but created by System
+  JobSeeker = 30, // Job Seeker but created by System
+  JobSeekerPreferences = 31, // Job Seeker but created by System
+  Company = 40, // Employer
+  CompanySettings = 41, // Employer
+  Profile = 50, // All Roles
+  Job = 60, // All Roles
+  Resume = 70, // All Roles
 }
 
 export enum ProductivityItemStatus {
@@ -143,9 +145,9 @@ export interface TaskUIState {
   id: string;
   title: string;
   description?: string;
-  type: "onboarding" | "interview" | "recruiting" | "sales" | "general";
+  type: TaskType;
   priority: "low" | "medium" | "high";
-  status: "todo" | "in_progress" | "completed";
+  status: ProductivityItemStatus;
   startDate?: string;
   dueDate: string;
   createdAt: string;
@@ -155,72 +157,155 @@ export interface TaskUIState {
 }
 
 // Utility functions for type conversion
-export const mapBackendTaskTypeToUI = (
-  taskType: TaskType,
-): TaskUIState["type"] => {
-  switch (taskType) {
-    case TaskType.Onboarding:
-    case TaskType.OnboardingProfile:
-    case TaskType.OnboardingProfileSettings:
-    case TaskType.OnboardingPrivacy:
-      return "onboarding";
-    case TaskType.Interview:
-      return "interview";
-    case TaskType.Recruiter:
-    case TaskType.Company:
-      return "recruiting";
-    case TaskType.General:
-    default:
-      return "general";
-  }
+export const mapBackendTaskTypeToUI = (taskType: TaskType): TaskType => {
+  return taskType; // Direct mapping since we're using the same enum
 };
 
-export const mapUITaskTypeToBackend = (type: TaskUIState["type"]): TaskType => {
-  switch (type) {
-    case "onboarding":
-      return TaskType.Onboarding;
-    case "interview":
-      return TaskType.Interview;
-    case "recruiting":
-      return TaskType.Recruiter;
-    case "sales":
-      return TaskType.Company;
-    case "general":
-    default:
-      return TaskType.General;
-  }
+export const mapUITaskTypeToBackend = (type: TaskType): TaskType => {
+  return type; // Direct mapping since we're using the same enum
 };
 
 export const mapBackendStatusToUI = (
   status: ProductivityItemStatus,
-): TaskUIState["status"] => {
-  switch (status) {
-    case ProductivityItemStatus.ToDo:
-    case ProductivityItemStatus.Open:
-    case ProductivityItemStatus.Planning:
-      return "todo";
-    case ProductivityItemStatus.InProgress:
-      return "in_progress";
-    case ProductivityItemStatus.Completed:
-    case ProductivityItemStatus.Closed:
-      return "completed";
-    default:
-      return "todo";
-  }
+): ProductivityItemStatus => {
+  return status; // Direct mapping since we're using the same enum
 };
 
 export const mapUIStatusToBackend = (
-  status: TaskUIState["status"],
+  status: ProductivityItemStatus,
 ): ProductivityItemStatus => {
-  switch (status) {
-    case "todo":
-      return ProductivityItemStatus.ToDo;
-    case "in_progress":
-      return ProductivityItemStatus.InProgress;
-    case "completed":
-      return ProductivityItemStatus.Completed;
+  return status; // Direct mapping since we're using the same enum
+};
+
+// Role-based task type filtering
+export const getAvailableTaskTypesForRole = (userRole: string): TaskType[] => {
+  const allRoles: TaskType[] = [
+    TaskType.General,
+    TaskType.Project,
+    TaskType.Email,
+    TaskType.Phone,
+    TaskType.Meeting,
+    TaskType.Interview,
+    TaskType.Recruiting,
+    TaskType.Sales,
+    TaskType.Onboarding,
+    TaskType.Profile,
+    TaskType.Job,
+    TaskType.Resume,
+  ];
+
+  const recruiterOnly: TaskType[] = [];
+  const employerOnly: TaskType[] = [TaskType.Company, TaskType.CompanySettings];
+  const jobSeekerOnly: TaskType[] = [];
+
+  // System-created task types (not available for manual creation)
+  const systemCreated: TaskType[] = [
+    TaskType.OnboardingProfile,
+    TaskType.OnboardingProfileSettings,
+    TaskType.OnboardingPrivacy,
+    TaskType.Recruiter,
+    TaskType.RecruiterPreferences,
+    TaskType.JobSeeker,
+    TaskType.JobSeekerPreferences,
+  ];
+
+  let availableTypes = [...allRoles];
+
+  switch (userRole?.toLowerCase()) {
+    case "recruiter":
+      availableTypes = [...availableTypes, ...recruiterOnly];
+      break;
+    case "employer":
+    case "employermanager":
+    case "employeremployee":
+    case "employerexecutive":
+      availableTypes = [...availableTypes, ...employerOnly];
+      break;
+    case "jobseeker":
+      availableTypes = [...availableTypes, ...jobSeekerOnly];
+      break;
     default:
-      return ProductivityItemStatus.ToDo;
+      // Default to all roles
+      break;
+  }
+
+  // Remove system-created types
+  return availableTypes.filter(type => !systemCreated.includes(type));
+};
+
+// Get display name for task type
+export const getTaskTypeDisplayName = (taskType: TaskType): string => {
+  switch (taskType) {
+    case TaskType.General:
+      return "General";
+    case TaskType.Project:
+      return "Project";
+    case TaskType.Email:
+      return "Email";
+    case TaskType.Phone:
+      return "Phone";
+    case TaskType.Meeting:
+      return "Meeting";
+    case TaskType.Interview:
+      return "Interview";
+    case TaskType.Recruiting:
+      return "Recruiting";
+    case TaskType.Sales:
+      return "Sales";
+    case TaskType.Onboarding:
+      return "Onboarding";
+    case TaskType.OnboardingProfile:
+      return "Profile Setup";
+    case TaskType.OnboardingProfileSettings:
+      return "Profile Settings";
+    case TaskType.OnboardingPrivacy:
+      return "Privacy Settings";
+    case TaskType.Recruiter:
+      return "Recruiter Tasks";
+    case TaskType.RecruiterPreferences:
+      return "Recruiter Preferences";
+    case TaskType.JobSeeker:
+      return "Job Seeker Tasks";
+    case TaskType.JobSeekerPreferences:
+      return "Job Seeker Preferences";
+    case TaskType.Company:
+      return "Company";
+    case TaskType.CompanySettings:
+      return "Company Settings";
+    case TaskType.Profile:
+      return "Profile";
+    case TaskType.Job:
+      return "Job";
+    case TaskType.Resume:
+      return "Resume";
+    default:
+      return "Unknown";
+  }
+};
+
+// Get status display name
+export const getStatusDisplayName = (status: ProductivityItemStatus): string => {
+  switch (status) {
+    case ProductivityItemStatus.Planning:
+      return "Planning";
+    case ProductivityItemStatus.ToDo:
+      return "To Do";
+    case ProductivityItemStatus.Open:
+      return "Open";
+    case ProductivityItemStatus.InProgress:
+      return "In Progress";
+    case ProductivityItemStatus.Closed:
+      return "Closed";
+    case ProductivityItemStatus.Descoped:
+      return "Descoped";
+    case ProductivityItemStatus.Completed:
+      return "Completed";
+    case ProductivityItemStatus.OnHold:
+      return "On Hold";
+    case ProductivityItemStatus.Cancelled:
+      return "Cancelled";
+    default:
+      return "Unknown";
   }
 };
 

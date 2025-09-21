@@ -91,19 +91,36 @@ import {
   ProductivityItemStatus,
   CreateTaskRequest,
   UpdateTaskRequest,
+  getAvailableTaskTypesForRole,
+  getTaskTypeDisplayName,
+  getStatusDisplayName,
 } from "@/types/task";
 
 // Use the TaskUIState interface from types/task.ts
 interface Task extends TaskUIState {}
 
 const taskTypeColors = {
-  onboarding: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  interview:
-    "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  recruiting:
-    "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  sales:
-    "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  [TaskType.General]: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+  [TaskType.Project]: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  [TaskType.Email]: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  [TaskType.Phone]: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  [TaskType.Meeting]: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  [TaskType.Interview]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  [TaskType.Recruiting]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  [TaskType.Sales]: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  [TaskType.Onboarding]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  [TaskType.OnboardingProfile]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  [TaskType.OnboardingProfileSettings]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  [TaskType.OnboardingPrivacy]: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  [TaskType.Recruiter]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  [TaskType.RecruiterPreferences]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  [TaskType.JobSeeker]: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  [TaskType.JobSeekerPreferences]: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  [TaskType.Company]: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  [TaskType.CompanySettings]: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  [TaskType.Profile]: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200",
+  [TaskType.Job]: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  [TaskType.Resume]: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
 };
 
 const priorityColors = {
@@ -183,7 +200,7 @@ export default function Tasks() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Type</span>
               <Badge className={taskTypeColors[selectedTask.type]}>
-                {selectedTask.type}
+                {getTaskTypeDisplayName(selectedTask.type)}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
@@ -194,7 +211,7 @@ export default function Tasks() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Status</span>
-              <Badge>{selectedTask.status.replace("_", " ")}</Badge>
+              <Badge>{getStatusDisplayName(selectedTask.status)}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Start</span>
@@ -262,19 +279,74 @@ export default function Tasks() {
             <div>
               <Label htmlFor="edit-type">Type</Label>
               <Select
-                value={editTask.type}
+                value={editTask.type.toString()}
                 onValueChange={(v) =>
-                  setEditTask({ ...editTask, type: v as Task["type"] })
+                  setEditTask({ ...editTask, type: parseInt(v) as TaskType })
                 }
               >
                 <SelectTrigger id="edit-type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="onboarding">Onboarding</SelectItem>
-                  <SelectItem value="interview">Interview</SelectItem>
-                  <SelectItem value="recruiting">Recruiting</SelectItem>
-                  <SelectItem value="sales">Sales</SelectItem>
+                  {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
+                    <SelectItem key={taskType} value={taskType.toString()}>
+                      {getTaskTypeDisplayName(taskType)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-priority">Priority</Label>
+              <Select
+                value={editTask.priority}
+                onValueChange={(v) =>
+                  setEditTask({ ...editTask, priority: v as Task["priority"] })
+                }
+              >
+                <SelectTrigger id="edit-priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-status">Status</Label>
+              <Select
+                value={editTask.status.toString()}
+                onValueChange={(v) =>
+                  setEditTask({ ...editTask, status: parseInt(v) as ProductivityItemStatus })
+                }
+              >
+                <SelectTrigger id="edit-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.Open)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                  </SelectItem>
+                  <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                    {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -468,9 +540,9 @@ export default function Tasks() {
   const filteredTasks = tasks
     .filter((task) => {
       const typeMatch =
-        selectedTaskType === "all" || task.type === selectedTaskType;
+        selectedTaskType === "all" || task.type.toString() === selectedTaskType;
       const statusMatch =
-        selectedStatus === "all" || task.status === selectedStatus;
+        selectedStatus === "all" || task.status.toString() === selectedStatus;
       return typeMatch && statusMatch;
     })
     .sort(
@@ -618,61 +690,7 @@ export default function Tasks() {
       value,
     );
 
-  const mapTaskTypeToBackend = (type: Task["type"]): string => {
-    switch (type) {
-      case "onboarding":
-        return "Onboarding";
-      case "interview":
-        return "Interview";
-      case "recruiting":
-        return "Recruiter";
-      default:
-        return "General";
-    }
-  };
-
-  const mapStatusToBackend = (status: Task["status"]): string => {
-    switch (status) {
-      case "todo":
-        return "ToDo";
-      case "in_progress":
-        return "InProgress";
-      case "completed":
-        return "Completed";
-    }
-  };
-  const backendStatusToUi = (status: string): Task["status"] => {
-    switch (status) {
-      case "ToDo":
-      case "Open":
-      case "Planning":
-        return "todo";
-      case "InProgress":
-        return "in_progress";
-      case "Completed":
-      case "Closed":
-        return "completed";
-      default:
-        return "todo";
-    }
-  };
-
-  const backendTypeToUi = (taskType: string): Task["type"] => {
-    switch (taskType) {
-      case "Onboarding":
-      case "OnboardingProfile":
-      case "OnboardingProfileSettings":
-      case "OnboardingPrivacy":
-        return "onboarding";
-      case "Interview":
-        return "interview";
-      case "Recruiter":
-      case "Company":
-        return "recruiting";
-      default:
-        return "sales";
-    }
-  };
+  // Old mapping functions removed - now using enum directly
 
   const fromBackendDto = (dto: any): Task => {
     const start = dto.start ? new Date(dto.start) : null;
@@ -685,9 +703,9 @@ export default function Tasks() {
       id: dto.id,
       title: dto.text,
       description: dto.description || undefined,
-      type: backendTypeToUi(String(dto.taskType)),
+      type: mapBackendTaskTypeToUI(dto.taskType),
       priority: "medium",
-      status: backendStatusToUi(String(dto.status)),
+      status: mapBackendStatusToUI(dto.status),
       startDate: ymd(start || end),
       dueDate: ymd(end || start) || ymd(new Date()),
       createdAt: dto.creationDateTime
@@ -708,8 +726,8 @@ export default function Tasks() {
       description: task.description,
       start: start ? new Date(start).toISOString() : new Date().toISOString(),
       end: end ? new Date(end).toISOString() : null,
-      taskType: mapTaskTypeToBackend(task.type),
-      status: mapStatusToBackend(task.status),
+      taskType: mapUITaskTypeToBackend(task.type),
+      status: mapUIStatusToBackend(task.status),
     } as const;
   };
 
@@ -751,7 +769,7 @@ export default function Tasks() {
     }
   };
 
-  const updateTaskStatus = (taskId: string, newStatus: Task["status"]) => {
+  const updateTaskStatus = (taskId: string, newStatus: ProductivityItemStatus) => {
     setTasks((prev) => {
       const updated = prev.map((task) =>
         task.id === taskId
@@ -774,7 +792,7 @@ export default function Tasks() {
 
   const onDropOnColumn = (
     e: React.DragEvent<HTMLDivElement>,
-    column: Task["status"],
+    column: ProductivityItemStatus,
   ) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
@@ -788,7 +806,7 @@ export default function Tasks() {
               ...t,
               status: column,
               startDate:
-                column === "in_progress" && !t.startDate ? now : t.startDate,
+                column === ProductivityItemStatus.InProgress && !t.startDate ? now : t.startDate,
               updatedAt: new Date().toISOString(),
             }
           : t,
@@ -852,9 +870,9 @@ export default function Tasks() {
                       id: `temp-${Date.now()}`,
                       title: "",
                       description: "",
-                      type: "onboarding",
+                      type: TaskType.General,
                       priority: "medium",
-                      status: "todo",
+                      status: ProductivityItemStatus.ToDo,
                       startDate: `${y}-${m}-${d}`,
                       dueDate: `${y}-${m}-${d}`,
                       createdAt: today.toISOString(),
@@ -913,7 +931,7 @@ export default function Tasks() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {tasks.filter((t) => t.status === "todo").length}
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.ToDo).length}
                     </div>
                   </CardContent>
                 </Card>
@@ -927,7 +945,7 @@ export default function Tasks() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {tasks.filter((t) => t.status === "in_progress").length}
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.InProgress).length}
                     </div>
                   </CardContent>
                 </Card>
@@ -941,7 +959,7 @@ export default function Tasks() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {tasks.filter((t) => t.status === "completed").length}
+                      {tasks.filter((t) => t.status === ProductivityItemStatus.Completed).length}
                     </div>
                   </CardContent>
                 </Card>
@@ -982,10 +1000,11 @@ export default function Tasks() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="onboarding">Onboarding</SelectItem>
-                    <SelectItem value="interview">Interview</SelectItem>
-                    <SelectItem value="recruiting">Recruiting</SelectItem>
-                    <SelectItem value="sales">Sales</SelectItem>
+                    {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
+                      <SelectItem key={taskType} value={taskType.toString()}>
+                        {getTaskTypeDisplayName(taskType)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -998,9 +1017,27 @@ export default function Tasks() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.Open)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                    </SelectItem>
+                    <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                      {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1049,7 +1086,7 @@ export default function Tasks() {
                           </TableCell>
                           <TableCell>
                             <Badge className={taskTypeColors[task.type]}>
-                              {task.type}
+                              {getTaskTypeDisplayName(task.type)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1067,12 +1104,11 @@ export default function Tasks() {
                           </TableCell>
                           <TableCell>
                             <Select
-                              value={task.status}
+                              value={task.status.toString()}
                               onValueChange={(value) =>
                                 updateTaskStatus(
                                   task.id,
-
-                                  value as Task["status"],
+                                  parseInt(value) as ProductivityItemStatus,
                                 )
                               }
                             >
@@ -1080,12 +1116,26 @@ export default function Tasks() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="todo">To Do</SelectItem>
-                                <SelectItem value="in_progress">
-                                  In Progress
+                                <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Planning)}
                                 </SelectItem>
-                                <SelectItem value="completed">
-                                  Completed
+                                <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Open)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                                </SelectItem>
+                                <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                                  {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -1206,13 +1256,7 @@ export default function Tasks() {
                                   key={task.id}
                                   onClick={() => openTaskPanel(task)}
                                   className={`text-xs p-1 rounded text-white cursor-pointer ${
-                                    task.type === "onboarding"
-                                      ? "bg-blue-600"
-                                      : task.type === "interview"
-                                        ? "bg-green-600"
-                                        : task.type === "recruiting"
-                                          ? "bg-purple-600"
-                                          : "bg-orange-600"
+                                    taskTypeColors[task.type] || "bg-gray-600"
                                   }`}
                                   title={task.description}
                                 >
@@ -1264,13 +1308,7 @@ export default function Tasks() {
                                   key={task.id}
                                   onClick={() => openTaskPanel(task)}
                                   className={`text-xs p-1 rounded text-white cursor-pointer ${
-                                    task.type === "onboarding"
-                                      ? "bg-blue-600"
-                                      : task.type === "interview"
-                                        ? "bg-green-600"
-                                        : task.type === "recruiting"
-                                          ? "bg-purple-600"
-                                          : "bg-orange-600"
+                                    taskTypeColors[task.type] || "bg-gray-600"
                                   }`}
                                   title={task.description}
                                 >
@@ -1304,12 +1342,12 @@ export default function Tasks() {
                     <div
                       className="rounded-lg border p-3 bg-muted/30"
                       onDragOver={onDragOver}
-                      onDrop={(e) => onDropOnColumn(e, "todo")}
+                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.ToDo)}
                     >
                       <div className="font-semibold mb-2">To Do</div>
                       <div className="space-y-2 min-h-24">
                         {tasks
-                          .filter((t) => t.status === "todo")
+                          .filter((t) => t.status === ProductivityItemStatus.ToDo)
                           .map((t) => (
                             <div
                               key={t.id}
@@ -1332,7 +1370,7 @@ export default function Tasks() {
                               )}
                               <div className="mt-2 flex items-center gap-2">
                                 <Badge className={taskTypeColors[t.type]}>
-                                  {t.type}
+                                  {getTaskTypeDisplayName(t.type)}
                                 </Badge>
                                 <Badge className={priorityColors[t.priority]}>
                                   {t.priority}
@@ -1347,12 +1385,12 @@ export default function Tasks() {
                     <div
                       className="rounded-lg border p-3 bg-muted/30"
                       onDragOver={onDragOver}
-                      onDrop={(e) => onDropOnColumn(e, "in_progress")}
+                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.InProgress)}
                     >
                       <div className="font-semibold mb-2">In Progress</div>
                       <div className="space-y-2 min-h-24">
                         {tasks
-                          .filter((t) => t.status === "in_progress")
+                          .filter((t) => t.status === ProductivityItemStatus.InProgress)
                           .map((t) => (
                             <div
                               key={t.id}
@@ -1373,7 +1411,7 @@ export default function Tasks() {
                               )}
                               <div className="mt-2 flex items-center gap-2">
                                 <Badge className={taskTypeColors[t.type]}>
-                                  {t.type}
+                                  {getTaskTypeDisplayName(t.type)}
                                 </Badge>
                                 <Badge className={priorityColors[t.priority]}>
                                   {t.priority}
@@ -1388,12 +1426,12 @@ export default function Tasks() {
                     <div
                       className="rounded-lg border p-3 bg-muted/30"
                       onDragOver={onDragOver}
-                      onDrop={(e) => onDropOnColumn(e, "completed")}
+                      onDrop={(e) => onDropOnColumn(e, ProductivityItemStatus.Completed)}
                     >
                       <div className="font-semibold mb-2">Completed</div>
                       <div className="space-y-2 min-h-24">
                         {tasks
-                          .filter((t) => t.status === "completed")
+                          .filter((t) => t.status === ProductivityItemStatus.Completed)
                           .map((t) => (
                             <div
                               key={t.id}
@@ -1414,7 +1452,7 @@ export default function Tasks() {
                               )}
                               <div className="mt-2 flex items-center gap-2">
                                 <Badge className={taskTypeColors[t.type]}>
-                                  {t.type}
+                                  {getTaskTypeDisplayName(t.type)}
                                 </Badge>
                                 <Badge className={priorityColors[t.priority]}>
                                   {t.priority}

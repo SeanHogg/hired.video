@@ -55,6 +55,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
@@ -1346,13 +1352,29 @@ export default function Resumes() {
                                       </div>
                                     </div>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleOpenActions(resume.id)}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleResumeView(resume.id)}>
+                                        View Resume
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => navigate(`/resumes/edit/${resume.id}`)}>
+                                        Edit Resume
+                                      </DropdownMenuItem>
+                                      {!resume.isActive && (
+                                        <DropdownMenuItem onClick={() => handleSetActiveResume(resume.id)}>
+                                          Set as Active
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem onClick={() => setDeleteDialog({ open: true, target: resume })} className="text-red-600">
+                                        Delete Resume
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </div>
                             ))}
@@ -1418,13 +1440,21 @@ export default function Resumes() {
                                       </div>
                                     </div>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleOpenActions(resume.id)}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleResumeView(resume.id)}>
+                                        View Resume
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleTrack(resume)}>
+                                        {resume.ownership === "tracked" ? "Untrack Resume" : "Track Resume"}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </div>
                             ))}
