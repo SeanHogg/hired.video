@@ -60,8 +60,8 @@ function SettingsContent() {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState({
     email: true,
-    push: false,
-    marketing: true,
+    push: true,
+    marketing: false,
     weekly: true,
   });
   const [privacy, setPrivacy] = useState<PrivacySettings>({
@@ -89,6 +89,19 @@ function SettingsContent() {
       })))
       .catch((err) => {
         console.error("Failed to load privacy settings", err);
+      });
+
+    // Load notification settings from API
+    settingsService
+      .getNotificationSettings()
+      .then((n) => setNotifications({
+        email: n.email,
+        push: n.push,
+        marketing: n.marketing,
+        weekly: n.weekly,
+      }))
+      .catch((err) => {
+        console.error("Failed to load notification settings", err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -422,9 +435,14 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={notifications.email}
-                        onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, email: checked })
-                        }
+                        onCheckedChange={async (checked) => {
+                          setNotifications({ ...notifications, email: checked });
+                          try {
+                            await settingsService.updateNotificationSettings({ email: checked });
+                          } catch (e) {
+                            console.error("Failed to save notifications (email)", e);
+                          }
+                        }}
                       />
                     </div>
                     <Separator />
@@ -439,9 +457,14 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={notifications.push}
-                        onCheckedChange={(checked) =>
-                          setNotifications({ ...notifications, push: checked })
-                        }
+                        onCheckedChange={async (checked) => {
+                          setNotifications({ ...notifications, push: checked });
+                          try {
+                            await settingsService.updateNotificationSettings({ push: checked });
+                          } catch (e) {
+                            console.error("Failed to save notifications (push)", e);
+                          }
+                        }}
                       />
                     </div>
                     <Separator />
@@ -456,12 +479,14 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={notifications.marketing}
-                        onCheckedChange={(checked) =>
-                          setNotifications({
-                            ...notifications,
-                            marketing: checked,
-                          })
-                        }
+                        onCheckedChange={async (checked) => {
+                          setNotifications({ ...notifications, marketing: checked });
+                          try {
+                            await settingsService.updateNotificationSettings({ marketing: checked });
+                          } catch (e) {
+                            console.error("Failed to save notifications (marketing)", e);
+                          }
+                        }}
                       />
                     </div>
                     <Separator />
@@ -476,12 +501,14 @@ function SettingsContent() {
                       </div>
                       <Switch
                         checked={notifications.weekly}
-                        onCheckedChange={(checked) =>
-                          setNotifications({
-                            ...notifications,
-                            weekly: checked,
-                          })
-                        }
+                        onCheckedChange={async (checked) => {
+                          setNotifications({ ...notifications, weekly: checked });
+                          try {
+                            await settingsService.updateNotificationSettings({ weekly: checked });
+                          } catch (e) {
+                            console.error("Failed to save notifications (weekly)", e);
+                          }
+                        }}
                       />
                     </div>
                   </CardContent>

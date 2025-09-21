@@ -10,14 +10,12 @@ import { apiClient } from "../api-client";
 // SCHEMAS
 // ============================================================================
 
+// Frontend simplified notifications model (UI)
 export const NotificationSettingsSchema = z.object({
   email: z.boolean(),
   push: z.boolean(),
   marketing: z.boolean(),
   weekly: z.boolean(),
-  jobAlerts: z.boolean().optional(),
-  connectionRequests: z.boolean().optional(),
-  messages: z.boolean().optional(),
 });
 
 // Backend DTO shape for privacy preferences (as returned by /api/Settings/privacy)
@@ -35,6 +33,23 @@ const BackendPrivacyPreferencesSchema = z.object({
 });
 
 // Frontend privacy settings (UI model)
+
+// Backend DTO for notifications
+const BackendNotificationPreferencesSchema = z.object({
+  emailJobMatches: z.boolean().optional(),
+  emailApplicationUpdates: z.boolean().optional(),
+  emailMessages: z.boolean().optional(),
+  emailConnectionRequests: z.boolean().optional(),
+  emailWeeklyDigest: z.boolean().optional(),
+  emailMarketingUpdates: z.boolean().optional(),
+  pushJobMatches: z.boolean().optional(),
+  pushApplicationUpdates: z.boolean().optional(),
+  pushMessages: z.boolean().optional(),
+  pushConnectionRequests: z.boolean().optional(),
+  smsImportantUpdates: z.boolean().optional(),
+  smsSecurityAlerts: z.boolean().optional(),
+});
+
 export const PrivacySettingsSchema = z.object({
   profileVisible: z.boolean(),
   showEmail: z.boolean(),
@@ -109,13 +124,53 @@ export class SettingsService {
   private mapPrivacyFromBackend(dto: z.infer<typeof BackendPrivacyPreferencesSchema>): PrivacySettings {
     return {
       profileVisible: dto.profileVisibleToPublic ?? true,
-      // UI toggles for email/phone are not persisted yet; keep defaults
+      // UI toggles for email/phone are not persisted yet; keep defaults for now
       showEmail: false,
       showPhone: false,
       indexable: dto.allowSearchEngineIndexing ?? true,
       allowMessages: dto.allowDirectMessages ?? true,
       showActivity: dto.showActivityStatus ?? true,
     };
+  }
+
+  // Map backend notifications -> simplified UI model
+  private mapNotificationsFromBackend(dto: z.infer<typeof BackendNotificationPreferencesSchema>): NotificationSettings {
+    const email = Boolean(
+      dto.emailMessages ?? dto.emailApplicationUpdates ?? dto.emailJobMatches ?? dto.emailConnectionRequests ?? true,
+    );
+    const push = Boolean(
+      dto.pushMessages ?? dto.pushApplicationUpdates ?? dto.pushJobMatches ?? dto.pushConnectionRequests ?? true,
+    );
+    return {
+      email,
+      push,
+      marketing: dto.emailMarketingUpdates ?? false,
+      weekly: dto.emailWeeklyDigest ?? true,
+    };
+  }
+
+  // Map simplified UI model -> backend notifications DTO
+  private mapNotificationsToBackend(settings: Partial<NotificationSettings>): Partial<z.infer<typeof BackendNotificationPreferencesSchema>> {
+    const payload: Record<string, boolean> = {};
+    if (typeof settings.email === "boolean") {
+      payload.emailMessages = settings.email;
+      payload.emailApplicationUpdates = settings.email;
+      payload.emailJobMatches = settings.email;
+      payload.emailConnectionRequests = settings.email;
+    }
+    if (typeof settings.push === "boolean") {
+      payload.pushMessages = settings.push;
+      payload.pushApplicationUpdates = settings.push;
+      payload.pushJobMatches = settings.push;
+      payload.pushConnectionRequests = settings.push;
+    }
+    if (typeof settings.marketing === "boolean") {
+      payload.emailMarketingUpdates = settings.marketing;
+    }
+    if (typeof settings.weekly === "boolean") {
+      payload.emailWeeklyDigest = settings.weekly;
+    }
+    return payload;
   }
 
   // Small mapper to convert frontend UI model -> backend DTO
@@ -144,11 +199,11 @@ export class SettingsService {
    * Get notification settings
    */
   async getNotificationSettings(): Promise<NotificationSettings> {
-    const response = await apiClient.get<NotificationSettings>(
-      "/Settings/notifications",
-      NotificationSettingsSchema,
+    const response = await apiClient.get<z.infer<typeof BackendNotificationPreferencesSchema>>(
+      "/api/Settings/notifications",
+      BackendNotificationPreferencesSchema,
     );
-    return response.data;
+    return this.mapNotificationsFromBackend(response.data);
   }
 
   /**
@@ -157,12 +212,13 @@ export class SettingsService {
   async updateNotificationSettings(
     settings: Partial<NotificationSettings>,
   ): Promise<NotificationSettings> {
-    const response = await apiClient.put<NotificationSettings>(
-      "/Settings/notifications",
-      settings,
-      NotificationSettingsSchema,
+    const payload = this.mapNotificationsToBackend(settings);
+    const response = await apiClient.put<z.infer<typeof BackendNotificationPreferencesSchema>>(
+      "/api/Settings/notifications",
+      payload,
+      BackendNotificationPreferencesSchema,
     );
-    return response.data;
+    return this.mapNotificationsFromBackend(response.data);
   }
 
   // ============================================================================
@@ -205,7 +261,7 @@ export class SettingsService {
    */
   async getJobPreferences(): Promise<JobPreferences> {
     const response = await apiClient.get<JobPreferences>(
-      "/Settings/job-preferences",
+      "/api/Settings/job-preferences",
       JobPreferencesSchema,
     );
     return response.data;
@@ -218,7 +274,7 @@ export class SettingsService {
     preferences: Partial<JobPreferences>,
   ): Promise<JobPreferences> {
     const response = await apiClient.put<JobPreferences>(
-      "/Settings/job-preferences",
+      "/api/Settings/job-preferences",
       preferences,
       JobPreferencesSchema,
     );
@@ -234,7 +290,7 @@ export class SettingsService {
    */
   async getAccountSettings(): Promise<AccountSettings> {
     const response = await apiClient.get<AccountSettings>(
-      "/Settings/account",
+      "/api/Settings/account",
       AccountSettingsSchema,
     );
     return response.data;
@@ -247,7 +303,7 @@ export class SettingsService {
     settings: Partial<AccountSettings>,
   ): Promise<AccountSettings> {
     const response = await apiClient.put<AccountSettings>(
-      "/Settings/account",
+      "/api/Settings/account",
       settings,
       AccountSettingsSchema,
     );

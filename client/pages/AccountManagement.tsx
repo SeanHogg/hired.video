@@ -60,6 +60,7 @@ import { InvitationAnalytics } from "@/components/account/InvitationAnalytics";
 import { EditRolesModal } from "@/components/account/EditRolesModal";
 import { AccountAnalytics } from "@/components/account/AccountAnalytics";
 import { AccountManagementSkeleton } from "@/components/account/AccountManagementSkeleton";
+import { BillingManagement } from "@/components/billing/BillingManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function AccountManagementContent() {
@@ -73,6 +74,7 @@ function AccountManagementContent() {
 
   // Tab-specific loading states
   const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({
+    billing: false,
     users: false,
     invitations: false,
     analytics: false,
@@ -90,7 +92,7 @@ function AccountManagementContent() {
 
   // Check if user is a job seeker (should see personal account page instead of team management)
   const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("billing");
 
   // Mock current user roles for demo - in real app this would come from auth context
   const currentUserRoles = ["Admin"];
@@ -295,11 +297,7 @@ function AccountManagementContent() {
     );
   }
 
-  // Redirect job seekers to settings page instead of showing account management
-  if (isAuthenticated && user && isJobSeeker) {
-    window.location.href = "/settings";
-    return null;
-  }
+  // Job seekers can now access account management for billing purposes
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -512,7 +510,10 @@ function AccountManagementContent() {
                   Account Management
                 </h1>
                 <p className="text-gray-600 mt-2">
-                  Manage your team members, invitations, and account analytics
+                  {isJobSeeker 
+                    ? "Manage your billing, subscription, and account settings"
+                    : "Manage your team members, billing, invitations, and account analytics"
+                  }
                 </p>
               </div>
               {canManage && activeTab === "users" && (
@@ -529,12 +530,21 @@ function AccountManagementContent() {
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               <TabsList>
-                <TabsTrigger value="users">Team Members</TabsTrigger>
-                <TabsTrigger value="invitations">
-                  Invitation Analytics
-                </TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                <TabsTrigger value="billing">Billing & Subscription</TabsTrigger>
+                {!isJobSeeker && (
+                  <>
+                    <TabsTrigger value="users">Team Members</TabsTrigger>
+                    <TabsTrigger value="invitations">
+                      Invitation Analytics
+                    </TabsTrigger>
+                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                  </>
+                )}
               </TabsList>
+
+              <TabsContent value="billing" className="space-y-6">
+                <BillingManagement />
+              </TabsContent>
 
               <TabsContent value="users" className="space-y-6">
                 {showInitialSkeleton ? (
