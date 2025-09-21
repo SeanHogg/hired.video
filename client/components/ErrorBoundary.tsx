@@ -62,14 +62,14 @@ export class ErrorBoundary extends Component<
 
     const { shouldLog, shouldReport } = handleError(normalizedError);
 
-    // Log error
-    if (shouldLog) {
-      logger.error("Error Boundary caught error", {
-        error: normalizedError.toJSON(),
-        errorInfo,
-        level: this.props.level,
-      });
-    }
+    // Always log error boundary errors regardless of status code
+    // Error boundaries catch React errors that may not have HTTP status codes
+    logger.error("Error Boundary caught error", {
+      error: normalizedError.toJSON(),
+      errorInfo,
+      level: this.props.level,
+      errorBoundary: true, // Flag to indicate this came from error boundary
+    });
 
     // Report error to external service (if configured)
     if (shouldReport) {
@@ -83,14 +83,17 @@ export class ErrorBoundary extends Component<
   }
 
   private reportError = (error: AppError, errorInfo: ErrorInfo): void => {
-    // TODO: Integrate with error reporting service (e.g., Sentry, Bugsnag)
-    console.error("Error reported:", {
+    // Log to console for immediate debugging
+    console.error("Error Boundary: Error reported to external service", {
       error: error.toJSON(),
       errorInfo,
       userAgent: navigator.userAgent,
       url: window.location.href,
       timestamp: new Date().toISOString(),
     });
+
+    // TODO: Integrate with error reporting service (e.g., Sentry, Bugsnag)
+    // This is where you would send the error to external monitoring services
   };
 
   private handleRetry = (): void => {
