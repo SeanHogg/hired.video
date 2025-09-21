@@ -48,6 +48,7 @@ import {
 
 import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
 import {
   roleToSelectValue,
@@ -56,7 +57,7 @@ import {
   createRolePermissions,
 } from "@/lib/role-utils";
 
-export default function Profile() {
+function ProfileContent() {
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -665,5 +666,13 @@ export default function Profile() {
         <Footer />
       </div>
     </div>
+  );
+}
+
+export default function Profile() {
+  return (
+    <PasswordRequirementsProvider>
+      <ProfileContent />
+    </PasswordRequirementsProvider>
   );
 }

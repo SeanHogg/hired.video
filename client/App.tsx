@@ -11,7 +11,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart-context";
-import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
@@ -195,10 +194,9 @@ const App = () => (
   >
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PasswordRequirementsProvider>
-          <CartProvider>
-            <AIProvider>
-              <TooltipProvider>
+        <CartProvider>
+          <AIProvider>
+            <TooltipProvider>
                 <Toaster />
                 <Sonner />
                 <BrowserRouter>
@@ -424,7 +422,6 @@ const App = () => (
               </TooltipProvider>
             </AIProvider>
           </CartProvider>
-        </PasswordRequirementsProvider>
       </AuthProvider>
     </QueryClientProvider>
   </ErrorBoundary>

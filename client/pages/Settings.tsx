@@ -20,7 +20,8 @@ import {
   Target,
   Sliders,
 } from "lucide-react";
-import { useState } from "react";
+import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -50,8 +51,10 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+import { settingsService } from "@/lib/services/settings-service";
+import { useToast } from "@/components/ui/use-toast";
 
-export default function Settings() {
+function SettingsContent() {
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -60,6 +63,7 @@ export default function Settings() {
     toggleSidebar,
   } = useSidebar();
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -72,7 +76,47 @@ export default function Settings() {
     showPhone: false,
     indexable: true,
   });
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    // Load privacy settings from API
+    settingsService
+      .getPrivacySettings()
+      .then((p) => setPrivacy({
+        profileVisible: p.profileVisible,
+        // The following fields are UI-only toggles for now
+        showEmail: privacy.showEmail,
+        showPhone: privacy.showPhone,
+        indexable: p.indexable,
+        allowMessages: p.allowMessages,
+        showActivity: p.showActivity,
+      }))
+      .catch((err) => {
+        console.error("Failed to load privacy settings", err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const savePrivacy = async () => {
+    try {
+      setSavingPrivacy(true);
+      const updated = await settingsService.updatePrivacySettings({
+        profileVisible: privacy.profileVisible,
+        indexable: privacy.indexable,
+        allowMessages: privacy.allowMessages,
+        showActivity: privacy.showActivity,
+      });
+      setPrivacy((prev) => ({ ...prev, ...updated }));
+      toast({ title: "Privacy settings saved" });
+    } catch (error) {
+      console.error("Failed to save privacy settings", error);
+      toast({ title: "Failed to save privacy settings", variant: "destructive" });
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -515,6 +559,15 @@ export default function Settings() {
                       <Switch
                         checked={privacy.indexable}
                         onCheckedChange={(checked) =>
+                        setPrivacy({ ...privacy, indexable: checked })
+                      }
+                    />
+                    <div className="pt-2">
+                      <Button onClick={savePrivacy} disabled={savingPrivacy}>
+                        <Save className="h-4 w-4" />
+                        {savingPrivacy ? "Saving..." : "Save Privacy Settings"}
+                      </Button>
+                    </div
                           setPrivacy({ ...privacy, indexable: checked })
                         }
                       />
@@ -651,6 +704,12 @@ export default function Settings() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
       />
-    </div>
+}
+
+export default function Settings() {
+  return (
+    <PasswordRequirementsProvider>
+      <SettingsContent />
+    </PasswordRequirementsProvider>
   );
 }

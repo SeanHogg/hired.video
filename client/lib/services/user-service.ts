@@ -105,19 +105,29 @@ export const PaginatedUsersSchema = z.object({
   hasPrev: nullableBoolean(),
 });
 
-// Matches API pagination shape for public users
+// Matches API pagination shape for public users (accept both camelCase and PascalCase)
 export const PaginatedPublicUsersSchema = z.object({
   items: z
     .array(PublicUserSchema)
     .nullable()
     .transform((val) => (val === null ? undefined : val))
     .optional(),
+  Items: z
+    .array(PublicUserSchema)
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
   total: nullableNumber(),
+  Total: nullableNumber(),
   page: nullableNumber(),
+  Page: nullableNumber(),
   limit: nullableNumber(),
+  Limit: nullableNumber(),
   totalPages: nullableNumber(),
   hasNextPage: nullableBoolean(),
   hasPreviousPage: nullableBoolean(),
+  HasNextPage: nullableBoolean(),
+  HasPreviousPage: nullableBoolean(),
 });
 
 export const SendConnectionRequestSchema = z.object({
@@ -161,12 +171,26 @@ export class UserService {
     }
 
     const endpoint = `/api/Users/public${params.toString() ? `?${params.toString()}` : ""}`;
-    const response = await apiClient.get<PaginatedPublicUsers>(
+    const response = await apiClient.get<any>(
       endpoint,
       PaginatedPublicUsersSchema,
     );
 
-    return response.data;
+    const dto = response.data as any;
+    const items = (dto.items || dto.Items || []) as unknown[];
+    const total = (dto.total ?? dto.Total ?? items.length) as number;
+    const page = (dto.page ?? dto.Page ?? 1) as number;
+    const limit = (dto.limit ?? dto.Limit ?? (items.length || (filters?.limit ?? 0))) as number;
+
+    return {
+      items: items as any,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil((total || 0) / (limit || 1)),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    } as PaginatedPublicUsers;
   }
 
   /**

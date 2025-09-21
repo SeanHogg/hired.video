@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import {
   Users,
   UserPlus,
@@ -61,7 +62,7 @@ import { AccountAnalytics } from "@/components/account/AccountAnalytics";
 import { AccountManagementSkeleton } from "@/components/account/AccountManagementSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function AccountManagement() {
+function AccountManagementContent() {
   const [users, setUsers] = useState<AccountUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -613,6 +614,12 @@ export default function AccountManagement() {
 
         <Footer />
       </div>
-    </div>
+}
+
+export default function AccountManagement() {
+  return (
+    <PasswordRequirementsProvider>
+      <AccountManagementContent />
+    </PasswordRequirementsProvider>
   );
 }

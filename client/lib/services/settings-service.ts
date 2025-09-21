@@ -20,6 +20,21 @@ export const NotificationSettingsSchema = z.object({
   messages: z.boolean().optional(),
 });
 
+// Backend DTO shape for privacy preferences (as returned by /api/Settings/privacy)
+const BackendPrivacyPreferencesSchema = z.object({
+  profileVisibleToPublic: z.boolean().optional(),
+  profileVisibleToRecruiters: z.boolean().optional(),
+  allowSearchEngineIndexing: z.boolean().optional(),
+  showActivityStatus: z.boolean().optional(),
+  showConnectionsList: z.boolean().optional(),
+  allowDirectMessages: z.boolean().optional(),
+  allowConnectionRequests: z.boolean().optional(),
+  shareAnalyticsData: z.boolean().optional(),
+  shareUsageData: z.boolean().optional(),
+  allowDataExport: z.boolean().optional(),
+});
+
+// Frontend privacy settings (UI model)
 export const PrivacySettingsSchema = z.object({
   profileVisible: z.boolean(),
   showEmail: z.boolean(),
@@ -84,10 +99,41 @@ export class SettingsService {
    */
   async getAllSettings(): Promise<AllSettings> {
     const response = await apiClient.get<AllSettings>(
-      "/Settings",
+      "/api/Settings",
       AllSettingsSchema,
     );
     return response.data;
+  }
+
+  // Small mapper to convert backend DTO -> frontend UI model
+  private mapPrivacyFromBackend(dto: z.infer<typeof BackendPrivacyPreferencesSchema>): PrivacySettings {
+    return {
+      profileVisible: dto.profileVisibleToPublic ?? true,
+      // UI toggles for email/phone are not persisted yet; keep defaults
+      showEmail: false,
+      showPhone: false,
+      indexable: dto.allowSearchEngineIndexing ?? true,
+      allowMessages: dto.allowDirectMessages ?? true,
+      showActivity: dto.showActivityStatus ?? true,
+    };
+  }
+
+  // Small mapper to convert frontend UI model -> backend DTO
+  private mapPrivacyToBackend(settings: Partial<PrivacySettings>): Partial<z.infer<typeof BackendPrivacyPreferencesSchema>> {
+    const payload: Record<string, boolean> = {};
+    if (typeof settings.profileVisible === "boolean") {
+      payload.profileVisibleToPublic = settings.profileVisible;
+    }
+    if (typeof settings.indexable === "boolean") {
+      payload.allowSearchEngineIndexing = settings.indexable;
+    }
+    if (typeof settings.allowMessages === "boolean") {
+      payload.allowDirectMessages = settings.allowMessages;
+    }
+    if (typeof settings.showActivity === "boolean") {
+      payload.showActivityStatus = settings.showActivity;
+    }
+    return payload;
   }
 
   // ============================================================================
@@ -127,11 +173,12 @@ export class SettingsService {
    * Get privacy settings
    */
   async getPrivacySettings(): Promise<PrivacySettings> {
-    const response = await apiClient.get<PrivacySettings>(
-      "/Settings/privacy",
-      PrivacySettingsSchema,
+    // Use backend schema, then map to UI model
+    const response = await apiClient.get<z.infer<typeof BackendPrivacyPreferencesSchema>>(
+      "/api/Settings/privacy",
+      BackendPrivacyPreferencesSchema,
     );
-    return response.data;
+    return this.mapPrivacyFromBackend(response.data);
   }
 
   /**
@@ -140,12 +187,13 @@ export class SettingsService {
   async updatePrivacySettings(
     settings: Partial<PrivacySettings>,
   ): Promise<PrivacySettings> {
-    const response = await apiClient.put<PrivacySettings>(
-      "/Settings/privacy",
-      settings,
-      PrivacySettingsSchema,
+    const payload = this.mapPrivacyToBackend(settings);
+    const response = await apiClient.put<z.infer<typeof BackendPrivacyPreferencesSchema>>(
+      "/api/Settings/privacy",
+      payload,
+      BackendPrivacyPreferencesSchema,
     );
-    return response.data;
+    return this.mapPrivacyFromBackend(response.data);
   }
 
   // ============================================================================
