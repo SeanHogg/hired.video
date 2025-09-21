@@ -9,7 +9,7 @@ import {
   Target,
   Edit,
   UserCheck,
-  Share,
+  MoreHorizontal,
 } from "lucide-react";
 
 import { CardContent } from "@/components/ui/card";
@@ -175,26 +175,13 @@ export default function ResumeCard({
             },
           },
           {
-            id: "share",
-            label: "Share",
+            id: "actions",
+            label: "Actions",
             variant: "default" as const,
-            icon: Share,
+            icon: MoreHorizontal,
             onClick: () => {
               if (onActions) {
                 onActions();
-              } else {
-                // Default share functionality - copy link to clipboard
-                const url = `${window.location.origin}/resumes/${id}`;
-                navigator.clipboard
-                  .writeText(url)
-                  .then(() => {
-                    // Could show a toast notification here
-                    alert("Resume link copied to clipboard!");
-                  })
-                  .catch(() => {
-                    // Fallback for older browsers
-                    prompt("Copy this link:", url);
-                  });
               }
             },
           },

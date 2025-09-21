@@ -1321,7 +1321,11 @@ export default function Resumes() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2">
-                                      <h3 className="font-medium">{resume.name}</h3>
+                                      <h3 className="font-medium">
+                                        <Link to={`/resumes/${resume.id}`} className="text-primary hover:underline">
+                                          {resume.name}
+                                        </Link>
+                                      </h3>
                                       {resume.isMaster && (
                                         <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                                           Master
@@ -1396,7 +1400,11 @@ export default function Resumes() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
                                     <div className="flex items-center space-x-2">
-                                      <h3 className="font-medium">{resume.name}</h3>
+                                      <h3 className="font-medium">
+                                        <Link to={`/resumes/${resume.id}`} className="text-primary hover:underline">
+                                          {resume.name}
+                                        </Link>
+                                      </h3>
                                       <Badge variant="outline" className="text-blue-600 border-blue-200">
                                         Tracked
                                       </Badge>
