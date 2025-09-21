@@ -166,6 +166,7 @@ export default function Tasks() {
   };
   const closeTaskPanel = () => setTaskPanelOpen(false);
 
+  const [isEditing, setIsEditing] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<ProductivityItemStatus | null>(null);
 
@@ -846,6 +847,10 @@ export default function Tasks() {
     if (column) {
       setDragOverColumn(column);
     }
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTasks(tasks.filter((task) => task.id !== taskId));
   };
 
   const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
