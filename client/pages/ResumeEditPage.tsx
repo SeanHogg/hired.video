@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
-import ResumeViewer from "@/components/ResumeViewer";
+import ResumeBuilder from "@/components/ResumeBuilder";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { resumeService } from "@/lib/services/resume-service";
@@ -231,11 +231,16 @@ export default function ResumeEditPage() {
               </Button>
             </div>
 
-            {/* Resume Editor */}
-            <ResumeViewer
-              resume={resume}
-              onUpdate={handleUpdateResume}
-              canEdit
+            {/* Resume Editor - direct builder in edit route */}
+            <ResumeBuilder
+              initialData={resume.data}
+              initialName={resume.name}
+              initialPrivacy={resume.privacy}
+              initialIsMaster={resume.isMaster}
+              initialMetaData={resume.metaData || []}
+              ownerUserId={resume.userId}
+              onSave={handleUpdateResume}
+              onCancel={handleCancel}
             />
           </div>
         </div>

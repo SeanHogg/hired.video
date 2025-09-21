@@ -167,8 +167,8 @@ export default function Dashboard() {
           sidebarCollapsed={sidebarCollapsed}
         />
         <div className="pt-16">{children}</div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   );
 

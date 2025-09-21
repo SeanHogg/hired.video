@@ -120,26 +120,24 @@ export default function ResumeViewer({
     setTimeout(() => setShowShareAlert(false), 3000);
   };
 
-  const formatDateForResume = (dateString: string) => {
-    return formatDate(
-      dateString,
-      { year: "numeric", month: "short" },
-      "Present",
-    );
+  // Date formatting to match ResumeDetail: MMM YYYY, hide when both missing, show end-only if start missing
+  const formatMMMYYYY = (dateString: string): string => {
+    if (!dateString) return "";
+    if (dateString === "Present") return "Present";
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
   };
 
-  // Check if we should show date information
-  const shouldShowDatesInResume = (startDate: string, endDate: string): boolean => {
-    if (!startDate) return false;
+  const getDateText = (startDate?: string, endDate?: string, treatMissingEndAsPresent: boolean = false): string | null => {
+    const start = formatMMMYYYY(startDate || "");
+    let end = formatMMMYYYY(endDate || "");
+    if (!end && treatMissingEndAsPresent) end = "Present";
 
-    const formattedStart = formatDateForResume(startDate);
-    const formattedEnd = formatDateForResume(endDate);
-
-    // Don't show if both are "Present" or if start date is invalid
-    if (formattedStart === "Present" && formattedEnd === "Present") return false;
-    if (formattedStart === "Invalid Date") return false;
-
-    return true;
+    if (!start && !end) return null;
+    if (!start && end) return end;
+    if (start && !end) return start;
+    return `${start} - ${end}`;
   };
 
   const getPrivacyIcon = (privacy: ResumePrivacy) => {
@@ -382,11 +380,10 @@ export default function ResumeViewer({
                           <h3 className="text-lg font-semibold">
                             {work.Position}
                           </h3>
-                          {shouldShowDatesInResume(work.StartDate, work.EndDate) && (
+                          {getDateText(work.StartDate, work.EndDate, true) && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Calendar className="h-4 w-4" />
-                              {formatDateForResume(work.StartDate)} -{" "}
-                              {formatDateForResume(work.EndDate)}
+                              <span>{getDateText(work.StartDate, work.EndDate, true)}</span>
                             </div>
                           )}
                         </div>
@@ -445,12 +442,9 @@ export default function ResumeViewer({
                             </p>
                           )}
                         </div>
-                        {shouldShowDatesInResume(edu.StartDate, edu.EndDate) && (
+                        {getDateText(edu.StartDate, edu.EndDate) && (
                           <div className="text-sm text-muted-foreground">
-                            {formatDateForResume(edu.StartDate)} -{" "}
-
-
-                            {formatDateForResume(edu.EndDate)}
+                            {getDateText(edu.StartDate, edu.EndDate)}
                           </div>
                         )}
                         {/* Metadata for Education item */}
@@ -466,10 +460,54 @@ export default function ResumeViewer({
 
                       </div>
                     </div>
+
+
                   ))}
                 </div>
               </section>
             )}
+
+              {/* Volunteer Experience */}
+              {resumeData.Volunteer.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Volunteer Experience</h2>
+                  <div className="space-y-4">
+                    {resumeData.Volunteer
+                      .slice()
+                      .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
+                      .map((volunteer, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                              <h3 className="font-semibold">{volunteer.Position}</h3>
+                              <p className="text-primary">{volunteer.Organization}</p>
+                              {volunteer.Summary && (
+                                <p className="text-sm text-muted-foreground">{volunteer.Summary}</p>
+                              )}
+                            </div>
+                            {getDateText(volunteer.StartDate, volunteer.EndDate, true) && (
+                              <div className="text-sm text-muted-foreground">
+                                {getDateText(volunteer.StartDate, volunteer.EndDate, true)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Metadata for Volunteer item */}
+                          {resume.metaData && volunteer.Id && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {resume.metaData
+                                .filter((m) => m.referenceId === volunteer.Id)
+                                .map((m) => (
+                                  <MetaBadge key={m.id} meta={m} />
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </section>
+              )}
+
 
             {/* Skills */}
             {resumeData.Skills.length > 0 && (
@@ -499,6 +537,184 @@ export default function ResumeViewer({
           </div>
         </CardContent>
       </Card>
+
+
+              {/* Projects */}
+              {resumeData.Projects.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Projects</h2>
+                  <div className="space-y-6">
+                    {resumeData.Projects.map((project, index) => (
+                      <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-lg">{project.Name}</h3>
+                          {project.Url && (
+                            <a href={project.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                        {(project.StartDate || project.EndDate) && (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {getDateText(project.StartDate, project.EndDate, true)}
+                          </p>
+                        )}
+                        {project.Entity && (
+                          <p className="text-sm text-muted-foreground mb-2">{project.Entity}</p>
+                        )}
+                        {project.Description && <p className="text-sm mb-3">{project.Description}</p>}
+                        {project.Highlights && project.Highlights.length > 0 && (
+                          <ul className="list-disc list-inside text-sm mb-3 space-y-1">
+                            {project.Highlights.map((highlight, hIndex) => (
+                              <li key={hIndex}>{highlight}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {resume.metaData && project.Id && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {resume.metaData
+                              .filter((m) => m.referenceId === project.Id)
+                              .map((m) => (
+                                <MetaBadge key={m.id} meta={m} />
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Awards */}
+              {resumeData.Awards.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Awards</h2>
+                  <div className="space-y-4">
+                    {resumeData.Awards.map((award, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{award.Title}</h3>
+                            <p className="text-sm text-muted-foreground">{award.Awarder}</p>
+                          </div>
+                          {getDateText(award.Date, undefined) && (
+                            <div className="text-sm text-muted-foreground">{getDateText(award.Date, undefined)}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Certificates */}
+              {resumeData.Certificates.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Certificates</h2>
+                  <div className="space-y-4">
+                    {resumeData.Certificates.map((cert, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{cert.Name}</h3>
+                            <p className="text-sm text-muted-foreground">{cert.Issuer}</p>
+                            {cert.Url && (
+                              <a href={cert.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                View Certificate
+                              </a>
+                            )}
+                          </div>
+                          {getDateText(cert.Date, undefined) && (
+                            <div className="text-sm text-muted-foreground">{getDateText(cert.Date, undefined)}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Publications */}
+              {resumeData.Publications.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Publications</h2>
+                  <div className="space-y-4">
+                    {resumeData.Publications.map((pub, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{pub.Name}</h3>
+                            <p className="text-sm text-muted-foreground">{pub.Publisher}</p>
+                            {pub.Url && (
+                              <a href={pub.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                View Publication
+                              </a>
+                            )}
+                          </div>
+                          {getDateText(pub.ReleaseDate, undefined) && (
+                            <div className="text-sm text-muted-foreground">{getDateText(pub.ReleaseDate, undefined)}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Languages */}
+              {resumeData.Languages.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Languages</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {resumeData.Languages.map((language, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <h3 className="font-semibold text-lg">{language.Language}</h3>
+                        {language.Fluency && (
+                          <p className="text-sm text-muted-foreground">{language.Fluency}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Interests */}
+              {resumeData.Interests.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">Interests</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {resumeData.Interests.map((interest, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <h3 className="font-semibold text-lg">{interest.Name}</h3>
+                        {interest.Keywords && interest.Keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {interest.Keywords.map((keyword, kIdx) => (
+                              <span key={kIdx} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* References */}
+              {resumeData.References.length > 0 && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6">References</h2>
+                  <div className="space-y-4">
+                    {resumeData.References.map((reference, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <h3 className="font-semibold">{reference.Name}</h3>
+                        <p className="text-sm text-muted-foreground">{reference.Reference}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
       {/* Resume Metadata */}
       <Card>

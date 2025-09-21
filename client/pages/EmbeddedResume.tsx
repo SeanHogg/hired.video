@@ -10,6 +10,7 @@ import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import type { UserProfile } from "@/lib/services/user-service";
 import type { Resume } from "@/types/resume";
+import ResumeViewer from "@/components/ResumeViewer";
 
 export default function EmbeddedResume() {
   const { identifier } = useParams<{ identifier: string }>();
@@ -162,211 +163,10 @@ export default function EmbeddedResume() {
 
   return (
     <div className="min-h-screen bg-background">
-
-
-      {/* Resume Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {resume && resume.data ? (
-          <div className="space-y-8">
-            {/* Personal Information */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    {resume.data.Basics?.Image && (
-                      <img
-                        src={resume.data.Basics.Image}
-                        alt={resume.data.Basics?.Name || "Profile"}
-                        className="w-20 h-20 rounded-full object-cover"
-                      />
-                    )}
-                    <div>
-                      <h1 className="text-3xl font-bold">
-                        {resume.data.Basics?.Name ||
-                          resume.name ||
-                          "Resume"}
-                      </h1>
-                      {resume.data.Basics?.Label && (
-                        <p className="text-xl text-muted-foreground mt-1">
-                          {resume.data.Basics.Label}
-                        </p>
-                      )}
-                      {resume.data.Basics?.Location && (
-                        <p className="text-muted-foreground mt-2">
-                          {[
-                            resume.data.Basics.Location.City,
-                            resume.data.Basics.Location.Region,
-                            resume.data.Basics.Location.CountryCode,
-                          ]
-                            .filter(Boolean)
-                            .join(", ")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {resume.data.Basics?.Summary && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Summary</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {resume.data.Basics.Summary}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Contact Information */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Contact Information</h3>
-                <div className="space-y-2">
-                  {resume.data.Basics?.Email && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Email:</span>{" "}
-                      {resume.data.Basics.Email}
-                    </p>
-                  )}
-                  {resume.data.Basics?.Phone && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Phone:</span>{" "}
-                      {resume.data.Basics.Phone}
-                    </p>
-                  )}
-                  {resume.data.Basics?.Url && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Website:</span>{" "}
-                      <a
-                        href={resume.data.Basics.Url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        {resume.data.Basics.Url}
-                      </a>
-                    </p>
-                  )}
-                  {resume.data.Basics?.Location?.Address && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Address:</span>{" "}
-                      {resume.data.Basics.Location.Address}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Skills */}
-            {resume.data.Skills &&
-              resume.data.Skills.length > 0 && (
-                <Card>
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold mb-4">Skills</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {resume.data.Skills.map((skill, index) => (
-                        <Badge key={index} variant="secondary">
-                          {skill.Name}
-                          {skill.Level && (
-                            <span className="ml-1 text-xs">
-                              ({skill.Level})
-                            </span>
-                          )}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Work Experience */}
-            {resume.data.Work && resume.data.Work.length > 0 && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Work Experience</h3>
-                  <div className="space-y-6">
-                    {resume.data.Work
-                      .sort((a, b) => {
-                        // Sort by start date descending (most recent first)
-                        const dateA = new Date(a.StartDate || "1900-01-01");
-                        const dateB = new Date(b.StartDate || "1900-01-01");
-                        return dateB.getTime() - dateA.getTime();
-                      })
-                      .map((job, index) => (
-                        <div key={index}>
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-medium">{job.Position}</h4>
-                              <p className="text-muted-foreground">
-                                {job.Name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {job.StartDate} - {job.EndDate || "Present"}
-                              </p>
-                            </div>
-                          </div>
-                          {job.Summary && (
-                            <p className="text-muted-foreground mt-2 leading-relaxed">
-                              {job.Summary}
-                            </p>
-                          )}
-                          {job.Highlights && job.Highlights.length > 0 && (
-                            <ul className="list-disc list-inside mt-2 text-muted-foreground">
-                              {job.Highlights.map((highlight, idx) => (
-                                <li key={idx}>{highlight}</li>
-                              ))}
-                            </ul>
-                          )}
-                          {index < resume.data.Work.length - 1 && (
-                            <Separator className="mt-6" />
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Education */}
-            {resume.data.Education &&
-              resume.data.Education.length > 0 && (
-                <Card>
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold mb-4">Education</h3>
-                    <div className="space-y-4">
-                      {resume.data.Education
-                        .sort((a, b) => {
-                          // Sort by start date descending (most recent first)
-                          const dateA = new Date(a.StartDate || "1900-01-01");
-                          const dateB = new Date(b.StartDate || "1900-01-01");
-                          return dateB.getTime() - dateA.getTime();
-                        })
-                        .map((edu, index) => (
-                          <div key={index}>
-                            <h4 className="font-medium">
-                              {edu.StudyType} in {edu.Area}
-                            </h4>
-                            <p className="text-muted-foreground">
-                              {edu.Institution}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {edu.StartDate} - {edu.EndDate || "Present"}
-                            </p>
-                            {edu.Score && (
-                              <p className="text-sm text-muted-foreground">
-                                Score: {edu.Score}
-                              </p>
-                            )}
-                            {index < resume.data.Education.length - 1 && (
-                              <Separator className="mt-4" />
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-          </div>
+      {/* Resume Content (uses consolidated ResumeViewer) */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {resume ? (
+          <ResumeViewer resume={resume} onUpdate={() => {}} canEdit={false} />
         ) : (
           <Card>
             <CardContent className="p-6 text-center">
@@ -393,22 +193,6 @@ export default function EmbeddedResume() {
           </div>
         </div>
       </footer>
-
-      {/* Share Modal */}
-      <ShareModal
-        open={shareModalOpen}
-        onOpenChange={setShareModalOpen}
-        shareUrl={getShareUrl()}
-        title={
-          resume?.data?.Basics?.Name ||
-          resume?.name ||
-          "Professional Resume"
-        }
-        message={
-          resume?.data?.Basics?.Label ||
-          "Share this professional resume"
-        }
-      />
     </div>
   );
 }
