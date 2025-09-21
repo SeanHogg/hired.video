@@ -72,7 +72,7 @@ export const ForcePasswordChangeModal: React.FC<
   const checkPasswordStrength = async (password: string) => {
     try {
       const response = await apiCall(
-        "/api/password-management/validate-strength",
+        "/api/PasswordManagement/validate-strength",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -114,7 +114,7 @@ export const ForcePasswordChangeModal: React.FC<
     setError(null);
 
     try {
-      const response = await apiCall("/api/password-management/force-change", {
+      const response = await apiCall("/api/PasswordManagement/force-change", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
