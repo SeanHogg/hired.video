@@ -136,6 +136,15 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
               "AuthProvider: no stored user; deferring /Users/me fetch until /profile",
             );
           }
+
+          // Prime verification state early so route guards behave correctly
+          try {
+            const status = await authService.getVerificationStatus();
+            setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+          } catch (err) {
+            logger.warn?.("AuthProvider: failed to fetch verification status on init", err as any);
+            setIsEmailVerified(undefined);
+          }
         } else {
           logger.info("AuthProvider: not authenticated; skipping user fetch");
         }
@@ -424,9 +433,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     updateUserRole,
     updateProfile,
     completeOnboarding,
-    isAuthenticated: !!user,
+    isAuthenticated: authService.isAuthenticated(),
     isLoading,
-    isEmailVerified,
+    isEmailVerified: isEmailVerified ?? (undefined as unknown as boolean),
     refreshUser,
     apiCall,
   };

@@ -100,7 +100,9 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 }
 
 function RequireVerified({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, isEmailVerified } = useAuthSafe();
+  const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
+  // Avoid false redirects while auth/verification status is initializing
+  if (isLoading) return <PageLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (isEmailVerified === false) {
     const intended = window.location.pathname + window.location.search;
