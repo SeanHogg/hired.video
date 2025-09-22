@@ -9,7 +9,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
-import { AuthProvider } from "@/lib/auth";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart-context";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
@@ -260,7 +260,7 @@ const App = () => (
                         element={<PersonaSelection />}
                       />
                       <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
-                      <Route path="/dashboard" element={<RequireVerified><Dashboard /></RequireVerified>} />
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"
@@ -273,7 +273,7 @@ const App = () => (
                       />
                       <Route path="/about" element={<About />} />
                       <Route path="/careers" element={<Careers />} />
-                      <Route path="/resumes" element={<RequireVerified><Resumes /></RequireVerified>} />
+                      <Route path="/resumes" element={<Resumes />} />
                       <Route
                         path="/resumes/upload"
                         element={<RequireVerified><ResumeUploadPage /></RequireVerified>}

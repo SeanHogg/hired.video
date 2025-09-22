@@ -264,7 +264,8 @@ export class AuthService {
       throw new Error("No pending two-factor challenge");
     }
 
-    const payload = { tempAuthToken: state.tempAuthToken, code } as const;
+    // Backend expects { tempAuthToken, verificationCode }
+    const payload = { tempAuthToken: state.tempAuthToken, verificationCode: code } as const;
 
     const result = await apiClient.post<LoginResponse>(
       "/api/Auth/verify-2fa",
@@ -498,9 +499,19 @@ export class AuthService {
     const token = localStorage.getItem(this.tokenKey);
     if (!token) return false;
 
-    // Check if token is expired (basic check)
+    // Check if token is expired using robust base64url decoding for JWT
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const parts = token.split(".");
+      if (parts.length < 2) return false;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+      const json = atob(padded);
+      const payload = JSON.parse(json) as { exp?: number };
+      if (typeof payload.exp !== "number") {
+        // If no exp present, assume valid (backend should include exp)
+        return true;
+      }
       const currentTime = Date.now() / 1000;
       return payload.exp > currentTime;
     } catch {
