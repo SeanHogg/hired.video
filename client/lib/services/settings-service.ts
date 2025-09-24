@@ -319,7 +319,7 @@ export class SettingsService {
    */
   async getSecuritySettings(): Promise<SecuritySettings> {
     const response = await apiClient.get<SecuritySettings>(
-      "/Settings/security",
+      "/api/Settings/security",
       SecuritySettingsSchema,
     );
     return response.data;
@@ -332,7 +332,7 @@ export class SettingsService {
     settings: Partial<SecuritySettings>,
   ): Promise<SecuritySettings> {
     const response = await apiClient.put<SecuritySettings>(
-      "/Settings/security",
+      "/api/Settings/security",
       settings,
       SecuritySettingsSchema,
     );
@@ -347,7 +347,7 @@ export class SettingsService {
       qrCode: string;
       backupCodes: string[];
     }>(
-      "/Settings/security/2fa/enable",
+      "/api/Settings/security/2fa/enable",
       {},
       z.object({
         qrCode: z.string(),
@@ -361,7 +361,7 @@ export class SettingsService {
    * Disable two-factor authentication
    */
   async disableTwoFactor(code: string): Promise<void> {
-    await apiClient.post("/Settings/security/2fa/disable", { code });
+    await apiClient.post("/api/Settings/security/2fa/disable", { code });
   }
 
   // ============================================================================
@@ -372,7 +372,7 @@ export class SettingsService {
    * Export user data (GDPR compliance)
    */
   async exportUserData(): Promise<Blob> {
-    const response = await apiClient.request<Blob>("/Settings/export", {
+    const response = await apiClient.request<Blob>("/api/Settings/export", {
       method: "GET",
     });
     return response.data;
@@ -389,15 +389,10 @@ export class SettingsService {
    * Request account deletion (with confirmation email)
    */
   async requestAccountDeletion(): Promise<void> {
-    await apiClient.post("/Settings/account/delete-request");
+    // No dedicated request endpoint. Use deleteAccount flow which performs soft delete per business rules.
+    await this.deleteAccount();
   }
 
-  /**
-   * Cancel account deletion request
-   */
-  async cancelAccountDeletion(token: string): Promise<void> {
-    await apiClient.post("/Settings/account/cancel-deletion", { token });
-  }
 }
 
 // ============================================================================
