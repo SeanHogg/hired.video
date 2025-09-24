@@ -45,9 +45,8 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { settingsService, type PrivacySettings, type AccountSettings, type NotificationSettings } from "@/lib/services/settings-service";
+import { settingsService, type PrivacySettings, type AccountSettings } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
-import { userService } from "@/lib/services/user-service";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function SettingsContent() {
@@ -93,13 +92,17 @@ function SettingsContent() {
     // Load privacy settings from API
     settingsService
       .getPrivacySettings()
-      .then((p) => setPrivacy((prev) => ({
-        ...prev,
-        profileVisible: p.profileVisible,
-        indexable: p.indexable,
-        allowMessages: p.allowMessages ?? prev.allowMessages,
-        showActivity: p.showActivity ?? prev.showActivity,
-      })))
+      .then((p) => {
+        setPrivacy((prev) => ({
+          ...prev,
+          profileVisible: p.profileVisible,
+          indexable: p.indexable,
+          allowMessages: p.allowMessages ?? prev.allowMessages,
+          showActivity: p.showActivity ?? prev.showActivity,
+          showEmail: p.showEmail ?? prev.showEmail,
+          showPhone: p.showPhone ?? prev.showPhone,
+        }));
+      })
       .catch((err) => {
         console.error("Failed to load privacy settings", err);
       });
@@ -612,7 +615,7 @@ function SettingsContent() {
                         onCheckedChange={async (checked) => {
                           setPrivacy({ ...privacy, showEmail: checked });
                           try {
-                            await userService.updateProfile({ showEmail: checked } as any);
+                            await settingsService.updatePrivacySettings({ showEmail: checked });
                           } catch (e) {
                             console.error("Failed to save privacy (show email)", e);
                           }
@@ -635,7 +638,7 @@ function SettingsContent() {
                         onCheckedChange={async (checked) => {
                           setPrivacy({ ...privacy, showPhone: checked });
                           try {
-                            await userService.updateProfile({ showPhone: checked } as any);
+                            await settingsService.updatePrivacySettings({ showPhone: checked });
                           } catch (e) {
                             console.error("Failed to save privacy (show phone)", e);
                           }

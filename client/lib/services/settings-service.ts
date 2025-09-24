@@ -27,6 +27,12 @@ const BackendPrivacyPreferencesSchema = z.object({
   showConnectionsList: z.boolean().optional(),
   allowDirectMessages: z.boolean().optional(),
   allowConnectionRequests: z.boolean().optional(),
+  // Contact visibility flags
+  showEmail: z.boolean().optional(),
+  showPhone: z.boolean().optional(),
+  showLocation: z.boolean().optional(),
+  allowMessaging: z.boolean().optional(),
+  // Data sharing
   shareAnalyticsData: z.boolean().optional(),
   shareUsageData: z.boolean().optional(),
   allowDataExport: z.boolean().optional(),
@@ -124,11 +130,10 @@ export class SettingsService {
   private mapPrivacyFromBackend(dto: z.infer<typeof BackendPrivacyPreferencesSchema>): PrivacySettings {
     return {
       profileVisible: dto.profileVisibleToPublic ?? true,
-      // UI toggles for email/phone are not persisted yet; keep defaults for now
-      showEmail: false,
-      showPhone: false,
+      showEmail: dto.showEmail ?? false,
+      showPhone: dto.showPhone ?? false,
       indexable: dto.allowSearchEngineIndexing ?? true,
-      allowMessages: dto.allowDirectMessages ?? true,
+      allowMessages: dto.allowMessaging ?? dto.allowDirectMessages ?? true,
       showActivity: dto.showActivityStatus ?? true,
     };
   }
@@ -181,6 +186,12 @@ export class SettingsService {
     }
     if (typeof settings.indexable === "boolean") {
       payload.allowSearchEngineIndexing = settings.indexable;
+    }
+    if (typeof settings.showEmail === "boolean") {
+      payload.showEmail = settings.showEmail;
+    }
+    if (typeof settings.showPhone === "boolean") {
+      payload.showPhone = settings.showPhone;
     }
     if (typeof settings.allowMessages === "boolean") {
       payload.allowDirectMessages = settings.allowMessages;
