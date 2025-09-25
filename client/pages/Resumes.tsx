@@ -319,11 +319,31 @@ export default function Resumes() {
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
-  const handleCreateResume = (request: CreateResumeRequest) => {
-    setSuccessMessage("Resume created successfully!");
-    setView("list");
-    loadResumes();
-    setTimeout(() => setSuccessMessage(null), 5000);
+  const handleCreateResume = async (request: CreateResumeRequest) => {
+    try {
+      // Create via service; include slug if provided
+      const created = await resumeService.createResume({
+        name: request.name,
+        data: request.data,
+        privacy: request.privacy,
+        isMaster: request.isMaster,
+        isActive: request.isActive,
+      });
+
+      // If a slug was provided, update it using the edit flow to apply slug post-create
+      if (request.slug && created?.id) {
+        await resumeService.updateResumeData(created.id, { data: created.data, slug: request.slug });
+      }
+
+      setSuccessMessage("Resume created successfully!");
+      setView("list");
+      loadResumes();
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (e) {
+      console.error("Failed to create resume", e);
+      setSuccessMessage("Failed to create resume");
+      setTimeout(() => setSuccessMessage(null), 5000);
+    }
   };
 
   const handleUpdateResume = (request: UpdateResumeRequest) => {

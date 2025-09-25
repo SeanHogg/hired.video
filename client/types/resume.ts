@@ -203,6 +203,7 @@ export interface CreateResumeRequest {
   isActive?: boolean;
   parentId?: string;
   metaData?: ResumeSectionMeta[];
+  slug?: string; // Optional vanity slug
 }
 
 export interface UpdateResumeRequest {
@@ -212,6 +213,7 @@ export interface UpdateResumeRequest {
   isMaster?: boolean;
   isActive?: boolean;
   metaData?: ResumeSectionMeta[];
+  slug?: string; // Optional vanity slug update
 }
 
 export interface UploadResumeRequest {

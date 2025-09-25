@@ -707,6 +707,7 @@ export class ResumeService {
 
   /**
    * Update resume with new data structure
+   * Note: slug is sent via querystring for server-side post-save handling
    */
   async updateResumeData(
     id: string,
@@ -716,21 +717,38 @@ export class ResumeService {
       privacy?: ResumePrivacy;
       isMaster?: boolean;
       metaData?: ResumeSectionMeta[];
+      slug?: string;
     },
   ): Promise<FrontendResume> {
     // Backend UpdateResume expects [FromBody] string of the raw resume JSON
     const raw = updates.data ? JSON.stringify(updates.data) : undefined;
     const body = raw !== undefined ? JSON.stringify(raw) : undefined; // JSON string literal
 
+    const qs = updates.slug ? `?slug=${encodeURIComponent(updates.slug)}` : "";
+
     const response = await apiClient.put<any>(
-      `/api/Resume/${id}`,
+      `/api/Resume/${id}${qs}`,
       body,
       z.any(),
     );
 
     // Transform the response back to frontend format
     return this.transformApiResumeToResume(response.data);
-  }
+    }
+
+    /**
+     * Validate slug for current user; optionally pass current resumeId to allow existing slug
+     */
+    async validateSlug(slug: string, resumeId?: string): Promise<{ slug: string; available: boolean }> {
+      const qs = new URLSearchParams({ slug });
+      if (resumeId) qs.set("resumeId", resumeId);
+      const response = await apiClient.get<{ slug: string; available: boolean }>(
+        `/api/Resume/validateSlug?${qs.toString()}`,
+        z.object({ slug: z.string(), available: z.boolean() }),
+      );
+      return response.data;
+    }
+
 
   /**
    * Delete resume

@@ -86,6 +86,7 @@ export default function ResumeEditPage() {
         data: request.data || resume.data,
         privacy: request.privacy || resume.privacy,
         isMaster: request.isMaster !== undefined ? request.isMaster : resume.isMaster,
+        slug: request.slug || resume.slug,
       };
 
       // Update the resume via API
@@ -239,6 +240,7 @@ export default function ResumeEditPage() {
               initialIsMaster={resume.isMaster}
               initialMetaData={resume.metaData || []}
               ownerUserId={resume.userId}
+              initialSlug={resume.slug}
               onSave={handleUpdateResume}
               onCancel={handleCancel}
             />

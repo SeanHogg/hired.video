@@ -182,13 +182,15 @@ export default function ActionsModal({
         });
       }
 
+      const deleteLabel = (item as any)?.parentId ? "Delete Variation" : "Delete Resume";
       actions.push({
         id: "delete",
-        label: "Delete",
+        label: deleteLabel,
         icon: Trash2,
         onClick: () => {
           onDelete?.();
-          onClose();
+          // Defer closing to ensure parent state (e.g., opening confirm dialog) applies first
+          setTimeout(() => onClose(), 0);
         },
         variant: "destructive",
       });

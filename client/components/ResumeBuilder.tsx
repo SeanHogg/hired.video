@@ -72,6 +72,7 @@ interface ResumeBuilderProps {
   initialIsMaster?: boolean;
   initialMetaData?: ResumeSectionMeta[];
   ownerUserId?: string;
+  initialSlug?: string;
 }
 
 export default function ResumeBuilder({
@@ -83,11 +84,13 @@ export default function ResumeBuilder({
   initialIsMaster = false,
   initialMetaData = [],
   ownerUserId,
+  initialSlug = "",
 }: ResumeBuilderProps) {
   const [resumeName, setResumeName] = useState(initialName);
   const [privacy, setPrivacy] = useState<ResumePrivacy>(initialPrivacy);
   const [isMaster, setIsMaster] = useState(initialIsMaster);
   const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetaData);
+  const [slug, setSlug] = useState<string>(initialSlug);
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto as Crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
 
@@ -594,6 +597,7 @@ export default function ResumeBuilder({
       privacy,
       isMaster,
       metaData,
+      slug: slug?.trim() || undefined,
     };
 
     onSave(request);
@@ -629,7 +633,7 @@ export default function ResumeBuilder({
               <Label>Privacy Setting</Label>
               <Select
                 value={privacy}
-                onValueChange={(value: ResumePrivacy) => setPrivacy(value)}
+                onValueChange={(value: ResumePrivacy) => setPrivacy(value as ResumePrivacy)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -640,6 +644,18 @@ export default function ResumeBuilder({
                   <SelectItem value="public">Public</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="slug">Custom URL (Slug)</Label>
+              <Input
+                id="slug"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="e.g., john-smith-cto"
+              />
+              <p className="text-xs text-muted-foreground">
+                Lowercase letters, numbers, and hyphens only. Leave blank to keep the current value or default.
+              </p>
             </div>
           </div>
 
