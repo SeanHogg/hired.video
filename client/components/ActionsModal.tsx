@@ -68,7 +68,8 @@ export default function ActionsModal({
     );
   }
 
-  const isOwner = user && user.id === item.ownerId;
+  const effectiveOwnerId = (item as any)?.ownerId ?? (item as any)?.userId;
+  const isOwner = Boolean(user && effectiveOwnerId && user.id === effectiveOwnerId);
   const isRecruiter = user && user.role === USER_ROLES.RECRUITER;
   const isAuthenticated = !!user;
 
@@ -167,8 +168,8 @@ export default function ActionsModal({
         variant: "outline",
       });
 
-      // Promote to master if this is a variant the user owns
-      if ((item as any).parentId) {
+      // Promote/Convert to master when the resume is not a master yet (covers variants and orphans)
+      if ((item as any)?.type === "resume" && (((item as any)?.isMaster === false) || (item as any)?.parentId)) {
         actions.push({
           id: "promote",
           label: "Promote to Master",

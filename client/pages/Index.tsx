@@ -868,6 +868,30 @@ export default function Index() {
         onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
         onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+        onPromoteToMaster={async () => {
+          const id = actionsModal.item?.id;
+          if (!id) return;
+          try {
+            // If it's a variant, call promote endpoint; if it's an orphan (no parentId), set as master
+            const isVariant = Boolean((actionsModal.item as any)?.parentId);
+            if (isVariant) {
+              const ok = await resumeService.promoteVariantToMaster(id);
+              if (ok) {
+                // eslint-disable-next-line no-console
+                console.log("Variant promoted to master");
+              }
+            } else {
+              const ok = await resumeService.setMasterResume(id);
+              if (ok) {
+                // eslint-disable-next-line no-console
+                console.log("Orphan converted to master");
+              }
+            }
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("Promote/Convert to master failed", err);
+          }
+        }}
       />
     </div>
   );
