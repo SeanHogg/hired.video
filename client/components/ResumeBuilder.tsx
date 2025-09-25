@@ -15,6 +15,7 @@ import {
   BookOpen,
   Lightbulb,
   UserCheck,
+  ChevronDown,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -185,7 +186,12 @@ export default function ResumeBuilder({
       <Collapsible>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Section Metadata</CardTitle>
-          <CollapsibleTrigger className="text-xs underline text-muted-foreground">Toggle</CollapsibleTrigger>
+          <CollapsibleTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown className="h-3.5 w-3.5" />
+            <span>
+              {metaData.length > 0 ? `Show details (${metaData.length})` : "Add details"}
+            </span>
+          </CollapsibleTrigger>
         </div>
         <CollapsibleContent asChild>
           <div>
