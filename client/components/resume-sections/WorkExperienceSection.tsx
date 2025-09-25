@@ -29,26 +29,41 @@ export default function WorkExperienceSection({
   onUpdateHighlight,
   onRemoveHighlight,
 }: WorkExperienceSectionProps) {
-  // Use sorted work for display if provided; otherwise compute a consistent order
-  const displayWork = (sortedWork || work.slice().sort((a, b) => {
-    const norm = (s?: string) => (s || '').trim().toLowerCase();
-    const aEnd = norm(a.EndDate);
-    const bEnd = norm(b.EndDate);
-    const aIsCurrent = aEnd === '' || aEnd === 'present';
-    const bIsCurrent = bEnd === '' || bEnd === 'present';
-    if (aIsCurrent && !bIsCurrent) return -1;
-    if (!aIsCurrent && bIsCurrent) return 1;
-    if (!aIsCurrent && !bIsCurrent) {
-      const aEndDate = new Date(a.EndDate || a.StartDate);
-      const bEndDate = new Date(b.EndDate || b.StartDate);
-      if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) return 0;
-      return bEndDate.getTime() - aEndDate.getTime();
+  // Always compute stable, correct sort for edit panels:
+  // - Current roles first: EndDate null/empty (also handle 'present'/'current'/'now')
+  // - Then by most recent end date desc; for current roles, start date desc
+  const isCurrent = (end?: string) => {
+    const s = (end || '').trim().toLowerCase();
+    return s === '' || s === 'present' || s === 'current' || s === 'now';
+  };
+  const toTime = (val?: string): number | null => {
+    if (!val) return null;
+    const t = Date.parse(val);
+    return Number.isFinite(t) ? t : null;
+  };
+  const compareWork = (a: WorkExperience, b: WorkExperience) => {
+    const aCur = isCurrent(a.EndDate);
+    const bCur = isCurrent(b.EndDate);
+    if (aCur && !bCur) return -1;
+    if (!aCur && bCur) return 1;
+    if (aCur && bCur) {
+      const aStart = toTime(a.StartDate);
+      const bStart = toTime(b.StartDate);
+      if (aStart !== null && bStart !== null) return bStart - aStart;
+      if (aStart !== null) return -1;
+      if (bStart !== null) return 1;
+      return 0;
     }
-    const aStartDate = new Date(a.StartDate);
-    const bStartDate = new Date(b.StartDate);
-    if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) return 0;
-    return bStartDate.getTime() - aStartDate.getTime();
-  }));
+    // both not current
+    const aEnd = toTime(a.EndDate) ?? toTime(a.StartDate);
+    const bEnd = toTime(b.EndDate) ?? toTime(b.StartDate);
+    if (aEnd !== null && bEnd !== null) return bEnd - aEnd;
+    if (aEnd !== null) return -1;
+    if (bEnd !== null) return 1;
+    return 0;
+  };
+  const source = (sortedWork && sortedWork.length ? sortedWork : work);
+  const displayWork = source.slice().sort(compareWork);
   const emptyState = {
     icon: <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />,
     title: "No work experience added yet.",

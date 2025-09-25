@@ -332,7 +332,7 @@ export default function Resumes() {
 
       // If a slug was provided, update it using the edit flow to apply slug post-create
       if (request.slug && created?.id) {
-        await resumeService.updateResumeData(created.id, { data: created.data, slug: request.slug });
+        await resumeService.updateResumeData(created.id, { data: request.data, slug: request.slug });
       }
 
       setSuccessMessage("Resume created successfully!");

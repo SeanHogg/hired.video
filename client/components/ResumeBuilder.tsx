@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+
 import type {
   ResumeData,
   ResumePrivacy,
@@ -177,6 +179,93 @@ export default function ResumeBuilder({
   const removeMeta = (index: number) => {
     setMetaData(prev => prev.filter((_, i) => i !== index));
   };
+  // Collapsible metadata panel shown under each tab's edit form
+  const MetadataPanel = () => (
+    <div className="mt-2">
+      <Collapsible>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Section Metadata</CardTitle>
+          <CollapsibleTrigger className="text-xs underline text-muted-foreground">Toggle</CollapsibleTrigger>
+        </div>
+        <CollapsibleContent asChild>
+          <div>
+            <div className="flex justify-between mt-2">
+              <Button type="button" variant="outline" size="sm" onClick={addMeta}>Add Metadata</Button>
+            </div>
+            {metaData.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No metadata added. Use "Add Metadata" to associate links, images, or videos with resume sections.</p>
+            ) : (
+              <div className="space-y-3">
+                {metaData.map((m, i) => (
+                  <div key={m.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 border rounded-lg p-3">
+                    <div className="md:col-span-2">
+                      <Label>Label</Label>
+                      <Input value={m.name} onChange={(e) => updateMeta(i, "name", e.target.value)} placeholder="e.g., Demo Reel" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>URL</Label>
+                      <Input value={m.url} onChange={(e) => updateMeta(i, "url", e.target.value)} placeholder="https://..." />
+                    </div>
+                    <div>
+                      <Label>Type</Label>
+                      <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={String(MetaType.Hyperlink)}>Link</SelectItem>
+                          <SelectItem value={String(MetaType.Image)}>Image</SelectItem>
+                          <SelectItem value={String(MetaType.YouTube)}>YouTube</SelectItem>
+                          <SelectItem value={String(MetaType.VideoMP4)}>Video (MP4)</SelectItem>
+                          <SelectItem value={String(MetaType.VideoWebM)}>Video (WebM)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Reference</Label>
+                      <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {basics.Id && (
+                            <SelectItem value={basics.Id}>Basics</SelectItem>
+                          )}
+                          {work.map((w, wi) => (
+                            w.Id ? (
+                              <SelectItem key={`w-${w.Id}`} value={w.Id}>{`Work ${wi + 1}: ${w.Position || w.Name || w.Id}`}</SelectItem>
+                            ) : null
+                          ))}
+                          {education.map((e, ei) => (
+                            e.Id ? (
+                              <SelectItem key={`e-${e.Id}`} value={e.Id}>{`Edu ${ei + 1}: ${e.Institution || e.Id}`}</SelectItem>
+                            ) : null
+                          ))}
+                          {skills.map((s, si) => (
+                            s.Id ? (
+                              <SelectItem key={`s-${s.Id}`} value={s.Id}>{`Skill ${si + 1}: ${s.Name || s.Id}`}</SelectItem>
+                            ) : null
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-6">
+                      <Label>Description</Label>
+                      <Textarea rows={2} value={m.description || ""} onChange={(e) => updateMeta(i, "description", e.target.value)} placeholder="Optional note shown in viewer modal" />
+                    </div>
+                    <div className="md:col-span-6 flex justify-end">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeMeta(i)}>Remove</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+
 
   const [basics, setBasics] = useState({
     Name: "",
@@ -726,11 +815,13 @@ export default function ResumeBuilder({
 
         <TabsContent value="basics">
           <Card>
+
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
@@ -800,8 +891,11 @@ export default function ResumeBuilder({
                   rows={4}
                 />
               </div>
+
+
             </CardContent>
           </Card>
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="work">
@@ -815,91 +909,10 @@ export default function ResumeBuilder({
             onUpdateHighlight={updateHighlight}
             onRemoveHighlight={removeHighlight}
           />
+                  {/* Metadata below Work */}
+        <MetadataPanel />
         </TabsContent>
 
-        {/* Metadata Management (simple inline list) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Section Metadata</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <Button type="button" variant="outline" size="sm" onClick={addMeta}>Add Metadata</Button>
-            </div>
-            {metaData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No metadata added. Use "Add Metadata" to associate links, images, or videos with resume sections.</p>
-            ) : (
-              <div className="space-y-3">
-                {metaData.map((m, i) => (
-                  <div key={m.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 border rounded-lg p-3">
-                    <div className="md:col-span-2">
-                      <Label>Label</Label>
-                      <Input value={m.name} onChange={(e) => updateMeta(i, "name", e.target.value)} placeholder="e.g., Demo Reel" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>URL</Label>
-                      <Input value={m.url} onChange={(e) => updateMeta(i, "url", e.target.value)} placeholder="https://..." />
-                    </div>
-                    <div>
-                      <Label>Type</Label>
-                      <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={String(MetaType.Hyperlink)}>Link</SelectItem>
-                          <SelectItem value={String(MetaType.Image)}>Image</SelectItem>
-                          <SelectItem value={String(MetaType.YouTube)}>YouTube</SelectItem>
-                          <SelectItem value={String(MetaType.VideoMP4)}>Video (MP4)</SelectItem>
-                          <SelectItem value={String(MetaType.VideoWebM)}>Video (WebM)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Reference</Label>
-                      <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose section" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Basics */}
-                          {basics.Id && (
-                            <SelectItem value={basics.Id}>Basics</SelectItem>
-                          )}
-                          {/* Work */}
-                          {work.map((w, wi) => (
-                            w.Id ? (
-                              <SelectItem key={`w-${w.Id}`} value={w.Id}>{`Work ${wi + 1}: ${w.Position || w.Name || w.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-                          {/* Education */}
-                          {education.map((e, ei) => (
-                            e.Id ? (
-                              <SelectItem key={`e-${e.Id}`} value={e.Id}>{`Edu ${ei + 1}: ${e.Institution || e.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-                          {/* Skills */}
-                          {skills.map((s, si) => (
-                            s.Id ? (
-                              <SelectItem key={`s-${s.Id}`} value={s.Id}>{`Skill ${si + 1}: ${s.Name || s.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-6">
-                      <Label>Description</Label>
-                      <Textarea rows={2} value={m.description || ""} onChange={(e) => updateMeta(i, "description", e.target.value)} placeholder="Optional note shown in viewer modal" />
-                    </div>
-                    <div className="md:col-span-6 flex justify-end">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeMeta(i)}>Remove</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
 
         <TabsContent value="education">
@@ -909,7 +922,11 @@ export default function ResumeBuilder({
             onUpdate={updateEducation}
             onRemove={removeEducation}
           />
+          <MetadataPanel />
         </TabsContent>
+
+
+
 
         <TabsContent value="skills">
           <SkillsSection
@@ -918,7 +935,11 @@ export default function ResumeBuilder({
             onUpdate={updateSkill}
             onRemove={removeSkill}
           />
+          <MetadataPanel />
         </TabsContent>
+        {/* Metadata below Volunteer */}
+
+
 
         <TabsContent value="volunteer">
           <VolunteerSection
@@ -927,6 +948,8 @@ export default function ResumeBuilder({
             onUpdate={updateVolunteer}
             onRemove={removeVolunteer}
           />
+          {/* Metadata below Volunteer */}
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="projects">
@@ -936,15 +959,23 @@ export default function ResumeBuilder({
             onUpdate={updateProject}
             onRemove={removeProject}
           />
+          {/* Metadata below Projects */}
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="languages">
+        {/* Metadata below Languages */}
+
+
           <LanguagesSection
             languages={languages}
             onAdd={addLanguage}
             onUpdate={updateLanguage}
             onRemove={removeLanguage}
           />
+        {/* Metadata below Awards */}
+        <MetadataPanel />
+
         </TabsContent>
 
         <TabsContent value="awards">
@@ -954,6 +985,8 @@ export default function ResumeBuilder({
             onUpdate={updateAward}
             onRemove={removeAward}
           />
+          {/* Metadata below Awards */}
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="certificates">
@@ -963,7 +996,11 @@ export default function ResumeBuilder({
             onUpdate={updateCertificate}
             onRemove={removeCertificate}
           />
+          <MetadataPanel />
         </TabsContent>
+        {/* Metadata below Certificates */}
+
+
 
         <TabsContent value="publications">
           <PublicationsSection
@@ -972,6 +1009,8 @@ export default function ResumeBuilder({
             onUpdate={updatePublication}
             onRemove={removePublication}
           />
+          {/* Metadata below Publications */}
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="interests">
@@ -981,6 +1020,8 @@ export default function ResumeBuilder({
             onUpdate={updateInterest}
             onRemove={removeInterest}
           />
+          {/* Metadata below Interests */}
+          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="references">
@@ -990,7 +1031,11 @@ export default function ResumeBuilder({
             onUpdate={updateReference}
             onRemove={removeReference}
           />
+           <MetadataPanel />
         </TabsContent>
+        {/* Metadata below References */}
+
+
       </Tabs>
 
       {/* Action Buttons */}
