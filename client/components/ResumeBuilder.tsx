@@ -16,8 +16,10 @@ import {
   Lightbulb,
   UserCheck,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,7 +69,7 @@ import {
 } from "@/components/resume-sections";
 
 interface ResumeBuilderProps {
-  onSave: (request: CreateResumeRequest) => void;
+  onSave: (request: CreateResumeRequest) => Promise<void> | void;
   onCancel: () => void;
   initialData?: Partial<ResumeData>;
   initialName?: string;
@@ -96,6 +98,12 @@ export default function ResumeBuilder({
   const [slug, setSlug] = useState<string>(initialSlug);
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto as Crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
+
+  // Ensure section Ids exist at mount so Reference dropdown has options immediately
+  useEffect(() => {
+    ensureIdsForSections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ensureIdsForSections = () => {
     // Basics
@@ -662,40 +670,47 @@ export default function ResumeBuilder({
     updatedWork[workIndex].Highlights.splice(highlightIndex, 1);
     setWork(updatedWork);
   };
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+
+  const handleSave = async () => {
     // Allow saving if we have a resume name OR if we're editing an existing resume (initialName exists)
     if (!resumeName.trim() && !initialName) return;
     if (!basics.Name.trim()) return;
 
-    // Ensure sections have UUIDs for metadata association
-    ensureIdsForSections();
+    setSaving(true);
+    try {
+      // Ensure sections have UUIDs for metadata association
+      ensureIdsForSections();
 
-    const resumeData: ResumeData = {
-      Basics: basics,
-      Work: work,
-      Volunteer: volunteer,
-      Education: education,
-      Awards: awards,
-      Certificates: certificates,
-      Publications: publications,
-      Skills: skills,
-      Languages: languages,
-      Interests: interests,
-      References: references,
-      Projects: projects,
-    };
+      const resumeData: ResumeData = {
+        Basics: basics,
+        Work: work,
+        Volunteer: volunteer,
+        Education: education,
+        Awards: awards,
+        Certificates: certificates,
+        Publications: publications,
+        Skills: skills,
+        Languages: languages,
+        Interests: interests,
+        References: references,
+        Projects: projects,
+      };
 
-    const request: CreateResumeRequest = {
-      name: resumeName.trim() || initialName, // Use resumeName or fall back to initialName
-      data: resumeData,
-      privacy,
-      isMaster,
-      metaData,
-      slug: slug?.trim() || undefined,
-    };
+      const request: CreateResumeRequest = {
+        name: resumeName.trim() || initialName, // Use resumeName or fall back to initialName
+        data: resumeData,
+        privacy,
+        isMaster,
+        metaData,
+        slug: slug?.trim() || undefined,
+      };
 
-    onSave(request);
+      await onSave(request);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Check if the form is valid for saving
@@ -1046,15 +1061,27 @@ export default function ResumeBuilder({
 
       {/* Action Buttons */}
       <div className="flex gap-3 justify-end">
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
         <Button
           onClick={handleSave}
-          disabled={!isFormValid()}
+          disabled={!isFormValid() || saving}
         >
-          <Save className="mr-2 h-4 w-4" />
-          Save Resume
+          {saving ? (
+            <>
+              <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save Resume
+            </>
+          )}
         </Button>
       </div>
     </div>
