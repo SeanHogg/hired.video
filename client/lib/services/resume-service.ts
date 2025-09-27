@@ -837,6 +837,7 @@ export class ResumeService {
 
           // Convert PascalCase to camelCase for consistency with existing logic
           basics = {
+            id: serializedBasics.Id || serializedBasics.id,
             name: serializedBasics.Name || serializedBasics.name || "",
             label: serializedBasics.Label || serializedBasics.label || "",
             image: serializedBasics.Image || serializedBasics.image || "",
@@ -848,6 +849,7 @@ export class ResumeService {
           };
 
           work = serializedWork.map((w: any) => ({
+            id: w.Id || w.id,
             name: w.Name || w.name || w.Company || w.company || "",
             position: w.Position || w.position || "",
             summary: w.Summary || w.summary || "",
@@ -858,6 +860,7 @@ export class ResumeService {
           }));
 
           education = serializedEducation.map((e: any) => ({
+            id: e.Id || e.id,
             institution: e.Institution || e.institution || "",
             area: e.Area || e.area || "",
             studyType: e.StudyType || e.studyType || "",
@@ -869,6 +872,7 @@ export class ResumeService {
           }));
 
           volunteer = serializedVolunteer.map((v: any) => ({
+            id: v.Id || v.id,
             organization: v.Organization || v.organization || "",
             position: v.Position || v.position || "",
             summary: v.Summary || v.summary || "",
@@ -879,6 +883,7 @@ export class ResumeService {
           }));
 
           awards = serializedAwards.map((a: any) => ({
+            id: a.Id || a.id,
             title: a.Title || a.title || "",
             date: a.Date || a.date || "",
             awarder: a.Awarder || a.awarder || "",
@@ -886,6 +891,7 @@ export class ResumeService {
           }));
 
           certificates = serializedCertificates.map((c: any) => ({
+            id: c.Id || c.id,
             name: c.Name || c.name || "",
             date: c.Date || c.date || "",
             issuer: c.Issuer || c.issuer || "",
@@ -893,6 +899,7 @@ export class ResumeService {
           }));
 
           publications = serializedPublications.map((p: any) => ({
+            id: p.Id || p.id,
             name: p.Name || p.name || "",
             publisher: p.Publisher || p.publisher || "",
             releaseDate: p.ReleaseDate || p.releaseDate || "",
@@ -901,27 +908,32 @@ export class ResumeService {
           }));
 
           skills = serializedSkills.map((s: any) => ({
+            id: s.Id || s.id,
             name: s.Name || s.name || "",
             level: s.Level || s.level || "",
             keywords: s.Keywords || s.keywords || []
           }));
 
           languages = serializedLanguages.map((l: any) => ({
+            id: l.Id || l.id,
             language: l.Language || l.language || "",
             fluency: l.Fluency || l.fluency || ""
           }));
 
           interests = serializedInterests.map((i: any) => ({
+            id: i.Id || i.id,
             name: i.Name || i.name || "",
             keywords: i.Keywords || i.keywords || []
           }));
 
           references = serializedReferences.map((r: any) => ({
+            id: r.Id || r.id,
             name: r.Name || r.name || "",
             reference: r.Reference || r.reference || ""
           }));
 
           projects = serializedProjects.map((p: any) => ({
+            id: p.Id || p.id,
             name: p.Name || p.name || "",
             description: p.Description || p.description || "",
             highlights: p.Highlights || p.highlights || [],
