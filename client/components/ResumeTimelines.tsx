@@ -255,12 +255,23 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             });
         });
 
-        // Sort by start date (earliest first for left-to-right progression)
-        return items.sort((a, b) => {
-            const dateA = new Date(a.startDate || '1900-01-01');
-            const dateB = new Date(b.startDate || '1900-01-01');
-            return dateA.getTime() - dateB.getTime();
-        });
+        // Overview tab sorting:
+        // - Past items (with endDate) first in chronological order (earliest -> latest)
+        // - Current items (no endDate or 'Present') at the end, ordered by StartDate desc
+        const isCurrent = (d?: string) => {
+            const norm = (d || '').trim().toLowerCase();
+            return norm === '' || norm === 'present';
+        };
+        const safeParse = (d?: string) => {
+            const dt = new Date(d || '');
+            return isNaN(dt.getTime()) ? new Date('1900-01-01') : dt;
+        };
+        const past = items.filter(i => !isCurrent(i.endDate));
+        const current = items.filter(i => isCurrent(i.endDate));
+        past.sort((a, b) => safeParse(a.startDate).getTime() - safeParse(b.startDate).getTime());
+        // Current items ascending by StartDate so the most recent current is rightmost
+        current.sort((a, b) => safeParse(a.startDate).getTime() - safeParse(b.startDate).getTime());
+        return [...past, ...current];
     };
 
     // Calculate total experience for work
