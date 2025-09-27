@@ -109,63 +109,63 @@ export default function ResumeBuilder({
   const ensureIdsForSections = () => {
     // Basics
     setBasics(prev => ({
-      Id: prev.Id || tryUuid(),
       ...prev,
+      Id: prev.Id || tryUuid(),
     }));
     // Work
     setWork(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Education
     setEducation(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Skills
     setSkills(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Volunteer
     setVolunteer(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Awards
     setAwards(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Certificates
     setCertificates(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Publications
     setPublications(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Languages
     setLanguages(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Interests
     setInterests(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // References
     setReferences(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
     // Projects
     setProjects(prev => prev.map(item => ({
-      Id: item.Id || tryUuid(),
       ...item,
+      Id: item.Id || tryUuid(),
     })));
   };
 
@@ -256,20 +256,27 @@ export default function ResumeBuilder({
                           <SelectValue placeholder="Choose section" />
                         </SelectTrigger>
                         <SelectContent>
-                          {basics.Id && (
+                          {/* Basics */}
+                          {!!basics?.Name?.trim() && basics.Id && (
                             <SelectItem value={basics.Id}>Basics</SelectItem>
                           )}
-                          {work.map((w, wi) => (
+
+                          {/* Work */}
+                          {work.filter(w => (w.Name?.trim() || w.Position?.trim())).map((w, wi) => (
                             w.Id ? (
                               <SelectItem key={`w-${w.Id}`} value={w.Id}>{`Work ${wi + 1}: ${w.Position || w.Name || w.Id}`}</SelectItem>
                             ) : null
                           ))}
-                          {education.map((e, ei) => (
+
+                          {/* Education */}
+                          {education.filter(e => e.Institution?.trim()).map((e, ei) => (
                             e.Id ? (
                               <SelectItem key={`e-${e.Id}`} value={e.Id}>{`Edu ${ei + 1}: ${e.Institution || e.Id}`}</SelectItem>
                             ) : null
                           ))}
-                          {skills.map((s, si) => (
+
+                          {/* Skills */}
+                          {skills.filter(s => s.Name?.trim()).map((s, si) => (
                             s.Id ? (
                               <SelectItem key={`s-${s.Id}`} value={s.Id}>{`Skill ${si + 1}: ${s.Name || s.Id}`}</SelectItem>
                             ) : null
