@@ -95,6 +95,7 @@ export default function ResumeBuilder({
   const [privacy, setPrivacy] = useState<ResumePrivacy>(initialPrivacy);
   const [isMaster, setIsMaster] = useState(initialIsMaster);
   const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetaData);
+  const [metaPanelOpen, setMetaPanelOpen] = useState<boolean>(initialMetaData.length > 0);
   const [slug, setSlug] = useState<string>(initialSlug);
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto as Crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
@@ -169,6 +170,9 @@ export default function ResumeBuilder({
   };
 
   const addMeta = () => {
+    // Ensure we have IDs for basics and sections before creating a meta row
+    ensureIdsForSections();
+
     const newMeta: ResumeSectionMeta = {
       id: tryUuid(),
       userId: ownerUserId || "",
@@ -191,7 +195,7 @@ export default function ResumeBuilder({
   // Collapsible metadata panel shown under each tab's edit form
   const MetadataPanel = () => (
     <div className="mt-2">
-      <Collapsible>
+      <Collapsible open={metaPanelOpen} onOpenChange={setMetaPanelOpen}>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Section Metadata</CardTitle>
           <CollapsibleTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -204,7 +208,17 @@ export default function ResumeBuilder({
         <CollapsibleContent asChild>
           <div>
             <div className="flex justify-between mt-2">
-              <Button type="button" variant="outline" size="sm" onClick={addMeta}>Add Metadata</Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  addMeta();
+                  setMetaPanelOpen(true);
+                }}
+              >
+                Add Metadata
+              </Button>
             </div>
             {metaData.length === 0 ? (
               <p className="text-sm text-muted-foreground">No metadata added. Use "Add Metadata" to associate links, images, or videos with resume sections.</p>
