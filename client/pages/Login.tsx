@@ -92,28 +92,7 @@ export default function Login() {
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setIsLoading(true);
-    setError("");
 
-    try {
-      const success = await login(demoEmail, demoPassword);
-      if (success === true) {
-        navigate("/dashboard");
-      } else if (typeof success === "object" && success && (success as any).requiresEmailVerification) {
-        const params = new URLSearchParams({ email: demoEmail, redirect: redirectParam });
-        navigate(`/verify-email?${params.toString()}`);
-      } else if (typeof success === "object" && success && (success as any).requiresTwoFactor) {
-        setTwoFactor(success as { requiresTwoFactor: true; email: string; expiresAt: string });
-      }
-    } catch (err) {
-      setError("Demo login failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleVerifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,59 +231,7 @@ export default function Login() {
                   </form>
                 )}
 
-                {!twoFactor && (
-                  <>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or try demo accounts
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          handleDemoLogin("john.seeker@example.com", "Password123!")
-                        }
-                        disabled={isLoading}
-                        className="text-left justify-start"
-                      >
-                        Demo Job Seeker (john.seeker@example.com)
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          handleDemoLogin(
-                            "sarah.recruiter@example.com",
-                            "Password123!",
-                          )
-                        }
-                        disabled={isLoading}
-                        className="text-left justify-start"
-                      >
-                        Demo Recruiter (sarah.recruiter@example.com)
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          handleDemoLogin(
-                            "michael.business@example.com",
-                            "Password123!",
-                          )
-                        }
-                        disabled={isLoading}
-                        className="text-left justify-start"
-                      >
-                        Demo Employer (michael.business@example.com)
-                      </Button>
-                    </div>
-                  </>
-                )}
+                {/* Demo accounts removed */}
 
                 <div className="text-center space-y-2">
                   <p className="text-sm text-muted-foreground">
