@@ -384,6 +384,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       await authService.verifyTwoFactor(code);
       const profile = authService.getStoredUser();
       if (profile) setUser(userProfileToUser(profile));
+
+      // After successful 2FA, prime verification status so route guards behave correctly
+      try {
+        const status = await authService.getVerificationStatus();
+        setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+      } catch (err) {
+        // Leave as undefined on failure; guards will avoid false redirects when loading
+        setIsEmailVerified(undefined);
+      }
+
       return true;
     } catch (error) {
       console.error("AuthContext.verifyTwoFactor: failed", error);

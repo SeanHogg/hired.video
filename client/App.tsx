@@ -95,7 +95,11 @@ const PageLoader = () => (
 // Simple route guards
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuthSafe();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    const intended = window.location.pathname + window.location.search;
+    const params = new URLSearchParams({ redirect: intended });
+    return <Navigate to={`/login?${params.toString()}`} replace />;
+  }
   return children;
 }
 
@@ -103,7 +107,11 @@ function RequireVerified({ children }: { children: JSX.Element }) {
   const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
   // Avoid false redirects while auth/verification status is initializing
   if (isLoading) return <PageLoader />;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    const intended = window.location.pathname + window.location.search;
+    const params = new URLSearchParams({ redirect: intended });
+    return <Navigate to={`/login?${params.toString()}`} replace />;
+  }
   if (isEmailVerified === false) {
     const intended = window.location.pathname + window.location.search;
     const params = new URLSearchParams({ redirect: intended });
