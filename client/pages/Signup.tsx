@@ -52,14 +52,29 @@ export default function Signup() {
       setRole(USER_ROLES.RECRUITER);
     } else if (roleParam === "employer") {
       setRole(USER_ROLES.EMPLOYER);
+    }
+  }, [location.search]);
 
-	  // Capture referral code from URL
-	  useEffect(() => {
-	    const searchParams = new URLSearchParams(location.search);
-	    const code = searchParams.get("ref");
-	    if (code) setReferralCode(code);
-	  }, [location.search]);
-
+  // Capture referral code from URL (?ref=CODE) and persist; fallback to stored value
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const code = searchParams.get("ref");
+    if (code) {
+      setReferralCode(code);
+      try {
+        sessionStorage.setItem("ref", code);
+      } catch {
+        // no-op
+      }
+    } else {
+      try {
+        const stored = sessionStorage.getItem("ref");
+        if (stored) {
+          setReferralCode(stored);
+        }
+      } catch {
+        // no-op
+      }
     }
   }, [location.search]);
 
@@ -227,12 +242,22 @@ export default function Signup() {
                     </div>
                   </div>
 
+	                  <div className="text-sm text-muted-foreground">
+	                    Interested in becoming an affiliate?{" "}
+	                    <Link to="/affiliate-program" className="text-primary hover:underline">
+	                      Sign up on the affiliate page
+	                    </Link>.
+	                  </div>
+
+
                   {/* Referral code */}
                   <div className="space-y-2">
                     <Label htmlFor="referralCode">Referral Code (optional)</Label>
                     <Input
                       id="referralCode"
                       type="text"
+
+
                       placeholder="Have a referral code? Enter it here"
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value)}
@@ -246,6 +271,8 @@ export default function Signup() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="password"
+
+
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
                         value={password}

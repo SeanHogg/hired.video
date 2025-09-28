@@ -3,7 +3,7 @@ import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -138,7 +138,7 @@ const queryClient = new QueryClient({
         logger.error("Mutation error", {
           error: error instanceof Error ? error.message : String(error),
         });
-        
+
         // Report to error tracking
         if (error instanceof Error) {
           reportError(error, { type: "mutation" });
@@ -175,7 +175,7 @@ window.addEventListener("unhandledrejection", (event) => {
     reason: event.reason,
     promise: event.promise,
   });
-  
+
   // Report to error tracking
   reportError(error, {
     type: "unhandledrejection",
@@ -195,7 +195,7 @@ window.addEventListener("error", (event) => {
     colno: event.colno,
     error: event.error,
   });
-  
+
   // Report to error tracking
   if (event.error) {
     reportError(event.error, {
@@ -207,6 +207,22 @@ window.addEventListener("error", (event) => {
   }
 });
 
+
+function ReferralCapture() {
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("ref");
+      if (code) {
+        sessionStorage.setItem("ref", code);
+      }
+    } catch {
+      // no-op
+    }
+  }, []);
+  return null;
+}
+
 const App = () => (
   <ErrorBoundary
     level="critical"
@@ -215,7 +231,7 @@ const App = () => (
         error: error.message,
         errorInfo,
       });
-      
+
       // Report to error tracking
       reportError(error, {
         type: "react-error-boundary",
@@ -231,9 +247,12 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <BrowserRouter>
+	                  <ReferralCapture />
+
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       <Route path="/" element={<Index />} />
+
                       <Route path="/login" element={<Login />} />
                       <Route path="/signup" element={<Signup />} />
                       <Route
@@ -307,7 +326,7 @@ const App = () => (
                         element={<CompanyCreatePage />}
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
-                      <Route path="/affiliate/dashboard" element={<AffiliateDashboard />} />
+                      <Route path="/affiliate/dashboard" element={<RequireVerified><AffiliateDashboard /></RequireVerified>} />
 
                       <Route
                         path="/companies/create/:id"
