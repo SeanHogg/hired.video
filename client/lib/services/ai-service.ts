@@ -5,6 +5,8 @@
 
 import { logger } from "@/lib/logger";
 import { apiClient } from "@/lib/api-client";
+import { billingService } from "@/lib/services/billing-service";
+import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 
 // ============================================================================
 // TYPES
@@ -64,6 +66,21 @@ class AIService {
         .slice(0, -1)
         .filter((msg) => msg.role !== "system");
 
+      // Enforce AI monthly usage limits client-side for immediate UX feedback
+      const usage = await billingService.getMonthlyAIUsage();
+      if (!usage.isUnlimited) {
+        const limit = usage.limit ?? FREE_AI_MONTHLY_LIMIT;
+        const remaining = usage.remaining ?? Math.max(0, limit - (usage.used ?? 0));
+        if (remaining <= 0) {
+          const limitError: AIServiceError = {
+            code: "AI_USAGE_LIMIT_REACHED",
+            message: `You've used all ${limit} free AI requests for this month. Upgrade to Premium for unlimited AI.`,
+          };
+          // Throw structured error; caller can display an upgrade prompt
+          throw limitError as unknown as Error;
+        }
+      }
+
       const requestData = {
         message: userMessage,
         history: history.length > 0 ? history : undefined,
@@ -89,10 +106,16 @@ class AIService {
         message: response.data.message,
         usage: response.data.usage,
       };
-    } catch (error) {
-      logger.error("AI service error", error);
+    } catch (error: unknown) {
+      logger.error("AI service error", { error });
 
-      // Fallback to mock response on any error
+      // If this is an explicit usage limit error, propagate it to the UI (no mock fallback)
+      const maybe = error as Partial<AIServiceError> | undefined;
+      if (maybe && maybe.code === "AI_USAGE_LIMIT_REACHED") {
+        throw error as Error;
+      }
+
+      // Fallback to mock response on other errors (e.g., network/AI provider issues)
       logger.warn("Falling back to mock response due to AI service error");
       return this.getMockResponse(messages[messages.length - 1]?.content || "");
     }

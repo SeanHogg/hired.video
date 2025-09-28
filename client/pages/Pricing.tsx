@@ -27,6 +27,8 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
+import { PREMIUM_MONTHLY_PRICE as basePrice } from "@shared/pricing";
+
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
@@ -229,7 +231,6 @@ export default function Pricing() {
     }
   }, []);
 
-  const basePrice = 9.95; // per user per month
   const calculatePrice = (users: number, annual: boolean) => {
     const monthlyTotal = basePrice * users;
     if (annual) {
