@@ -58,6 +58,7 @@ import {
 import VideoCard from "@/components/VideoCard";
 import PeopleCard from "@/components/PeopleCard";
 import SearchBar from "@/components/SearchBar";
+import MediaSection from "@/components/MediaSection";
 import Pagination, { usePagination } from "@/components/Pagination";
 import ContentSection from "@/components/ui/ContentSection";
 import { useCardRenderer } from "@/lib/card-factory";
@@ -840,6 +841,13 @@ export default function Index() {
                 </p>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* Featured Media Section */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 bg-muted/30">
+          <div className="max-w-7xl mx-auto">
+            <MediaSection limit={12} />
           </div>
         </section>
 
