@@ -64,7 +64,7 @@ export default function Login() {
         console.log(
           "Login.handleSubmit: Login successful, navigating to dashboard",
         );
-        navigate("/dashboard");
+        navigate(redirectParam);
         return;
       }
 
@@ -102,7 +102,7 @@ export default function Login() {
     try {
       const ok = await verifyTwoFactor(code.trim());
       if (ok) {
-        navigate("/dashboard");
+        navigate(redirectParam);
       } else {
         setError("Invalid or expired verification code. Please try again.");
       }

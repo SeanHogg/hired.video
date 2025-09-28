@@ -121,14 +121,8 @@ function RequireVerified({ children }: { children: JSX.Element }) {
 }
 
 function useAuthSafe() {
-  try {
-    // Lazy import to avoid circulars
-    const mod = require("./lib/auth");
-    return mod.useAuth();
-  } catch {
-    // Fallback shape matching AuthContextType subset
-    return { isAuthenticated: false, isEmailVerified: undefined } as { isAuthenticated: boolean; isEmailVerified?: boolean };
-  }
+  // Directly use the Auth context; avoid brittle require()-based fallback that can misreport state
+  return useAuth();
 }
 
 // Create a client with production-ready configuration
