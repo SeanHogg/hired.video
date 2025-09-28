@@ -543,7 +543,7 @@ function AccountManagementContent() {
               </TabsList>
 
               <TabsContent value="billing" className="space-y-6">
-                <BillingManagement />
+                {activeTab === "billing" && <BillingManagement />}
               </TabsContent>
 
               <TabsContent value="users" className="space-y-6">

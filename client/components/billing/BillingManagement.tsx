@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { CreditCard, FileText, Settings, AlertCircle } from "lucide-react";
+import { CreditCard, FileText, AlertCircle } from "lucide-react";
 
-import { billingService, type SubscriptionSummary, type PaymentMethod, type Invoice, type AIUsageMonth } from "@/lib/services/billing-service";
-import { PREMIUM_MONTHLY_PRICE, FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
+import { billingService, type PaymentMethod, type Invoice, type AIUsageMonth } from "@/lib/services/billing-service";
+import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 
 
 
@@ -17,7 +17,7 @@ import { PREMIUM_MONTHLY_PRICE, FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 
 export function BillingManagement() {
   const [activeTab, setActiveTab] = useState("overview");
-  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
+
   const [aiUsage, setAiUsage] = useState<AIUsageMonth | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -25,30 +25,32 @@ export function BillingManagement() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadBillingData();
-  }, []);
-
-  const loadBillingData = async () => {
+    let isMounted = true;
     setIsLoading(true);
     setError(null);
-    try {
-      const [sub, usage, pms, invs] = await Promise.all([
-        billingService.getSubscription(),
-        billingService.getMonthlyAIUsage(),
-        billingService.getPaymentMethods(),
-        billingService.getInvoices(),
-      ]);
-      setSubscription(sub);
-      setAiUsage(usage);
-      setPaymentMethods(pms);
-      setInvoices(invs);
-    } catch (error) {
-      console.error("Failed to load billing data:", error);
-      setError("Failed to load billing data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    (async () => {
+      try {
+        if (activeTab === "overview") {
+          const usage = await billingService.getMonthlyAIUsage();
+          if (isMounted) setAiUsage(usage);
+        } else if (activeTab === "payment-methods") {
+          const pms = await billingService.getPaymentMethods();
+          if (isMounted) setPaymentMethods(pms);
+        } else if (activeTab === "invoices") {
+          const invs = await billingService.getInvoices();
+          if (isMounted) setInvoices(invs);
+        }
+      } catch (error) {
+        console.error("Failed to load billing data:", error);
+        if (isMounted) setError("Failed to load billing data. Please try again.");
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab]);
 
 
 
@@ -64,7 +66,7 @@ export function BillingManagement() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <CreditCard className="h-8 w-8" />
-            Billing & Subscriptions
+            Billing
           </h1>
           <p className="text-muted-foreground mt-1">
             Manage your subscription, payment methods, and billing history
@@ -82,65 +84,19 @@ export function BillingManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="subscription">Subscription</TabsTrigger>
+
           <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          {/* Current Plan */}
-          {subscription && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Current Plan
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {subscription.isPremium
-                        ? `Premium ($${PREMIUM_MONTHLY_PRICE.toFixed(2)})`
-                        : "Free"}
-                    </h3>
-                    {subscription.currentPeriodEnd && (
-                      <p className="text-muted-foreground">
-                        Next billing: {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold">
-                      {subscription.isPremium ? `$${PREMIUM_MONTHLY_PRICE}` : "$0"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {subscription.isPremium ? "per month" : "Free"}
-                    </div>
-                  </div>
-                </div>
-
-                {subscription.cancelAtPeriodEnd && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Your subscription will be canceled at the end of the
-                      current billing period.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* AI Usage Overview */}
           {aiUsage && (
             <Card>
               <CardHeader>
                 <CardTitle>AI Usage This Month</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {subscription?.isPremium ? (
+                {aiUsage.isUnlimited ? (
                   <div className="text-sm text-muted-foreground">Unlimited AI usage</div>
                 ) : (
                   <>
@@ -161,18 +117,8 @@ export function BillingManagement() {
               </CardContent>
             </Card>
           )}
-
         </TabsContent>
 
-        <TabsContent value="subscription" className="space-y-4">
-          <Alert>
-            <Settings className="h-4 w-4" />
-            <AlertDescription>
-              Detailed subscription management will be implemented in the next
-              phase.
-            </AlertDescription>
-          </Alert>
-        </TabsContent>
 
         <TabsContent value="payment-methods" className="space-y-4">
           {paymentMethods.length === 0 ? (

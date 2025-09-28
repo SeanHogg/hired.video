@@ -54,12 +54,6 @@ export interface AIUsageMonth {
 }
 
 export const billingService = {
-  async getSubscription(): Promise<SubscriptionSummary> {
-    const res: ApiSuccessResponse<SubscriptionSummary> = await apiClient.get(
-      "/api/Billing/subscription",
-    );
-    return res.data;
-  },
 
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     const res: ApiSuccessResponse<PaymentMethod[]> = await apiClient.get(
