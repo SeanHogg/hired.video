@@ -469,7 +469,13 @@ export default function Index() {
         (item.company &&
           item.company.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return matchesCategory && matchesSearch;
+      // Media filter logic
+      const matchesMedia =
+        searchFilters.hasMedia === undefined ||
+        (searchFilters.hasMedia === true && (item as any).hasMedia === true) ||
+        (searchFilters.hasMedia === false && (item as any).hasMedia !== true);
+
+      return matchesCategory && matchesSearch && matchesMedia;
     })
     .sort((a, b) => {
       const sortBy = searchFilters.sortBy || "recent";

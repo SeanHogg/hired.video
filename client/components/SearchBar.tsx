@@ -54,6 +54,7 @@ export interface SearchFilters {
   searchRadius?: string;
   education?: string;
   datePosted?: string;
+  hasMedia?: boolean;
 }
 
 export interface SearchBarProps {
@@ -104,7 +105,7 @@ const contextConfig = {
   all: {
     placeholder: "Search videos, professions, companies...",
     icon: Search,
-    filterSections: ["location", "experience", "education", "datePosted"],
+    filterSections: ["location", "experience", "education", "datePosted", "media"],
   },
 };
 
@@ -461,6 +462,31 @@ export default function SearchBar({
           </div>
         );
 
+      case "media":
+        return (
+          <div>
+            <label className="text-sm font-medium mb-2 block">Media</label>
+            <Select
+              value={filters.hasMedia?.toString() || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "hasMedia",
+                  value === "all" ? undefined : value === "true",
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All content" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All content</SelectItem>
+                <SelectItem value="true">With videos/images</SelectItem>
+                <SelectItem value="false">Text only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -672,6 +698,32 @@ export default function SearchBar({
                     <SelectItem value="3d">Last 3 days</SelectItem>
                     <SelectItem value="week">Last week</SelectItem>
                     <SelectItem value="month">Last month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Media Filter */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <FileText className="w-3 h-3" />
+                  Media Content
+                </label>
+                <Select
+                  value={filters.hasMedia?.toString() || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "hasMedia",
+                      value === "all" ? undefined : value === "true",
+                    )
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Content</SelectItem>
+                    <SelectItem value="true">With Videos/Images</SelectItem>
+                    <SelectItem value="false">Text Only</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
