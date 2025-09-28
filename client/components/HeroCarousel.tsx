@@ -31,7 +31,7 @@ export default function HeroCarousel({
   const [currentSlide, setCurrentSlide] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const slides = [
     {
