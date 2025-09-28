@@ -90,27 +90,12 @@ export const billingService = {
     return u;
   },
 
-  async getStripePublicKey(): Promise<string> {
-    const { data } = await apiClient.getRaw<{ publishableKey: string }>(
-      "/api/Payment/public-key",
+  async createSetupSession(successUrl: string, cancelUrl: string): Promise<string> {
+    const res: ApiSuccessResponse<{ url: string }> = await apiClient.post(
+      "/api/Payment/create-setup-session",
+      { successUrl, cancelUrl }
     );
-    return data.publishableKey;
-  },
-
-  async createSetupIntent(): Promise<string> {
-    const { data } = await apiClient.requestRaw<{ clientSecret: string }>(
-      "/api/Payment/setup-intent",
-      { method: "POST" },
-    );
-    return data.clientSecret;
-  },
-
-  async savePaymentMethod(paymentMethodId: string): Promise<string> {
-    const { data } = await apiClient.requestRaw<{ message: string }>(
-      "/api/Payment/save-payment-method",
-      { method: "POST", body: { PaymentMethodId: paymentMethodId } },
-    );
-    return data.message;
+    return res.data.url;
   },
 
   async deletePaymentMethod(paymentMethodId: string): Promise<string> {

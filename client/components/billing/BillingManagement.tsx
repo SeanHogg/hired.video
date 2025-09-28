@@ -27,17 +27,8 @@ export function BillingManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Payment method panel state
-  const [pmPanelOpen, setPmPanelOpen] = useState(false);
-  const [pmPanelMode, setPmPanelMode] = useState<"add" | "edit">("add");
-  const [editingPmId, setEditingPmId] = useState<string | null>(null);
-  const [pmSubmitting, setPmSubmitting] = useState(false);
-  const cardContainerRef = useRef<HTMLDivElement | null>(null);
-  const stripeRef = useRef<any>(null);
-  const elementsRef = useRef<any>(null);
-  const cardElementRef = useRef<any>(null);
-  const clientSecretRef = useRef<string | null>(null);
-  const publishableKeyRef = useRef<string | null>(null);
+  // Payment method state
+  const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
