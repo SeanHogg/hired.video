@@ -317,6 +317,47 @@ export default function PrivacyPolicy() {
                     </p>
                   </div>
                 </CardContent>
+
+	                  <Separator />
+
+	                  <div>
+	                    <h4 className="font-medium mb-2">Role-Based Information</h4>
+	                    <p className="text-muted-foreground mb-2">
+	                      We process certain information depending on your role in the platform:
+	                    </p>
+	                    <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
+	                      <li>
+	                        <strong>Job Seekers:</strong> resume content (text and video), work history, skills, profile details, and signals you choose to make public to employers/recruiters.
+	                      </li>
+	                      <li>
+	                        <strong>Employers:</strong> company profile, job postings, recruiting activity, and communications necessary to evaluate candidates.
+	                      </li>
+	                      <li>
+	                        <strong>Recruiters:</strong> talent searches, candidate communications, and engagement metrics necessary to facilitate recruiting.
+	                      </li>
+	                      <li>
+	                        <strong>Affiliates:</strong> referral codes, referral links, and limited performance metrics related to referrals (e.g., clicks, signups, qualifying purchases) for attribution and payouts.
+	                      </li>
+	                    </ul>
+	                  </div>
+
+	                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+	                    <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Affiliate Program Data</h4>
+	                    <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 text-sm space-y-1 ml-4">
+	                      <li>
+	                        <strong>Attribution:</strong> We may capture referral codes from URL parameters (e.g., "ref") and use cookies/session storage to attribute referrals. This enables fair crediting of commissions to affiliates.
+	                      </li>
+	                      <li>
+	                        <strong>Payout Records:</strong> We maintain records of qualifying transactions, commission calculations (25% of first month subscription only), and payout status. We may collect payee details (e.g., email, account ID) to process payouts.
+	                      </li>
+	                      <li>
+	                        <strong>Compliance:</strong> Where required by law, we may collect tax and compliance information (e.g., forms or declarations) before releasing payouts. We do not sell affiliate data.
+	                      </li>
+	                      <li>
+	                        <strong>Retention:</strong> Affiliate-related records are retained consistent with our retention policy and legal obligations (e.g., financial recordkeeping). We minimize the data retained to what is necessary for attribution and payouts.
+	                      </li>
+	                    </ul>
+	                  </div>
               </Card>
 
               <Card>

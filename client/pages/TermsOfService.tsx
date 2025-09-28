@@ -1584,6 +1584,60 @@ export default function TermsOfService() {
 
               <Card>
                 <CardHeader>
+                  <CardTitle>24. Role-Specific Terms and Affiliate Program</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Roles and Allowed Uses</h4>
+                    <p className="text-muted-foreground mb-2">
+                      We support multiple roles within the platform. By selecting a role, you agree to the following role-specific obligations in addition to these Terms:
+                    </p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
+                      <li>
+                        <strong>Job Seeker:</strong> You represent that the information in your resumes (text or video) is accurate and that you have the rights to share it. You will not upload content that violates privacy, publicity, or intellectual property rights.
+                      </li>
+                      <li>
+                        <strong>Employer:</strong> You will post jobs with accurate descriptions, avoid discriminatory language, and use candidate data solely for legitimate hiring purposes consistent with applicable law.
+                      </li>
+                      <li>
+                        <strong>Recruiter:</strong> You will engage candidates fairly, avoid misrepresentation of roles, and use the Services only to facilitate lawful recruiting activity for actual roles.
+                      </li>
+                      <li>
+                        <strong>Affiliate:</strong> You may promote our Services to your audience subject to the Affiliate Program terms below. You must not engage in spam, deception, impersonation, or any unlawful or misleading marketing.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Affiliate Program Terms</h4>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
+                      <li>
+                        <strong>Eligibility and Account:</strong> You must maintain an active MyVideoResu.ME account in good standing. We may review affiliate applications and refuse or revoke access at our discretion for any reason, including suspected abuse.
+                      </li>
+                      <li>
+                        <strong>Commission:</strong> 25% commission on the first month's subscription fee only (one-time per qualified referral). No recurring commission is paid for subsequent renewals.
+                      </li>
+                      <li>
+                        <strong>Payout Threshold and Methods:</strong> Payouts are available once your confirmed commission balance reaches $25.00. Payout methods include standard options (e.g., PayPal or bank transfer) as configured in your affiliate settings.
+                      </li>
+                      <li>
+                        <strong>Attribution:</strong> Referrals are attributed via referral codes and standard tracking (e.g., URL parameters and cookies). A referral qualifies when a new customer completes their first paid subscription and the initial charge clears. Self-referrals are not permitted.
+                      </li>
+                      <li>
+                        <strong>Prohibited Conduct:</strong> No spam, misleading claims, coupon/discount sites without express permission, unauthorized paid search on our brand terms, or any behavior that could harm our reputation. We may withhold or reverse commissions for fraudulent or abusive activity, chargebacks, or refunds.
+                      </li>
+                      <li>
+                        <strong>Taxes and Reporting:</strong> You are responsible for applicable taxes on commissions. We may request tax or payee information where required by law and may suspend payouts until such information is provided.
+                      </li>
+                      <li>
+                        <strong>Termination:</strong> We may suspend or terminate your affiliate participation for breach of these terms, suspected abuse, or inactivity. Upon termination, unpaid commissions for qualified referrals through the termination date will be evaluated and paid in accordance with these terms.
+                      </li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
                   <CardTitle>25. SMS Text Messaging</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">

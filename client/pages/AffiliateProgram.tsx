@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function AffiliateProgram() {
@@ -132,9 +132,16 @@ export default function AffiliateProgram() {
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? "Creating account..." : "Create affiliate account"}
                     </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      By continuing, you agree to our Terms and Privacy Policy.
-                    </p>
+                    <div className="text-xs text-center text-muted-foreground">
+                      By creating an account, you agree to our{" "}
+                      <Link to="/terms" className="text-primary hover:underline">
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link to="/privacy" className="text-primary hover:underline">
+                        Privacy Policy
+                      </Link>
+                    </div>
                   </form>
                 </CardContent>
               </Card>
