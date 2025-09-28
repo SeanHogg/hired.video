@@ -12,10 +12,12 @@ import {
   Building2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 interface HeroCarouselProps {
   totalViews: string;
@@ -28,6 +30,8 @@ export default function HeroCarousel({
 }: HeroCarouselProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   const slides = [
     {
@@ -149,6 +153,58 @@ export default function HeroCarousel({
     }
   };
 
+  // Navigation handlers for CTA buttons
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      // If user is logged in, take them to dashboard or profile
+      navigate("/dashboard");
+    } else {
+      // If not logged in, take them to signup
+      navigate("/signup");
+    }
+  };
+
+  const handleWatchDemo = () => {
+    // Navigate to about page or a demo video section
+    navigate("/about");
+  };
+
+  const handleExploreFeatures = () => {
+    // Navigate to pricing page which shows features
+    navigate("/pricing");
+  };
+
+  const handleSeePricing = () => {
+    // Navigate to pricing page
+    navigate("/pricing");
+  };
+
+  const handleGenerateAIVideo = () => {
+    if (isAuthenticated) {
+      // If user is logged in, take them to resume upload/creation
+      navigate("/resumes/upload");
+    } else {
+      // If not logged in, take them to signup first
+      navigate("/signup");
+    }
+  };
+
+  // Helper function to get the appropriate handler for each action
+  const getActionHandler = (label: string) => {
+    switch (label) {
+      case "Get Started":
+        return handleGetStarted;
+      case "Watch Demo":
+        return handleWatchDemo;
+      case "Explore Features":
+        return handleExploreFeatures;
+      case "See Pricing":
+        return handleSeePricing;
+      default:
+        return () => console.log(`No handler defined for: ${label}`);
+    }
+  };
+
   const currentSlideData = slides[currentSlide];
 
   return (
@@ -258,7 +314,10 @@ export default function HeroCarousel({
           {/* Action Buttons */}
           <div className="min-h-[50px] flex items-center justify-center">
             {currentSlideData.type === "upload" ? (
-              <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2">
+              <Button
+                onClick={handleGenerateAIVideo}
+                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2"
+              >
                 Generate AI Video
               </Button>
             ) : (
@@ -270,6 +329,7 @@ export default function HeroCarousel({
                       size="sm"
                       variant={action.variant}
                       className="text-sm px-6 py-2"
+                      onClick={getActionHandler(action.label)}
                     >
                       {action.label}
                     </Button>
