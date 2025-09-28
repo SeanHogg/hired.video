@@ -54,6 +54,13 @@ export interface AIUsageMonth {
 }
 
 export const billingService = {
+  async getSubscription(): Promise<SubscriptionSummary> {
+    const res: ApiSuccessResponse<SubscriptionSummary> = await apiClient.get(
+      "/api/Billing/subscription",
+    );
+    return res.data;
+  },
+
 
   async getPaymentMethods(): Promise<PaymentMethod[]> {
     const res: ApiSuccessResponse<PaymentMethod[]> = await apiClient.get(
@@ -81,6 +88,37 @@ export const billingService = {
       return { ...u, limit, remaining };
     }
     return u;
+  },
+
+  async getStripePublicKey(): Promise<string> {
+    const { data } = await apiClient.getRaw<{ publishableKey: string }>(
+      "/api/Payment/public-key",
+    );
+    return data.publishableKey;
+  },
+
+  async createSetupIntent(): Promise<string> {
+    const { data } = await apiClient.requestRaw<{ clientSecret: string }>(
+      "/api/Payment/setup-intent",
+      { method: "POST" },
+    );
+    return data.clientSecret;
+  },
+
+  async savePaymentMethod(paymentMethodId: string): Promise<string> {
+    const { data } = await apiClient.requestRaw<{ message: string }>(
+      "/api/Payment/save-payment-method",
+      { method: "POST", body: { PaymentMethodId: paymentMethodId } },
+    );
+    return data.message;
+  },
+
+  async deletePaymentMethod(paymentMethodId: string): Promise<string> {
+    const { data } = await apiClient.requestRaw<{ message: string }>(
+      `/api/Payment/payment-methods/${paymentMethodId}`,
+      { method: "DELETE" },
+    );
+    return data.message;
   },
 };
 
