@@ -12,6 +12,7 @@ import CompanyCard from "@/components/CompanyCard";
 import PeopleCard from "@/components/PeopleCard";
 import ResumeCard from "@/components/ResumeCard";
 import VideoCard from "@/components/VideoCard";
+import MediaCard from "@/components/MediaCard";
 
 import {
   normalizeJobData,
@@ -19,6 +20,7 @@ import {
   normalizePersonData,
   normalizeResumeData,
   normalizeVideoData,
+  normalizeMediaData,
   getCardType,
 } from "@/lib/card-normalizers";
 
@@ -248,6 +250,31 @@ export function useCardRenderer({
             />
           );
 
+        case "media":
+          const mediaData = normalizeMediaData(item, context);
+          const mediaOwnership = determineItemOwnership(
+            mediaData,
+            effectiveUserContext,
+          );
+
+          // Convert normalized media data to MediaCard format
+          const mediaCardData = {
+            id: mediaData.id,
+            name: mediaData.name,
+            metaType: mediaData.metaType,
+            url: mediaData.url,
+            description: mediaData.description,
+          };
+
+          return (
+            <MediaCard
+              key={mediaData.id}
+              media={mediaCardData as any}
+              onView={() => interactions.onView?.(mediaData)}
+              onPlay={() => interactions.onView?.(mediaData)}
+            />
+          );
+
         default:
           // eslint-disable-next-line no-console
           console.warn(`Unknown card type for item:`, item);
@@ -344,6 +371,26 @@ export function renderCardItem(
           createdAt={normalizedData.createdAt}
           onView={() => interactions.onView?.(normalizedData)}
           onActions={() => interactions.onActions?.(normalizedData)}
+        />
+      );
+
+    case "media":
+      const mediaData = normalizeMediaData(item, context);
+      // Convert normalized media data to MediaCard format
+      const mediaCardData = {
+        id: mediaData.id,
+        name: mediaData.name,
+        metaType: mediaData.metaType,
+        url: mediaData.url,
+        description: mediaData.description,
+      };
+
+      return (
+        <MediaCard
+          key={mediaData.id}
+          media={mediaCardData as any}
+          onView={() => interactions.onView?.(mediaData)}
+          onPlay={() => interactions.onView?.(mediaData)}
         />
       );
 

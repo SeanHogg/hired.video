@@ -224,6 +224,34 @@ export function normalizeVideoData(
 }
 
 /**
+ * Normalize media data from various API formats
+ */
+export function normalizeMediaData(
+  item: RawApiItem,
+  context: CardContext,
+): NormalizedMediaData {
+  return {
+    id: item.id,
+    type: "media" as const,
+    title: item.title || item.name || "Untitled Media",
+    name: item.name || item.title || "Untitled Media",
+    description: item.description || item.summary || "",
+    metaType: item.metaType || 0,
+    url: item.experienceLevel || item.url || "", // Backend stores URL in experienceLevel field
+    userId: item.location || item.userId || "", // Backend stores userId in location field
+    referenceId: item.company || item.referenceId || "", // Backend stores referenceId in company field
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    views: item.views || 0,
+    slug: item.slug || `media-${item.id}`,
+    ownership:
+      determineOwnership(item, context) === "none"
+        ? "tracked"
+        : (determineOwnership(item, context) as "owned" | "tracked"),
+  };
+}
+
+/**
  * Determine ownership status based on context and item data
  */
 function determineOwnership(
@@ -309,6 +337,11 @@ export function getCardType(item: RawApiItem): CardType {
     (item.privacy === "public" || item.privacy === "private")
   ) {
     return "resume";
+  }
+
+  // Media detection - check for media-specific fields
+  if (item.metaType !== undefined || item.skills?.includes("YouTube") || item.skills?.includes("VideoMP4") || item.skills?.includes("Image")) {
+    return "media";
   }
 
   // Video detection

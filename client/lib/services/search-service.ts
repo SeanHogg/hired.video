@@ -52,7 +52,7 @@ export const SearchResponseSchema = z.object({
 export const SearchFiltersSchema = z.object({
   search: z.string().optional(),
   category: z
-    .enum(["all", "jobs", "resumes", "people", "companies"])
+    .enum(["all", "jobs", "resumes", "people", "companies", "media"])
     .optional(),
   location: z.string().optional(),
   industry: z.string().optional(),
@@ -165,6 +165,13 @@ export class SearchService {
         userId: item.metadata?.userId as string,
         isPublic: (item.metadata?.isPublic ?? true) as boolean,
       }),
+      ...(item.type === "media" && {
+        name: item.title,
+        metaType: item.metadata?.metaType as number,
+        url: item.metadata?.url as string,
+        userId: item.metadata?.userId as string,
+        referenceId: item.metadata?.referenceId as string,
+      }),
     }));
 
     const searchResponse: SearchResponse = {
@@ -194,7 +201,7 @@ export class SearchService {
    * Get content by category with pagination
    */
   async getContentByCategory(
-    category: "jobs" | "resumes" | "people" | "companies",
+    category: "jobs" | "resumes" | "people" | "companies" | "media",
     page = 1,
     limit = 20,
   ): Promise<SearchResponse> {

@@ -149,16 +149,29 @@ export interface NormalizedVideoData extends BaseCardData {
   status?: "active" | "draft" | "archived";
 }
 
+// Media Card Data
+export interface NormalizedMediaData extends BaseCardData {
+  title: string;
+  name: string;
+  description: string;
+  metaType: number;
+  url: string;
+  userId?: string;
+  referenceId?: string;
+  ownership: "owned" | "tracked";
+}
+
 // Union type for all normalized card data
 export type NormalizedCardData =
   | NormalizedJobData
   | NormalizedCompanyData
   | NormalizedPersonData
   | NormalizedResumeData
-  | NormalizedVideoData;
+  | NormalizedVideoData
+  | NormalizedMediaData;
 
 // Card type discriminator
-export type CardType = "job" | "company" | "people" | "resume" | "video";
+export type CardType = "job" | "company" | "people" | "resume" | "video" | "media";
 
 // Card rendering context
 export interface CardContext {

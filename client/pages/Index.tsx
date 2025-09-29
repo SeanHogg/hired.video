@@ -128,15 +128,17 @@ export default function Index() {
   const [contentError, setContentError] = useState<string | null>(null);
 
   // Load dashboard data function
-  const loadContent = async () => {
+  const loadContent = async (category?: string) => {
     try {
       setIsLoadingContent(true);
       setContentError(null);
 
-      // Call unified search to get all content types
+      // Call unified search to get content for the selected category
+      const searchCategory = category || selectedCategory;
       const content = await searchService.searchPublicContent({
         page: 1,
         limit: 16, // Get enough items to distribute across all categories
+        category: searchCategory === "all" ? undefined : searchCategory as any,
       });
 
       setSearchResults(content);
@@ -152,6 +154,11 @@ export default function Index() {
   useEffect(() => {
     loadContent();
   }, []);
+
+  // Reload content when category changes
+  useEffect(() => {
+    loadContent(selectedCategory);
+  }, [selectedCategory]);
 
   // Action handlers
   const handleOpenActions = (item: any) => {
@@ -455,8 +462,8 @@ export default function Index() {
     { id: "all", label: "All", icon: TrendingUp },
     { id: "people", label: "People", icon: User },
     { id: "companies", label: "Companies", icon: Building2 },
-    { id: "resume", label: "Resumes", icon: User },
-    { id: "job_description", label: "Jobs", icon: Briefcase },
+    { id: "resumes", label: "Resumes", icon: User },
+    { id: "jobs", label: "Jobs", icon: Briefcase },
     { id: "media", label: "Media", icon: Play },
   ];
 
@@ -485,9 +492,11 @@ export default function Index() {
       const searchQuery = searchFilters.search || "";
       const matchesCategory =
         selectedCategory === "all" ||
-        (selectedCategory === "job_description" && item.type === "job") ||
+        (selectedCategory === "jobs" && item.type === "job") ||
         (selectedCategory === "people" && item.type === "resume") ||
-        (selectedCategory === "companies" && item.type === "company") || // Fixed company filtering
+        (selectedCategory === "companies" && item.type === "company") ||
+        (selectedCategory === "resumes" && item.type === "resume") ||
+        (selectedCategory === "media" && item.type === "media") ||
         item.type === selectedCategory;
       const matchesSearch =
         searchQuery === "" ||
@@ -726,9 +735,13 @@ export default function Index() {
                         ? "People"
                         : selectedCategory === "companies"
                           ? "Companies"
-                          : selectedCategory === "resume"
+                          : selectedCategory === "resumes"
                             ? "Resumes"
-                            : "Jobs"}
+                            : selectedCategory === "media"
+                              ? "Media"
+                              : selectedCategory === "jobs"
+                                ? "Jobs"
+                                : "Content"}
                   </h2>
                   <p className="text-muted-foreground">
                     {filteredItems.length} items found
