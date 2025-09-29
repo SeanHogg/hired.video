@@ -101,152 +101,85 @@ export class SearchService {
     params.append("page", filters.page.toString());
     params.append("limit", filters.limit.toString());
 
-    // Use the working public search endpoint (legacy) and normalize to unified SearchResponse
-    const legacyUrl = `/api/search/public?${params.toString()}`;
+    // Use the new unified search endpoint
+    const unifiedUrl = `/api/Dashboard/search/public?${params.toString()}`;
 
-    // Helper schemas for legacy shape (jobs/companies paginated collections)
-    const LegacyJobItemSchema = z.object({
+    // Schema for the unified search response
+    const UnifiedSearchItemSchema = z.object({
       id: z.string(),
-      title: z.string().optional(),
+      type: z.string(),
+      title: z.string(),
       description: z.string().optional(),
-      creationDateTimeFormatted: z.string().optional(),
-      views: z.number().optional(),
-      applications: z.number().optional(),
-      userId: z.string().optional(),
-      atsApplyUrl: z.string().optional(),
-    });
-
-    const LegacyCompanyItemSchema = z.object({
-      id: z.string(),
-      name: z.string().optional(),
-      description: z.string().optional(),
-      industry: z.string().optional(),
       location: z.string().optional(),
-      logo: z.string().optional(),
-      logoUrl: z.string().optional(),
-      creationDateTime: z.string().optional(),
-      views: z.number().optional(),
+      createdAt: z.string().optional(),
+      metadata: z.record(z.string(), z.any()).optional(),
     });
 
-    const PaginatedSchema = <T extends z.ZodTypeAny>(item: T) =>
-      z.object({
-        items: z.array(item).default([]),
-        total: z.number().default(0),
-        page: z.number().default(1),
-        limit: z.number().default(0),
-      });
-
-    const LegacySearchSchema = z.object({
-      jobs: PaginatedSchema(LegacyJobItemSchema),
-      companies: PaginatedSchema(LegacyCompanyItemSchema).optional(),
+    const UnifiedSearchResponseSchema = z.object({
+      items: z.array(UnifiedSearchItemSchema),
+      total: z.number(),
+      page: z.number(),
+      limit: z.number(),
+      totalPages: z.number(),
+      hasNextPage: z.boolean(),
+      hasPreviousPage: z.boolean(),
     });
 
-    // Legacy public search and normalize to unified SearchResponse
-    const legacyResponse = await apiClient.get<z.infer<typeof LegacySearchSchema>>(
-      legacyUrl,
-      LegacySearchSchema,
+    // Call the unified search endpoint
+    const response = await apiClient.get<z.infer<typeof UnifiedSearchResponseSchema>>(
+      unifiedUrl,
+      UnifiedSearchResponseSchema,
     );
-    const legacy = legacyResponse.data;
+    const unifiedData = response.data;
 
-    // Pull additional people and resumes to enrich homepage content
-    const [publicUsers, publicResumes] = await Promise.all([
-      // People
-      userService
-        .getPublicUsers({ page: filters.page, limit: filters.limit })
-        .catch(() => ({ items: [], total: 0 } as PaginatedPublicUsers)),
-      // Resumes
-      resumeService
-        .getPublicResumes(filters.page, filters.limit)
-        .catch(() => ({ items: [], total: 0 } as PaginatedResumes)),
-    ]);
+    // Transform the unified response to our SearchResponse format
+    const items: SearchResultItem[] = unifiedData.items.map((item) => ({
+      id: item.id,
+      type: item.type as "job" | "company" | "people" | "resume",
+      title: item.title,
+      summary: item.description || "",
+      description: item.description || "",
+      location: item.location || "",
+      createdAt: item.createdAt || "",
+      views: (item.metadata?.views as number) || 0,
+      // Add type-specific properties based on metadata
+      ...(item.type === "job" && {
+        postedDate: item.createdAt,
+        applications: item.metadata?.applications as number,
+        userId: item.metadata?.userId as string,
+        atsApplyUrl: item.metadata?.atsApplyUrl as string,
+      }),
+      ...(item.type === "company" && {
+        name: item.title,
+        industry: item.metadata?.industry as string,
+        logo: (item.metadata?.logo || item.metadata?.logoUrl) as string,
+      }),
+      ...(item.type === "people" && {
+        name: item.title,
+        headline: item.metadata?.headline as string,
+        avatar: (item.metadata?.avatar || item.metadata?.profilePictureUrl) as string,
+        openToWork: item.metadata?.openToWork as boolean,
+        slug: item.metadata?.slug as string,
+      }),
+      ...(item.type === "resume" && {
+        name: item.title,
+        slug: item.metadata?.slug as string,
+        userId: item.metadata?.userId as string,
+        isPublic: (item.metadata?.isPublic ?? true) as boolean,
+      }),
+    }));
 
-    const items: SearchResultItem[] = [
-      // Jobs
-      ...legacy.jobs.items.map((j) => ({
-        id: j.id,
-        type: "job" as const,
-        title: j.title || "Untitled Job",
-        summary: j.description || "",
-        postedDate: j.creationDateTimeFormatted,
-        createdAt: j.creationDateTimeFormatted,
-        views: j.views ?? 0,
-      })),
-      // Companies
-      ...((legacy.companies?.items || []).map((c) => ({
-        id: c.id,
-        type: "company" as const,
-        title: c.name || "Unnamed Company",
-        name: c.name || "Unnamed Company",
-        summary: c.description || "",
-        description: c.description || "",
-        industry: c.industry,
-        location: c.location,
-        logo: c.logo || c.logoUrl,
-        createdAt: c.creationDateTime,
-        views: c.views ?? 0,
-      })) || []),
-      // People (Public Users)
-      ...((publicUsers.items || []).map((u) => ({
-        id: (u as any).id || "",
-        type: "people" as const,
-        title: (u as any).fullName || "",
-        name: (u as any).fullName || "",
-        headline: (u as any).headline || undefined,
-        summary: (u as any).headline || undefined,
-        avatar: (u as any).avatar || undefined,
-        location: (u as any).location || undefined,
-        views: (u as any).profileViews || 0,
-        createdAt: (u as any).createdAt || undefined,
-      })) as SearchResultItem[]),
-      // Resumes
-      ...((publicResumes.items || []).map((r) => ({
-        id: (r as any).id || "",
-        type: "resume" as const,
-        title: (r as any).title || (r as any).name || "Untitled Resume",
-        name: (r as any).name || (r as any).title || "Untitled Resume",
-        summary: (r as any).summary || (r as any).description || "",
-        location: (r as any).location || undefined,
-        createdAt:
-          (r as any).creationDateTimeFormatted || (r as any).createdAt || undefined,
-        views: (r as any).views || 0,
-        isPublic: (r as any).isPublic ?? true,
-      })) as SearchResultItem[]),
-    ];
-
-    const jobsTotal = legacy.jobs.total ?? 0;
-    const companiesTotal = legacy.companies?.total ?? 0;
-    const peopleTotal = (publicUsers.total as number) || 0;
-    // PaginatedResumes may not include total; fall back to length
-    const resumesTotal =
-      (publicResumes.total as number) || (publicResumes.items?.length ?? 0);
-
-    const total = jobsTotal + companiesTotal + peopleTotal + resumesTotal;
-    const page = Math.max(
-      legacy.jobs.page ?? 1,
-      legacy.companies?.page ?? 1,
-      (publicUsers.page as number) || 1,
-      (publicResumes.page as number) || 1,
-    );
-    const limit = Math.max(
-      legacy.jobs.limit ?? 0,
-      legacy.companies?.limit ?? 0,
-      (publicUsers.limit as number) || 0,
-      (publicResumes.limit as number) || 0,
-      filters.limit || 0,
-    );
-    const totalPages = limit > 0 ? Math.ceil(total / limit) : 1;
-
-    const normalized: SearchResponse = {
+    const searchResponse: SearchResponse = {
       items,
-      total,
-      page,
-      limit: limit || (filters.limit || 20),
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPreviousPage: page > 1,
+      total: unifiedData.total,
+      page: unifiedData.page,
+      limit: unifiedData.limit,
+      totalPages: unifiedData.totalPages,
+      hasNextPage: unifiedData.hasNextPage,
+      hasPreviousPage: unifiedData.hasPreviousPage,
     };
 
-    return SearchResponseSchema.parse(normalized);
+    return SearchResponseSchema.parse(searchResponse);
   }
 
   /**
