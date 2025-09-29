@@ -123,7 +123,7 @@ export default function ResumeViewer({
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
   };
 
-  const getDateText = (startDate?: string, endDate?: string, treatMissingEndAsPresent: boolean = false): string | null => {
+  const getDateText = (startDate?: string, endDate?: string, treatMissingEndAsPresent = false): string | null => {
     const start = formatMMMYYYY(startDate || "");
     let end = formatMMMYYYY(endDate || "");
     if (!end && treatMissingEndAsPresent) end = "Present";

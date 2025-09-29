@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface ContentSectionProps<T> {
   title: string;
   items: T[];
-  // eslint-disable-next-line no-unused-vars
+   
   renderItem: (item: T, index: number) => React.ReactNode;
   isLoading?: boolean;
   error?: string | null;

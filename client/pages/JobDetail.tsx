@@ -23,7 +23,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -43,7 +43,6 @@ import { jobService } from "@/lib/services/job-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
-import { useLocation } from "react-router-dom";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 
 type UIJobRequirement = { skill: string; level: string; required: boolean };

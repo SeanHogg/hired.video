@@ -88,9 +88,9 @@ export function determineItemOwnership(
  * This would typically query a tracking service or check local state
  */
 function checkIfTracked(
-  // eslint-disable-next-line no-unused-vars
+   
   _item: RawApiItem | NormalizedCardData,
-  // eslint-disable-next-line no-unused-vars
+   
   _userId: string,
 ): boolean {
   // TODO: Implement actual tracking check

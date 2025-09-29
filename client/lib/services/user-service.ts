@@ -176,7 +176,7 @@ export class UserService {
       PaginatedPublicUsersSchema,
     );
 
-    const dto = response.data as any;
+    const dto = response.data;
     const items = (dto.items || dto.Items || []) as unknown[];
     const total = (dto.total ?? dto.Total ?? items.length) as number;
     const page = (dto.page ?? dto.Page ?? 1) as number;

@@ -255,7 +255,7 @@ export default function AffiliateDashboard() {
                           <td className="py-2 pr-4">{p.paidAt ? new Date(p.paidAt).toLocaleString() : "—"}</td>
                         </tr>
                       ))}
-                      {(!data || !data.payouts || data.payouts.length === 0) && (
+                      {(!data?.payouts || data.payouts.length === 0) && (
                         <tr>
                           <td className="py-3 text-muted-foreground" colSpan={5}>No payout history yet.</td>
                         </tr>

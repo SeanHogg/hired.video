@@ -35,8 +35,8 @@ export default function VideoCard({
   company,
   createdAt,
   actions,
-  userContext: _userContext, // eslint-disable-line no-unused-vars
-  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
+  userContext: _userContext,  
+  itemOwnership: _itemOwnership,  
   onView,
   onActions,
 }: VideoCardProps) {

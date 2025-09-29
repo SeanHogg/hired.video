@@ -168,7 +168,7 @@ export function CompanyCareersControl({
     enabled: !!companyQuery.data?.id,
     queryKey: [
       "company-jobs",
-      (companyQuery.data?.id as string) ?? (companyId || companySlug || "myvideoresume-company"),
+      (companyQuery.data?.id) ?? (companyId || companySlug || "myvideoresume-company"),
       maxJobs ?? null,
     ],
     queryFn: async (): Promise<CompanyJob[]> => {
@@ -207,7 +207,7 @@ export function CompanyCareersControl({
   const loading = companyQuery.isLoading || jobsQuery.isLoading;
   const error = (companyQuery.error || jobsQuery.error) ? "Failed to load jobs. Please try again later." : null;
   const company = companyQuery.data ?? null;
-  const jobs = (jobsQuery.data ?? []) as CompanyJob[];
+  const jobs = (jobsQuery.data ?? []);
 
 
 

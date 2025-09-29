@@ -18,8 +18,7 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState , useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -98,7 +97,7 @@ export default function ResumeBuilder({
   const [metaPanelOpen, setMetaPanelOpen] = useState<boolean>(initialMetaData.length > 0);
   const [slug, setSlug] = useState<string>(initialSlug);
 
-  const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto as Crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
+  const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
 
   // Ensure section Ids exist at mount so Reference dropdown has options immediately
   useEffect(() => {
@@ -764,7 +763,7 @@ export default function ResumeBuilder({
               <Label>Privacy Setting</Label>
               <Select
                 value={privacy}
-                onValueChange={(value: ResumePrivacy) => setPrivacy(value as ResumePrivacy)}
+                onValueChange={(value: ResumePrivacy) => setPrivacy(value)}
               >
                 <SelectTrigger>
                   <SelectValue />

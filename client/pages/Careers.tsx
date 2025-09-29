@@ -21,17 +21,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useSEO } from "@/lib/seo";
 // Lazy-load the heavy jobs control to avoid blocking LCP
 const CompanyCareersControl = React.lazy(() =>
   import("@/components/careers/CompanyCareersControl").then((m) => ({
     default: m.CompanyCareersControl,
   }))
 );
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { useSEO } from "@/lib/seo";
 // Lightweight skeleton for jobs section
 function JobsSkeleton() {
   return (

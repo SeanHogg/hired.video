@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { logger } from "./logger";
-import { authService, type UserProfile, type EmailVerificationChallenge } from "./services/auth-service";
-import type { TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
+import { authService, type UserProfile, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 import { apiClient } from "./api-client";
 
 // Role constants to avoid hardcoded strings
@@ -142,7 +141,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
             const status = await authService.getVerificationStatus();
             setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
           } catch (err) {
-            logger.warn?.("AuthProvider: failed to fetch verification status on init", err as any);
+            logger.warn?.("AuthProvider: failed to fetch verification status on init", err);
             setIsEmailVerified(undefined);
           }
         } else {

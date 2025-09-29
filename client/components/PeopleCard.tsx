@@ -60,8 +60,8 @@ export default function PeopleCard({
   connectionStatus = "none",
   showOwnership = false,
   actions,
-  userContext: _userContext, // eslint-disable-line no-unused-vars
-  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
+  userContext: _userContext,  
+  itemOwnership: _itemOwnership,  
   onTrack,
   onUntrack,
   onConnect,

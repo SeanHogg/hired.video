@@ -189,7 +189,7 @@ export default function JobCreatePage() {
       user.role !== USER_ROLES.EMPLOYER
     ) {
       navigate("/jobs");
-      return;
+      
     }
   }, [isAuthenticated, user, navigate]);
 

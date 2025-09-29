@@ -13,7 +13,7 @@ interface CardAction {
     | "link";
   size?: "default" | "sm" | "lg" | "icon";
   icon?: React.ComponentType<{ className?: string }>;
-  // eslint-disable-next-line no-unused-vars
+   
   onClick: (event: React.MouseEvent) => void;
   disabled?: boolean;
   loading?: boolean;

@@ -827,7 +827,7 @@ export class ResumeService {
    */
   private transformApiResumeToResume(apiResponse: any): FrontendResume {
 
-    let metaResume = apiResponse.metaResume || {};
+    const metaResume = apiResponse.metaResume || {};
     let basics = metaResume.basics || {};
     let work = metaResume.work || [];
     let education = metaResume.education || [];

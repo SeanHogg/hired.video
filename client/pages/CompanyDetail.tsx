@@ -23,7 +23,7 @@ import {
   Twitter,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -45,7 +45,6 @@ import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { useLocation } from "react-router-dom";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 
@@ -298,7 +297,7 @@ export default function CompanyDetail() {
                             <h1 className="text-2xl font-bold">
                               {company.data.name}
                             </h1>
-                            <Badge className={getStatusColor(company.status as string)}>
+                            <Badge className={getStatusColor(company.status)}>
                               {String(company.status)}
                             </Badge>
                           </div>

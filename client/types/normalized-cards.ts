@@ -39,21 +39,21 @@ export interface ItemOwnership {
 export interface CardInteractions {
   onView?: (item: NormalizedCardData) => void;
   onActions?: (item: NormalizedCardData) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onTrack?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onUntrack?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onEdit?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onDelete?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onManage?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onAssign?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onContact?: (id: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onReview?: (id: string) => void;
 }
 

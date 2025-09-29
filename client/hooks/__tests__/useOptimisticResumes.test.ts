@@ -47,8 +47,8 @@ describe('useOptimisticResumes.setPrivacyOptimistic', () => {
     act(() => result.current[1].setPrivacyOptimistic('r1', 'public'));
 
     const state = result.current[0];
-    const r1 = state.resumes.find(r => r.id === 'r1')!;
-    const r2 = state.resumes.find(r => r.id === 'r2')!;
+    const r1 = state.resumes.find(r => r.id === 'r1');
+    const r2 = state.resumes.find(r => r.id === 'r2');
     expect(r1.privacy).toBe('public');
     expect(r2.privacy).toBe('private');
   });

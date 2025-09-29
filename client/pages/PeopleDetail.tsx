@@ -29,7 +29,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -60,7 +60,6 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
-import { useLocation } from "react-router-dom";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 
 import ResumeCard from "@/components/ResumeCard";
@@ -708,8 +707,8 @@ export default function PeopleDetail() {
                                   createdAt={activePublicResume.CreationDateTimeFormatted || activePublicResume.createdAt || new Date().toISOString()}
                                   views={activePublicResume.Views || activePublicResume.views || 0}
                                   privacy="public"
-                                  isMaster={activePublicResume.IsMaster || (activePublicResume as any).isMaster || false}
-                                  isActive={(activePublicResume as any).isActive || false}
+                                  isMaster={activePublicResume.IsMaster || (activePublicResume).isMaster || false}
+                                  isActive={(activePublicResume).isActive || false}
                                   ownership="tracked"
                                   onView={() => {
                                     const resumeId = activePublicResume.Id || activePublicResume.id;

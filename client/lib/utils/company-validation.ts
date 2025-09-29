@@ -42,8 +42,8 @@ export function isValidCompanyName(name: string | null | undefined): boolean {
  */
 export function filterValidCompanies<T extends Record<string, any>>(
   companies: T[], 
-  nameProperty: string = 'name',
-  excludeDemo: boolean = true
+  nameProperty = 'name',
+  excludeDemo = true
 ): T[] {
   return companies.filter(company => {
     const hasValidName = isValidCompanyName(company[nameProperty]);

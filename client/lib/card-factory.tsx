@@ -73,7 +73,7 @@ export function useCardRenderer({
     [section, effectiveUserContext, showOwnership, maxItems, interactions],
   );
 
-  // eslint-disable-next-line no-unused-vars
+   
   const renderCard = React.useCallback(
     (item: RawApiItem, _index: number) => {
       const cardType = getCardType(item);

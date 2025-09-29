@@ -890,7 +890,7 @@ export default function Index() {
           if (!id) return;
           try {
             // If it's a variant, call promote endpoint; if it's an orphan (no parentId), set as master
-            const isVariant = Boolean((actionsModal.item as any)?.parentId);
+            const isVariant = Boolean((actionsModal.item)?.parentId);
             if (isVariant) {
               const ok = await resumeService.promoteVariantToMaster(id);
               if (ok) {

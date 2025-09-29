@@ -25,9 +25,9 @@ interface JobCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
-  // eslint-disable-next-line no-unused-vars
+   
   onTrack?: (_jobId: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onUntrack?: (_jobId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -37,10 +37,10 @@ export default function JobCard({
   job,
   showOwnership = false,
   actions,
-  userContext: _userContext, // eslint-disable-line no-unused-vars
-  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
-  onTrack: _onTrack, // eslint-disable-line no-unused-vars
-  onUntrack: _onUntrack, // eslint-disable-line no-unused-vars
+  userContext: _userContext,  
+  itemOwnership: _itemOwnership,  
+  onTrack: _onTrack,  
+  onUntrack: _onUntrack,  
   onView,
   onActions,
 }: JobCardProps) {

@@ -31,9 +31,9 @@ interface CompanyCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
-  // eslint-disable-next-line no-unused-vars
+   
   onTrack?: (_companyId: string) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onUntrack?: (_companyId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -43,10 +43,10 @@ export default function CompanyCard({
   company,
   showOwnership = false,
   actions,
-  userContext: _userContext, // eslint-disable-line no-unused-vars
-  itemOwnership: _itemOwnership, // eslint-disable-line no-unused-vars
-  onTrack: _onTrack, // eslint-disable-line no-unused-vars
-  onUntrack: _onUntrack, // eslint-disable-line no-unused-vars
+  userContext: _userContext,  
+  itemOwnership: _itemOwnership,  
+  onTrack: _onTrack,  
+  onUntrack: _onUntrack,  
   onView,
   onActions,
 }: CompanyCardProps) {
