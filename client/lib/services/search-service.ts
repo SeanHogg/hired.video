@@ -5,8 +5,6 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import { userService, type PaginatedPublicUsers } from "./user-service";
-import { resumeService, type PaginatedResumes } from "./resume-service";
 
 // ============================================================================
 // SCHEMAS

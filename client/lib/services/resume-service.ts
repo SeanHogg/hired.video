@@ -500,31 +500,7 @@ export class ResumeService {
     };
   }
 
-  /**
-   * Get metadata from public, active resumes for content discovery
-   */
-  async getPublicResumeMetadata(limit = 20): Promise<ResumeSectionMeta[]> {
-    const params = new URLSearchParams({
-      limit: limit.toString(),
-    });
 
-    const response = await apiClient.get<any>(
-      `/api/Resume/public/metadata?${params.toString()}`,
-      z.any(),
-    );
-
-    // Transform the API response to match the expected ResumeSectionMeta interface
-    return response.data?.map((item: any) => ({
-      id: item.id,
-      userId: item.userId,
-      referenceId: item.referenceId,
-      name: item.name,
-      metaType: item.metaType,
-      url: item.url,
-      description: item.description || "",
-      creationDateTime: item.creationDateTime,
-    })) || [];
-  }
 
   /**
    * Get resumes owned by current user

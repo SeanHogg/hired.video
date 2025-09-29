@@ -56,9 +56,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import VideoCard from "@/components/VideoCard";
+import MediaCard from "@/components/MediaCard";
 import PeopleCard from "@/components/PeopleCard";
 import SearchBar from "@/components/SearchBar";
-import MediaSection from "@/components/MediaSection";
+
 import Pagination, { usePagination } from "@/components/Pagination";
 import ContentSection from "@/components/ui/ContentSection";
 import { useCardRenderer } from "@/lib/card-factory";
@@ -352,6 +353,32 @@ export default function Index() {
                 views: item.views || 0,
               },
             };
+          case "media":
+            // Handle media content (videos, images from resumes)
+            const metaType = Array.isArray(item.skills) ? item.skills[0] : item.skills; // MetaType stored in skills field
+            const userId = item.location; // UserId stored in location field
+            const resumeId = item.company; // ReferenceId stored in company field
+            const mediaUrl = item.experienceLevel; // URL stored in experience level field
+
+            return {
+              id: item.id,
+              name: item.name || "Media Content",
+              title: item.name || "Media Content",
+              summary: item.summary || item.description || "Media from resume",
+              views: item.views || 0,
+              type: "media" as const,
+              contentType: metaType?.toLowerCase?.().includes("video") ? "video" : "image" as const,
+              profession: "Content Creator", // Generic profession for media
+              company: "MyVideoResume", // Platform name
+              createdAt: item.createdAt || new Date().toISOString(),
+              // Media-specific properties
+              mediaType: metaType,
+              mediaUrl: mediaUrl,
+              thumbnail: item.avatar, // Thumbnail stored in avatar field
+              ownerId: userId,
+              resumeId: resumeId,
+              isFeatured: item.isFeatured || false,
+            };
           default:
             return null;
         }
@@ -430,6 +457,7 @@ export default function Index() {
     { id: "companies", label: "Companies", icon: Building2 },
     { id: "resume", label: "Resumes", icon: User },
     { id: "job_description", label: "Jobs", icon: Briefcase },
+    { id: "media", label: "Media", icon: Play },
   ];
 
   const allContentItems = contentItems;
@@ -853,12 +881,7 @@ export default function Index() {
           </div>
         </section>
 
-        {/* Featured Media Section */}
-        <section className="py-8 px-4 sm:px-6 lg:px-8 bg-muted/30">
-          <div className="max-w-7xl mx-auto">
-            <MediaSection limit={12} />
-          </div>
-        </section>
+
 
         <Footer />
       </div>
