@@ -12,7 +12,7 @@ import { apiClient } from "../api-client";
 
 export const SearchResultItemSchema = z.object({
   id: z.string(),
-  type: z.enum(["job", "resume", "people", "company"]),
+  type: z.enum(["job", "resume", "people", "company", "media"]),
   title: z.string().default("").optional(),
   name: z.string().default("").optional(),
   summary: z.string().default("").optional(),
@@ -133,7 +133,7 @@ export class SearchService {
     // Transform the unified response to our SearchResponse format
     const items: SearchResultItem[] = unifiedData.items.map((item) => ({
       id: item.id,
-      type: item.type as "job" | "company" | "people" | "resume",
+      type: item.type as "job" | "company" | "people" | "resume" | "media",
       title: item.title,
       summary: item.description || "",
       description: item.description || "",
