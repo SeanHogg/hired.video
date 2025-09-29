@@ -293,12 +293,9 @@ export class JobService {
   /**
    * Get job by slug (for SEO-friendly URLs)
    */
-  async getJobBySlug(slug: string): Promise<Job> {
-    const response = await apiClient.get<Job>(
-      `/api/Job/slug/${slug}`,
-      JobSchema,
-    );
-
+  async getJobBySlug(slug: string): Promise<any> {
+    // Bypass strict client-side schema; backend returns JobItemEntity shape
+    const response = await apiClient.get<any>(`/api/Job/slug/${slug}`);
     return response.data;
   }
 
