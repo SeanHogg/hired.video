@@ -25,6 +25,7 @@ import {
   UserCheck,
   FolderOpen,
   Trophy,
+  MoreHorizontal,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -36,6 +37,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -44,6 +51,7 @@ import type { Resume , ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import ResumeTimelines from "@/components/ResumeTimelines";
 import { MetaBadge } from "@/components/MetaBadge";
+import MetadataModal from "@/components/MetadataModal";
 
 
 interface TimelineItemProps {
@@ -162,6 +170,15 @@ export default function ResumeDetail() {
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Metadata modal state
+  const [metadataModal, setMetadataModal] = useState<{
+    open: boolean;
+    initialMetadata: ResumeSectionMeta[];
+  }>({
+    open: false,
+    initialMetadata: [],
+  });
+
   const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
     if (!resume?.metaData || resume.metaData.length === 0) return [];
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
@@ -221,6 +238,28 @@ export default function ResumeDetail() {
   }, [id]);
 
   const isOwner = user?.id === resume?.userId;
+
+  const handleAddMedia = () => {
+    if (!resume) return;
+    setMetadataModal({
+      open: true,
+      initialMetadata: resume.metaData || [],
+    });
+  };
+
+  const handleSaveMetadata = async (metadata: ResumeSectionMeta[]) => {
+    if (!resume?.id) return;
+
+    try {
+      await resumeService.updateResumeMetadata(resume.id, metadata);
+      // Refresh the resume data
+      const updatedResume = await resumeService.getResumeById(resume.id);
+      setResume(updatedResume);
+    } catch (error) {
+      console.error("Failed to save metadata:", error);
+      throw error; // Re-throw to prevent modal from closing
+    }
+  };
 
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
@@ -383,24 +422,35 @@ export default function ResumeDetail() {
                     </Badge>
                   </div>
 
-                  {isOwner && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => navigate(`/resumes/edit/${resume.id}`)}
-                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Resume
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isOwner && (
+                        <>
+                          <DropdownMenuItem onClick={() => navigate(`/resumes/edit/${resume.id}`)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Resume
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleAddMedia}>
+                            <Share2 className="w-4 h-4 mr-2" />
+                            Add Media
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuItem>
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
@@ -1178,6 +1228,17 @@ export default function ResumeDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Metadata Modal */}
+      {resume && (
+        <MetadataModal
+          open={metadataModal.open}
+          onOpenChange={(open) => setMetadataModal(prev => ({ ...prev, open }))}
+          resumeId={resume.id}
+          initialMetadata={metadataModal.initialMetadata}
+          onSave={handleSaveMetadata}
+        />
+      )}
     </div>
   );
 }

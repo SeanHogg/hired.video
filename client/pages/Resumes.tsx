@@ -65,6 +65,7 @@ import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
 import CreateVariationDialog from "@/components/CreateVariationDialog";
+import MetadataModal from "@/components/MetadataModal";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -175,6 +176,17 @@ export default function Resumes() {
   }>({
     isOpen: false,
     item: null,
+  });
+
+  // Metadata modal state
+  const [metadataModal, setMetadataModal] = useState<{
+    open: boolean;
+    resumeId: string | null;
+    initialMetadata: any[];
+  }>({
+    open: false,
+    resumeId: null,
+    initialMetadata: [],
   });
 
   // Consolidated fetch
@@ -579,6 +591,47 @@ export default function Resumes() {
     setResumes(updatedResumes);
     setSuccessMessage("Resume set as active!");
     setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handleAddMedia = async (resume: ResumeWithOwnership) => {
+    try {
+      // Get the full resume data to access metadata
+      const fullResume = await resumeService.getResumeById(resume.id);
+      setMetadataModal({
+        open: true,
+        resumeId: resume.id,
+        initialMetadata: fullResume.metaData || [],
+      });
+    } catch (error) {
+      console.error("Failed to load resume metadata:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load resume data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveMetadata = async (metadata: any[]) => {
+    if (!metadataModal.resumeId) return;
+
+    try {
+      await resumeService.updateResumeMetadata(metadataModal.resumeId, metadata);
+      toast({
+        title: "Success",
+        description: "Resume media updated successfully!",
+      });
+      // Refresh the resume list
+      await loadResumes();
+    } catch (error) {
+      console.error("Failed to save metadata:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save resume media",
+        variant: "destructive",
+      });
+      throw error; // Re-throw to prevent modal from closing
+    }
   };
 
   const getActiveResume = () => {
@@ -1385,6 +1438,9 @@ export default function Resumes() {
                                       <DropdownMenuItem onClick={() => navigate(`/resumes/edit/${resume.id}`)}>
                                         Edit Resume
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleAddMedia(resume)}>
+                                        Add Media
+                                      </DropdownMenuItem>
                                       {!resume.isActive && (
                                         <DropdownMenuItem onClick={() => handleSetActiveResume(resume.id)}>
                                           Set as Active
@@ -1660,6 +1716,15 @@ export default function Resumes() {
         masterResumeId={variationDialog.masterResumeId}
         masterResumeName={variationDialog.masterResumeName}
         onVariationCreated={handleVariationCreated}
+      />
+
+      {/* Metadata Modal */}
+      <MetadataModal
+        open={metadataModal.open}
+        onOpenChange={(open) => setMetadataModal(prev => ({ ...prev, open }))}
+        resumeId={metadataModal.resumeId || ""}
+        initialMetadata={metadataModal.initialMetadata}
+        onSave={handleSaveMetadata}
       />
     </div>
   );

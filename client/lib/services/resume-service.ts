@@ -718,7 +718,6 @@ export class ResumeService {
       data?: ResumeData;
       privacy?: ResumePrivacy;
       isMaster?: boolean;
-      metaData?: ResumeSectionMeta[];
       slug?: string;
     },
   ): Promise<FrontendResume> {
@@ -737,6 +736,22 @@ export class ResumeService {
     // Transform the response back to frontend format
     return this.transformApiResumeToResume(response.data);
     }
+
+  /**
+   * Update only the metadata for a resume
+   */
+  async updateResumeMetadata(
+    id: string,
+    metadata: ResumeSectionMeta[],
+  ): Promise<FrontendResume> {
+    const response = await apiClient.put<any>(
+      `/api/Resume/${id}/metadata`,
+      metadata,
+      z.any(),
+    );
+
+    return this.transformApiResumeToResume(response.data);
+  }
 
     /**
      * Validate slug for current user; optionally pass current resumeId to allow existing slug

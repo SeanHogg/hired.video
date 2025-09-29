@@ -238,8 +238,6 @@ export default function ResumeEditPage() {
               initialName={resume.name}
               initialPrivacy={resume.privacy}
               initialIsMaster={resume.isMaster}
-              initialMetaData={resume.metaData || []}
-              ownerUserId={resume.userId}
               initialSlug={resume.slug}
               onSave={handleUpdateResume}
               onCancel={handleCancel}

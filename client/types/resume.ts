@@ -202,7 +202,6 @@ export interface CreateResumeRequest {
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
-  metaData?: ResumeSectionMeta[];
   slug?: string; // Optional vanity slug
 }
 

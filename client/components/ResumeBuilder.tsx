@@ -50,9 +50,7 @@ import type {
   Award as AwardType,
   Certificate,
   Publication,
-  ResumeSectionMeta,
 } from "@/types/resume";
-import { MetaType } from "@/types/resume";
 import {
   WorkExperienceSection,
   EducationSection,
@@ -74,8 +72,6 @@ interface ResumeBuilderProps {
   initialName?: string;
   initialPrivacy?: ResumePrivacy;
   initialIsMaster?: boolean;
-  initialMetaData?: ResumeSectionMeta[];
-  ownerUserId?: string;
   initialSlug?: string;
 }
 
@@ -86,15 +82,11 @@ export default function ResumeBuilder({
   initialName = "",
   initialPrivacy = "private",
   initialIsMaster = false,
-  initialMetaData = [],
-  ownerUserId,
   initialSlug = "",
 }: ResumeBuilderProps) {
   const [resumeName, setResumeName] = useState(initialName);
   const [privacy, setPrivacy] = useState<ResumePrivacy>(initialPrivacy);
   const [isMaster, setIsMaster] = useState(initialIsMaster);
-  const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetaData);
-  const [metaPanelOpen, setMetaPanelOpen] = useState<boolean>(initialMetaData.length > 0);
   const [slug, setSlug] = useState<string>(initialSlug);
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
@@ -168,137 +160,8 @@ export default function ResumeBuilder({
     })));
   };
 
-  const addMeta = () => {
-    // Ensure we have IDs for basics and sections before creating a meta row
-    ensureIdsForSections();
 
-    const newMeta: ResumeSectionMeta = {
-      id: tryUuid(),
-      userId: ownerUserId || "",
-      referenceId: basics.Id || "",
-      name: "",
-      metaType: MetaType.Hyperlink,
-      url: "",
-      description: "",
-    };
-    setMetaData(prev => [...prev, newMeta]);
-  };
 
-  const updateMeta = (index: number, field: keyof ResumeSectionMeta, value: string | number) => {
-    setMetaData(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } as ResumeSectionMeta : m));
-  };
-
-  const removeMeta = (index: number) => {
-    setMetaData(prev => prev.filter((_, i) => i !== index));
-  };
-  // Collapsible metadata panel shown under each tab's edit form
-  const MetadataPanel = () => (
-    <div className="mt-2">
-      <Collapsible open={metaPanelOpen} onOpenChange={setMetaPanelOpen}>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Section Metadata</CardTitle>
-          <CollapsibleTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <ChevronDown className="h-3.5 w-3.5" />
-            <span>
-              {metaData.length > 0 ? `Show details (${metaData.length})` : "Add details"}
-            </span>
-          </CollapsibleTrigger>
-        </div>
-        <CollapsibleContent asChild>
-          <div>
-            <div className="flex justify-between mt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  addMeta();
-                  setMetaPanelOpen(true);
-                }}
-              >
-                Add Metadata
-              </Button>
-            </div>
-            {metaData.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No metadata added. Use "Add Metadata" to associate links, images, or videos with resume sections.</p>
-            ) : (
-              <div className="space-y-3">
-                {metaData.map((m, i) => (
-                  <div key={m.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 border rounded-lg p-3">
-                    <div className="md:col-span-2">
-                      <Label>Label</Label>
-                      <Input value={m.name} onChange={(e) => updateMeta(i, "name", e.target.value)} placeholder="e.g., Demo Reel" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label>URL</Label>
-                      <Input value={m.url} onChange={(e) => updateMeta(i, "url", e.target.value)} placeholder="https://..." />
-                    </div>
-                    <div>
-                      <Label>Type</Label>
-                      <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={String(MetaType.Hyperlink)}>Link</SelectItem>
-                          <SelectItem value={String(MetaType.Image)}>Image</SelectItem>
-                          <SelectItem value={String(MetaType.YouTube)}>YouTube</SelectItem>
-                          <SelectItem value={String(MetaType.VideoMP4)}>Video (MP4)</SelectItem>
-                          <SelectItem value={String(MetaType.VideoWebM)}>Video (WebM)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Reference</Label>
-                      <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose section" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* Basics */}
-                          {!!basics?.Name?.trim() && basics.Id && (
-                            <SelectItem value={basics.Id}>Basics</SelectItem>
-                          )}
-
-                          {/* Work */}
-                          {work.filter(w => (w.Name?.trim() || w.Position?.trim())).map((w, wi) => (
-                            w.Id ? (
-                              <SelectItem key={`w-${w.Id}`} value={w.Id}>{`Work ${wi + 1}: ${w.Position || w.Name || w.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-
-                          {/* Education */}
-                          {education.filter(e => e.Institution?.trim()).map((e, ei) => (
-                            e.Id ? (
-                              <SelectItem key={`e-${e.Id}`} value={e.Id}>{`Edu ${ei + 1}: ${e.Institution || e.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-
-                          {/* Skills */}
-                          {skills.filter(s => s.Name?.trim()).map((s, si) => (
-                            s.Id ? (
-                              <SelectItem key={`s-${s.Id}`} value={s.Id}>{`Skill ${si + 1}: ${s.Name || s.Id}`}</SelectItem>
-                            ) : null
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-6">
-                      <Label>Description</Label>
-                      <Textarea rows={2} value={m.description || ""} onChange={(e) => updateMeta(i, "description", e.target.value)} placeholder="Optional note shown in viewer modal" />
-                    </div>
-                    <div className="md:col-span-6 flex justify-end">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeMeta(i)}>Remove</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
-  );
 
 
   const [basics, setBasics] = useState({
@@ -723,7 +586,6 @@ export default function ResumeBuilder({
         data: resumeData,
         privacy,
         isMaster,
-        metaData,
         slug: slug?.trim() || undefined,
       };
 
@@ -936,7 +798,7 @@ export default function ResumeBuilder({
 
             </CardContent>
           </Card>
-          <MetadataPanel />
+
         </TabsContent>
 
         <TabsContent value="work">
@@ -950,8 +812,7 @@ export default function ResumeBuilder({
             onUpdateHighlight={updateHighlight}
             onRemoveHighlight={removeHighlight}
           />
-                  {/* Metadata below Work */}
-        <MetadataPanel />
+
         </TabsContent>
 
 
@@ -963,11 +824,7 @@ export default function ResumeBuilder({
             onUpdate={updateEducation}
             onRemove={removeEducation}
           />
-          <MetadataPanel />
         </TabsContent>
-
-
-
 
         <TabsContent value="skills">
           <SkillsSection
@@ -976,11 +833,7 @@ export default function ResumeBuilder({
             onUpdate={updateSkill}
             onRemove={removeSkill}
           />
-          <MetadataPanel />
         </TabsContent>
-        {/* Metadata below Volunteer */}
-
-
 
         <TabsContent value="volunteer">
           <VolunteerSection
@@ -989,8 +842,6 @@ export default function ResumeBuilder({
             onUpdate={updateVolunteer}
             onRemove={removeVolunteer}
           />
-          {/* Metadata below Volunteer */}
-          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="projects">
@@ -1000,23 +851,15 @@ export default function ResumeBuilder({
             onUpdate={updateProject}
             onRemove={removeProject}
           />
-          {/* Metadata below Projects */}
-          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="languages">
-        {/* Metadata below Languages */}
-
-
           <LanguagesSection
             languages={languages}
             onAdd={addLanguage}
             onUpdate={updateLanguage}
             onRemove={removeLanguage}
           />
-        {/* Metadata below Awards */}
-        <MetadataPanel />
-
         </TabsContent>
 
         <TabsContent value="awards">
@@ -1026,8 +869,6 @@ export default function ResumeBuilder({
             onUpdate={updateAward}
             onRemove={removeAward}
           />
-          {/* Metadata below Awards */}
-          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="certificates">
@@ -1037,11 +878,7 @@ export default function ResumeBuilder({
             onUpdate={updateCertificate}
             onRemove={removeCertificate}
           />
-          <MetadataPanel />
         </TabsContent>
-        {/* Metadata below Certificates */}
-
-
 
         <TabsContent value="publications">
           <PublicationsSection
@@ -1050,8 +887,6 @@ export default function ResumeBuilder({
             onUpdate={updatePublication}
             onRemove={removePublication}
           />
-          {/* Metadata below Publications */}
-          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="interests">
@@ -1061,8 +896,6 @@ export default function ResumeBuilder({
             onUpdate={updateInterest}
             onRemove={removeInterest}
           />
-          {/* Metadata below Interests */}
-          <MetadataPanel />
         </TabsContent>
 
         <TabsContent value="references">
@@ -1072,9 +905,7 @@ export default function ResumeBuilder({
             onUpdate={updateReference}
             onRemove={removeReference}
           />
-           <MetadataPanel />
         </TabsContent>
-        {/* Metadata below References */}
 
 
       </Tabs>
