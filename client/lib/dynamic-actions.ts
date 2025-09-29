@@ -30,6 +30,7 @@ import type {
   UserContext,
   ItemOwnership,
   NormalizedCardData,
+  NormalizedJobData,
   CardInteractions,
 } from "@/types/normalized-cards";
 
@@ -96,23 +97,26 @@ export function generateJobActions(
       priority: 5,
     });
 
-    // Job-specific owner actions
-    if (job.status === "active") {
-      actions.push({
-        id: "pause",
-        label: "Pause",
-        icon: Pause,
-        onClick: () => handleJobStatusChange(job.id, "paused"),
-        priority: 3,
-      });
-    } else if (job.status === "paused") {
-      actions.push({
-        id: "activate",
-        label: "Activate",
-        icon: Play,
-        onClick: () => handleJobStatusChange(job.id, "active"),
-        priority: 3,
-      });
+    // Job-specific owner actions (only for job cards)
+    if (job.type === "job") {
+      const jobData = job as NormalizedJobData;
+      if (jobData.status === "active") {
+        actions.push({
+          id: "pause",
+          label: "Pause",
+          icon: Pause,
+          onClick: () => handleJobStatusChange(job.id, "paused"),
+          priority: 3,
+        });
+      } else if (jobData.status === "paused") {
+        actions.push({
+          id: "activate",
+          label: "Activate",
+          icon: Play,
+          onClick: () => handleJobStatusChange(job.id, "active"),
+          priority: 3,
+        });
+      }
     }
 
     actions.push({

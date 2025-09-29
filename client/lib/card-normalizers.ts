@@ -12,6 +12,7 @@ import type {
   NormalizedPersonData,
   NormalizedResumeData,
   NormalizedVideoData,
+  NormalizedMediaData,
   CardContext,
   CardType,
 } from "@/types/normalized-cards";
@@ -244,6 +245,7 @@ export function normalizeMediaData(
     updatedAt: item.updatedAt || new Date().toISOString(),
     views: item.views || 0,
     slug: item.slug || `media-${item.id}`,
+    showOwnership: context.showOwnership ?? false,
     ownership:
       determineOwnership(item, context) === "none"
         ? "tracked"
