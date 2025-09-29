@@ -122,6 +122,7 @@ export default function Index() {
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(
     null,
   );
+
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
 
@@ -130,11 +131,13 @@ export default function Index() {
     try {
       setIsLoadingContent(true);
       setContentError(null);
-      // Call unified search once to get all content types
+
+      // Call unified search to get all content types
       const content = await searchService.searchPublicContent({
         page: 1,
         limit: 16, // Get enough items to distribute across all categories
       });
+
       setSearchResults(content);
     } catch (error) {
       console.error("Failed to load homepage content:", error);
