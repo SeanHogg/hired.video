@@ -252,10 +252,18 @@ export function useCardRenderer({
         case "media":
           const mediaData = normalizeMediaData(item, context);
 
+          // Try to extract resume ID from the item data
+          // Note: Currently the search API doesn't provide resume ID directly for media items
+          // The referenceId points to a resume section, not the resume itself
+          const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
+
+          // For media items, also try to get the owner's user ID for fallback navigation
+          const ownerId = (item as any).ownerId || (item as any).userId || mediaData.userId;
+
           // Convert normalized media data to MediaCard format
           const mediaCardData = {
             id: mediaData.id,
-            userId: mediaData.userId,
+            userId: mediaData.userId || ownerId, // Use ownerId as fallback
             referenceId: mediaData.referenceId,
             name: mediaData.name,
             metaType: mediaData.metaType,
@@ -264,10 +272,7 @@ export function useCardRenderer({
             creationDateTime: mediaData.createdAt,
           };
 
-          // Try to extract resume ID from the item data
-          // Note: Currently the search API doesn't provide resume ID directly for media items
-          // The referenceId points to a resume section, not the resume itself
-          const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
+
 
 
 
