@@ -213,6 +213,11 @@ export default function JobDetail() {
         if (isMounted) setLoading(false);
       }
     };
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [slug]);
 
   // SEO: compute and apply at top-level to respect Rules of Hooks
   const jobSeoTitle = job
@@ -245,12 +250,6 @@ export default function JobDetail() {
     ogDescription: jobSeoDescription,
     structuredData: jobStructuredData,
   });
-
-    run();
-    return () => {
-      isMounted = false;
-    };
-  }, [slug]);
 
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);
