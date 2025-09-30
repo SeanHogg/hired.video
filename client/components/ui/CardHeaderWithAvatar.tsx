@@ -46,7 +46,7 @@ export function CardHeaderWithAvatar({
   avatar,
   badges = [],
   linkTo,
-  className = "",
+
   titleClassName = "",
   subtitleClassName = "",
   layout = "horizontal",
