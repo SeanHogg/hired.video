@@ -238,26 +238,30 @@ export default function PeopleDetail() {
     };
   }, [userProfile?.id]);
 
-  // SEO: when profile loads, update title/description and structured data
-  useEffect(() => {
-    if (!userProfile) return;
-    const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
-    const title = `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | MyVideoResu.me`;
-    const description = userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`;
-    useSEO(location.pathname, {
-      title,
-      description,
-      ogTitle: title,
-      ogDescription: description,
-      structuredData: generateStructuredData.person({
+  // SEO: update title/description and structured data at top-level (hooks must not be called inside callbacks)
+  const fullName = userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : '';
+  const seoTitle = userProfile
+    ? `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | MyVideoResu.me`
+    : undefined;
+  const seoDescription = userProfile
+    ? userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`
+    : undefined;
+  const structuredData = userProfile
+    ? generateStructuredData.person({
         name: fullName,
         title: getRoleDisplayLabel(userProfile.role),
         bio: userProfile.bio,
         avatar: userProfile.profilePicture,
         id: userProfile.id,
-      }),
-    });
-  }, [userProfile, location.pathname]);
+      })
+    : undefined;
+  useSEO(location.pathname, {
+    title: seoTitle,
+    description: seoDescription,
+    ogTitle: seoTitle,
+    ogDescription: seoDescription,
+    structuredData,
+  });
 
   // Track profile view when profile loads
   useEffect(() => {
