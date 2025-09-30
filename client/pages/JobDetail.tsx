@@ -213,17 +213,16 @@ export default function JobDetail() {
         if (isMounted) setLoading(false);
       }
     };
-  // SEO: update when job is loaded
-  useEffect(() => {
-    if (!job) return;
-    const title = `${job.data.title} at ${job.data.company.name} | MyVideoResu.me`;
-    const description = `${job.data.title} at ${job.data.company.name}${job.data.location?.remote ? " (Remote)" : job.data.location?.city ? ` in ${job.data.location.city}, ${job.data.location.state}` : ""}. ${job.data.description?.slice(0, 150)}`;
-    useSEO(location.pathname, {
-      title,
-      description,
-      ogTitle: title,
-      ogDescription: description,
-      structuredData: generateStructuredData.jobPosting({
+
+  // SEO: compute and apply at top-level to respect Rules of Hooks
+  const jobSeoTitle = job
+    ? `${job.data.title} at ${job.data.company.name} | MyVideoResu.me`
+    : undefined;
+  const jobSeoDescription = job
+    ? `${job.data.title} at ${job.data.company.name}${job.data.location?.remote ? " (Remote)" : job.data.location?.city ? ` in ${job.data.location.city}, ${job.data.location.state}` : ""}. ${job.data.description?.slice(0, 150)}`
+    : undefined;
+  const jobStructuredData = job
+    ? generateStructuredData.jobPosting({
         title: job.data.title,
         description: job.data.description,
         postedDate: job.createdAt,
@@ -236,9 +235,16 @@ export default function JobDetail() {
           job.data.salaryMin && job.data.salaryMax
             ? `${(job.data.salaryMin / 1000).toFixed(0)}k-${(job.data.salaryMax / 1000).toFixed(0)}k`
             : undefined,
-      }),
-    });
-  }, [job, location.pathname]);
+      })
+    : undefined;
+
+  useSEO(location.pathname, {
+    title: jobSeoTitle,
+    description: jobSeoDescription,
+    ogTitle: jobSeoTitle,
+    ogDescription: jobSeoDescription,
+    structuredData: jobStructuredData,
+  });
 
     run();
     return () => {
