@@ -128,17 +128,19 @@ export default function Index() {
   const [contentError, setContentError] = useState<string | null>(null);
 
   // Load dashboard data function
-  const loadContent = async (category?: string) => {
+  const loadContent = async (category?: string, pageArg?: number, limitArg?: number) => {
     try {
       setIsLoadingContent(true);
       setContentError(null);
 
       // Call unified search to get content for the selected category
       const searchCategory = category || selectedCategory;
+      const pageToUse = typeof pageArg === "number" ? pageArg : 1;
+      const limitToUse = typeof limitArg === "number" ? limitArg : 12;
       const content = await searchService.searchPublicContent({
-        page: 1,
-        limit: 16, // Get enough items to distribute across all categories
-        category: searchCategory === "all" ? undefined : searchCategory as any,
+        page: pageToUse,
+        limit: limitToUse,
+        category: searchCategory === "all" ? undefined : (searchCategory as any),
       });
 
       setSearchResults(content);
@@ -155,10 +157,7 @@ export default function Index() {
     loadContent();
   }, []);
 
-  // Reload content when category changes
-  useEffect(() => {
-    loadContent(selectedCategory);
-  }, [selectedCategory]);
+
 
   // Action handlers
   const handleOpenActions = (item: any) => {
@@ -263,7 +262,7 @@ export default function Index() {
             if ((item as any).isDemo) {
               return null;
             }
-            
+
             return {
               id: item.id,
               name: item.name ?? item.title ?? "",
@@ -287,11 +286,11 @@ export default function Index() {
           case "company":
             // Filter out companies with invalid names and demo companies
             const companyName = item.name ?? item.title ?? "";
-            
+
             if (!isValidCompanyName(companyName) || (item as any).isDemo) {
               return null; // Filter out invalid or demo companies
             }
-            
+
             return {
               id: item.id,
               name: companyName,
@@ -588,6 +587,13 @@ export default function Index() {
   const paginatedItems = hasClientSideFiltering
     ? filteredItems.slice(startIndex, endIndex)
     : filteredItems; // Backend already paginated these
+
+  // Refetch when page or page size changes (server-side pagination) and no client-side filtering is applied
+  React.useEffect(() => {
+    if (!hasClientSideFiltering) {
+      loadContent(selectedCategory, currentPage, itemsPerPage);
+    }
+  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering]);
 
   // Calculate total views from search results
   const totalViews = searchResults
