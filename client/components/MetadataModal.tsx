@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ResumeSectionMeta, MetaType } from "@/types/resume";
+import { ResumeSectionMeta, MetaType, Resume } from "@/types/resume";
+import { resumeService } from "@/lib/services/resume-service";
 
 interface MetadataModalProps {
   open: boolean;
@@ -37,6 +38,8 @@ export default function MetadataModal({
 }: MetadataModalProps) {
   const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetadata);
   const [saving, setSaving] = useState(false);
+  const [resume, setResume] = useState<Resume | null>(null);
+  const [loadingResume, setLoadingResume] = useState(false);
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
 
@@ -46,6 +49,25 @@ export default function MetadataModal({
       setMetaData(initialMetadata);
     }
   }, [open, initialMetadata]);
+
+  // Fetch resume data when modal opens
+  useEffect(() => {
+    const fetchResume = async () => {
+      if (open && resumeId && !resume) {
+        setLoadingResume(true);
+        try {
+          const resumeData = await resumeService.getResumeById(resumeId);
+          setResume(resumeData);
+        } catch (error) {
+          console.error("Failed to fetch resume data:", error);
+        } finally {
+          setLoadingResume(false);
+        }
+      }
+    };
+
+    fetchResume();
+  }, [open, resumeId, resume]);
 
   const addMeta = () => {
     const newMeta: ResumeSectionMeta = {
@@ -67,6 +89,83 @@ export default function MetadataModal({
   const removeMeta = (index: number) => {
     setMetaData(prev => prev.filter((_, i) => i !== index));
   };
+
+  // Generate section options from actual resume data
+  const getSectionOptions = () => {
+    const options: { value: string; label: string; group: string }[] = [];
+
+    if (!resume?.data) {
+      return options;
+    }
+
+    // Basics section
+    if (resume.data.Basics?.Id) {
+      options.push({
+        value: resume.data.Basics.Id,
+        label: `${resume.data.Basics.Name || 'Profile'} (Basics)`,
+        group: 'Profile'
+      });
+    }
+
+    // Work Experience
+    resume.data?.Work?.forEach((work, index) => {
+      if (work.Id) {
+        options.push({
+          value: work.Id,
+          label: `${work.Position || `Work ${index + 1}`} at ${work.Name || 'Company'}`,
+          group: 'Work Experience'
+        });
+      }
+    });
+
+    // Education
+    resume.data?.Education?.forEach((edu, index) => {
+      if (edu.Id) {
+        options.push({
+          value: edu.Id,
+          label: `${edu.StudyType || 'Degree'} at ${edu.Institution || `Education ${index + 1}`}`,
+          group: 'Education'
+        });
+      }
+    });
+
+    // Projects
+    resume.data?.Projects?.forEach((project, index) => {
+      if (project.Id) {
+        options.push({
+          value: project.Id,
+          label: project.Name || `Project ${index + 1}`,
+          group: 'Projects'
+        });
+      }
+    });
+
+    // Skills
+    resume.data?.Skills?.forEach((skill, index) => {
+      if (skill.Id) {
+        options.push({
+          value: skill.Id,
+          label: skill.Name || `Skill ${index + 1}`,
+          group: 'Skills'
+        });
+      }
+    });
+
+    // Volunteer
+    resume.data?.Volunteer?.forEach((volunteer, index) => {
+      if (volunteer.Id) {
+        options.push({
+          value: volunteer.Id,
+          label: `${volunteer.Position || 'Volunteer'} at ${volunteer.Organization || `Organization ${index + 1}`}`,
+          group: 'Volunteer'
+        });
+      }
+    });
+
+    return options;
+  };
+
+  const sectionOptions = getSectionOptions();
 
   const handleSave = async () => {
     setSaving(true);
@@ -154,18 +253,31 @@ export default function MetadataModal({
                         <SelectValue placeholder="Choose section" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="basics">Basics</SelectItem>
-                        <SelectItem value="work">Work Experience</SelectItem>
-                        <SelectItem value="education">Education</SelectItem>
-                        <SelectItem value="skills">Skills</SelectItem>
-                        <SelectItem value="projects">Projects</SelectItem>
-                        <SelectItem value="volunteer">Volunteer</SelectItem>
-                        <SelectItem value="languages">Languages</SelectItem>
-                        <SelectItem value="awards">Awards</SelectItem>
-                        <SelectItem value="certificates">Certificates</SelectItem>
-                        <SelectItem value="publications">Publications</SelectItem>
-                        <SelectItem value="interests">Interests</SelectItem>
-                        <SelectItem value="references">References</SelectItem>
+                        {sectionOptions.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            {loadingResume ? "Loading sections..." : "No sections available"}
+                          </SelectItem>
+                        ) : (
+                          // Group options by section type
+                          Object.entries(
+                            sectionOptions.reduce((groups, option) => {
+                              if (!groups[option.group]) groups[option.group] = [];
+                              groups[option.group].push(option);
+                              return groups;
+                            }, {} as Record<string, typeof sectionOptions>)
+                          ).map(([group, options]) => (
+                            <div key={group}>
+                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+                                {group}
+                              </div>
+                              {options.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

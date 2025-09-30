@@ -490,14 +490,9 @@ export default function Index() {
   const filteredItems = allContentItems
     .filter((item) => {
       const searchQuery = searchFilters.search || "";
-      const matchesCategory =
-        selectedCategory === "all" ||
-        (selectedCategory === "jobs" && item.type === "job") ||
-        (selectedCategory === "people" && item.type === "resume") ||
-        (selectedCategory === "companies" && item.type === "company") ||
-        (selectedCategory === "resumes" && item.type === "resume") ||
-        (selectedCategory === "media" && item.type === "media") ||
-        item.type === selectedCategory;
+
+      // Only apply client-side search filtering if there's a search query
+      // Category filtering is already handled by the backend API
       const matchesSearch =
         searchQuery === "" ||
         (item.title &&
@@ -509,13 +504,13 @@ export default function Index() {
         (item.company &&
           item.company.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // Media filter logic
+      // Media filter logic (for additional UI filters)
       const matchesMedia =
         searchFilters.hasMedia === undefined ||
         (searchFilters.hasMedia === true && (item as any).hasMedia === true) ||
         (searchFilters.hasMedia === false && (item as any).hasMedia !== true);
 
-      return matchesCategory && matchesSearch && matchesMedia;
+      return matchesSearch && matchesMedia;
     })
     .sort((a, b) => {
       const sortBy = searchFilters.sortBy || "recent";
@@ -565,7 +560,10 @@ export default function Index() {
       }
     });
 
-  // Pagination logic
+  // Pagination logic - use backend pagination when no additional client-side filtering is applied
+  const hasClientSideFiltering = (searchFilters.search && searchFilters.search.length > 0) ||
+                                  searchFilters.hasMedia !== undefined;
+
   const {
     currentPage,
     itemsPerPage,
@@ -575,15 +573,21 @@ export default function Index() {
     setCurrentPage,
     handleItemsPerPageChange,
     handleTotalItemsChange,
-  } = usePagination(filteredItems.length, 12);
+  } = usePagination(
+    hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0),
+    12
+  );
 
   // Update pagination when filtered items change
   React.useEffect(() => {
-    handleTotalItemsChange(filteredItems.length);
-  }, [filteredItems.length, handleTotalItemsChange]);
+    const totalItems = hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0);
+    handleTotalItemsChange(totalItems);
+  }, [filteredItems.length, searchResults?.total, hasClientSideFiltering, handleTotalItemsChange]);
 
-  // Get paginated items
-  const paginatedItems = filteredItems.slice(startIndex, endIndex);
+  // Get paginated items - use all items if backend already paginated, otherwise slice client-side
+  const paginatedItems = hasClientSideFiltering
+    ? filteredItems.slice(startIndex, endIndex)
+    : filteredItems; // Backend already paginated these
 
   // Calculate total views from search results
   const totalViews = searchResults
@@ -744,12 +748,12 @@ export default function Index() {
                                 : "Content"}
                   </h2>
                   <p className="text-muted-foreground">
-                    {filteredItems.length} items found
+                    {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
                     {searchFilters.search && ` for "${searchFilters.search}"`}
                     {searchFilters.sortBy &&
                       ` sorted by ${searchFilters.sortBy}`}
-                    {filteredItems.length > itemsPerPage &&
-                      ` (showing ${startIndex + 1}-${Math.min(endIndex, filteredItems.length)})`}
+                    {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
+                      ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
                   </p>
                 </div>
 
@@ -871,7 +875,7 @@ export default function Index() {
                 {/* Pagination */}
                 <Pagination
                   currentPage={currentPage}
-                  totalItems={filteredItems.length}
+                  totalItems={hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)}
                   itemsPerPage={itemsPerPage}
                   onPageChange={setCurrentPage}
                   onItemsPerPageChange={handleItemsPerPageChange}

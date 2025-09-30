@@ -6,14 +6,17 @@ import CardActions from "@/components/ui/CardActions";
 import { formatDate } from "@/lib/utils";
 import { MetaType, type ResumeSectionMeta } from "@/types/resume";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import { useNavigate } from "react-router-dom";
 
 interface MediaCardProps {
   media: ResumeSectionMeta;
+  resumeId?: string; // Add resumeId prop for navigation
   onView?: () => void;
   onPlay?: () => void;
 }
 
-export default function MediaCard({ media, onView, onPlay }: MediaCardProps) {
+export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
+  const navigate = useNavigate();
   const isVideo = [MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM].includes(media.metaType);
   const isImage = media.metaType === MetaType.Image;
 
@@ -68,22 +71,33 @@ export default function MediaCard({ media, onView, onPlay }: MediaCardProps) {
   const thumbnail = getThumbnail();
   const MediaIcon = getMediaIcon();
 
+  // Navigation handler for header and View button
+  const handleNavigateToResume = () => {
+    if (resumeId) {
+      // Navigate to resume with section anchor if we have referenceId
+      const url = media.referenceId
+        ? `/resumes/${resumeId}#${media.referenceId}`
+        : `/resumes/${resumeId}`;
+      navigate(url);
+    } else if (media.userId) {
+      // If we have userId but no resumeId, navigate to user's profile page
+      // The profile page will show their active resume
+      navigate(`/people/${media.userId}`);
+    } else if (onView) {
+      onView();
+    } else {
+      // Fallback to opening media URL directly
+      window.open(media.url, "_blank");
+    }
+  };
+
   const cardActions: DynamicCardAction[] = [
     {
       id: "view",
       label: isVideo ? "Play" : "View",
       variant: "default" as const,
       icon: MediaIcon,
-      onClick: () => {
-        if (isVideo && onPlay) {
-          onPlay();
-        } else if (onView) {
-          onView();
-        } else {
-          // Open in new tab as fallback
-          window.open(media.url, "_blank");
-        }
-      },
+      onClick: handleNavigateToResume,
     },
   ];
 
@@ -91,7 +105,7 @@ export default function MediaCard({ media, onView, onPlay }: MediaCardProps) {
     <BaseCard>
       <CardHeaderWithAvatar
         title={media.name}
-        subtitle={getMediaTypeLabel()}
+        subtitle=""
         avatar={{
           src: undefined,
           fallback: isVideo ? "▶" : isImage ? "🖼" : "📄",
@@ -103,13 +117,16 @@ export default function MediaCard({ media, onView, onPlay }: MediaCardProps) {
             variant: isVideo ? "default" : isImage ? "secondary" : "outline",
           },
         ]}
+        linkTo={resumeId ? (media.referenceId ? `/resumes/${resumeId}#${media.referenceId}` : `/resumes/${resumeId}`) :
+                media.userId ? `/people/${media.userId}` : undefined}
+        titleClassName="cursor-pointer"
       />
 
       <CardContent className="space-y-4">
         {/* Media Preview */}
         {thumbnail && (
           <div className="relative aspect-video bg-muted rounded-lg overflow-hidden group cursor-pointer"
-               onClick={() => isVideo && onPlay ? onPlay() : onView ? onView() : window.open(media.url, "_blank")}>
+               onClick={handleNavigateToResume}>
             <img
               src={thumbnail}
               alt={media.name}

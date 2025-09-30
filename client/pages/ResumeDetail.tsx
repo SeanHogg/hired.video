@@ -28,7 +28,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -158,6 +158,7 @@ function TimelineItem({
 export default function ResumeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -169,6 +170,7 @@ export default function ResumeDetail() {
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
   // Metadata modal state
   const [metadataModal, setMetadataModal] = useState<{
@@ -236,6 +238,17 @@ export default function ResumeDetail() {
 
     loadResume();
   }, [id]);
+
+  // Handle URL fragments to open specific media content
+  useEffect(() => {
+    if (location.hash && resume?.metaData) {
+      const mediaId = location.hash.substring(1); // Remove the # symbol
+      const mediaItem = resume.metaData.find(m => m.referenceId === mediaId || m.id === mediaId);
+      if (mediaItem) {
+        setSelectedMediaId(mediaItem.id);
+      }
+    }
+  }, [location.hash, resume?.metaData]);
 
   const isOwner = user?.id === resume?.userId;
 

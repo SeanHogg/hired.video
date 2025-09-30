@@ -43,6 +43,7 @@ interface ResumeViewerProps {
   onCreateVariation?: (_parentId: string) => void;
   canEdit?: boolean;
   showToolbar?: boolean; // show internal action toolbar (name, privacy, share, edit)
+  selectedMediaId?: string | null; // ID of media to highlight/scroll to
 }
 
 export default function ResumeViewer({
@@ -51,6 +52,7 @@ export default function ResumeViewer({
   onCreateVariation,
   canEdit = true,
   showToolbar = true,
+  selectedMediaId,
 }: ResumeViewerProps) {
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
@@ -185,6 +187,31 @@ export default function ResumeViewer({
   useEffect(() => {
     if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
   }, [videoMetaItems.length, videoIndex]);
+
+  // Handle selectedMediaId to automatically select the appropriate video and scroll to section
+  useEffect(() => {
+    if (selectedMediaId && resume?.metaData) {
+      // Find the media item
+      const mediaItem = resume.metaData.find(m => m.id === selectedMediaId || m.referenceId === selectedMediaId);
+      if (mediaItem) {
+        // If it's a video, select it in the video carousel
+        if (videoMetaItems.length > 0) {
+          const mediaIndex = videoMetaItems.findIndex(m => m.id === selectedMediaId || m.referenceId === selectedMediaId);
+          if (mediaIndex >= 0) {
+            setVideoIndex(mediaIndex);
+          }
+        }
+
+        // Scroll to the section that contains this media
+        setTimeout(() => {
+          const sectionElement = document.querySelector(`[data-section-id="${mediaItem.referenceId}"]`);
+          if (sectionElement) {
+            sectionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+    }
+  }, [selectedMediaId, resume?.metaData, videoMetaItems]);
   const currentVideoMeta = videoMetaItems.length > 0 ? videoMetaItems[videoIndex] : null;
   const youTubeEmbed = (url: string): string => {
     try {
@@ -404,7 +431,7 @@ export default function ResumeViewer({
 
             {/* Basics Metadata */}
             {resume.metaData && resumeData.Basics.Id && (
-              <section>
+              <section data-section-id={resumeData.Basics.Id}>
                 <div className="flex flex-wrap gap-2">
                   {resume.metaData
                     .filter((m) => m.referenceId === resumeData.Basics.Id)
@@ -451,6 +478,7 @@ export default function ResumeViewer({
                     <div
                       key={index}
                       className="border-l-2 border-primary/20 pl-6 relative"
+                      data-section-id={work.Id}
                     >
                       <div className="absolute w-3 h-3 bg-primary rounded-full -left-2 top-2" />
                       <div className="space-y-2">
@@ -507,7 +535,7 @@ export default function ResumeViewer({
                   {resumeData.Education.map((edu, index) => (
 
 
-                    <div key={index} className="border rounded-lg p-4">
+                    <div key={index} className="border rounded-lg p-4" data-section-id={edu.Id}>
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
                           <h3 className="font-semibold">
@@ -554,7 +582,7 @@ export default function ResumeViewer({
                       .slice()
                       .sort((a, b) => new Date(b.StartDate).getTime() - new Date(a.StartDate).getTime())
                       .map((volunteer, index) => (
-                        <div key={index} className="border rounded-lg p-4">
+                        <div key={index} className="border rounded-lg p-4" data-section-id={volunteer.Id}>
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <div>
                               <h3 className="font-semibold">{volunteer.Position}</h3>
@@ -593,7 +621,7 @@ export default function ResumeViewer({
                 <h2 className="text-2xl font-bold mb-6">Skills</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {resumeData.Skills.map((skill, index) => (
-                    <div key={index} className="flex flex-col gap-2 p-3 border rounded-lg">
+                    <div key={index} className="flex flex-col gap-2 p-3 border rounded-lg" data-section-id={skill.Id}>
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{skill.Name}</span>
                         <Badge variant="secondary">{skill.Level}</Badge>
@@ -635,7 +663,7 @@ export default function ResumeViewer({
                   <h2 className="text-2xl font-bold mb-6">Projects</h2>
                   <div className="space-y-6">
                     {resumeData.Projects.map((project, index) => (
-                      <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0">
+                      <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0" data-section-id={project.Id}>
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="font-semibold text-lg">{project.Name}</h3>
                           {project.Url && (

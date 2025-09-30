@@ -41,7 +41,6 @@ import {
   generateJobActions,
   generateCompanyActions,
   generateResumeActions,
-  type DynamicCardAction,
 } from "@/lib/dynamic-actions";
 
 interface UseCardRendererProps {
@@ -252,24 +251,29 @@ export function useCardRenderer({
 
         case "media":
           const mediaData = normalizeMediaData(item, context);
-          const mediaOwnership = determineItemOwnership(
-            mediaData,
-            effectiveUserContext,
-          );
 
           // Convert normalized media data to MediaCard format
           const mediaCardData = {
             id: mediaData.id,
+            userId: mediaData.userId,
+            referenceId: mediaData.referenceId,
             name: mediaData.name,
             metaType: mediaData.metaType,
             url: mediaData.url,
             description: mediaData.description,
+            creationDateTime: mediaData.createdAt,
           };
+
+          // Try to extract resume ID from the item data
+          // Note: Currently the search API doesn't provide resume ID directly for media items
+          // The referenceId points to a resume section, not the resume itself
+          const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
 
           return (
             <MediaCard
               key={mediaData.id}
               media={mediaCardData as any}
+              resumeId={resumeId}
               onView={() => interactions.onView?.(mediaData)}
               onPlay={() => interactions.onView?.(mediaData)}
             />
@@ -379,16 +383,25 @@ export function renderCardItem(
       // Convert normalized media data to MediaCard format
       const mediaCardData = {
         id: mediaData.id,
+        userId: mediaData.userId,
+        referenceId: mediaData.referenceId,
         name: mediaData.name,
         metaType: mediaData.metaType,
         url: mediaData.url,
         description: mediaData.description,
+        creationDateTime: mediaData.createdAt,
       };
+
+      // Try to extract resume ID from the item data
+      // Note: Currently the search API doesn't provide resume ID directly for media items
+      // The referenceId points to a resume section, not the resume itself
+      const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
 
       return (
         <MediaCard
           key={mediaData.id}
           media={mediaCardData as any}
+          resumeId={resumeId}
           onView={() => interactions.onView?.(mediaData)}
           onPlay={() => interactions.onView?.(mediaData)}
         />
