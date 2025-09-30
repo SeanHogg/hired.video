@@ -24,7 +24,7 @@ interface CardHeaderWithAvatarProps {
   avatar?: AvatarConfig;
   badges?: BadgeConfig[];
   linkTo?: string;
-  className?: string;
+
   titleClassName?: string;
   subtitleClassName?: string;
   layout?: "horizontal" | "vertical";
