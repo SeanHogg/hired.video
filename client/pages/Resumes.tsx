@@ -612,6 +612,25 @@ export default function Resumes() {
     }
   };
 
+  const handleAddMediaById = async (resumeId: string) => {
+    try {
+      // Get the full resume data to access metadata
+      const fullResume = await resumeService.getResumeById(resumeId);
+      setMetadataModal({
+        open: true,
+        resumeId: resumeId,
+        initialMetadata: fullResume.metaData || [],
+      });
+    } catch (error) {
+      console.error("Failed to load resume metadata:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load resume data",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSaveMetadata = async (metadata: any[]) => {
     if (!metadataModal.resumeId) return;
 
@@ -1339,6 +1358,7 @@ export default function Resumes() {
                         onCreateVariation={handleCreateVariation}
                         onSetActive={handleSetActiveResume}
                         onEditResume={(id) => navigate(`/resumes/edit/${id}`)}
+                        onAddMedia={handleAddMediaById}
                         onDeleteResume={(resumeId) => {
                           const resume = displayResumes.find(r => r.id === resumeId);
                           if (resume) {

@@ -24,6 +24,7 @@ interface MasterResumeGroupProps {
   onDeleteResume: (resumeId: string) => void;
   onTrackResume?: (resumeId: string) => void;
   onPromoteVariant?: (resumeId: string) => void;
+  onAddMedia?: (resumeId: string) => void;
 }
 
 export default function MasterResumeGroupComponent({
@@ -37,6 +38,7 @@ export default function MasterResumeGroupComponent({
   onDeleteResume,
   onTrackResume,
   onPromoteVariant,
+  onAddMedia,
 }: MasterResumeGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -138,6 +140,11 @@ export default function MasterResumeGroupComponent({
                     <DropdownMenuItem onClick={() => onEditResume(group.masterResume.id)}>
                       Edit Resume
                     </DropdownMenuItem>
+                    {onAddMedia && (
+                      <DropdownMenuItem onClick={() => onAddMedia(group.masterResume.id)}>
+                        Add Media
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => onCreateVariation(group.masterResume.id)}>
                       Create Variation
                     </DropdownMenuItem>
