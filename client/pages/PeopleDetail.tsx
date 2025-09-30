@@ -61,7 +61,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { useSEO, generateStructuredData } from "@/lib/seo";
-import { dashboardService } from "@/lib/services/dashboard-service";
+// import { dashboardService } from "@/lib/services/dashboard-service";
 
 import ResumeCard from "@/components/ResumeCard";
 
@@ -270,24 +270,25 @@ export default function PeopleDetail() {
   }, [userProfile, location.pathname]);
 
   // Track profile view when profile loads
-  useEffect(() => {
-    if (!userProfile?.id) return;
+  // TODO: Re-enable after fixing React hook error
+  // useEffect(() => {
+  //   if (!userProfile?.id) return;
 
-    // Record profile view for analytics
-    const recordView = async () => {
-      try {
-        await dashboardService.recordProfileView({
-          profileUserId: userProfile.id,
-          viewType: "profile",
-        });
-      } catch (error) {
-        // Don't throw - view tracking is not critical
-        console.warn("Failed to record profile view:", error);
-      }
-    };
+  //   // Record profile view for analytics
+  //   const recordView = async () => {
+  //     try {
+  //       await dashboardService.recordProfileView({
+  //         profileUserId: userProfile.id,
+  //         viewType: "profile",
+  //       });
+  //     } catch (error) {
+  //       // Don't throw - view tracking is not critical
+  //       console.warn("Failed to record profile view:", error);
+  //     }
+  //   };
 
-    recordView();
-  }, [userProfile?.id]);
+  //   recordView();
+  // }, [userProfile?.id]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
