@@ -149,7 +149,7 @@ export default function PeopleDetail() {
         id: userProfile.id,
         slug:
           userProfile.slug ||
-          `${userProfile.firstName}-${userProfile.lastName}`
+          `${userProfile.firstName || ''}-${userProfile.lastName || ''}`
             .toLowerCase()
             .replace(/\s+/g, "-"),
         role: userProfile.role, // Add role property for proper role display
@@ -160,7 +160,7 @@ export default function PeopleDetail() {
           headline: `${getRoleDisplayLabel(userProfile.role)} | ${userProfile.location || "Remote"}`,
           summary:
             userProfile.bio ||
-            `${userProfile.firstName} ${userProfile.lastName} is a ${getRoleDisplayLabel(userProfile.role)} professional.`,
+            `${userProfile.firstName || ''} ${userProfile.lastName || ''} is a ${getRoleDisplayLabel(userProfile.role)} professional.`.trim(),
           location: {
             city: userProfile.location?.split(",")[0]?.trim() || "",
             state: userProfile.location?.split(",")[1]?.trim() || "",
@@ -241,7 +241,7 @@ export default function PeopleDetail() {
   // SEO: when profile loads, update title/description and structured data
   useEffect(() => {
     if (!userProfile) return;
-    const fullName = `${userProfile.firstName} ${userProfile.lastName}`.trim();
+    const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
     const title = `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | MyVideoResu.me`;
     const description = userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`;
     useSEO(location.pathname, {
