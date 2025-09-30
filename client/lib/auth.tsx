@@ -27,6 +27,7 @@ export interface User {
   skills?: string[];
   openToWork?: boolean;
   isDemo?: boolean; // Demo user designation
+  slug?: string; // User-friendly URL identifier
 }
 
 interface TwoFactorChallengeUI {
@@ -93,6 +94,7 @@ function userProfileToUser(profile: UserProfile): User {
     skills: profile.skills,
     openToWork: profile.openToWork,
     isDemo: profile.isDemo,
+    slug: profile.slug,
   };
 }
 
