@@ -827,7 +827,35 @@ export default function Index() {
                             <div className="flex items-start justify-between">
                               <div>
                                 <h3 className="font-semibold text-lg truncate">
-                                  {item.name ?? item.title ?? ""}
+                                  <button
+                                    onClick={() => {
+                                      if (item.type === "people")
+                                        navigate(`/people/${item.id}`);
+                                      else if (item.type === "company")
+                                        navigate(`/companies/${item.id}`);
+                                      else if (item.type === "resume")
+                                        navigate(`/resumes/${item.id}`);
+                                      else if (item.type === "job")
+                                        navigate(`/jobs/${item.id}`);
+                                      else if (item.type === "media") {
+                                        // For media items, navigate to the associated resume with the media reference
+                                        const resumeId = (item as any).resumeId;
+                                        const referenceId = item.id;
+                                        if (resumeId) {
+                                          navigate(`/resumes/${resumeId}#${referenceId}`);
+                                        } else {
+                                          // Fallback to media owner's profile
+                                          const ownerId = (item as any).ownerId;
+                                          if (ownerId) {
+                                            navigate(`/people/${ownerId}`);
+                                          }
+                                        }
+                                      }
+                                    }}
+                                    className="text-left hover:text-primary transition-colors cursor-pointer"
+                                  >
+                                    {item.name ?? item.title ?? ""}
+                                  </button>
                                 </h3>
                                 <p className="text-muted-foreground">
                                   {item.title}
