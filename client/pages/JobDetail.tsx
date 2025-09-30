@@ -202,7 +202,23 @@ export default function JobDetail() {
       try {
         setLoading(true);
         setError(null);
-        const apiJob = await jobService.getJobBySlug(slug);
+
+        // Determine if the route param is a UUID or a slug
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+
+        let apiJob: any;
+        if (isUUID) {
+          // Load by ID for UUIDs
+          apiJob = await jobService.getJobById(slug);
+        } else {
+          // Try slug first, then fallback to ID just in case
+          try {
+            apiJob = await jobService.getJobBySlug(slug);
+          } catch (slugErr) {
+            apiJob = await jobService.getJobById(slug);
+          }
+        }
+
         if (!isMounted) return;
         setJob(mapApiJobToUI(apiJob as any));
       } catch (e) {
