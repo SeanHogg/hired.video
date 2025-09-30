@@ -178,6 +178,9 @@ export default function Jobs() {
       setJobsData({
         owned: ownedJobs.map((j) => ({
           ...j,
+          company: j.company ?? "",
+          location: j.location ?? "",
+          employmentType: j.employmentType ?? "",
           ownership: "owned" as const,
           slug: (j as any).slug || "",
           experienceLevel: (j as any).experienceLevel || "entry",
@@ -193,6 +196,9 @@ export default function Jobs() {
         })),
         tracked: trackedJobs.map((j) => ({
           ...j,
+          company: j.company ?? "",
+          location: j.location ?? "",
+          employmentType: j.employmentType ?? "",
           ownership: "tracked" as const,
           slug: (j as any).slug || "",
           experienceLevel: (j as any).experienceLevel || "entry",

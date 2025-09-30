@@ -42,17 +42,29 @@ export const JobSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const JobSummarySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  company: z.string(),
-  location: z.string(),
-  employmentType: z.string(),
-  salaryMin: z.number().optional(),
-  salaryMax: z.number().optional(),
-  postedDate: z.string().optional().default(new Date().toISOString()),
-  isRemote: z.boolean().optional(),
-});
+export const JobSummarySchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    company: z.string().optional(),
+    companyId: z.string().optional(),
+    location: z.string().optional(),
+    employmentType: z.string().optional(),
+    experienceLevel: z.string().optional(),
+    salaryMin: z.number().optional(),
+    salaryMax: z.number().optional(),
+    postedDate: z.string().optional(),
+    isRemote: z.boolean().optional(),
+    views: z.number().optional(),
+    applications: z.number().optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+    summary: z.string().optional(),
+    userId: z.string().optional(),
+    slug: z.string().optional(),
+  })
+  .passthrough();
 
 export const CreateJobSchema = z.object({
   title: z.string().min(1),
@@ -97,22 +109,25 @@ export const JobFiltersSchema = z.object({
 });
 
 // Accept both our normalized keys and backend PascalCase keys
-export const PaginatedJobsSchema = z.object({
-  items: z.array(JobSummarySchema).optional(),
-  Items: z.array(JobSummarySchema).optional(),
-  total: z.number().optional(),
-  Total: z.number().optional(),
-  page: z.number().optional(),
-  Page: z.number().optional(),
-  limit: z.number().optional(),
-  Limit: z.number().optional(),
-  hasNext: z.boolean().optional(),
-  hasPrev: z.boolean().optional(),
-  hasNextPage: z.boolean().optional(),
-  HasNextPage: z.boolean().optional(),
-  hasPreviousPage: z.boolean().optional(),
-  HasPreviousPage: z.boolean().optional(),
-});
+export const PaginatedJobsSchema = z
+  .object({
+    items: z.array(JobSummarySchema).optional(),
+    Items: z.array(JobSummarySchema).optional(),
+    total: z.number().optional(),
+    Total: z.number().optional(),
+    page: z.number().optional(),
+    Page: z.number().optional(),
+    limit: z.number().optional(),
+    Limit: z.number().optional(),
+    totalPages: z.number().optional(),
+    hasNext: z.boolean().optional(),
+    hasPrev: z.boolean().optional(),
+    hasNextPage: z.boolean().optional(),
+    HasNextPage: z.boolean().optional(),
+    hasPreviousPage: z.boolean().optional(),
+    HasPreviousPage: z.boolean().optional(),
+  })
+  .passthrough();
 
 // ============================================================================
 // TYPES
@@ -148,28 +163,18 @@ export class JobService {
     }
 
     const endpoint = `/api/Job${params.toString() ? `?${params.toString()}` : ""}`;
-    const response = await apiClient.get<any>(endpoint, PaginatedJobsSchema);
+    const response = await apiClient.get<z.infer<typeof PaginatedJobsSchema>>(endpoint, PaginatedJobsSchema);
 
     const dto = response.data;
-    const items = (dto.items || dto.Items || []) as unknown[];
-    const total = (dto.total ??
-      dto.Total ??
-      (Array.isArray(items) ? items.length : 0)) as number;
-    const page = (dto.page ?? dto.Page ?? 1) as number;
-    const limit = (dto.limit ??
-      dto.Limit ??
-      (Array.isArray(items) ? items.length : 0)) as number;
-    const hasNext = (dto.hasNext ??
-      dto.hasNextPage ??
-      dto.HasNextPage ??
-      page * limit < total) as boolean;
-    const hasPrev = (dto.hasPrev ??
-      dto.hasPreviousPage ??
-      dto.HasPreviousPage ??
-      page > 1) as boolean;
+    const items = (dto.items || dto.Items || []) as JobSummary[];
+    const total = dto.total ?? dto.Total ?? items.length;
+    const page = dto.page ?? dto.Page ?? 1;
+    const limit = dto.limit ?? dto.Limit ?? items.length;
+    const hasNext = dto.hasNext ?? dto.hasNextPage ?? dto.HasNextPage ?? page * limit < total;
+    const hasPrev = dto.hasPrev ?? dto.hasPreviousPage ?? dto.HasPreviousPage ?? page > 1;
 
     return {
-      items: items as JobSummary[],
+      items,
       total,
       page,
       limit,
