@@ -269,12 +269,7 @@ export function useCardRenderer({
           // The referenceId points to a resume section, not the resume itself
           const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
 
-          console.log("MediaCard data mapping:", {
-            original: item,
-            normalized: mediaData,
-            cardData: mediaCardData,
-            resumeId
-          });
+
 
           return (
             <MediaCard
