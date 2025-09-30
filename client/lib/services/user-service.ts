@@ -405,6 +405,17 @@ export class UserService {
     );
     return response.data;
   }
+
+  /**
+   * Get user's resumes (public resumes for other users, all resumes for current user)
+   */
+  async getUserResumes(userId: string): Promise<any[]> {
+    const response = await apiClient.get<any[]>(
+      `/api/Users/${userId}/resumes`,
+      z.array(z.any()), // Using any for now since the API returns different formats
+    );
+    return response.data;
+  }
 }
 
 // ============================================================================

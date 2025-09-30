@@ -210,21 +210,11 @@ export default function PeopleDetail() {
         return;
       }
       try {
-        // Use the user-specific resumes endpoint to get their public resumes
-        const response = await fetch(`/api/Users/${userProfile.id}/resumes`);
-        if (!response.ok) {
-          if (isMounted) {
-            setHasPublicMasterResume(false);
-            setPublicMasterResume(null);
-          }
-          return;
-        }
-
-        const result = await response.json();
+        // Use the user service to get their public resumes
+        const userResumes = await userService.getUserResumes(userProfile.id);
         if (!isMounted) return;
 
         // Find the Master resume from the user's public resumes
-        const userResumes = result.data || [];
         const masterResume = userResumes.find((r: any) => r.IsMaster || r.isMaster);
 
         if (masterResume) {
