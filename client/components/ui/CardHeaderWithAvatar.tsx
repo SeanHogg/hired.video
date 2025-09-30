@@ -82,65 +82,30 @@ export function CardHeaderWithAvatar({
           <div
             className={cn("flex-1 min-w-0", layout === "vertical" && "w-full")}
           >
-            <div
+            <CardTitle
               className={cn(
-                "flex items-center gap-2 mb-1",
-                layout === "vertical" && "flex-col gap-1",
+                "text-lg hover:text-primary leading-tight mb-1",
+                "w-full max-w-[280px] break-words", // Fixed width with word breaking
+                layout === "vertical" && "text-center",
+                titleClassName,
               )}
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordWrap: "break-word",
+                hyphens: "auto",
+              }}
             >
-              <CardTitle
-                className={cn(
-                  "text-lg hover:text-primary leading-tight",
-                  "w-full max-w-[280px] break-words", // Fixed width with word breaking
-                  layout === "vertical" && "text-center",
-                  titleClassName,
-                )}
-                style={{
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                  wordWrap: "break-word",
-                  hyphens: "auto",
-                }}
-              >
-                {linkTo ? (
-                  <TitleComponent to={linkTo} className="hover:text-primary">
-                    {title}
-                  </TitleComponent>
-                ) : (
-                  title
-                )}
-              </CardTitle>
-
-              {badges.length > 0 && (
-                <div
-                  className={cn(
-                    "flex items-center gap-1 flex-wrap",
-                    layout === "vertical" && "justify-center",
-                  )}
-                >
-                  {badges.map((badge, index) => (
-                    <Badge
-                      key={index}
-                      variant={badge.variant || "outline"}
-                      className={cn("text-xs flex-shrink-0", badge.className)}
-                    >
-                      {badge.icon &&
-                        (React.isValidElement(badge.icon)
-                          ? badge.icon
-                          : React.createElement(
-                              badge.icon as React.ComponentType<{
-                                className?: string;
-                              }>,
-                              { className: "h-3 w-3 mr-1" },
-                            ))}
-                      {badge.text}
-                    </Badge>
-                  ))}
-                </div>
+              {linkTo ? (
+                <TitleComponent to={linkTo} className="hover:text-primary">
+                  {title}
+                </TitleComponent>
+              ) : (
+                title
               )}
-            </div>
+            </CardTitle>
 
             {subtitle && (
               <CardDescription
@@ -154,6 +119,39 @@ export function CardHeaderWithAvatar({
               </CardDescription>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Badges moved under the header */}
+      {badges.length > 0 && (
+        <div className="px-6 pb-3">
+          <div
+            className={cn(
+              "flex items-center gap-1 flex-wrap",
+              layout === "vertical" && "justify-center",
+            )}
+          >
+            {badges.map((badge, index) => (
+              <Badge
+                key={index}
+                variant={badge.variant || "outline"}
+                className={cn("text-xs flex-shrink-0", badge.className)}
+              >
+                {badge.icon &&
+                  (React.isValidElement(badge.icon)
+                    ? badge.icon
+                    : React.createElement(
+                        badge.icon as React.ComponentType<{
+                          className?: string;
+                        }>,
+                        { className: "h-3 w-3 mr-1" },
+                      ))}
+                {badge.text}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
         </div>
       </div>
     </div>

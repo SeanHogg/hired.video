@@ -73,21 +73,32 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
 
   // Navigation handler for header and View button
   const handleNavigateToResume = () => {
+    console.log("MediaCard navigation:", { resumeId, userId: media.userId, referenceId: media.referenceId, media });
+
     if (resumeId) {
       // Navigate to resume with section anchor if we have referenceId
       const url = media.referenceId
         ? `/resumes/${resumeId}#${media.referenceId}`
         : `/resumes/${resumeId}`;
+      console.log("Navigating to resume:", url);
       navigate(url);
     } else if (media.userId) {
       // If we have userId but no resumeId, navigate to user's profile page
       // The profile page will show their active resume
-      navigate(`/people/${media.userId}`);
+      const url = `/people/${media.userId}`;
+      console.log("Navigating to user profile:", url);
+      navigate(url);
     } else if (onView) {
+      console.log("Calling onView callback");
       onView();
     } else {
       // Fallback to opening media URL directly
-      window.open(media.url, "_blank");
+      console.log("Opening media URL directly:", media.url);
+      if (media.url) {
+        window.open(media.url, "_blank");
+      } else {
+        console.warn("No navigation option available for media item:", media);
+      }
     }
   };
 
@@ -118,11 +129,13 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
           },
         ]}
         linkTo={resumeId ? (media.referenceId ? `/resumes/${resumeId}#${media.referenceId}` : `/resumes/${resumeId}`) :
-                media.userId ? `/people/${media.userId}` : undefined}
+                media.userId ? `/people/${media.userId}` :
+                media.url ? media.url : undefined}
         titleClassName="cursor-pointer"
       />
 
       <CardContent className="space-y-4">
+
         {/* Media Preview */}
         {thumbnail && (
           <div className="relative aspect-video bg-muted rounded-lg overflow-hidden group cursor-pointer"
