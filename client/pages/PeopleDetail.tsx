@@ -196,27 +196,57 @@ export default function PeopleDetail() {
   >("none"); // TODO: Implement with real API
   const isOwnProfile = user && userProfile && userProfile.id === user.id;
 
-  // Check if person has an active public resume and fetch it
-  const [hasActivePublicResume, setHasActivePublicResume] = useState(false);
-  const [activePublicResume, setActivePublicResume] = useState<any>(null);
+  // Check if person has a public Master resume and fetch it
+  const [hasPublicMasterResume, setHasPublicMasterResume] = useState(false);
+  const [publicMasterResume, setPublicMasterResume] = useState<any>(null);
+
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
       if (!userProfile?.id) {
-        setHasActivePublicResume(false);
-        setActivePublicResume(null);
+        setHasPublicMasterResume(false);
+        setPublicMasterResume(null);
         return;
       }
       try {
-        const list = await resumeService.getPublicResumes(1, 20);
+        // Use the user-specific resumes endpoint to get their public resumes
+        const response = await fetch(`/api/Users/${userProfile.id}/resumes`);
+        if (!response.ok) {
+          if (isMounted) {
+            setHasPublicMasterResume(false);
+            setPublicMasterResume(null);
+          }
+          return;
+        }
+
+        const result = await response.json();
         if (!isMounted) return;
 
-        // Find this user's public resumes
-        const userPublicResumes = (list.items ?? []).filter(
-          (r) => r.userId === userProfile.id && r.isPublic,
-        );
+        // Find the Master resume from the user's public resumes
+        const userResumes = result.data || [];
+        const masterResume = userResumes.find((r: any) => r.IsMaster || r.isMaster);
 
-        if (userPublicResumes.length > 0) {
+        if (masterResume) {
+          setPublicMasterResume(masterResume);
+          setHasPublicMasterResume(true);
+        } else {
+          setHasPublicMasterResume(false);
+          setPublicMasterResume(null);
+        }
+      } catch (error) {
+        console.error('Error fetching user resumes:', error);
+        if (isMounted) {
+          setHasPublicMasterResume(false);
+          setPublicMasterResume(null);
+        }
+      }
+    };
+    load();
+    return () => {
+      isMounted = false;
+    };
+  }, [userProfile?.id]);
+
   // SEO: when profile loads, update title/description and structured data
   useEffect(() => {
     if (!userProfile) return;
@@ -237,27 +267,6 @@ export default function PeopleDetail() {
       }),
     });
   }, [userProfile, location.pathname]);
-
-          // Find active resume or use the first public one
-          const activeResume = userPublicResumes.find(r => (r as any).isActive) || userPublicResumes[0];
-          setActivePublicResume(activeResume);
-          setHasActivePublicResume(true);
-        } else {
-          setHasActivePublicResume(false);
-          setActivePublicResume(null);
-        }
-      } catch {
-        if (isMounted) {
-          setHasActivePublicResume(false);
-          setActivePublicResume(null);
-        }
-      }
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [userProfile?.id]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -678,8 +687,8 @@ export default function PeopleDetail() {
                   </CardContent>
                 </Card>
 
-                {/* Resume Details - Only show if user has active public resume */}
-                {hasActivePublicResume ? (
+                {/* Professional Details - Show Master resume if available */}
+                {hasPublicMasterResume ? (
                   <>
                     {/* Experience Section */}
                     <Card>
@@ -691,28 +700,32 @@ export default function PeopleDetail() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
-                          {/* Active Public Resume Card */}
-                          {activePublicResume && (
+                          {/* Master Resume Card */}
+                          {publicMasterResume && (
                             <div className="mb-6">
                               <div className="flex items-center gap-2 mb-3">
                                 <FileText className="h-4 w-4 text-primary" />
-                                <h3 className="font-medium text-sm">Professional Resume</h3>
+                                <h3 className="font-medium text-sm">Master Resume</h3>
                               </div>
                               <div className="max-w-md">
                                 <ResumeCard
-                                  id={activePublicResume.Id || activePublicResume.id}
-                                  name={activePublicResume.Name || activePublicResume.name || "Resume"}
-                                  title={activePublicResume.title}
-                                  summary={activePublicResume.Description || activePublicResume.description || "Professional resume"}
-                                  createdAt={activePublicResume.CreationDateTimeFormatted || activePublicResume.createdAt || new Date().toISOString()}
-                                  views={activePublicResume.Views || activePublicResume.views || 0}
+                                  id={publicMasterResume.Id || publicMasterResume.id}
+                                  slug={publicMasterResume.Slug || publicMasterResume.slug}
+                                  name={publicMasterResume.Name || publicMasterResume.name || "Master Resume"}
+                                  title={publicMasterResume.title}
+                                  summary={publicMasterResume.Description || publicMasterResume.description || "Professional master resume"}
+                                  createdAt={publicMasterResume.CreationDateTimeFormatted || publicMasterResume.createdAt || new Date().toISOString()}
+                                  views={publicMasterResume.Views || publicMasterResume.views || 0}
                                   privacy="public"
-                                  isMaster={activePublicResume.IsMaster || (activePublicResume).isMaster || false}
-                                  isActive={(activePublicResume).isActive || false}
+                                  isMaster={true}
+                                  isActive={publicMasterResume.IsActive || publicMasterResume.isActive || false}
                                   ownership="tracked"
                                   onView={() => {
-                                    const resumeId = activePublicResume.Id || activePublicResume.id;
-                                    window.open(`/resumes/${resumeId}`, '_blank');
+                                    const resumeId = publicMasterResume.Id || publicMasterResume.id;
+                                    const resumeSlug = publicMasterResume.Slug || publicMasterResume.slug;
+                                    // Use slug if available, otherwise use ID
+                                    const identifier = resumeSlug || resumeId;
+                                    window.open(`/resumes/${identifier}`, '_blank');
                                   }}
                                 />
                               </div>
@@ -920,7 +933,7 @@ export default function PeopleDetail() {
                     )}
                   </>
                 ) : (
-                  /* No Public Resume Message */
+                  /* No Public Master Resume Message */
                   <Card>
                     <CardContent className="text-center py-8">
                       <div className="flex justify-center mb-4">
@@ -932,9 +945,8 @@ export default function PeopleDetail() {
                         Professional Details Private
                       </h3>
                       <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                        This user hasn't made their detailed professional
-                        information public yet. You can still connect with them
-                        and see their basic profile information.
+                        This user hasn't made their master resume public yet.
+                        You can still connect with them and see their basic profile information.
                       </p>
                     </CardContent>
                   </Card>

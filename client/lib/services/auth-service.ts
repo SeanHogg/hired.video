@@ -51,6 +51,7 @@ export const LoginResponseSchema = SharedLoginResponseSchema.extend({
 // Matches /api/Users/me DTO structure (tolerant to backend enum serialization)
 export const UserProfileDTOSchema = z.object({
   id: z.string(),
+  slug: z.string().optional().default(""),
   email: z.string(),
   userName: z.string().optional().default(""),
   data: z.object({
@@ -125,6 +126,7 @@ export type LoginResponse = SharedLoginResponse & { refreshToken?: string };
 export type UserProfileDTO = z.infer<typeof UserProfileDTOSchema>;
 export type UserProfile = {
   id: string;
+  slug?: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -384,6 +386,7 @@ export class AuthService {
     const dto = response.data;
     const normalized: UserProfile = {
       id: dto.id,
+      slug: dto.slug,
       email: dto.email,
       firstName: dto.data.firstName ?? "",
       lastName: dto.data.lastName ?? "",

@@ -177,7 +177,7 @@ export default function Index() {
     } else if (item.type === "company") {
       navigate(`/companies/${item.id}`);
     } else if (item.type === "people") {
-      navigate(`/people/${item.id}`);
+      navigate(`/people/${(item as any).slug || item.id}`);
     } else {
       console.log("Unknown item type:", item.type, "for item:", item.id);
     }
@@ -830,7 +830,7 @@ export default function Index() {
                                   <button
                                     onClick={() => {
                                       if (item.type === "people")
-                                        navigate(`/people/${item.id}`);
+                                        navigate(`/people/${(item as any).slug || item.id}`);
                                       else if (item.type === "company")
                                         navigate(`/companies/${item.id}`);
                                       else if (item.type === "resume")
@@ -846,8 +846,9 @@ export default function Index() {
                                         } else {
                                           // Fallback to media owner's profile
                                           const ownerId = (item as any).ownerId;
+                                          const ownerSlug = (item as any).ownerSlug;
                                           if (ownerId) {
-                                            navigate(`/people/${ownerId}`);
+                                            navigate(`/people/${ownerSlug || ownerId}`);
                                           }
                                         }
                                       }
@@ -869,7 +870,7 @@ export default function Index() {
                                 size="sm"
                                 onClick={() => {
                                   if (item.type === "people")
-                                    navigate(`/people/${item.id}`);
+                                    navigate(`/people/${(item as any).slug || item.id}`);
                                   else if (item.type === "company")
                                     navigate(
                                       `/companies/${(item as any).id}`,

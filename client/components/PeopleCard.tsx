@@ -153,7 +153,7 @@ export default function PeopleCard({
               if (onView) {
                 onView();
               } else {
-                window.location.href = `/people/${person.id}`;
+                window.location.href = `/people/${person.slug || person.id}`;
               }
             },
           },
@@ -190,7 +190,7 @@ export default function PeopleCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg hover:text-primary truncate">
-                  <Link to={`/people/${person.id}`}>{person.fullName}</Link>
+                  <Link to={`/people/${person.slug || person.id}`}>{person.fullName}</Link>
                 </CardTitle>
                 {person.isVerified && (
                   <CheckCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />

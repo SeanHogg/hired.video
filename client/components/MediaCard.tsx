@@ -82,7 +82,9 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
     } else if (media.userId) {
       // If we have userId but no resumeId, navigate to user's profile page
       // The profile page will show their active resume
-      navigate(`/people/${media.userId}`);
+      // Try to use slug if available, fallback to userId
+      const userSlug = (media as any).userSlug || (media as any).slug;
+      navigate(`/people/${userSlug || media.userId}`);
     } else if (onView) {
       onView();
     } else {

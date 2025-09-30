@@ -657,7 +657,7 @@ function ProfileContent() {
             <ShareModal
               open={shareOpen}
               onOpenChange={setShareOpen}
-              shareUrl={`${window.location.origin}/people/${user?.id}`}
+              shareUrl={`${window.location.origin}/people/${user?.slug || user?.id}`}
               title="Share Options"
               message="Please share by using an option below."
             />
