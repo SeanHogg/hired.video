@@ -199,7 +199,7 @@ export default function PeopleDetail() {
 
   // Check if person has a public Master resume and fetch it
   const [hasPublicMasterResume, setHasPublicMasterResume] = useState(false);
-  const [publicMasterResume, setPublicMasterResume] = useState<any>(null);
+  const [publicMasterResume, setPublicMasterResume] = useState<import("@/lib/services/user-service").ResumeSummary | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -215,7 +215,7 @@ export default function PeopleDetail() {
         if (!isMounted) return;
 
         // Find the Master resume from the user's public resumes
-        const masterResume = userResumes.find((r: any) => r.IsMaster || r.isMaster);
+        const masterResume = userResumes.find((r) => r.isMaster === true);
 
         if (masterResume) {
           setPublicMasterResume(masterResume);
@@ -720,20 +720,20 @@ export default function PeopleDetail() {
                               </div>
                               <div className="max-w-md">
                                 <ResumeCard
-                                  id={publicMasterResume.Id || publicMasterResume.id}
-                                  slug={publicMasterResume.Slug || publicMasterResume.slug}
-                                  name={publicMasterResume.Name || publicMasterResume.name || "Master Resume"}
-                                  title={publicMasterResume.title}
-                                  summary={publicMasterResume.Description || publicMasterResume.description || "Professional master resume"}
-                                  createdAt={publicMasterResume.CreationDateTimeFormatted || publicMasterResume.createdAt || new Date().toISOString()}
-                                  views={publicMasterResume.Views || publicMasterResume.views || 0}
+                                  id={publicMasterResume.id}
+                                  slug={publicMasterResume.slug}
+                                  name={publicMasterResume.name || "Master Resume"}
+                                  title={undefined}
+                                  summary={publicMasterResume.description || "Professional master resume"}
+                                  createdAt={publicMasterResume.createdAt || new Date().toISOString()}
+                                  views={publicMasterResume.views || 0}
                                   privacy="public"
                                   isMaster={true}
-                                  isActive={publicMasterResume.IsActive || publicMasterResume.isActive || false}
+                                  isActive={publicMasterResume.isActive || false}
                                   ownership="tracked"
                                   onView={() => {
-                                    const resumeId = publicMasterResume.Id || publicMasterResume.id;
-                                    const resumeSlug = publicMasterResume.Slug || publicMasterResume.slug;
+                                    const resumeId = publicMasterResume.id;
+                                    const resumeSlug = publicMasterResume.slug;
                                     // Use slug if available, otherwise use ID
                                     const identifier = resumeSlug || resumeId;
                                     window.open(`/resumes/${identifier}`, '_blank');

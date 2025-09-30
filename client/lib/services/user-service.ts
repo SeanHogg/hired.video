@@ -5,7 +5,6 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { ApiSuccessResponse } from "@shared/api";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 
 // ============================================================================
@@ -69,6 +68,55 @@ export const PublicUserSchema = z.object({
   createdAt: nullableString(),
   updatedAt: nullableString(),
 });
+
+// Resume summary (normalized) returned by /api/Users/{id}/resumes
+export const ResumeSummarySchema = z.object({
+  id: z.string(),
+  slug: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  views: z.number().optional(),
+  isMaster: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  createdAt: z.string().optional(),
+});
+export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
+
+// Accept both PascalCase and camelCase fields from the API
+const RawResumeSchema = z.object({
+  Id: z.string().optional(),
+  id: z.string().optional(),
+  Slug: z.string().nullable().optional(),
+  slug: z.string().nullable().optional(),
+  Name: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  Title: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  Description: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  Views: z.number().nullable().optional(),
+  views: z.number().nullable().optional(),
+  IsMaster: z.boolean().nullable().optional(),
+  isMaster: z.boolean().nullable().optional(),
+  IsActive: z.boolean().nullable().optional(),
+  isActive: z.boolean().nullable().optional(),
+  CreationDateTimeFormatted: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+});
+
+type RawResume = z.infer<typeof RawResumeSchema>;
+
+const normalizeResume = (raw: RawResume): ResumeSummary => ({
+  id: String(raw.Id ?? raw.id ?? ""),
+  slug: raw.Slug ?? raw.slug ?? undefined,
+  name: (raw.Name ?? raw.name ?? raw.Title ?? raw.title) ?? undefined,
+  description: (raw.Description ?? raw.description) ?? undefined,
+  views: (raw.Views ?? raw.views ?? undefined) ?? undefined,
+  isMaster: (raw.IsMaster ?? raw.isMaster ?? undefined) ?? undefined,
+  isActive: (raw.IsActive ?? raw.isActive ?? undefined) ?? undefined,
+  createdAt: (raw.CreationDateTimeFormatted ?? raw.createdAt ?? undefined) ?? undefined,
+});
+
 
 export const ConnectionSchema = z.object({
   id: z.string(),
@@ -409,12 +457,12 @@ export class UserService {
   /**
    * Get user's resumes (public resumes for other users, all resumes for current user)
    */
-  async getUserResumes(userId: string): Promise<any[]> {
-    const response = await apiClient.get<any[]>(
+  async getUserResumes(userId: string): Promise<ResumeSummary[]> {
+    const response = await apiClient.get<RawResume[]>(
       `/api/Users/${userId}/resumes`,
-      z.array(z.any()), // Using any for now since the API returns different formats
+      z.array(RawResumeSchema),
     );
-    return response.data;
+    return response.data.map((r) => normalizeResume(r));
   }
 }
 
