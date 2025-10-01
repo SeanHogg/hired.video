@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -37,6 +37,8 @@ import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 
 export default function Dashboard() {
+  const [testMessage, setTestMessage] = useState<string>("useEffect NOT run yet");
+
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -59,6 +61,7 @@ export default function Dashboard() {
   // Set AI context for dashboard - TESTING MINIMAL VERSION
   useEffect(() => {
     console.log("Dashboard: useEffect running");
+    setTestMessage("useEffect HAS RUN!");
     // Do nothing else - just test if useEffect itself works
   }, []);
 
@@ -73,6 +76,9 @@ export default function Dashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{dashboardData?.title}</h1>
         <p className="text-muted-foreground">{dashboardData?.description}</p>
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded mt-2">
+          TEST: {testMessage}
+        </div>
         {lastRefresh && (
           <p className="text-xs text-muted-foreground mt-2">
             Last updated: {lastRefresh.toLocaleString()}
