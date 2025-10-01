@@ -148,6 +148,8 @@ describe("AIOrchestrationService", () => {
             title: "Senior Developer",
             company: "TechCorp",
             description: "Built amazing things",
+            startDate: "2020-01-01",
+            endDate: "2023-12-31",
           },
         ],
         skills: ["JavaScript", "TypeScript", "React"],

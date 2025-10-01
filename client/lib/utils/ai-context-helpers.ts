@@ -365,7 +365,7 @@ export function getActionLabel(action: string): string {
  * Check if a context has a specific action available
  */
 export function hasAction(context: AIContext, action: string): boolean {
-  return context.availableActions.includes(action as any);
+  return (context.availableActions as string[]).includes(action);
 }
 
 /**

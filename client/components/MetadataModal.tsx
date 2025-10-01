@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { ResumeSectionMeta, MetaType, Resume } from "@/types/resume";
 import { resumeService } from "@/lib/services/resume-service";
+import { useToast } from "@/hooks/use-toast";
 
 interface MetadataModalProps {
   open: boolean;
@@ -36,6 +37,7 @@ export default function MetadataModal({
   initialMetadata = [],
   onSave,
 }: MetadataModalProps) {
+  const { toast } = useToast();
   const [metaData, setMetaData] = useState<ResumeSectionMeta[]>(initialMetadata);
   const [saving, setSaving] = useState(false);
   const [resume, setResume] = useState<Resume | null>(null);
@@ -43,10 +45,12 @@ export default function MetadataModal({
 
   const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
 
-  // Reset metadata when modal opens with new data
+  // Reset metadata and resume when modal opens with new data
   useEffect(() => {
     if (open) {
       setMetaData(initialMetadata);
+      // Reset resume state when modal opens to force refetch
+      setResume(null);
     }
   }, [open, initialMetadata]);
 
@@ -60,6 +64,11 @@ export default function MetadataModal({
           setResume(resumeData);
         } catch (error) {
           console.error("Failed to fetch resume data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load resume sections. Please try again.",
+            variant: "destructive",
+          });
         } finally {
           setLoadingResume(false);
         }
@@ -67,7 +76,7 @@ export default function MetadataModal({
     };
 
     fetchResume();
-  }, [open, resumeId, resume]);
+  }, [open, resumeId, resume, toast]);
 
   const addMeta = () => {
     const newMeta: ResumeSectionMeta = {
@@ -174,7 +183,11 @@ export default function MetadataModal({
       onOpenChange(false);
     } catch (error) {
       console.error("Failed to save metadata:", error);
-      // TODO: Show error toast
+      toast({
+        title: "Error",
+        description: "Failed to save resume media. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }

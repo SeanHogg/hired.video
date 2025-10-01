@@ -47,17 +47,6 @@ export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { setPageContext } = useAI();
 
-  // Set AI context for dashboard
-  useEffect(() => {
-    const context = createDashboardContext(
-      dashboardData,
-      user?.role || "guest"
-    );
-    setPageContext(context);
-
-    return () => setPageContext(undefined);
-  }, [dashboardData, user?.role, setPageContext]);
-
   // Use custom dashboard hook for data management
   const {
     dashboardData,
@@ -66,6 +55,33 @@ export default function Dashboard() {
     lastRefresh,
     refreshDashboard,
   } = useDashboard();
+
+  // Set AI context for dashboard
+  useEffect(() => {
+    // Extract stats from dashboard data if available
+    const stats = dashboardData ? {
+      activeJobs: dashboardData.metrics.find(m => m.title === "Active Jobs")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Active Jobs")!.value) : undefined,
+      applications: dashboardData.metrics.find(m => m.title === "Applications")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Applications")!.value) : undefined,
+      views: dashboardData.metrics.find(m => m.title === "Profile Views")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Profile Views")!.value) : undefined,
+      matches: dashboardData.metrics.find(m => m.title === "Matches")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Matches")!.value) : undefined,
+    } : undefined;
+
+    // Transform recent activity to match expected format
+    const recentActivity = dashboardData?.recentActivity?.map(activity => ({
+      type: activity.type,
+      description: activity.content,
+      timestamp: activity.timestamp || new Date(),
+    }));
+
+    const context = createDashboardContext(
+      stats,
+      recentActivity,
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    return () => setPageContext(undefined);
+  }, [dashboardData, user?.role, setPageContext]);
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);

@@ -357,7 +357,10 @@ class AIOrchestrationService {
     });
 
     // Generate contextual message based on results
-    message = this.generateResponseMessage(successfulCalls, context, userMessage);
+    const successfulCallsWithData: Array<{ api: AvailableAPI; data: any }> = successfulCalls
+      .filter(r => r.success && r.data !== undefined)
+      .map(r => ({ api: r.api, data: r.data! }));
+    message = this.generateResponseMessage(successfulCallsWithData, context, userMessage);
 
     return {
       success: true,
@@ -370,7 +373,7 @@ class AIOrchestrationService {
         data: r.data,
         error: r.error,
       })),
-      suggestions: this.generateSuggestions(successfulCalls, context),
+      suggestions: this.generateSuggestions(successfulCallsWithData, context),
     };
   }
 

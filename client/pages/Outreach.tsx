@@ -105,6 +105,7 @@ export default function Outreach() {
   useEffect(() => {
     const context = createOutreachContext(
       "outreach",
+      undefined,
       user?.role || "guest"
     );
     setPageContext(context);
