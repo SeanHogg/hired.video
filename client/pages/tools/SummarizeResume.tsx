@@ -22,6 +22,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 
 export default function SummarizeResume() {
   const location = useLocation();
@@ -98,20 +99,10 @@ export default function SummarizeResume() {
 
     try {
       // Call the summarization API
-      const response = await fetch("/api/Resume/Summarize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(resumeText),
-      });
+      const response = await apiClient.post("/api/Resume/Summarize", resumeText);
 
-      if (!response.ok) {
-        throw new Error("Failed to summarize resume");
-      }
-
-      const result = await response.json();
-      setSummary(result.data || result.result || result);
+      const data: any = response.data;
+      setSummary(data.result || data);
     } catch (err) {
       console.error("Summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");
@@ -151,20 +142,10 @@ export default function SummarizeResume() {
       const resumeContent = parseResult.result || parseResult;
 
       // Now summarize the parsed content
-      const summaryResponse = await fetch("/api/Resume/Summarize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(resumeContent),
-      });
+      const summaryResponse = await apiClient.post("/api/Resume/Summarize", resumeContent);
 
-      if (!summaryResponse.ok) {
-        throw new Error("Failed to summarize resume");
-      }
-
-      const summaryResult = await summaryResponse.json();
-      setSummary(summaryResult.result || summaryResult);
+      const data: any = summaryResponse.data;
+      setSummary(data.result || data);
     } catch (err) {
       console.error("File summarization failed:", err);
       setError("Failed to summarize resume file. Please try again.");
@@ -189,20 +170,10 @@ export default function SummarizeResume() {
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
 
-      const response = await fetch("/api/Resume/Summarize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(resume.data || {}),
-      });
+      const response = await apiClient.post("/api/Resume/Summarize", resume.data || {});
 
-      if (!response.ok) {
-        throw new Error("Failed to summarize resume");
-      }
-
-      const result = await response.json();
-      setSummary(result.data || result.result || result);
+      const data: any = response.data;
+      setSummary(data.result || data);
     } catch (err) {
       console.error("Resume summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");

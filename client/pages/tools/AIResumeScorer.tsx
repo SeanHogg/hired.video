@@ -33,6 +33,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 
 interface ResumeScore {
   overallScore: number;
@@ -152,25 +153,16 @@ Return the response in JSON format with the following structure:
 }`;
 
     try {
-      const response = await fetch("/api/ResumeScorer/score", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          resumeText: resumeText
-        }),
+      const response = await apiClient.post("/api/ResumeScorer/score", {
+        resumeText: resumeText
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to score resume");
-      }
-
-      const result = await response.json();
-
-      // Try to parse as JSON, fallback to mock data if parsing fails
+      // Try to parse the result
       try {
-        const parsedResult = JSON.parse(result.result || result);
+        const data: any = response.data;
+        const parsedResult = typeof data.result === 'string'
+          ? JSON.parse(data.result)
+          : data.result || data;
         return parsedResult;
       } catch {
         // Return mock scoring result
