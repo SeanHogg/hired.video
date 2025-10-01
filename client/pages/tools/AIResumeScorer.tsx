@@ -152,12 +152,14 @@ Return the response in JSON format with the following structure:
 }`;
 
     try {
-      const response = await fetch("/prompt/summarize", {
+      const response = await fetch("/api/ResumeScorer/score", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(prompt),
+        body: JSON.stringify({
+          resumeText: resumeText
+        }),
       });
 
       if (!response.ok) {

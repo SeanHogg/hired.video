@@ -143,12 +143,15 @@ Return the response in JSON format with the following structure:
 }`;
 
     try {
-      const response = await fetch("/prompt/summarize", {
+      const response = await fetch("/api/ResumeOptimizer/optimize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(prompt),
+        body: JSON.stringify({
+          resumeText: resumeText,
+          jobDescription: jobDescription || undefined
+        }),
       });
 
       if (!response.ok) {

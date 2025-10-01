@@ -98,7 +98,7 @@ export default function SummarizeResume() {
 
     try {
       // Call the summarization API
-      const response = await fetch("/prompt/summarize", {
+      const response = await fetch("/api/Resume/Summarize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,7 +111,7 @@ export default function SummarizeResume() {
       }
 
       const result = await response.json();
-      setSummary(result.result || result);
+      setSummary(result.data || result.result || result);
     } catch (err) {
       console.error("Summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");
@@ -151,7 +151,7 @@ export default function SummarizeResume() {
       const resumeContent = parseResult.result || parseResult;
 
       // Now summarize the parsed content
-      const summaryResponse = await fetch("/prompt/summarize", {
+      const summaryResponse = await fetch("/api/Resume/Summarize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -189,7 +189,7 @@ export default function SummarizeResume() {
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
 
-      const response = await fetch("/prompt/summarize", {
+      const response = await fetch("/api/Resume/Summarize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -202,7 +202,7 @@ export default function SummarizeResume() {
       }
 
       const result = await response.json();
-      setSummary(result.result || result);
+      setSummary(result.data || result.result || result);
     } catch (err) {
       console.error("Resume summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");
