@@ -48,6 +48,8 @@ import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
+import { useAI } from "@/lib/ai-context";
+import { createJobContext } from "@/lib/utils/ai-context-helpers";
 
 export default function Jobs() {
   const location = useLocation();
@@ -62,6 +64,7 @@ export default function Jobs() {
   // SEO for jobs page
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
+  const { setPageContext } = useAI();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -74,6 +77,19 @@ export default function Jobs() {
   });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
+
+  // Set AI context for this page
+  useEffect(() => {
+    const context = createJobContext(
+      "job-list",
+      undefined,
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    // Clear context on unmount
+    return () => setPageContext(undefined);
+  }, [user?.role, setPageContext]);
 
   // Pagination logic
   const {

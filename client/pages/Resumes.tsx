@@ -30,6 +30,8 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
+import { useAI } from "@/lib/ai-context";
+import { createResumeContext } from "@/lib/utils/ai-context-helpers";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -110,6 +112,7 @@ export default function Resumes() {
   // SEO for resumes page
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
+  const { setPageContext } = useAI();
   const { toast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -198,6 +201,18 @@ export default function Resumes() {
       return [];
     }
   };
+
+  // Set AI context for resume list page
+  useEffect(() => {
+    const context = createResumeContext(
+      "resume-list",
+      undefined,
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    return () => setPageContext(undefined);
+  }, [user?.role, setPageContext]);
 
   // Set default view state based on user role
   useEffect(() => {

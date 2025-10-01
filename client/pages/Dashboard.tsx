@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -13,6 +13,8 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import { useAI } from "@/lib/ai-context";
+import { createDashboardContext } from "@/lib/utils/ai-context-helpers";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -43,6 +45,18 @@ export default function Dashboard() {
     toggleSidebar,
   } = useSidebar();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { setPageContext } = useAI();
+
+  // Set AI context for dashboard
+  useEffect(() => {
+    const context = createDashboardContext(
+      dashboardData,
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    return () => setPageContext(undefined);
+  }, [dashboardData, user?.role, setPageContext]);
 
   // Use custom dashboard hook for data management
   const {

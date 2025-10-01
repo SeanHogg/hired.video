@@ -24,6 +24,8 @@ import {
   NotFoundError,
   normalizeError,
   UnverifiedAccountError,
+  RateLimitError,
+  AIUsageLimitError,
 } from "./errors";
 import { logApiCall } from "./logger";
 
@@ -376,6 +378,16 @@ export class ApiClient {
         throw new AuthorizationError("Access forbidden");
       case 404:
         throw new NotFoundError("Resource not found");
+      case 429:
+        // Rate limit exceeded - try to extract details from data
+        const rateLimitData = data as any;
+        throw new RateLimitError(
+          rateLimitData?.message || "Rate limit exceeded",
+          rateLimitData?.data?.upgradeUrl,
+          rateLimitData?.data?.used,
+          rateLimitData?.data?.limit,
+          rateLimitData?.data?.remaining,
+        );
       default:
         throw new NetworkError(`HTTP ${status}: Request failed`);
     }
@@ -392,6 +404,28 @@ export class ApiClient {
       case "EMAIL_NOT_VERIFIED":
         // Do NOT clear auth or redirect; this is a special flow handled by UI
         return new UnverifiedAccountError(error.message, error.details);
+      case "AI_USAGE_LIMIT_REACHED":
+        // AI usage limit exceeded - extract upgrade info from data
+        const aiData = (errorResponse as any).data || {};
+        return new AIUsageLimitError(
+          error.message,
+          aiData.upgradeUrl || "/pricing",
+          aiData.used,
+          aiData.limit,
+          aiData.remaining,
+          error.details,
+        );
+      case "RATE_LIMIT_EXCEEDED":
+        // General rate limit exceeded
+        const rateLimitData = (errorResponse as any).data || {};
+        return new RateLimitError(
+          error.message,
+          rateLimitData.upgradeUrl || "/pricing",
+          rateLimitData.used,
+          rateLimitData.limit,
+          rateLimitData.remaining,
+          error.details,
+        );
       case "AUTHENTICATION_ERROR":
       case "ACCOUNT_DELETED":
         console.log(

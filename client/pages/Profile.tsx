@@ -23,6 +23,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { uploadAvatar } from "@/lib/services/upload-service";
+import { useAI } from "@/lib/ai-context";
+import { createProfileContext } from "@/lib/utils/ai-context-helpers";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ShareModal from "@/components/ShareModal";
@@ -69,6 +71,19 @@ function ProfileContent() {
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { user, isAuthenticated, refreshUser, logout } = useAuth();
+  const { setPageContext } = useAI();
+
+  // Set AI context for profile page
+  useEffect(() => {
+    const context = createProfileContext(
+      isEditing ? "profile-edit" : "profile-view",
+      user || undefined,
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    return () => setPageContext(undefined);
+  }, [isEditing, user, setPageContext]);
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {

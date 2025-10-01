@@ -27,6 +27,8 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import { useAI } from "@/lib/ai-context";
+import { createOutreachContext } from "@/lib/utils/ai-context-helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,6 +92,7 @@ export default function Outreach() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { setPageContext } = useAI();
 
   // State management
   const [activeTab, setActiveTab] = useState<
@@ -97,6 +100,17 @@ export default function Outreach() {
   >("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Set AI context for outreach page
+  useEffect(() => {
+    const context = createOutreachContext(
+      "outreach",
+      user?.role || "guest"
+    );
+    setPageContext(context);
+
+    return () => setPageContext(undefined);
+  }, [user?.role, setPageContext]);
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);

@@ -136,6 +136,44 @@ export class UnverifiedAccountError extends AppError {
 }
 
 /**
+ * Rate limit error - for when API rate limits are exceeded
+ */
+export class RateLimitError extends AppError {
+  readonly code = "RATE_LIMIT_EXCEEDED";
+  readonly statusCode = 429;
+
+  constructor(
+    message: string,
+    public readonly upgradeUrl?: string,
+    public readonly used?: number,
+    public readonly limit?: number,
+    public readonly remaining?: number,
+    context?: Record<string, unknown>,
+  ) {
+    super(message, context);
+  }
+}
+
+/**
+ * AI usage limit error - for when AI usage limits are exceeded
+ */
+export class AIUsageLimitError extends AppError {
+  readonly code = "AI_USAGE_LIMIT_REACHED";
+  readonly statusCode = 429;
+
+  constructor(
+    message: string,
+    public readonly upgradeUrl?: string,
+    public readonly used?: number,
+    public readonly limit?: number,
+    public readonly remaining?: number,
+    context?: Record<string, unknown>,
+  ) {
+    super(message, context);
+  }
+}
+
+/**
  * Internal error - for unexpected application errors
  */
 export class InternalError extends AppError {

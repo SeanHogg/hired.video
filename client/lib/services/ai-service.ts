@@ -7,6 +7,13 @@ import { logger } from "@/lib/logger";
 import { apiClient } from "@/lib/api-client";
 import { billingService } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
+import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
+import type {
+  AIContext,
+  AIContextPayload,
+  AIContextResponse,
+  AIAction,
+} from "@/lib/types/ai-context";
 
 // ============================================================================
 // TYPES
@@ -109,7 +116,13 @@ class AIService {
     } catch (error: unknown) {
       logger.error("AI service error", { error });
 
-      // If this is an explicit usage limit error, propagate it to the UI (no mock fallback)
+      // If this is an AI usage limit or rate limit error, propagate it to the UI (no mock fallback)
+      if (error instanceof AIUsageLimitError || error instanceof RateLimitError) {
+        logger.warn("AI usage limit reached, propagating to UI");
+        throw error;
+      }
+
+      // Also check for legacy error format
       const maybe = error as Partial<AIServiceError> | undefined;
       if (maybe && maybe.code === "AI_USAGE_LIMIT_REACHED") {
         throw error as Error;
@@ -218,6 +231,76 @@ Keep responses concise but informative, using bullet points and emojis to improv
 
     return this.sendChatMessage(messages);
   }
+
+  /**
+   * Send a context-aware AI request
+   * This method sends the page context along with the user's message
+   */
+  async sendContextAwareMessage(
+    message: string,
+    context: AIContext,
+    history: ChatMessage[] = [],
+    action?: AIAction,
+  ): Promise<AIContextResponse> {
+    try {
+      logger.info("Sending context-aware AI request", {
+        contextType: context.contextType,
+        action,
+      });
+
+      // Enforce AI monthly usage limits client-side for immediate UX feedback
+      const usage = await billingService.getMonthlyAIUsage();
+      if (!usage.isUnlimited) {
+        const limit = usage.limit ?? FREE_AI_MONTHLY_LIMIT;
+        const remaining = usage.remaining ?? Math.max(0, limit - (usage.used ?? 0));
+        if (remaining <= 0) {
+          const limitError: AIServiceError = {
+            code: "AI_USAGE_LIMIT_REACHED",
+            message: `You've used all ${limit} free AI requests for this month. Upgrade to Premium for unlimited AI.`,
+          };
+          throw limitError as unknown as Error;
+        }
+      }
+
+      const payload: AIContextPayload = {
+        context,
+        message,
+        history,
+        action,
+      };
+
+      const response = await apiClient.post<AIContextResponse>(
+        "/api/ai/context",
+        payload,
+      );
+
+      if (!response.data) {
+        throw new Error("Invalid response from context-aware AI API");
+      }
+
+      logger.info("Context-aware AI response received");
+      return response.data;
+    } catch (error: unknown) {
+      logger.error("Context-aware AI service error", { error });
+
+      // If this is an AI usage limit or rate limit error, propagate it to the UI
+      if (error instanceof AIUsageLimitError || error instanceof RateLimitError) {
+        logger.warn("AI usage limit reached, propagating to UI");
+        throw error;
+      }
+
+      // Also check for legacy error format
+      const maybe = error as Partial<AIServiceError> | undefined;
+      if (maybe && maybe.code === "AI_USAGE_LIMIT_REACHED") {
+        throw error as Error;
+      }
+
+      // For other errors, throw with context
+      throw new Error(
+        `Context-aware AI request failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+  }
 }
 
 // ============================================================================
@@ -238,6 +321,18 @@ export async function sendHRMessage(
   history: ChatMessage[] = [],
 ): Promise<ChatResponse> {
   return aiService.sendHRChatMessage(message, history);
+}
+
+/**
+ * Send a context-aware AI message
+ */
+export async function sendContextAwareMessage(
+  message: string,
+  context: AIContext,
+  history: ChatMessage[] = [],
+  action?: AIAction,
+): Promise<AIContextResponse> {
+  return aiService.sendContextAwareMessage(message, context, history, action);
 }
 
 /**
