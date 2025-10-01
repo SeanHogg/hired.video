@@ -58,12 +58,15 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // Set AI context for dashboard - TESTING MINIMAL VERSION
+  // TEST 1: Can we call setPageContext with undefined?
   useEffect(() => {
-    console.log("Dashboard: useEffect running");
-    setTestMessage("useEffect HAS RUN!");
-    // Do nothing else - just test if useEffect itself works
-  }, []);
+    try {
+      setPageContext(undefined);
+      setTestMessage("✅ TEST 1 PASSED: setPageContext(undefined) worked");
+    } catch (error) {
+      setTestMessage(`❌ TEST 1 FAILED: ${error}`);
+    }
+  }, [setPageContext]);
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
