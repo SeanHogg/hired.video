@@ -37,8 +37,6 @@ import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 
 export default function Dashboard() {
-  console.log("[Dashboard] Component rendering");
-
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -46,14 +44,8 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-
-  console.log("[Dashboard] After useSidebar");
-
   const { user, isAuthenticated, isLoading } = useAuth();
-  console.log("[Dashboard] After useAuth", { user, isAuthenticated, isLoading });
-
   const { setPageContext } = useAI();
-  console.log("[Dashboard] After useAI", { setPageContext });
 
   // Use custom dashboard hook for data management
   const {
@@ -67,9 +59,20 @@ export default function Dashboard() {
   // Set AI context for dashboard
   useEffect(() => {
     // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      console.log("Dashboard: Skipping AI context setup (SSR)");
+      return;
+    }
+
+    // Skip if AI context is not available
+    if (!setPageContext) {
+      console.warn("Dashboard: setPageContext is not available");
+      return;
+    }
 
     try {
+      console.log("Dashboard: Setting up AI context", { dashboardData, userRole: user?.role });
+
       // Extract stats from dashboard data if available
       const stats = dashboardData ? {
         activeJobs: dashboardData.metrics.find(m => m.title === "Active Jobs")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Active Jobs")!.value) : undefined,
@@ -90,17 +93,20 @@ export default function Dashboard() {
         recentActivity,
         user?.role || "guest"
       );
+
+      console.log("Dashboard: AI context created successfully", context);
       setPageContext(context);
     } catch (error) {
-      console.error("Failed to set AI context:", error);
-      // Don't break the page if AI context fails
+      console.error("Dashboard: Error setting AI context:", error);
+      // Don't throw - just log the error and continue
     }
 
     return () => {
       try {
+        console.log("Dashboard: Cleaning up AI context");
         setPageContext(undefined);
       } catch (error) {
-        console.error("Failed to clear AI context:", error);
+        console.error("Dashboard: Error clearing AI context:", error);
       }
     };
   }, [dashboardData, user?.role, setPageContext]);
