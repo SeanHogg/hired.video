@@ -101,31 +101,31 @@ export default function Outreach() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Set AI context for outreach page
-  useEffect(() => {
-    // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") return;
+  // Set AI context for outreach page - TEMPORARILY DISABLED FOR DEBUGGING
+  // useEffect(() => {
+  //   // Skip AI context setup if window is not available (SSR)
+  //   if (typeof window === "undefined") return;
 
-    try {
-      const context = createOutreachContext(
-        "outreach",
-        undefined,
-        user?.role || "guest"
-      );
-      setPageContext(context);
-    } catch (error) {
-      console.error("Failed to set AI context:", error);
-      // Don't break the page if AI context fails
-    }
+  //   try {
+  //     const context = createOutreachContext(
+  //       "outreach",
+  //       undefined,
+  //       user?.role || "guest"
+  //     );
+  //     setPageContext(context);
+  //   } catch (error) {
+  //     console.error("Failed to set AI context:", error);
+  //     // Don't break the page if AI context fails
+  //   }
 
-    return () => {
-      try {
-        setPageContext(undefined);
-      } catch (error) {
-        console.error("Failed to clear AI context:", error);
-      }
-    };
-  }, [user?.role, setPageContext]);
+  //   return () => {
+  //     try {
+  //       setPageContext(undefined);
+  //     } catch (error) {
+  //       console.error("Failed to clear AI context:", error);
+  //     }
+  //   };
+  // }, [user?.role, setPageContext]);
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);

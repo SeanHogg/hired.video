@@ -202,31 +202,31 @@ export default function Resumes() {
     }
   };
 
-  // Set AI context for resume list page
-  useEffect(() => {
-    // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") return;
+  // Set AI context for resume list page - TEMPORARILY DISABLED FOR DEBUGGING
+  // useEffect(() => {
+  //   // Skip AI context setup if window is not available (SSR)
+  //   if (typeof window === "undefined") return;
 
-    try {
-      const context = createResumeContext(
-        "resume-list",
-        undefined,
-        user?.role || "guest"
-      );
-      setPageContext(context);
-    } catch (error) {
-      console.error("Failed to set AI context:", error);
-      // Don't break the page if AI context fails
-    }
+  //   try {
+  //     const context = createResumeContext(
+  //       "resume-list",
+  //       undefined,
+  //       user?.role || "guest"
+  //     );
+  //     setPageContext(context);
+  //   } catch (error) {
+  //     console.error("Failed to set AI context:", error);
+  //     // Don't break the page if AI context fails
+  //   }
 
-    return () => {
-      try {
-        setPageContext(undefined);
-      } catch (error) {
-        console.error("Failed to clear AI context:", error);
-      }
-    };
-  }, [user?.role, setPageContext]);
+  //   return () => {
+  //     try {
+  //       setPageContext(undefined);
+  //     } catch (error) {
+  //       console.error("Failed to clear AI context:", error);
+  //     }
+  //   };
+  // }, [user?.role, setPageContext]);
 
   // Set default view state based on user role
   useEffect(() => {

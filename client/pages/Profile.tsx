@@ -73,31 +73,31 @@ function ProfileContent() {
   const { user, isAuthenticated, refreshUser, logout } = useAuth();
   const { setPageContext } = useAI();
 
-  // Set AI context for profile page
-  useEffect(() => {
-    // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") return;
+  // Set AI context for profile page - TEMPORARILY DISABLED FOR DEBUGGING
+  // useEffect(() => {
+  //   // Skip AI context setup if window is not available (SSR)
+  //   if (typeof window === "undefined") return;
 
-    try {
-      const context = createProfileContext(
-        isEditing ? "profile-edit" : "profile-view",
-        user || undefined,
-        user?.role || "guest"
-      );
-      setPageContext(context);
-    } catch (error) {
-      console.error("Failed to set AI context:", error);
-      // Don't break the page if AI context fails
-    }
+  //   try {
+  //     const context = createProfileContext(
+  //       isEditing ? "profile-edit" : "profile-view",
+  //       user || undefined,
+  //       user?.role || "guest"
+  //     );
+  //     setPageContext(context);
+  //   } catch (error) {
+  //     console.error("Failed to set AI context:", error);
+  //     // Don't break the page if AI context fails
+  //   }
 
-    return () => {
-      try {
-        setPageContext(undefined);
-      } catch (error) {
-        console.error("Failed to clear AI context:", error);
-      }
-    };
-  }, [isEditing, user, setPageContext]);
+  //   return () => {
+  //     try {
+  //       setPageContext(undefined);
+  //     } catch (error) {
+  //       console.error("Failed to clear AI context:", error);
+  //     }
+  //   };
+  // }, [isEditing, user, setPageContext]);
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {

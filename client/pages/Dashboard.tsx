@@ -58,15 +58,15 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // TEST 1: Can we call setPageContext with undefined?
+  // TEST 2: Can we create a dashboard context?
   useEffect(() => {
     try {
-      setPageContext(undefined);
-      setTestMessage("✅ TEST 1 PASSED: setPageContext(undefined) worked");
+      const context = createDashboardContext(undefined, undefined, "guest");
+      setTestMessage("✅ TEST 2 PASSED: createDashboardContext worked");
     } catch (error) {
-      setTestMessage(`❌ TEST 1 FAILED: ${error}`);
+      setTestMessage(`❌ TEST 2 FAILED: ${error}`);
     }
-  }, [setPageContext]);
+  }, []);
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
