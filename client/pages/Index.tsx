@@ -176,7 +176,7 @@ export default function Index() {
     } else if (item.type === "company") {
       navigate(`/companies/${item.id}`);
     } else if (item.type === "people") {
-      navigate(`/people/${(item as any).slug || item.id}`);
+      navigate(`/people/${(item).slug || item.id}`);
     } else {
       console.log("Unknown item type:", item.type, "for item:", item.id);
     }

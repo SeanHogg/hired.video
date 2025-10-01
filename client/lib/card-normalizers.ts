@@ -25,7 +25,7 @@ export function normalizeJobData(
   context: CardContext,
 ): NormalizedJobData {
   // Handle nested jobData structure vs flat structure
-  const jobData = item.jobData || item;
+  const jobData: RawApiItem = (item.jobData as unknown as RawApiItem) || item;
 
   return {
     id: jobData.id || item.id,
@@ -33,37 +33,37 @@ export function normalizeJobData(
     title: jobData.title || item.title || "Untitled Position",
     company: jobData.company || item.company || "Unknown Company",
     location: jobData.location || item.location || "Remote",
-    salary: (jobData as any)?.salary || (item as any)?.salary,
+    salary: jobData.salary || item.salary,
     employmentType:
       jobData.employmentType || item.employmentType || "Full-time",
     experienceLevel:
-      (jobData as any)?.experienceLevel ||
-      (item as any)?.experienceLevel ||
+      jobData.experienceLevel ||
+      item.experienceLevel ||
       "Not specified",
-    status: (jobData as any)?.status || (item as any)?.status || "active",
-    privacy: (jobData as any)?.privacy || (item as any)?.privacy || "public",
-    summary: (jobData as any)?.summary || (item as any)?.summary || "",
+    status: jobData.status || item.status || "active",
+    privacy: (jobData.privacy || item.privacy || "public") as "public" | "private",
+    summary: jobData.summary || item.summary || "",
     createdAt:
-      (jobData as any)?.createdAt ||
-      (jobData as any)?.postedDate ||
-      (item as any)?.createdAt ||
+      jobData.createdAt ||
+      jobData.postedDate ||
+      item.createdAt ||
       new Date().toISOString(),
     updatedAt:
-      (jobData as any)?.updatedAt ||
-      (item as any)?.updatedAt ||
+      jobData.updatedAt ||
+      item.updatedAt ||
       new Date().toISOString(),
     views: jobData.views || item.views || 0,
     applications:
-      (jobData as any)?.applications || (item as any)?.applications || 0,
+      jobData.applications || item.applications || 0,
     ownership:
       determineOwnership(item, context) === "none"
         ? "tracked"
         : (determineOwnership(item, context) as "owned" | "tracked"),
     showOwnership: context.showOwnership || false,
-    userId: (jobData as any)?.userId || (item as any)?.userId || "unknown",
-    companyId: (jobData as any)?.companyId || (item as any)?.companyId,
-    expiresAt: (jobData as any)?.expiresAt || (item as any)?.expiresAt,
-    slug: (jobData as any)?.slug || (item as any)?.slug || `job-${item.id}`,
+    userId: jobData.userId || item.userId || "unknown",
+    companyId: jobData.companyId || item.companyId,
+    expiresAt: jobData.expiresAt || item.expiresAt,
+    slug: jobData.slug || item.slug || `job-${item.id}`,
   };
 }
 

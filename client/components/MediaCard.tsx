@@ -1,12 +1,17 @@
-import { Play, Image as ImageIcon, Eye, Calendar } from "lucide-react";
+import { Play, Image as ImageIcon, Eye, Calendar, ExternalLink } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
-import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { MetaType, type ResumeSectionMeta } from "@/types/resume";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import { useNavigate } from "react-router-dom";
+
+// Extended type for media with user information
+interface MediaWithUser extends ResumeSectionMeta {
+  userSlug?: string;
+  slug?: string;
+}
 
 interface MediaCardProps {
   media: ResumeSectionMeta;
@@ -42,36 +47,54 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
 
   const getThumbnail = () => {
     if (media.metaType === MetaType.YouTube) {
-      // Extract YouTube video ID and create thumbnail URL
+      // Extract YouTube video ID and create high-quality thumbnail URL
       try {
         const url = new URL(media.url);
         let videoId = "";
-        
+
         if (url.hostname.includes("youtu.be")) {
           videoId = url.pathname.split("/").filter(Boolean)[0];
         } else if (url.hostname.includes("youtube.com")) {
           videoId = url.searchParams.get("v") || "";
         }
-        
+
         if (videoId) {
-          return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+          // Use maxresdefault for higher quality, fallback to mqdefault if not available
+          return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         }
-      } catch (error) {
-        console.error("Error parsing YouTube URL:", error);
+      } catch {
+        // Silently handle YouTube URL parsing errors
       }
     }
-    
+
     if (isImage) {
       return media.url;
     }
-    
+
+    return null;
+  };
+
+  const getYouTubeVideoId = () => {
+    if (media.metaType !== MetaType.YouTube) return null;
+
+    try {
+      const url = new URL(media.url);
+      if (url.hostname.includes("youtu.be")) {
+        return url.pathname.split("/").filter(Boolean)[0];
+      } else if (url.hostname.includes("youtube.com")) {
+        return url.searchParams.get("v") || null;
+      }
+    } catch {
+      // Silently handle YouTube URL parsing errors
+    }
     return null;
   };
 
   const thumbnail = getThumbnail();
   const MediaIcon = getMediaIcon();
+  const videoId = getYouTubeVideoId();
 
-  // Navigation handler for header and View button
+  // Navigation handler for media preview and actions
   const handleNavigateToResume = () => {
     if (resumeId) {
       // Navigate to resume with section anchor if we have referenceId
@@ -83,7 +106,7 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
       // If we have userId but no resumeId, navigate to user's profile page
       // The profile page will show their active resume
       // Try to use slug if available, fallback to userId
-      const userSlug = (media as any).userSlug || (media as any).slug;
+      const userSlug = (media as MediaWithUser).userSlug || (media as MediaWithUser).slug;
       navigate(`/people/${userSlug || media.userId}`);
     } else if (onView) {
       onView();
@@ -103,68 +126,113 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
       icon: MediaIcon,
       onClick: handleNavigateToResume,
     },
+    ...(media.url && media.metaType === MetaType.YouTube ? [{
+      id: "external",
+      label: "YouTube",
+      variant: "outline" as const,
+      icon: ExternalLink,
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        window.open(media.url, "_blank");
+      },
+    }] : []),
   ];
 
   return (
-    <BaseCard>
-      <CardHeaderWithAvatar
-        title={media.name}
-        subtitle=""
-        avatar={{
-          src: undefined,
-          fallback: isVideo ? "▶" : isImage ? "🖼" : "📄",
-          size: "md",
-        }}
-        badges={[
-          {
-            text: getMediaTypeLabel(),
-            variant: isVideo ? "default" : isImage ? "secondary" : "outline",
-          },
-        ]}
-        linkTo={resumeId ? (media.referenceId ? `/resumes/${resumeId}#${media.referenceId}` : `/resumes/${resumeId}`) :
-                media.userId ? `/people/${media.userId}` :
-                media.url ? media.url : undefined}
-        titleClassName="cursor-pointer"
-      />
-
-      <CardContent className="space-y-4">
-
-        {/* Media Preview */}
-        {thumbnail && (
-          <div className="relative aspect-video bg-muted rounded-lg overflow-hidden group cursor-pointer"
-               onClick={handleNavigateToResume}>
+    <BaseCard className="group cursor-pointer overflow-hidden" hover={true} onClick={handleNavigateToResume}>
+      {/* Enhanced Media Preview - Primary Visual Element */}
+      <div className="relative">
+        {thumbnail ? (
+          <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
+            {/* Thumbnail Image */}
             <img
               src={thumbnail}
               alt={media.name}
-              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+              className="absolute inset-0 w-full h-full object-cover transition-all duration-300 group-hover:scale-105"
+              onError={(e) => {
+                // Fallback to medium quality thumbnail for YouTube if maxres fails
+                if (media.metaType === MetaType.YouTube && videoId) {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src.includes('maxresdefault')) {
+                    target.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+                  }
+                }
+              }}
             />
+
+            {/* Video Play Button Overlay */}
             {isVideo && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                <div className="bg-white/90 rounded-full p-3 group-hover:bg-white transition-colors">
-                  <Play className="w-6 h-6 text-black fill-black" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-all duration-300">
+                <div className="bg-black/70 hover:bg-black/80 rounded-full p-4 transform scale-90 group-hover:scale-100 transition-all duration-300 shadow-lg">
+                  <Play className="w-8 h-8 text-white fill-white ml-1" />
                 </div>
               </div>
             )}
+
+            {/* Image Overlay for Non-Videos */}
+            {isImage && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center">
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 rounded-full p-3 shadow-lg">
+                  <Eye className="w-6 h-6 text-black" />
+                </div>
+              </div>
+            )}
+
+            {/* Media Type Badge */}
+            <div className="absolute top-3 left-3">
+              <div className={cn(
+                "px-2 py-1 rounded text-xs font-medium shadow-sm backdrop-blur-sm",
+                isVideo ? "bg-red-600/90 text-white" : "bg-blue-600/90 text-white"
+              )}>
+                {getMediaTypeLabel()}
+              </div>
+            </div>
+
+            {/* YouTube Duration Badge (if available) */}
+            {media.metaType === MetaType.YouTube && (
+              <div className="absolute bottom-3 right-3 bg-black/80 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                Video
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Fallback for media without thumbnails */
+          <div className="aspect-video bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 flex items-center justify-center">
+            <div className="text-center">
+              <MediaIcon className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">{getMediaTypeLabel()}</p>
+            </div>
           </div>
         )}
+      </div>
 
-        {/* Description */}
-        {media.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {media.description}
-          </p>
-        )}
+      {/* Compact Content Section */}
+      <CardContent className="p-4 space-y-3">
+        {/* Title and Description */}
+        <div className="space-y-2">
+          <h3 className="font-semibold text-base line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+            {media.name}
+          </h3>
+
+          {media.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+              {media.description}
+            </p>
+          )}
+        </div>
 
         {/* Metadata */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              <span>ADDED</span>
-            </div>
-            <span className="font-medium text-foreground">
-              {media.creationDateTime ? formatDate(media.creationDateTime) : "Recently"}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3 h-3" />
+            <span>
+              {media.creationDateTime ? formatDate(media.creationDateTime) : "Recently added"}
             </span>
+          </div>
+
+          {/* Professional indicator */}
+          <div className="flex items-center gap-1 text-primary/70">
+            <span className="font-medium">Portfolio</span>
           </div>
         </div>
       </CardContent>

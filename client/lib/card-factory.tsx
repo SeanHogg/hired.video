@@ -82,7 +82,7 @@ export function useCardRenderer({
 
       // Normalize data based on card type
       switch (cardType) {
-        case "job":
+        case "job": {
           normalizedData = normalizeJobData(item, context);
           const jobOwnership = determineItemOwnership(
             normalizedData,
@@ -108,8 +108,9 @@ export function useCardRenderer({
               onUntrack={interactions.onUntrack}
             />
           );
+        }
 
-        case "company":
+        case "company": {
           normalizedData = normalizeCompanyData(item, context);
           const companyOwnership = determineItemOwnership(
             normalizedData,
@@ -135,8 +136,9 @@ export function useCardRenderer({
               onUntrack={interactions.onUntrack}
             />
           );
+        }
 
-        case "people":
+        case "people": {
           normalizedData = normalizePersonData(item, context);
           const peopleOwnership = determineItemOwnership(
             normalizedData,
@@ -173,8 +175,9 @@ export function useCardRenderer({
               onUntrack={interactions.onUntrack}
             />
           );
+        }
 
-        case "resume":
+        case "resume": {
           normalizedData = normalizeResumeData(item, context);
           const resumeOwnership = determineItemOwnership(
             normalizedData,
@@ -203,8 +206,9 @@ export function useCardRenderer({
               onActions={() => interactions.onActions?.(normalizedData)}
             />
           );
+        }
 
-        case "video":
+        case "video": {
           normalizedData = normalizeVideoData(item, context);
           const videoOwnership = determineItemOwnership(
             normalizedData,
@@ -248,8 +252,9 @@ export function useCardRenderer({
               onActions={() => interactions.onActions?.(normalizedData)}
             />
           );
+        }
 
-        case "media":
+        case "media": {
           const mediaData = normalizeMediaData(item, context);
 
           // Try to extract resume ID from the item data
@@ -258,7 +263,7 @@ export function useCardRenderer({
           const resumeId = item.resumeId || item.ResumeId || item.resumeInformationEntityId || item.ResumeInformationEntityId;
 
           // For media items, also try to get the owner's user ID for fallback navigation
-          const ownerId = (item as any).ownerId || (item as any).userId || mediaData.userId;
+          const ownerId = item.ownerId || item.userId || mediaData.userId;
 
           // Convert normalized media data to MediaCard format
           const mediaCardData = {
@@ -279,12 +284,13 @@ export function useCardRenderer({
           return (
             <MediaCard
               key={mediaData.id}
-              media={mediaCardData as any}
+              media={mediaCardData}
               resumeId={resumeId}
               onView={() => interactions.onView?.(mediaData)}
               onPlay={() => interactions.onView?.(mediaData)}
             />
           );
+        }
 
         default:
           // eslint-disable-next-line no-console
@@ -310,7 +316,7 @@ export function renderCardItem(
   let normalizedData: NormalizedCardData;
 
   switch (cardType) {
-    case "job":
+    case "job": {
       normalizedData = normalizeJobData(item, context);
       return (
         <JobCard
@@ -322,8 +328,9 @@ export function renderCardItem(
           onUntrack={interactions.onUntrack}
         />
       );
+    }
 
-    case "company":
+    case "company": {
       normalizedData = normalizeCompanyData(item, context);
       return (
         <CompanyCard
@@ -335,8 +342,9 @@ export function renderCardItem(
           onUntrack={interactions.onUntrack}
         />
       );
+    }
 
-    case "people":
+    case "people": {
       normalizedData = normalizePersonData(item, context);
       return (
         <PeopleCard
@@ -348,8 +356,9 @@ export function renderCardItem(
           onUntrack={interactions.onUntrack}
         />
       );
+    }
 
-    case "resume":
+    case "resume": {
       normalizedData = normalizeResumeData(item, context);
       return (
         <ResumeCard
@@ -364,8 +373,9 @@ export function renderCardItem(
           onActions={() => interactions.onActions?.(normalizedData)}
         />
       );
+    }
 
-    case "video":
+    case "video": {
       normalizedData = normalizeVideoData(item, context);
       return (
         <VideoCard
@@ -384,8 +394,9 @@ export function renderCardItem(
           onActions={() => interactions.onActions?.(normalizedData)}
         />
       );
+    }
 
-    case "media":
+    case "media": {
       const mediaData = normalizeMediaData(item, context);
       // Convert normalized media data to MediaCard format
       const mediaCardData = {
@@ -407,12 +418,14 @@ export function renderCardItem(
       return (
         <MediaCard
           key={mediaData.id}
-          media={mediaCardData as any}
+          media={mediaCardData}
           resumeId={resumeId}
           onView={() => interactions.onView?.(mediaData)}
           onPlay={() => interactions.onView?.(mediaData)}
         />
       );
+
+    }
 
     default:
       // eslint-disable-next-line no-console

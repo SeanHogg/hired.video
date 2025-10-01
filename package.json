@@ -21,7 +21,9 @@
     "check": "npm run typecheck && npm run lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "quality-check": "node ./scripts/quality-check.mjs",
+    "quality-check:required": "node ./scripts/quality-check.mjs --required-only"
   },
   "dependencies": {
     "@microsoft/signalr": "^9.0.6",

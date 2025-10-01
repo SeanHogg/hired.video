@@ -4,10 +4,7 @@ import {
   GraduationCap,
   Award,
   FileText,
-  Plus,
-  Trash2,
   Save,
-  X,
   Heart,
   FolderOpen,
   Globe,
@@ -15,8 +12,6 @@ import {
   BookOpen,
   Lightbulb,
   UserCheck,
-  ChevronDown,
-  Loader2,
 } from "lucide-react";
 import { useState , useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+
 
 import type {
   ResumeData,

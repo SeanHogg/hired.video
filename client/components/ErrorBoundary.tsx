@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<
       errorBoundary: this.props.level || "component",
     });
 
-    const { shouldLog, shouldReport } = handleError(normalizedError);
+    const { shouldLog: _shouldLog, shouldReport } = handleError(normalizedError);
 
     // Always log error boundary errors regardless of status code
     // Error boundaries catch React errors that may not have HTTP status codes

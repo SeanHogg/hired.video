@@ -166,7 +166,7 @@ export class JobService {
     const response = await apiClient.get<z.infer<typeof PaginatedJobsSchema>>(endpoint, PaginatedJobsSchema);
 
     const dto = response.data;
-    const items = (dto.items || dto.Items || []) as JobSummary[];
+    const items = (dto.items || dto.Items || []);
     const total = dto.total ?? dto.Total ?? items.length;
     const page = dto.page ?? dto.Page ?? 1;
     const limit = dto.limit ?? dto.Limit ?? items.length;

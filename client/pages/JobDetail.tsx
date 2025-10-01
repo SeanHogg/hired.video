@@ -220,7 +220,7 @@ export default function JobDetail() {
         }
 
         if (!isMounted) return;
-        setJob(mapApiJobToUI(apiJob as any));
+        setJob(mapApiJobToUI(apiJob));
       } catch (e) {
         if (!isMounted) return;
         setError("Failed to load job");
