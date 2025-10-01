@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -13,8 +13,7 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import { useAI } from "@/lib/ai-context";
-import { createDashboardContext } from "@/lib/utils/ai-context-helpers";
+
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -35,10 +34,9 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import AIContextProvider from "@/components/AIContextProvider";
 
 export default function Dashboard() {
-  const [testMessage, setTestMessage] = useState<string>("useEffect NOT run yet");
-
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -47,7 +45,6 @@ export default function Dashboard() {
     toggleSidebar,
   } = useSidebar();
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { setPageContext } = useAI();
 
   // Use custom dashboard hook for data management
   const {
@@ -58,18 +55,6 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // TEST 4: Can we set the context WITHOUT setPageContext in dependencies?
-  useEffect(() => {
-    try {
-      const context = createDashboardContext(undefined, undefined, "guest");
-      setPageContext(context);
-      setTestMessage("✅ TEST 4 PASSED: setPageContext works without dependency!");
-    } catch (error) {
-      setTestMessage(`❌ TEST 4 FAILED: ${error}`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array - only run once
-
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
 
@@ -78,12 +63,18 @@ export default function Dashboard() {
     children,
   }) => (
     <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* AI Context Provider - Auto-initializes AI context for this page */}
+      <AIContextProvider
+        contextData={{
+          metrics: dashboardData?.metrics,
+          recentActivity: dashboardData?.recentActivity,
+          userRole: user?.role,
+        }}
+      />
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{dashboardData?.title}</h1>
         <p className="text-muted-foreground">{dashboardData?.description}</p>
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded mt-2">
-          TEST: {testMessage}
-        </div>
         {lastRefresh && (
           <p className="text-xs text-muted-foreground mt-2">
             Last updated: {lastRefresh.toLocaleString()}
