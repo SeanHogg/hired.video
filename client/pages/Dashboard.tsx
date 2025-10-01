@@ -56,60 +56,11 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // Set AI context for dashboard
+  // Set AI context for dashboard - TESTING MINIMAL VERSION
   useEffect(() => {
-    // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") {
-      console.log("Dashboard: Skipping AI context setup (SSR)");
-      return;
-    }
-
-    // Skip if AI context is not available
-    if (!setPageContext) {
-      console.warn("Dashboard: setPageContext is not available");
-      return;
-    }
-
-    try {
-      console.log("Dashboard: Setting up AI context", { dashboardData, userRole: user?.role });
-
-      // Extract stats from dashboard data if available
-      const stats = dashboardData ? {
-        activeJobs: dashboardData.metrics.find(m => m.title === "Active Jobs")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Active Jobs")!.value) : undefined,
-        applications: dashboardData.metrics.find(m => m.title === "Applications")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Applications")!.value) : undefined,
-        views: dashboardData.metrics.find(m => m.title === "Profile Views")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Profile Views")!.value) : undefined,
-        matches: dashboardData.metrics.find(m => m.title === "Matches")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Matches")!.value) : undefined,
-      } : undefined;
-
-      // Transform recent activity to match expected format
-      const recentActivity = dashboardData?.recentActivity?.map(activity => ({
-        type: activity.type,
-        description: activity.content,
-        timestamp: activity.timestamp || new Date(),
-      }));
-
-      const context = createDashboardContext(
-        stats,
-        recentActivity,
-        user?.role || "guest"
-      );
-
-      console.log("Dashboard: AI context created successfully", context);
-      setPageContext(context);
-    } catch (error) {
-      console.error("Dashboard: Error setting AI context:", error);
-      // Don't throw - just log the error and continue
-    }
-
-    return () => {
-      try {
-        console.log("Dashboard: Cleaning up AI context");
-        setPageContext(undefined);
-      } catch (error) {
-        console.error("Dashboard: Error clearing AI context:", error);
-      }
-    };
-  }, [dashboardData, user?.role, setPageContext]);
+    console.log("Dashboard: useEffect running");
+    // Do nothing else - just test if useEffect itself works
+  }, []);
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
