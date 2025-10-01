@@ -78,32 +78,32 @@ export default function Jobs() {
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
 
-  // Set AI context for this page
-  useEffect(() => {
-    // Skip AI context setup if window is not available (SSR)
-    if (typeof window === "undefined") return;
+  // Set AI context for this page - TEMPORARILY DISABLED FOR DEBUGGING
+  // useEffect(() => {
+  //   // Skip AI context setup if window is not available (SSR)
+  //   if (typeof window === "undefined") return;
 
-    try {
-      const context = createJobContext(
-        "job-list",
-        undefined,
-        user?.role || "guest"
-      );
-      setPageContext(context);
-    } catch (error) {
-      console.error("Failed to set AI context:", error);
-      // Don't break the page if AI context fails
-    }
+  //   try {
+  //     const context = createJobContext(
+  //       "job-list",
+  //       undefined,
+  //       user?.role || "guest"
+  //     );
+  //     setPageContext(context);
+  //   } catch (error) {
+  //     console.error("Failed to set AI context:", error);
+  //     // Don't break the page if AI context fails
+  //   }
 
-    // Clear context on unmount
-    return () => {
-      try {
-        setPageContext(undefined);
-      } catch (error) {
-        console.error("Failed to clear AI context:", error);
-      }
-    };
-  }, [user?.role, setPageContext]);
+  //   // Clear context on unmount
+  //   return () => {
+  //     try {
+  //       setPageContext(undefined);
+  //     } catch (error) {
+  //       console.error("Failed to clear AI context:", error);
+  //     }
+  //   };
+  // }, [user?.role, setPageContext]);
 
   // Pagination logic
   const {
