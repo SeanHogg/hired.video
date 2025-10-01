@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAI } from "@/lib/ai-context";
 import { getAPIsForContext } from "@/lib/config/ai-api-registry";
-import type { AIContextData, AIContextType } from "@/lib/types/ai-context";
+import type { AIContext, AIContextType } from "@/lib/types/ai-context";
 
 interface AIContextProviderProps {
   /** Optional: Provide specific context data */
@@ -48,14 +48,14 @@ export default function AIContextProvider({
     const availableActions = getActionsForContext(contextType);
 
     // Build the context object
-    const context: AIContextData = {
+    const context: AIContext = {
       contextType,
       pageUrl: window.location.href,
       timestamp: new Date(),
       availableAPIs,
       availableActions,
       ...contextData, // Merge in any page-specific data
-    };
+    } as AIContext;
 
     setPageContext(context);
 

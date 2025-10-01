@@ -23,8 +23,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { uploadAvatar } from "@/lib/services/upload-service";
-import { useAI } from "@/lib/ai-context";
-import { createProfileContext } from "@/lib/utils/ai-context-helpers";
+import AIContextProvider from "@/components/AIContextProvider";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ShareModal from "@/components/ShareModal";
@@ -71,33 +70,6 @@ function ProfileContent() {
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { user, isAuthenticated, refreshUser, logout } = useAuth();
-  const { setPageContext } = useAI();
-
-  // Set AI context for profile page - TEMPORARILY DISABLED FOR DEBUGGING
-  // useEffect(() => {
-  //   // Skip AI context setup if window is not available (SSR)
-  //   if (typeof window === "undefined") return;
-
-  //   try {
-  //     const context = createProfileContext(
-  //       isEditing ? "profile-edit" : "profile-view",
-  //       user || undefined,
-  //       user?.role || "guest"
-  //     );
-  //     setPageContext(context);
-  //   } catch (error) {
-  //     console.error("Failed to set AI context:", error);
-  //     // Don't break the page if AI context fails
-  //   }
-
-  //   return () => {
-  //     try {
-  //       setPageContext(undefined);
-  //     } catch (error) {
-  //       console.error("Failed to clear AI context:", error);
-  //     }
-  //   };
-  // }, [isEditing, user, setPageContext]);
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
@@ -250,6 +222,9 @@ function ProfileContent() {
         />
 
         <div className="pt-16 p-6">
+          {/* AI Context Provider - Auto-initializes AI context for this page */}
+          <AIContextProvider />
+
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Profile Header */}
             <Card>

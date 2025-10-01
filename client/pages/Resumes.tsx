@@ -30,8 +30,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import { useAI } from "@/lib/ai-context";
-import { createResumeContext } from "@/lib/utils/ai-context-helpers";
+import AIContextProvider from "@/components/AIContextProvider";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -112,7 +111,6 @@ export default function Resumes() {
   // SEO for resumes page
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
-  const { setPageContext } = useAI();
   const { toast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -202,31 +200,7 @@ export default function Resumes() {
     }
   };
 
-  // Set AI context for resume list page - TEMPORARILY DISABLED FOR DEBUGGING
-  // useEffect(() => {
-  //   // Skip AI context setup if window is not available (SSR)
-  //   if (typeof window === "undefined") return;
 
-  //   try {
-  //     const context = createResumeContext(
-  //       "resume-list",
-  //       undefined,
-  //       user?.role || "guest"
-  //     );
-  //     setPageContext(context);
-  //   } catch (error) {
-  //     console.error("Failed to set AI context:", error);
-  //     // Don't break the page if AI context fails
-  //   }
-
-  //   return () => {
-  //     try {
-  //       setPageContext(undefined);
-  //     } catch (error) {
-  //       console.error("Failed to clear AI context:", error);
-  //     }
-  //   };
-  // }, [user?.role, setPageContext]);
 
   // Set default view state based on user role
   useEffect(() => {
@@ -826,6 +800,9 @@ export default function Resumes() {
           />
 
           <div className="pt-16">
+            {/* AI Context Provider - Auto-initializes AI context for this page */}
+            <AIContextProvider />
+
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">

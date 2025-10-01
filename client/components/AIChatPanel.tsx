@@ -40,21 +40,7 @@ interface Message {
 }
 
 export default function AIChatPanel() {
-  const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext } = useAI();
-
-  // Auto-initialize context from data island on mount
-  useEffect(() => {
-    // Look for data island in the DOM
-    const dataIsland = document.getElementById("ai-context-data");
-    if (dataIsland && dataIsland.textContent) {
-      try {
-        const contextData = JSON.parse(dataIsland.textContent);
-        setPageContext(contextData);
-      } catch (error) {
-        console.error("Failed to parse AI context data island:", error);
-      }
-    }
-  }, []); // Only run once on mount
+  const { isAIChatOpen, closeAIChat, currentContext, pageContext } = useAI();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",

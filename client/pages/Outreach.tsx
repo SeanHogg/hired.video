@@ -27,8 +27,7 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import { useAI } from "@/lib/ai-context";
-import { createOutreachContext } from "@/lib/utils/ai-context-helpers";
+import AIContextProvider from "@/components/AIContextProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,7 +91,6 @@ export default function Outreach() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
-  const { setPageContext } = useAI();
 
   // State management
   const [activeTab, setActiveTab] = useState<
@@ -101,31 +99,7 @@ export default function Outreach() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Set AI context for outreach page - TEMPORARILY DISABLED FOR DEBUGGING
-  // useEffect(() => {
-  //   // Skip AI context setup if window is not available (SSR)
-  //   if (typeof window === "undefined") return;
 
-  //   try {
-  //     const context = createOutreachContext(
-  //       "outreach",
-  //       undefined,
-  //       user?.role || "guest"
-  //     );
-  //     setPageContext(context);
-  //   } catch (error) {
-  //     console.error("Failed to set AI context:", error);
-  //     // Don't break the page if AI context fails
-  //   }
-
-  //   return () => {
-  //     try {
-  //       setPageContext(undefined);
-  //     } catch (error) {
-  //       console.error("Failed to clear AI context:", error);
-  //     }
-  //   };
-  // }, [user?.role, setPageContext]);
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);
@@ -355,6 +329,9 @@ export default function Outreach() {
           />
 
           <div className="pt-16">
+            {/* AI Context Provider - Auto-initializes AI context for this page */}
+            <AIContextProvider />
+
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
