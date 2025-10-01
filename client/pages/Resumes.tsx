@@ -204,6 +204,9 @@ export default function Resumes() {
 
   // Set AI context for resume list page
   useEffect(() => {
+    // Skip AI context setup if window is not available (SSR)
+    if (typeof window === "undefined") return;
+
     try {
       const context = createResumeContext(
         "resume-list",

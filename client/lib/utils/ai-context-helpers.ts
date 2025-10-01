@@ -37,41 +37,55 @@ export function createResumeContext(
   resume?: ResumeContext["resume"],
   userRole?: string,
 ): ResumeContext {
-  const actions: ResumeAIAction[] = [];
+  try {
+    const actions: ResumeAIAction[] = [];
 
-  // Add actions based on context type
-  if (type === "resume-create" || type === "resume-edit") {
-    actions.push(
-      "optimize-content",
-      "improve-summary",
-      "enhance-experience",
-      "suggest-skills",
-      "generate-bullet-points",
-      "rewrite-section",
-      "keyword-optimization",
-    );
+    // Add actions based on context type
+    if (type === "resume-create" || type === "resume-edit") {
+      actions.push(
+        "optimize-content",
+        "improve-summary",
+        "enhance-experience",
+        "suggest-skills",
+        "generate-bullet-points",
+        "rewrite-section",
+        "keyword-optimization",
+      );
+    }
+
+    if (type === "resume-view") {
+      actions.push("ats-score", "optimize-content", "suggest-skills");
+    }
+
+    if (type === "resume-list") {
+      actions.push("optimize-content", "ats-score");
+    }
+
+    // Get available APIs for this context type
+    const availableAPIs = getAPIsForContext(type);
+
+    return {
+      contextType: type,
+      pageUrl: typeof window !== "undefined" ? window.location.href : "",
+      userRole,
+      timestamp: new Date(),
+      availableAPIs,
+      resume,
+      availableActions: actions,
+    };
+  } catch (error) {
+    console.error("Error in createResumeContext:", error);
+    // Return minimal safe context
+    return {
+      contextType: type,
+      pageUrl: "",
+      userRole,
+      timestamp: new Date(),
+      availableAPIs: [],
+      resume,
+      availableActions: [],
+    };
   }
-
-  if (type === "resume-view") {
-    actions.push("ats-score", "optimize-content", "suggest-skills");
-  }
-
-  if (type === "resume-list") {
-    actions.push("optimize-content", "ats-score");
-  }
-
-  // Get available APIs for this context type
-  const availableAPIs = getAPIsForContext(type);
-
-  return {
-    contextType: type,
-    pageUrl: typeof window !== "undefined" ? window.location.href : "",
-    userRole,
-    timestamp: new Date(),
-    availableAPIs,
-    resume,
-    availableActions: actions,
-  };
 }
 
 /**

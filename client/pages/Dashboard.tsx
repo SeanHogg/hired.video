@@ -58,6 +58,9 @@ export default function Dashboard() {
 
   // Set AI context for dashboard
   useEffect(() => {
+    // Skip AI context setup if window is not available (SSR)
+    if (typeof window === "undefined") return;
+
     try {
       // Extract stats from dashboard data if available
       const stats = dashboardData ? {

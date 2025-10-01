@@ -103,6 +103,9 @@ export default function Outreach() {
 
   // Set AI context for outreach page
   useEffect(() => {
+    // Skip AI context setup if window is not available (SSR)
+    if (typeof window === "undefined") return;
+
     try {
       const context = createOutreachContext(
         "outreach",

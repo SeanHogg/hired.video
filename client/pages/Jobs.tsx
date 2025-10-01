@@ -80,6 +80,9 @@ export default function Jobs() {
 
   // Set AI context for this page
   useEffect(() => {
+    // Skip AI context setup if window is not available (SSR)
+    if (typeof window === "undefined") return;
+
     try {
       const context = createJobContext(
         "job-list",

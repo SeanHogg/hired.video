@@ -96,7 +96,20 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
 export function useAI() {
   const context = useContext(AIContext);
   if (context === undefined) {
-    throw new Error("useAI must be used within an AIProvider");
+    // Log error but don't throw - return a safe default instead
+    console.error("useAI must be used within an AIProvider - returning safe defaults");
+    // Return safe defaults to prevent app crash
+    return {
+      isAIChatOpen: false,
+      currentContext: undefined,
+      pageContext: undefined,
+      openAIChat: () => console.warn("AIProvider not available"),
+      openAIWithContext: () => console.warn("AIProvider not available"),
+      setPageContext: () => console.warn("AIProvider not available"),
+      openAIWithPageContext: () => console.warn("AIProvider not available"),
+      closeAIChat: () => console.warn("AIProvider not available"),
+      toggleAIChat: () => console.warn("AIProvider not available"),
+    };
   }
   return context;
 }

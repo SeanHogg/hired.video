@@ -75,6 +75,9 @@ function ProfileContent() {
 
   // Set AI context for profile page
   useEffect(() => {
+    // Skip AI context setup if window is not available (SSR)
+    if (typeof window === "undefined") return;
+
     try {
       const context = createProfileContext(
         isEditing ? "profile-edit" : "profile-view",
