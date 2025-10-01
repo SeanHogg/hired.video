@@ -227,8 +227,8 @@ export default function AIChatPanel() {
   };
 
   const { user, isAuthenticated } = useAuth();
-  const isPro =
-    user?.subscription === "pro" || user?.subscription === "enterprise";
+  // Allow AI access for all authenticated users
+  const isPro = isAuthenticated;
 
   if (!isAIChatOpen) return null;
 

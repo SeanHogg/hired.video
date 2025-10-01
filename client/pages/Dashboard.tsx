@@ -37,6 +37,8 @@ import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 
 export default function Dashboard() {
+  console.log("[Dashboard] Component rendering");
+
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -44,8 +46,14 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  console.log("[Dashboard] After useSidebar");
+
   const { user, isAuthenticated, isLoading } = useAuth();
+  console.log("[Dashboard] After useAuth", { user, isAuthenticated, isLoading });
+
   const { setPageContext } = useAI();
+  console.log("[Dashboard] After useAI", { setPageContext });
 
   // Use custom dashboard hook for data management
   const {
