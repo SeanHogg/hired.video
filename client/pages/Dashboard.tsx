@@ -58,29 +58,40 @@ export default function Dashboard() {
 
   // Set AI context for dashboard
   useEffect(() => {
-    // Extract stats from dashboard data if available
-    const stats = dashboardData ? {
-      activeJobs: dashboardData.metrics.find(m => m.title === "Active Jobs")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Active Jobs")!.value) : undefined,
-      applications: dashboardData.metrics.find(m => m.title === "Applications")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Applications")!.value) : undefined,
-      views: dashboardData.metrics.find(m => m.title === "Profile Views")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Profile Views")!.value) : undefined,
-      matches: dashboardData.metrics.find(m => m.title === "Matches")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Matches")!.value) : undefined,
-    } : undefined;
+    try {
+      // Extract stats from dashboard data if available
+      const stats = dashboardData ? {
+        activeJobs: dashboardData.metrics.find(m => m.title === "Active Jobs")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Active Jobs")!.value) : undefined,
+        applications: dashboardData.metrics.find(m => m.title === "Applications")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Applications")!.value) : undefined,
+        views: dashboardData.metrics.find(m => m.title === "Profile Views")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Profile Views")!.value) : undefined,
+        matches: dashboardData.metrics.find(m => m.title === "Matches")?.value ? parseInt(dashboardData.metrics.find(m => m.title === "Matches")!.value) : undefined,
+      } : undefined;
 
-    // Transform recent activity to match expected format
-    const recentActivity = dashboardData?.recentActivity?.map(activity => ({
-      type: activity.type,
-      description: activity.content,
-      timestamp: activity.timestamp || new Date(),
-    }));
+      // Transform recent activity to match expected format
+      const recentActivity = dashboardData?.recentActivity?.map(activity => ({
+        type: activity.type,
+        description: activity.content,
+        timestamp: activity.timestamp || new Date(),
+      }));
 
-    const context = createDashboardContext(
-      stats,
-      recentActivity,
-      user?.role || "guest"
-    );
-    setPageContext(context);
+      const context = createDashboardContext(
+        stats,
+        recentActivity,
+        user?.role || "guest"
+      );
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails
+    }
 
-    return () => setPageContext(undefined);
+    return () => {
+      try {
+        setPageContext(undefined);
+      } catch (error) {
+        console.error("Failed to clear AI context:", error);
+      }
+    };
   }, [dashboardData, user?.role, setPageContext]);
 
   // Get role permissions for routing

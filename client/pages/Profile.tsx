@@ -75,14 +75,25 @@ function ProfileContent() {
 
   // Set AI context for profile page
   useEffect(() => {
-    const context = createProfileContext(
-      isEditing ? "profile-edit" : "profile-view",
-      user || undefined,
-      user?.role || "guest"
-    );
-    setPageContext(context);
+    try {
+      const context = createProfileContext(
+        isEditing ? "profile-edit" : "profile-view",
+        user || undefined,
+        user?.role || "guest"
+      );
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails
+    }
 
-    return () => setPageContext(undefined);
+    return () => {
+      try {
+        setPageContext(undefined);
+      } catch (error) {
+        console.error("Failed to clear AI context:", error);
+      }
+    };
   }, [isEditing, user, setPageContext]);
 
   // Ensure we have fresh user data only on /profile

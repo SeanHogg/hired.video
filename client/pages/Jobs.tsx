@@ -80,15 +80,26 @@ export default function Jobs() {
 
   // Set AI context for this page
   useEffect(() => {
-    const context = createJobContext(
-      "job-list",
-      undefined,
-      user?.role || "guest"
-    );
-    setPageContext(context);
+    try {
+      const context = createJobContext(
+        "job-list",
+        undefined,
+        user?.role || "guest"
+      );
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails
+    }
 
     // Clear context on unmount
-    return () => setPageContext(undefined);
+    return () => {
+      try {
+        setPageContext(undefined);
+      } catch (error) {
+        console.error("Failed to clear AI context:", error);
+      }
+    };
   }, [user?.role, setPageContext]);
 
   // Pagination logic

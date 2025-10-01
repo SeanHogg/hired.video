@@ -103,14 +103,25 @@ export default function Outreach() {
 
   // Set AI context for outreach page
   useEffect(() => {
-    const context = createOutreachContext(
-      "outreach",
-      undefined,
-      user?.role || "guest"
-    );
-    setPageContext(context);
+    try {
+      const context = createOutreachContext(
+        "outreach",
+        undefined,
+        user?.role || "guest"
+      );
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails
+    }
 
-    return () => setPageContext(undefined);
+    return () => {
+      try {
+        setPageContext(undefined);
+      } catch (error) {
+        console.error("Failed to clear AI context:", error);
+      }
+    };
   }, [user?.role, setPageContext]);
 
   // Data state

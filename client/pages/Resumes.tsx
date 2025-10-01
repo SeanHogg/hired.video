@@ -204,14 +204,25 @@ export default function Resumes() {
 
   // Set AI context for resume list page
   useEffect(() => {
-    const context = createResumeContext(
-      "resume-list",
-      undefined,
-      user?.role || "guest"
-    );
-    setPageContext(context);
+    try {
+      const context = createResumeContext(
+        "resume-list",
+        undefined,
+        user?.role || "guest"
+      );
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails
+    }
 
-    return () => setPageContext(undefined);
+    return () => {
+      try {
+        setPageContext(undefined);
+      } catch (error) {
+        console.error("Failed to clear AI context:", error);
+      }
+    };
   }, [user?.role, setPageContext]);
 
   // Set default view state based on user role
