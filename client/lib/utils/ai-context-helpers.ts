@@ -65,7 +65,7 @@ export function createResumeContext(
 
   return {
     contextType: type,
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -108,7 +108,7 @@ export function createJobContext(
 
   return {
     contextType: type,
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -146,7 +146,7 @@ export function createProfileContext(
 
   return {
     contextType: type,
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -179,7 +179,7 @@ export function createOutreachContext(
 
   return {
     contextType: type,
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -211,7 +211,7 @@ export function createSearchContext(
 
   return {
     contextType: "search",
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -242,7 +242,7 @@ export function createDashboardContext(
 
   return {
     contextType: "dashboard",
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
@@ -267,7 +267,7 @@ export function createGeneralContext(userRole?: string): GeneralContext {
 
   return {
     contextType: "general",
-    pageUrl: window.location.href,
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
     userRole,
     timestamp: new Date(),
     availableAPIs,
