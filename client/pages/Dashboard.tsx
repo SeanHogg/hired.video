@@ -58,16 +58,17 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // TEST 3: Can we set the context?
+  // TEST 4: Can we set the context WITHOUT setPageContext in dependencies?
   useEffect(() => {
     try {
       const context = createDashboardContext(undefined, undefined, "guest");
       setPageContext(context);
-      setTestMessage("✅ TEST 3 PASSED: setPageContext(context) worked!");
+      setTestMessage("✅ TEST 4 PASSED: setPageContext works without dependency!");
     } catch (error) {
-      setTestMessage(`❌ TEST 3 FAILED: ${error}`);
+      setTestMessage(`❌ TEST 4 FAILED: ${error}`);
     }
-  }, [setPageContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
