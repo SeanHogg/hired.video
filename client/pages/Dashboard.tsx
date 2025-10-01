@@ -58,15 +58,16 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // TEST 2: Can we create a dashboard context?
+  // TEST 3: Can we set the context?
   useEffect(() => {
     try {
       const context = createDashboardContext(undefined, undefined, "guest");
-      setTestMessage("✅ TEST 2 PASSED: createDashboardContext worked");
+      setPageContext(context);
+      setTestMessage("✅ TEST 3 PASSED: setPageContext(context) worked!");
     } catch (error) {
-      setTestMessage(`❌ TEST 2 FAILED: ${error}`);
+      setTestMessage(`❌ TEST 3 FAILED: ${error}`);
     }
-  }, []);
+  }, [setPageContext]);
 
   // Get role permissions for routing
   const rolePermissions = createRolePermissions(user?.role);
