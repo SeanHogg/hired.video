@@ -30,7 +30,6 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import AIContextProvider from "@/components/AIContextProvider";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -787,9 +786,6 @@ export default function Resumes() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        {/* AI Context Provider - Auto-initializes AI context for this page */}
-        <AIContextProvider />
-
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -1129,9 +1125,6 @@ export default function Resumes() {
   // Authenticated user resume management interface
   return (
     <div className="min-h-screen bg-background">
-      {/* AI Context Provider - Auto-initializes AI context for this page */}
-      <AIContextProvider />
-
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}

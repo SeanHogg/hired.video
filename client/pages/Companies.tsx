@@ -12,7 +12,6 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import AIContextProvider from "@/components/AIContextProvider";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -180,9 +179,6 @@ export default function Companies() {
 
     return (
       <div className="min-h-screen bg-background">
-        {/* AI Context Provider - Auto-initializes AI context for this page */}
-        <AIContextProvider />
-
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}

@@ -23,7 +23,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { uploadAvatar } from "@/lib/services/upload-service";
-import AIContextProvider from "@/components/AIContextProvider";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ShareModal from "@/components/ShareModal";
@@ -209,9 +208,6 @@ function ProfileContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* AI Context Provider - Auto-initializes AI context for this page */}
-      <AIContextProvider />
-
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}

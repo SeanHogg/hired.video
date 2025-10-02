@@ -27,7 +27,6 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import AIContextProvider from "@/components/AIContextProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -316,9 +315,6 @@ export default function Outreach() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        {/* AI Context Provider - Auto-initializes AI context for this page */}
-        <AIContextProvider />
-
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -580,9 +576,6 @@ export default function Outreach() {
   // Authenticated user view - Outreach dashboard
   return (
     <div className="min-h-screen bg-background">
-      {/* AI Context Provider - Auto-initializes AI context for this page */}
-      <AIContextProvider />
-
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}

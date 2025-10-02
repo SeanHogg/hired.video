@@ -23,7 +23,6 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import AIContextProvider from "@/components/AIContextProvider";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -332,9 +331,6 @@ export default function People() {
 
     return (
       <div className="min-h-screen bg-background">
-        {/* AI Context Provider - Auto-initializes AI context for this page */}
-        <AIContextProvider />
-
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}

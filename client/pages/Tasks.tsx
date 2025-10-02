@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import AIContextProvider from "@/components/AIContextProvider";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -863,9 +862,6 @@ export default function Tasks() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* AI Context Provider - Auto-initializes AI context for this page */}
-      <AIContextProvider />
-
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
