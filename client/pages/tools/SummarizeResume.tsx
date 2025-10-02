@@ -98,8 +98,10 @@ export default function SummarizeResume() {
     setSummary(null);
 
     try {
-      // Call the summarization API
-      const response = await apiClient.post("/api/Resume/Summarize", resumeText);
+      // Call the summarization API with resume text
+      const response = await apiClient.post("/api/Resume/Summarize", {
+        resumeText: resumeText,
+      });
 
       const data: any = response.data;
       setSummary(data.result || data);
@@ -142,7 +144,9 @@ export default function SummarizeResume() {
       const resumeContent = parseResult.result || parseResult;
 
       // Now summarize the parsed content
-      const summaryResponse = await apiClient.post("/api/Resume/Summarize", resumeContent);
+      const summaryResponse = await apiClient.post("/api/Resume/Summarize", {
+        resumeText: resumeContent,
+      });
 
       const data: any = summaryResponse.data;
       setSummary(data.result || data);
@@ -168,9 +172,10 @@ export default function SummarizeResume() {
     setSummary(null);
 
     try {
-      const resume = await resumeService.getResumeById(selectedResumeId);
-
-      const response = await apiClient.post("/api/Resume/Summarize", resume.data || {});
+      // Pass the resume ID to the API - it will fetch and use the SerializedResume property
+      const response = await apiClient.post("/api/Resume/Summarize", {
+        resumeId: selectedResumeId,
+      });
 
       const data: any = response.data;
       setSummary(data.result || data);

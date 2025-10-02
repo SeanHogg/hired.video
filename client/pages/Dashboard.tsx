@@ -63,15 +63,6 @@ export default function Dashboard() {
     children,
   }) => (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* AI Context Provider - Auto-initializes AI context for this page */}
-      <AIContextProvider
-        contextData={{
-          metrics: dashboardData?.metrics,
-          recentActivity: dashboardData?.recentActivity,
-          userRole: user?.role,
-        }}
-      />
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{dashboardData?.title}</h1>
         <p className="text-muted-foreground">{dashboardData?.description}</p>
@@ -166,6 +157,9 @@ export default function Dashboard() {
     children,
   }) => (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      {/* AI Context Provider - Auto-initializes AI context for dashboard */}
+      <AIContextProvider />
+
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
