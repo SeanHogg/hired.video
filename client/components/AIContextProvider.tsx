@@ -24,14 +24,28 @@ interface AIContextProviderProps {
  * 3. With explicit context type:
  *    <AIContextProvider contextType="resume-edit" contextData={{ resume }} />
  */
-export default function AIContextProvider({ 
-  contextData, 
-  contextType: explicitContextType 
+export default function AIContextProvider({
+  contextData,
+  contextType: explicitContextType
 }: AIContextProviderProps) {
   const location = useLocation();
-  const { setPageContext } = useAI();
+
+  // Safely get AI context - it might not be available during SSR or initial render
+  let setPageContext: ((context: AIContext | undefined) => void) | undefined;
+  try {
+    const aiContext = useAI();
+    setPageContext = aiContext?.setPageContext;
+  } catch (error) {
+    // AI context not available - this is okay, just skip setting context
+    console.warn("AI context not available:", error);
+  }
 
   useEffect(() => {
+    // Skip if AI context is not available
+    if (!setPageContext) {
+      return;
+    }
+
     // Determine context type from route if not explicitly provided
     const contextType = explicitContextType || detectContextFromRoute(location.pathname);
 
@@ -61,10 +75,12 @@ export default function AIContextProvider({
 
     // Cleanup on unmount
     return () => {
-      setPageContext(undefined);
+      if (setPageContext) {
+        setPageContext(undefined);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, explicitContextType]);
+  }, [location.pathname, explicitContextType, setPageContext]);
 
   // This component doesn't render anything
   return null;

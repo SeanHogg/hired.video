@@ -787,6 +787,9 @@ export default function Resumes() {
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        {/* AI Context Provider - Auto-initializes AI context for this page */}
+        <AIContextProvider />
+
         <Sidebar
           isOpen={sidebarOpen}
           onClose={closeSidebar}
@@ -800,9 +803,6 @@ export default function Resumes() {
           />
 
           <div className="pt-16">
-            {/* AI Context Provider - Auto-initializes AI context for this page */}
-            <AIContextProvider />
-
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
@@ -1129,6 +1129,9 @@ export default function Resumes() {
   // Authenticated user resume management interface
   return (
     <div className="min-h-screen bg-background">
+      {/* AI Context Provider - Auto-initializes AI context for this page */}
+      <AIContextProvider />
+
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
