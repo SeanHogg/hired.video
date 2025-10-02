@@ -31,6 +31,7 @@ import * as React from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
+import AIContextProvider from "@/components/AIContextProvider";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import HeroCarousel from "@/components/HeroCarousel";
@@ -634,6 +635,9 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* AI Context Provider - Auto-initializes AI context for home page */}
+      <AIContextProvider />
+
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}

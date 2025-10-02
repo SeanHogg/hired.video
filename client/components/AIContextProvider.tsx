@@ -34,7 +34,7 @@ export default function AIContextProvider({
   useEffect(() => {
     // Determine context type from route if not explicitly provided
     const contextType = explicitContextType || detectContextFromRoute(location.pathname);
-    
+
     if (!contextType) {
       // No context for this page
       setPageContext(undefined);
@@ -43,7 +43,7 @@ export default function AIContextProvider({
 
     // Get available APIs for this context
     const availableAPIs = getAPIsForContext(contextType);
-    
+
     // Get available actions for this context
     const availableActions = getActionsForContext(contextType);
 
@@ -63,7 +63,8 @@ export default function AIContextProvider({
     return () => {
       setPageContext(undefined);
     };
-  }, [location.pathname, contextData, explicitContextType, setPageContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, explicitContextType]);
 
   // This component doesn't render anything
   return null;
@@ -73,9 +74,12 @@ export default function AIContextProvider({
  * Auto-detect context type from route pathname
  */
 function detectContextFromRoute(pathname: string): AIContextType | null {
+  // Home page
+  if (pathname === "/" || pathname === "/index") return "search";
+
   // Dashboard
   if (pathname === "/dashboard") return "dashboard";
-  
+
   // Resume routes
   if (pathname.startsWith("/resumes/new") || pathname.startsWith("/resumes/create")) {
     return "resume-create";
@@ -89,7 +93,7 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
   if (pathname === "/resumes") {
     return "resume-list";
   }
-  
+
   // Job routes
   if (pathname.startsWith("/jobs/new") || pathname.startsWith("/jobs/create")) {
     return "job-create";
@@ -103,7 +107,7 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
   if (pathname === "/jobs") {
     return "job-list";
   }
-  
+
   // Profile routes
   if (pathname.startsWith("/profile/edit") || pathname === "/settings") {
     return "profile-edit";
@@ -111,12 +115,15 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
   if (pathname.startsWith("/profile/") || pathname.startsWith("/people/")) {
     return "profile-view";
   }
-  
+
   // Other routes
   if (pathname === "/outreach") return "outreach";
   if (pathname === "/messages" || pathname.startsWith("/messages/")) return "messaging";
   if (pathname === "/search") return "search";
-  
+  if (pathname === "/tasks") return "general"; // Tasks page - general AI assistance
+  if (pathname === "/people") return "search"; // People page - search/discovery context
+  if (pathname === "/companies") return "search"; // Companies page - search/discovery context
+
   // Default: general context
   return "general";
 }

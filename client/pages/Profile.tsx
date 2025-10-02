@@ -209,6 +209,9 @@ function ProfileContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* AI Context Provider - Auto-initializes AI context for this page */}
+      <AIContextProvider />
+
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
@@ -222,9 +225,6 @@ function ProfileContent() {
         />
 
         <div className="pt-16 p-6">
-          {/* AI Context Provider - Auto-initializes AI context for this page */}
-          <AIContextProvider />
-
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Profile Header */}
             <Card>
