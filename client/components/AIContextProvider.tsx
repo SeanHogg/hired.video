@@ -29,23 +29,9 @@ export default function AIContextProvider({
   contextType: explicitContextType
 }: AIContextProviderProps) {
   const location = useLocation();
-
-  // Safely get AI context - it might not be available during SSR or initial render
-  let setPageContext: ((context: AIContext | undefined) => void) | undefined;
-  try {
-    const aiContext = useAI();
-    setPageContext = aiContext?.setPageContext;
-  } catch (error) {
-    // AI context not available - this is okay, just skip setting context
-    console.warn("AI context not available:", error);
-  }
+  const { setPageContext } = useAI();
 
   useEffect(() => {
-    // Skip if AI context is not available
-    if (!setPageContext) {
-      return;
-    }
-
     // Determine context type from route if not explicitly provided
     const contextType = explicitContextType || detectContextFromRoute(location.pathname);
 
@@ -75,12 +61,10 @@ export default function AIContextProvider({
 
     // Cleanup on unmount
     return () => {
-      if (setPageContext) {
-        setPageContext(undefined);
-      }
+      setPageContext(undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, explicitContextType, setPageContext]);
+  }, [location.pathname, explicitContextType]);
 
   // This component doesn't render anything
   return null;
