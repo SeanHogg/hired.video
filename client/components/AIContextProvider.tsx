@@ -13,14 +13,14 @@ interface AIContextProviderProps {
 
 /**
  * AIContextProvider - Automatically sets up AI context based on current route
- * 
+ *
  * Usage:
  * 1. Simple (auto-detect from route):
  *    <AIContextProvider />
- * 
+ *
  * 2. With page-specific data:
  *    <AIContextProvider contextData={{ stats, recentActivity }} />
- * 
+ *
  * 3. With explicit context type:
  *    <AIContextProvider contextType="resume-edit" contextData={{ resume }} />
  */
@@ -41,23 +41,29 @@ export default function AIContextProvider({
       return;
     }
 
-    // Get available APIs for this context
-    const availableAPIs = getAPIsForContext(contextType);
+    try {
+      // Get available APIs for this context
+      const availableAPIs = getAPIsForContext(contextType);
 
-    // Get available actions for this context
-    const availableActions = getActionsForContext(contextType);
+      // Get available actions for this context
+      const availableActions = getActionsForContext(contextType);
 
-    // Build the context object
-    const context: AIContext = {
-      contextType,
-      pageUrl: window.location.href,
-      timestamp: new Date(),
-      availableAPIs,
-      availableActions,
-      ...contextData, // Merge in any page-specific data
-    } as AIContext;
+      // Build the context object
+      const context: AIContext = {
+        contextType,
+        pageUrl: window.location.href,
+        timestamp: new Date(),
+        availableAPIs,
+        availableActions,
+        ...contextData, // Merge in any page-specific data
+      } as AIContext;
 
-    setPageContext(context);
+      setPageContext(context);
+    } catch (error) {
+      console.error("Failed to set AI context:", error);
+      // Don't break the page if AI context fails - set undefined context
+      setPageContext(undefined);
+    }
 
     // Cleanup on unmount
     return () => {

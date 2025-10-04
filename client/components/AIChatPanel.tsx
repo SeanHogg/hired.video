@@ -11,10 +11,12 @@ import {
   Info,
   Sparkles,
   Code,
+  AlertTriangle,
 } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useAI } from "@/lib/ai-context";
 import {
   sendHRMessage,
@@ -30,6 +32,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { aiOrchestrationService } from "@/lib/services/ai-orchestration-service";
 import { getContextLabel, getActionLabel, getContextIcon } from "@/lib/utils/ai-context-helpers";
 import type { AIAction } from "@/lib/types/ai-context";
+import { billingService } from "@/lib/services/billing-service";
 
 interface Message {
   id: string;
@@ -66,6 +69,15 @@ export default function AIChatPanel() {
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
+
+  // AI Usage tracking
+  const [aiUsage, setAiUsage] = useState<{
+    used: number;
+    limit: number;
+    remaining: number;
+    isUnlimited: boolean;
+  } | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(false);
 
   // Get context-specific suggestions
   const getContextSuggestions = () => {
@@ -219,6 +231,10 @@ export default function AIChatPanel() {
       }
     } finally {
       setIsTyping(false);
+      // Refresh usage after sending a message
+      if (isAuthenticated) {
+        fetchAIUsage();
+      }
     }
   };
 
@@ -227,8 +243,35 @@ export default function AIChatPanel() {
   };
 
   const { user, isAuthenticated } = useAuth();
-  // Allow AI access for all authenticated users
-  const isPro = isAuthenticated;
+  // Allow AI access for all authenticated users (10 requests/month free, unlimited for Pro/Enterprise)
+  const hasAIAccess = isAuthenticated;
+
+  // Fetch AI usage when panel opens or after sending a message
+  const fetchAIUsage = async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      setIsLoadingUsage(true);
+      const usage = await billingService.getMonthlyAIUsage();
+      setAiUsage({
+        used: usage.used ?? 0,
+        limit: usage.limit ?? 10,
+        remaining: usage.remaining ?? 10,
+        isUnlimited: usage.isUnlimited ?? false,
+      });
+    } catch (error) {
+      console.error("Failed to fetch AI usage:", error);
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  };
+
+  // Fetch usage when panel opens
+  useEffect(() => {
+    if (isAIChatOpen && isAuthenticated) {
+      fetchAIUsage();
+    }
+  }, [isAIChatOpen, isAuthenticated]);
 
   if (!isAIChatOpen) return null;
 
@@ -280,6 +323,47 @@ export default function AIChatPanel() {
             </Button>
           </div>
         </div>
+
+        {/* AI Usage Indicator */}
+        {isAuthenticated && aiUsage && !aiUsage.isUnlimited && (
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-muted-foreground font-medium">
+                AI Requests: {aiUsage.used}/{aiUsage.limit} used this month
+              </span>
+              {aiUsage.remaining <= 2 && aiUsage.remaining > 0 && (
+                <Link to="/pricing" className="text-primary hover:underline font-medium">
+                  Upgrade for Unlimited
+                </Link>
+              )}
+            </div>
+            <Progress
+              value={(aiUsage.used / aiUsage.limit) * 100}
+              className="h-1.5"
+            />
+            {aiUsage.remaining <= 2 && aiUsage.remaining > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Only {aiUsage.remaining} request{aiUsage.remaining === 1 ? '' : 's'} remaining</span>
+              </div>
+            )}
+            {aiUsage.remaining === 0 && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-destructive">
+                <AlertCircle className="h-3 w-3" />
+                <span>Monthly limit reached. <Link to="/pricing" className="underline font-medium">Upgrade to Pro</Link> for unlimited access.</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isAuthenticated && aiUsage && aiUsage.isUnlimited && (
+          <div className="px-4 py-2 border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10">
+            <div className="flex items-center gap-2 text-xs">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              <span className="text-primary font-medium">Unlimited AI Access</span>
+            </div>
+          </div>
+        )}
 
         {/* Context Info Panel */}
         {showContextInfo && pageContext && (
@@ -473,9 +557,9 @@ export default function AIChatPanel() {
                     size="sm"
                     className="h-auto p-2 text-left justify-start"
                     onClick={() =>
-                      isPro ? handleQuickSuggestion(suggestion.text, suggestion.action) : undefined
+                      hasAIAccess ? handleQuickSuggestion(suggestion.text, suggestion.action) : undefined
                     }
-                    disabled={!isPro}
+                    disabled={!hasAIAccess}
                   >
                     <Icon className="h-3 w-3 mr-2" />
                     <span className="text-xs">{suggestion.text}</span>
@@ -488,7 +572,7 @@ export default function AIChatPanel() {
 
         {/* Input */}
         <div className="p-4 border-t">
-          {isPro ? (
+          {hasAIAccess ? (
             <div className="flex gap-2">
               <Input
                 placeholder="Ask me anything about HR..."
@@ -513,8 +597,8 @@ export default function AIChatPanel() {
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm text-muted-foreground">
                 {isAuthenticated
-                  ? "Upgrade to Pro to use the AI Assistant."
-                  : "Sign in to upgrade to Pro and use the AI Assistant."}
+                  ? "You have 10 free AI requests per month. Upgrade to Pro for unlimited access."
+                  : "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access."}
               </div>
               <div className="flex gap-2">
                 {!isAuthenticated && (
