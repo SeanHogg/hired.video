@@ -29,7 +29,7 @@ import { useAuth, USER_ROLES } from "@/lib/auth";
 import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { aiOrchestrationService } from "@/lib/services/ai-orchestration-service";
+import { aiService } from "@/lib/services/ai-service";
 import {
   getContextLabel,
   getActionLabel,
@@ -42,8 +42,9 @@ import {
   createTasksContext,
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
-import type { AIAction, AIContextType } from "@/lib/types/ai-context";
+import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
 import { billingService } from "@/lib/services/billing-service";
+import { getAPIsByAction } from "@/lib/config/ai-api-registry";
 
 interface Message {
   id: string;
@@ -52,6 +53,152 @@ interface Message {
   timestamp: Date;
   type?: "text" | "suggestion";
 }
+
+// ============================================================================
+// HELPER FUNCTIONS - System Prompt Creation
+// ============================================================================
+
+/**
+ * Create an enhanced system prompt with context and action awareness
+ */
+function createEnhancedSystemPrompt(context: AIContext, action?: AIAction): string {
+  const basePrompt = `You are an AI HR Assistant for MyVideoResume, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
+
+Your role is to help users with:
+- Resume optimization and ATS compatibility
+- Job search strategies and career guidance
+- Recruitment best practices and candidate sourcing
+- HR analytics and performance metrics
+- Video resume creation and optimization
+- Interview preparation and tips
+- Task management and productivity
+
+IMPORTANT INTERACTION RULES:
+1. **Be Conversational**: Always engage in a natural conversation with the user
+2. **Gather Information First**: Before making any API calls or taking actions, ask the user for ALL required information
+3. **Never Assume Data**: If a user wants to create something (task, resume, job), ask for details first
+4. **Ask Clarifying Questions**: Engage the user to gather:
+   - What they want to accomplish
+   - Required fields for the action
+   - Optional details that would be helpful
+5. **Confirm Before Acting**: Once you have all information, summarize it and ask for confirmation
+6. **Provide Guidance**: Explain what information is needed and why
+7. **Handle Incomplete Info**: If information is missing, politely ask for it
+
+Keep responses concise but informative, using bullet points and emojis to improve readability.`;
+
+  // Add context-specific instructions
+  let contextInstructions = "";
+
+  if (context.contextType === "tasks") {
+    contextInstructions = `
+
+CURRENT CONTEXT: Task Management Page
+The user is on the task management page where they can create and manage tasks.
+
+Available APIs:
+${context.availableAPIs.map((api) => `- ${api.id}: ${api.description} (${api.endpoint})`).join("\n")}
+
+When helping with tasks:
+- For "create-task": Ask for task name/title (REQUIRED), description, start date (REQUIRED), deadline, and priority
+- For "prioritize-tasks": Analyze their current tasks and suggest a priority order with reasoning
+- For "organize-tasks": Suggest categorization and grouping strategies
+- For "break-down-task": Help break complex tasks into smaller, manageable subtasks
+- For "suggest-schedule": Create a realistic schedule based on their tasks and deadlines
+
+TASK API REQUIREMENTS:
+To create a task via /api/Task/save, you MUST have:
+- text (string, REQUIRED): The task title/name
+- start (date, REQUIRED): When the task starts
+- description (string, optional): Detailed description
+- end (date, optional): Deadline/due date
+- progress (number 0-100, optional): Current progress
+- type (string, optional): Task category/type
+- priority (string, optional): Priority level (high/medium/low)
+
+NEVER attempt to create a task without gathering the required fields first!`;
+  } else if (context.contextType.startsWith("resume")) {
+    contextInstructions = `
+
+CURRENT CONTEXT: Resume ${context.contextType.includes("create") ? "Creation" : context.contextType.includes("edit") ? "Editing" : "Viewing"}
+Help the user create a compelling, ATS-optimized resume. Ask about their experience, skills, and target roles before making suggestions.`;
+  } else if (context.contextType.startsWith("job")) {
+    contextInstructions = `
+
+CURRENT CONTEXT: Job ${context.contextType.includes("create") ? "Creation" : context.contextType.includes("edit") ? "Editing" : "Viewing"}
+Help the user with job-related tasks. Provide insights on job fit, application strategies, and optimization.`;
+  } else if (context.contextType === "dashboard") {
+    contextInstructions = `
+
+CURRENT CONTEXT: Dashboard
+Provide an overview of their account status, suggest next steps, and help them navigate the platform effectively.`;
+  }
+
+  // Add action-specific instructions
+  let actionInstructions = "";
+
+  if (action) {
+    const actionDescriptions: Record<string, string> = {
+      "create-task": `
+
+USER INTENT: The user wants to create a new task.
+
+YOUR RESPONSE SHOULD:
+1. Acknowledge their request warmly
+2. Explain what information you need (task name and start date are required)
+3. Ask them to describe the task they want to create
+4. Once they provide details, ask for any missing required fields
+5. Summarize the task details and ask for confirmation
+6. Only after confirmation, tell them you would create the task (but you cannot actually call APIs - explain this)
+
+Example response:
+"I'd be happy to help you create a new task! To get started, I need a few details:
+
+📝 **Required:**
+- Task name/title
+- Start date
+
+✨ **Optional (but helpful):**
+- Description
+- Deadline
+- Priority level (high/medium/low)
+
+What task would you like to create?"`,
+
+      "prioritize-tasks": `
+
+USER INTENT: The user wants help prioritizing their tasks.
+
+YOUR RESPONSE SHOULD:
+1. Ask about their current tasks or goals
+2. Inquire about deadlines and importance
+3. Provide a prioritization framework (e.g., Eisenhower Matrix)
+4. Suggest a specific priority order with reasoning`,
+
+      "break-down-task": `
+
+USER INTENT: The user wants to break down a complex task into smaller steps.
+
+YOUR RESPONSE SHOULD:
+1. Ask them to describe the complex task
+2. Help identify logical subtasks
+3. Suggest a sequence or order
+4. Offer to help them create these as separate tasks if they'd like`,
+    };
+
+    actionInstructions = actionDescriptions[action] || `
+
+USER INTENT: The user wants help with: ${action.replace(/-/g, " ")}
+
+Engage conversationally to understand their needs and provide helpful guidance.`;
+  }
+
+  return basePrompt + contextInstructions + actionInstructions;
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 export default function AIChatPanel() {
   const location = useLocation();
@@ -207,28 +354,27 @@ export default function AIChatPanel() {
       let responseMessage = "";
       let suggestions: string[] = [];
 
-      // Use orchestration if page context is available and orchestration is enabled
-      if (useOrchestration && pageContext) {
-        const result = await aiOrchestrationService.orchestrate({
-          context: pageContext,
-          userMessage: content.trim(),
-          action,
-        });
+      // Use context-aware AI if page context is available
+      if (pageContext) {
+        // Create enhanced system message with context and action
+        const systemMessage = {
+          role: "system" as const,
+          content: createEnhancedSystemPrompt(pageContext, action),
+        };
 
-        if (result.success) {
-          responseMessage = result.message;
-          suggestions = result.suggestions || [];
+        const userChatMessage = {
+          role: "user" as const,
+          content: content.trim(),
+        };
 
-          // Add API call details if in debug mode
-          if (showContextInfo) {
-            const apiDetails = result.apiCalls
-              .map((call) => `- ${call.apiId}: ${call.success ? "✓" : "✗"}`)
-              .join("\n");
-            responseMessage += `\n\n**API Calls:**\n${apiDetails}`;
-          }
-        } else {
-          responseMessage = result.message;
-        }
+        const messages = [
+          systemMessage,
+          ...conversationHistory,
+          userChatMessage,
+        ];
+
+        const response = await aiService.sendChatMessage(messages);
+        responseMessage = response.message;
       } else {
         // Fallback to regular AI service
         const response = await sendHRMessage(content.trim(), conversationHistory);
@@ -304,8 +450,62 @@ export default function AIChatPanel() {
     }
   };
 
+  /**
+   * Get a conversational prompt for an action
+   * This converts action names into natural conversation starters
+   */
+  const getConversationalPrompt = (action: AIAction): string => {
+    const prompts: Record<string, string> = {
+      // Task actions
+      "create-task": "I'd like to create a new task",
+      "prioritize-tasks": "Can you help me prioritize my tasks?",
+      "suggest-deadlines": "I need help setting realistic deadlines for my tasks",
+      "break-down-task": "I have a complex task that I need to break down into smaller steps",
+      "estimate-time": "Can you help me estimate how long my tasks will take?",
+      "organize-tasks": "I need help organizing my tasks better",
+      "suggest-schedule": "Can you create a schedule for my tasks?",
+      "productivity-tips": "What are some productivity tips for managing my tasks?",
+
+      // Resume actions
+      "optimize-content": "I'd like to optimize my resume",
+      "improve-summary": "Can you help me improve my resume summary?",
+      "enhance-experience": "I want to enhance my work experience section",
+      "suggest-skills": "What skills should I add to my resume?",
+      "ats-score": "Can you check my resume's ATS score?",
+      "keyword-suggestions": "What keywords should I include in my resume?",
+
+      // Job actions
+      "analyze-fit": "How well does this job match my profile?",
+      "application-tips": "Can you give me tips for applying to this job?",
+      "match-candidates": "Find candidates that match this job",
+      "optimize-posting": "Help me optimize this job posting",
+
+      // Profile actions
+      "optimize-headline": "Help me create a better profile headline",
+      "enhance-profile": "I want to improve my profile",
+
+      // General actions
+      "career-advice": "I need some career advice",
+      "interview-prep": "Help me prepare for an interview",
+      "get-help": "I need help with something",
+    };
+
+    return prompts[action] || `Help me with ${action.replace(/-/g, " ")}`;
+  };
+
   const handleQuickSuggestion = (suggestionText: string, action?: AIAction) => {
-    handleSendMessage(suggestionText, action);
+    // Convert action to conversational prompt
+    const conversationalPrompt = action ? getConversationalPrompt(action) : suggestionText;
+
+    console.log("[AIChatPanel] Suggestion clicked:", {
+      originalText: suggestionText,
+      action,
+      conversationalPrompt,
+      context: pageContext?.contextType,
+    });
+
+    // Send the conversational prompt with the action context
+    handleSendMessage(conversationalPrompt, action);
   };
 
   // Allow AI access for all authenticated users (10 requests/month free, unlimited for Pro/Enterprise)
