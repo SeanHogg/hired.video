@@ -48,7 +48,6 @@ import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
-import AIContextProvider from "@/components/AIContextProvider";
 
 export default function Jobs() {
   const location = useLocation();
@@ -250,9 +249,6 @@ export default function Jobs() {
           />
 
           <div className="pt-16 p-6">
-            {/* AI Context Provider - TEMPORARILY DISABLED FOR DEBUGGING */}
-            {/* <AIContextProvider /> */}
-
             <div className="max-w-7xl mx-auto">
               {/* Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">

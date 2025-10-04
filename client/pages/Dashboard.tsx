@@ -34,7 +34,7 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import AIContextProvider from "@/components/AIContextProvider";
+
 
 export default function Dashboard() {
   const {
@@ -157,9 +157,6 @@ export default function Dashboard() {
     children,
   }) => (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      {/* AI Context Provider - TEMPORARILY DISABLED FOR DEBUGGING */}
-      {/* <AIContextProvider /> */}
-
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}

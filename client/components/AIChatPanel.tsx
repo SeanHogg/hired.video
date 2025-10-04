@@ -26,12 +26,22 @@ import {
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
 import { useAuth } from "@/lib/auth";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { aiOrchestrationService } from "@/lib/services/ai-orchestration-service";
-import { getContextLabel, getActionLabel, getContextIcon } from "@/lib/utils/ai-context-helpers";
-import type { AIAction } from "@/lib/types/ai-context";
+import {
+  getContextLabel,
+  getActionLabel,
+  getContextIcon,
+  createDashboardContext,
+  createJobContext,
+  createResumeContext,
+  createProfileContext,
+  createSearchContext,
+  createGeneralContext
+} from "@/lib/utils/ai-context-helpers";
+import type { AIAction, AIContextType } from "@/lib/types/ai-context";
 import { billingService } from "@/lib/services/billing-service";
 
 interface Message {
@@ -43,7 +53,8 @@ interface Message {
 }
 
 export default function AIChatPanel() {
-  const { isAIChatOpen, closeAIChat, currentContext, pageContext } = useAI();
+  const location = useLocation();
+  const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext } = useAI();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -69,6 +80,32 @@ export default function AIChatPanel() {
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
+
+  // Auto-detect and set context based on current route
+  useEffect(() => {
+    console.log('[AIChatPanel] Route changed, detecting context for:', location.pathname);
+
+    try {
+      const contextType = detectContextFromRoute(location.pathname);
+      console.log('[AIChatPanel] Detected context type:', contextType);
+
+      if (!contextType) {
+        console.log('[AIChatPanel] No context detected, clearing');
+        setPageContext(undefined);
+        return;
+      }
+
+      // Create appropriate context based on type
+      const context = createContextForType(contextType);
+      console.log('[AIChatPanel] Created context:', context);
+
+      setPageContext(context);
+    } catch (error) {
+      console.error('[AIChatPanel] Error detecting/setting context:', error);
+      // Don't break the AI chat if context detection fails
+      setPageContext(undefined);
+    }
+  }, [location.pathname, setPageContext]);
 
   // AI Usage tracking
   const [aiUsage, setAiUsage] = useState<{
@@ -621,4 +658,98 @@ export default function AIChatPanel() {
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// HELPER FUNCTIONS - Route Detection & Context Creation
+// ============================================================================
+
+/**
+ * Detect AI context type from current route
+ */
+function detectContextFromRoute(pathname: string): AIContextType | null {
+  // Dashboard
+  if (pathname === "/dashboard") return "dashboard";
+
+  // Resume routes
+  if (pathname.startsWith("/resumes/new") || pathname.startsWith("/resumes/create")) {
+    return "resume-create";
+  }
+  if (pathname.startsWith("/resumes/edit/") || (pathname.includes("/resumes/") && pathname.includes("/edit"))) {
+    return "resume-edit";
+  }
+  if (pathname.startsWith("/resumes/") && !pathname.includes("/edit")) {
+    return "resume-view";
+  }
+  if (pathname === "/resumes") return "resume-list";
+
+  // Job routes
+  if (pathname.startsWith("/jobs/new") || pathname.startsWith("/jobs/create")) {
+    return "job-create";
+  }
+  if (pathname.startsWith("/jobs/edit/") || (pathname.includes("/jobs/") && pathname.includes("/edit"))) {
+    return "job-edit";
+  }
+  if (pathname.startsWith("/jobs/") && !pathname.includes("/edit")) {
+    return "job-view";
+  }
+  if (pathname === "/jobs") return "job-list";
+
+  // Profile routes
+  if (pathname.startsWith("/profile/edit") || pathname === "/settings") {
+    return "profile-edit";
+  }
+  if (pathname.startsWith("/profile/") || pathname.startsWith("/people/")) {
+    return "profile-view";
+  }
+
+  // Other routes
+  if (pathname === "/outreach") return "outreach";
+  if (pathname === "/messages" || pathname.startsWith("/messages/")) return "messaging";
+  if (pathname === "/search" || pathname === "/people" || pathname === "/companies") {
+    return "search";
+  }
+
+  // Home page
+  if (pathname === "/" || pathname === "/index") return "search";
+
+  // Default: general context
+  return "general";
+}
+
+/**
+ * Create appropriate context object for a given context type
+ */
+function createContextForType(contextType: AIContextType) {
+  switch (contextType) {
+    case "dashboard":
+      return createDashboardContext();
+
+    case "resume-list":
+    case "resume-create":
+    case "resume-edit":
+    case "resume-view":
+      return createResumeContext(contextType);
+
+    case "job-list":
+    case "job-create":
+    case "job-edit":
+    case "job-view":
+      return createJobContext(contextType);
+
+    case "profile-view":
+    case "profile-edit":
+      return createProfileContext(contextType);
+
+    case "search":
+      return createSearchContext();
+
+    case "outreach":
+    case "messaging":
+      return createGeneralContext(); // Use general for now, could create specific outreach context
+
+    case "general":
+    default:
+      return createGeneralContext();
+  }
 }
