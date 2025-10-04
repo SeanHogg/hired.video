@@ -29,15 +29,17 @@ export default function AIContextProvider({
   contextType: explicitContextType
 }: AIContextProviderProps) {
   const location = useLocation();
-  const { setPageContext } = useAI();
+  const { setPageContext, isAIChatOpen } = useAI();
 
   useEffect(() => {
     // Determine context type from route if not explicitly provided
     const contextType = explicitContextType || detectContextFromRoute(location.pathname);
 
     if (!contextType) {
-      // No context for this page
-      setPageContext(undefined);
+      // No context for this page - but don't clear if AI chat is open
+      if (!isAIChatOpen) {
+        setPageContext(undefined);
+      }
       return;
     }
 
@@ -65,12 +67,14 @@ export default function AIContextProvider({
       setPageContext(undefined);
     }
 
-    // Cleanup on unmount
+    // Cleanup on unmount - don't clear context to allow smooth transitions
+    // Context will be updated by the next page's AIContextProvider
+    // This prevents flickering and maintains context during navigation
     return () => {
-      setPageContext(undefined);
+      // No cleanup needed - let the next page set its own context
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, explicitContextType]);
+  }, [location.pathname, explicitContextType, isAIChatOpen]);
 
   // This component doesn't render anything
   return null;
