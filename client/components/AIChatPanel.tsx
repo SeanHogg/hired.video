@@ -116,13 +116,27 @@ export default function AIChatPanel() {
   } | null>(null);
   const [isLoadingUsage, setIsLoadingUsage] = useState(false);
 
+  // Helper function to get icon for action (MUST be defined before getContextSuggestions)
+  const getIconForAction = (action: string) => {
+    if (action.includes("resume") || action.includes("optimize") || action.includes("improve")) {
+      return FileText;
+    }
+    if (action.includes("job") || action.includes("match")) {
+      return Briefcase;
+    }
+    if (action.includes("analyze") || action.includes("score")) {
+      return BarChart3;
+    }
+    return Sparkles;
+  };
+
   // Get context-specific suggestions
   const getContextSuggestions = () => {
     if (pageContext && pageContext.availableActions.length > 0) {
-      return pageContext.availableActions.slice(0, 4).map((action) => ({
+      return pageContext.availableActions.slice(0, 4).map((action: string) => ({
         text: getActionLabel(action),
         icon: getIconForAction(action),
-        action: action,
+        action: action as AIAction,
       }));
     }
 
@@ -136,20 +150,6 @@ export default function AIChatPanel() {
   };
 
   const quickSuggestions = getContextSuggestions();
-
-  // Helper function to get icon for action
-  const getIconForAction = (action: AIAction) => {
-    if (action.includes("resume") || action.includes("optimize") || action.includes("improve")) {
-      return FileText;
-    }
-    if (action.includes("job") || action.includes("match")) {
-      return Briefcase;
-    }
-    if (action.includes("analyze") || action.includes("score")) {
-      return BarChart3;
-    }
-    return Sparkles;
-  };
 
   useEffect(() => {
     if (scrollAreaRef.current) {
