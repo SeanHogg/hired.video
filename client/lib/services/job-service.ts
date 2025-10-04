@@ -296,6 +296,16 @@ export class JobService {
   }
 
   /**
+   * Apply to a job
+   */
+  async applyToJob(
+    jobId: string,
+    application: { resumeId: string; coverLetter?: string },
+  ): Promise<void> {
+    await apiClient.post(`/api/Job/${jobId}/apply`, application);
+  }
+
+  /**
    * Get job by slug (for SEO-friendly URLs)
    */
   async getJobBySlug(slug: string): Promise<any> {

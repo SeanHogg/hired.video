@@ -14,6 +14,7 @@ import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
+import SaveJobButton from "@/components/SaveJobButton";
 import { useAuth } from "@/lib/auth";
 import type { JobMetadata, JobWithOwnership } from "@/types/job";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
@@ -169,6 +170,14 @@ export default function JobCard({
         subtitle={`${job.company}`}
         badges={badges}
         linkTo={`/jobs/${job.id}`}
+        actions={
+          <SaveJobButton
+            jobId={job.id}
+            initialSaved={false}
+            variant="ghost"
+            size="icon"
+          />
+        }
       />
 
       <CardContent>
