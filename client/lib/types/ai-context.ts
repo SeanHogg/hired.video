@@ -65,6 +65,7 @@ export type AIContextType =
   | "messaging"
   | "search"
   | "dashboard"
+  | "tasks"
   | "general";
 
 // ============================================================================
@@ -108,7 +109,13 @@ export type ResumeAIAction =
   | "ats-score"
   | "generate-bullet-points"
   | "rewrite-section"
-  | "keyword-optimization";
+  | "keyword-optimization"
+  // Recruiter/Employer actions
+  | "analyze-candidate"
+  | "match-to-jobs"
+  | "skill-assessment"
+  | "compare-candidates"
+  | "find-best-match";
 
 // ============================================================================
 // JOB CONTEXTS
@@ -145,7 +152,12 @@ export type JobAIAction =
   | "optimize-posting"
   | "suggest-keywords"
   | "match-candidates"
-  | "salary-insights";
+  | "salary-insights"
+  // Job Seeker actions
+  | "analyze-fit"
+  | "application-tips"
+  | "find-matches"
+  | "career-advice";
 
 // ============================================================================
 // PROFILE CONTEXTS
@@ -232,7 +244,13 @@ export type SearchAIAction =
   | "refine-search"
   | "suggest-keywords"
   | "analyze-results"
-  | "recommend-filters";
+  | "recommend-filters"
+  // Job Seeker actions
+  | "find-job-matches"
+  | "career-advice"
+  // Recruiter/Employer actions
+  | "find-candidates"
+  | "analyze-talent-pool";
 
 // ============================================================================
 // DASHBOARD CONTEXT
@@ -262,7 +280,51 @@ export type DashboardAIAction =
   | "analyze-performance"
   | "suggest-improvements"
   | "generate-insights"
-  | "recommend-actions";
+  | "recommend-actions"
+  // Job Seeker actions
+  | "career-insights"
+  // Recruiter actions
+  | "hiring-insights"
+  | "candidate-pipeline"
+  // Employer actions
+  | "hiring-metrics"
+  | "team-insights"
+  // Affiliate actions
+  | "referral-insights"
+  | "commission-tracking";
+
+// ============================================================================
+// TASKS CONTEXT
+// ============================================================================
+
+/**
+ * Context for task management pages
+ */
+export interface TasksContext extends BaseAIContext {
+  contextType: "tasks";
+  tasks?: Array<{
+    id?: string;
+    text?: string;
+    description?: string;
+    start?: Date;
+    end?: Date;
+    progress?: number;
+    type?: string;
+    priority?: string;
+  }>;
+  /** Available AI actions for this context */
+  availableActions: TasksAIAction[];
+}
+
+export type TasksAIAction =
+  | "create-task"
+  | "prioritize-tasks"
+  | "suggest-deadlines"
+  | "break-down-task"
+  | "estimate-time"
+  | "organize-tasks"
+  | "suggest-schedule"
+  | "productivity-tips";
 
 // ============================================================================
 // GENERAL CONTEXT
@@ -281,7 +343,23 @@ export type GeneralAIAction =
   | "ask-question"
   | "get-help"
   | "explain-feature"
-  | "provide-tips";
+  | "provide-tips"
+  // Job Seeker actions
+  | "career-advice"
+  | "resume-tips"
+  | "interview-prep"
+  // Recruiter actions
+  | "recruiting-tips"
+  | "candidate-sourcing"
+  | "hiring-best-practices"
+  // Employer actions
+  | "hiring-guidance"
+  | "team-building"
+  | "job-posting-tips"
+  // Affiliate actions
+  | "marketing-tips"
+  | "referral-strategies"
+  | "commission-info";
 
 // ============================================================================
 // UNION TYPE FOR ALL CONTEXTS
@@ -297,6 +375,7 @@ export type AIContext =
   | OutreachContext
   | SearchContext
   | DashboardContext
+  | TasksContext
   | GeneralContext;
 
 // ============================================================================

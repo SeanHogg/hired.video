@@ -13,6 +13,7 @@ import type {
   OutreachContext,
   SearchContext,
   DashboardContext,
+  TasksContext,
   GeneralContext,
   ResumeAIAction,
   JobAIAction,
@@ -20,6 +21,7 @@ import type {
   OutreachAIAction,
   SearchAIAction,
   DashboardAIAction,
+  TasksAIAction,
   GeneralAIAction,
   AvailableAPI,
 } from "@/lib/types/ai-context";
@@ -39,25 +41,45 @@ export function createResumeContext(
 ): ResumeContext {
   const actions: ResumeAIAction[] = [];
 
-  // Add actions based on context type
+  // Add actions based on context type and user role
   if (type === "resume-create" || type === "resume-edit") {
-    actions.push(
-      "optimize-content",
-      "improve-summary",
-      "enhance-experience",
-      "suggest-skills",
-      "generate-bullet-points",
-      "rewrite-section",
-      "keyword-optimization",
-    );
+    // Job seekers creating/editing their own resume
+    if (userRole === "JobSeeker" || !userRole) {
+      actions.push(
+        "optimize-content",
+        "improve-summary",
+        "enhance-experience",
+        "suggest-skills",
+        "generate-bullet-points",
+        "rewrite-section",
+        "keyword-optimization",
+      );
+    } else if (userRole === "Recruiter" || userRole === "Employer") {
+      // Recruiters might help candidates with resumes
+      actions.push(
+        "optimize-content",
+        "suggest-skills",
+        "improve-summary",
+      );
+    }
   }
 
   if (type === "resume-view") {
-    actions.push("ats-score", "optimize-content", "suggest-skills");
+    if (userRole === "JobSeeker" || !userRole) {
+      // Job seekers viewing their own resume
+      actions.push("ats-score", "optimize-content", "suggest-skills");
+    } else if (userRole === "Recruiter" || userRole === "Employer") {
+      // Recruiters viewing candidate resumes
+      actions.push("analyze-candidate", "match-to-jobs", "skill-assessment");
+    }
   }
 
   if (type === "resume-list") {
-    actions.push("optimize-content", "ats-score");
+    if (userRole === "JobSeeker" || !userRole) {
+      actions.push("optimize-content", "ats-score");
+    } else if (userRole === "Recruiter" || userRole === "Employer") {
+      actions.push("compare-candidates", "find-best-match");
+    }
   }
 
   // Get available APIs for this context type
@@ -84,24 +106,43 @@ export function createJobContext(
 ): JobContext {
   const actions: JobAIAction[] = [];
 
-  // Add actions based on context type
+  // Add actions based on context type and user role
   if (type === "job-create" || type === "job-edit") {
-    actions.push(
-      "generate-description",
-      "suggest-requirements",
-      "improve-responsibilities",
-      "optimize-posting",
-      "suggest-keywords",
-      "salary-insights",
-    );
+    // Recruiters and Employers can create/edit jobs
+    if (userRole === "Recruiter" || userRole === "Employer" || userRole === "Admin" || userRole === "SuperAdmin") {
+      actions.push(
+        "generate-description",
+        "suggest-requirements",
+        "improve-responsibilities",
+        "optimize-posting",
+        "suggest-keywords",
+        "salary-insights",
+      );
+    }
   }
 
   if (type === "job-view") {
-    actions.push("match-candidates", "optimize-posting", "suggest-keywords");
+    // Different actions based on role
+    if (userRole === "JobSeeker") {
+      // Job seekers want to know if they're a good match
+      actions.push("analyze-fit", "suggest-keywords", "application-tips");
+    } else if (userRole === "Recruiter" || userRole === "Employer") {
+      // Recruiters/Employers want to find candidates
+      actions.push("match-candidates", "optimize-posting", "suggest-keywords");
+    } else {
+      // Default for unauthenticated or other roles
+      actions.push("analyze-fit", "suggest-keywords");
+    }
   }
 
   if (type === "job-list") {
-    actions.push("optimize-posting", "match-candidates");
+    if (userRole === "JobSeeker") {
+      actions.push("find-matches", "career-advice");
+    } else if (userRole === "Recruiter" || userRole === "Employer") {
+      actions.push("optimize-posting", "match-candidates");
+    } else {
+      actions.push("find-matches");
+    }
   }
 
   const availableAPIs = getAPIsForContext(type);
@@ -200,12 +241,32 @@ export function createSearchContext(
   results?: SearchContext["results"],
   userRole?: string,
 ): SearchContext {
-  const actions: SearchAIAction[] = [
-    "refine-search",
-    "suggest-keywords",
-    "analyze-results",
-    "recommend-filters",
-  ];
+  const actions: SearchAIAction[] = [];
+
+  // Add role-specific search actions
+  if (userRole === "JobSeeker" || !userRole) {
+    actions.push(
+      "refine-search",
+      "suggest-keywords",
+      "find-job-matches",
+      "career-advice",
+    );
+  } else if (userRole === "Recruiter" || userRole === "Employer") {
+    actions.push(
+      "refine-search",
+      "suggest-keywords",
+      "find-candidates",
+      "analyze-talent-pool",
+    );
+  } else {
+    // Default for other roles
+    actions.push(
+      "refine-search",
+      "suggest-keywords",
+      "analyze-results",
+      "recommend-filters",
+    );
+  }
 
   const availableAPIs = getAPIsForContext("search");
 
@@ -231,12 +292,46 @@ export function createDashboardContext(
   recentActivity?: DashboardContext["recentActivity"],
   userRole?: string,
 ): DashboardContext {
-  const actions: DashboardAIAction[] = [
-    "analyze-performance",
-    "suggest-improvements",
-    "generate-insights",
-    "recommend-actions",
-  ];
+  const actions: DashboardAIAction[] = [];
+
+  // Add role-specific dashboard actions
+  if (userRole === "JobSeeker" || !userRole) {
+    actions.push(
+      "analyze-performance",
+      "suggest-improvements",
+      "career-insights",
+      "recommend-actions",
+    );
+  } else if (userRole === "Recruiter") {
+    actions.push(
+      "analyze-performance",
+      "hiring-insights",
+      "candidate-pipeline",
+      "recommend-actions",
+    );
+  } else if (userRole === "Employer") {
+    actions.push(
+      "analyze-performance",
+      "hiring-metrics",
+      "team-insights",
+      "recommend-actions",
+    );
+  } else if (userRole === "Affiliate") {
+    actions.push(
+      "analyze-performance",
+      "referral-insights",
+      "commission-tracking",
+      "recommend-actions",
+    );
+  } else {
+    // Admin/SuperAdmin or default
+    actions.push(
+      "analyze-performance",
+      "suggest-improvements",
+      "generate-insights",
+      "recommend-actions",
+    );
+  }
 
   const availableAPIs = getAPIsForContext("dashboard");
 
@@ -256,12 +351,46 @@ export function createDashboardContext(
  * Create a general context (fallback)
  */
 export function createGeneralContext(userRole?: string): GeneralContext {
-  const actions: GeneralAIAction[] = [
-    "ask-question",
-    "get-help",
-    "explain-feature",
-    "provide-tips",
-  ];
+  const actions: GeneralAIAction[] = [];
+
+  // Add role-specific general actions
+  if (userRole === "JobSeeker" || !userRole) {
+    actions.push(
+      "ask-question",
+      "career-advice",
+      "resume-tips",
+      "interview-prep",
+    );
+  } else if (userRole === "Recruiter") {
+    actions.push(
+      "ask-question",
+      "recruiting-tips",
+      "candidate-sourcing",
+      "hiring-best-practices",
+    );
+  } else if (userRole === "Employer") {
+    actions.push(
+      "ask-question",
+      "hiring-guidance",
+      "team-building",
+      "job-posting-tips",
+    );
+  } else if (userRole === "Affiliate") {
+    actions.push(
+      "ask-question",
+      "marketing-tips",
+      "referral-strategies",
+      "commission-info",
+    );
+  } else {
+    // Default for Admin/SuperAdmin or unknown roles
+    actions.push(
+      "ask-question",
+      "get-help",
+      "explain-feature",
+      "provide-tips",
+    );
+  }
 
   const availableAPIs = getAPIsForContext("general");
 
@@ -271,6 +400,58 @@ export function createGeneralContext(userRole?: string): GeneralContext {
     userRole,
     timestamp: new Date(),
     availableAPIs,
+    availableActions: actions,
+  };
+}
+
+/**
+ * Create a tasks context
+ */
+export function createTasksContext(
+  tasks?: TasksContext["tasks"],
+  userRole?: string,
+): TasksContext {
+  const actions: TasksAIAction[] = [];
+
+  // Add role-specific task management actions
+  if (userRole === "JobSeeker" || !userRole) {
+    actions.push(
+      "create-task",
+      "prioritize-tasks",
+      "suggest-deadlines",
+      "break-down-task",
+      "estimate-time",
+      "organize-tasks",
+      "productivity-tips",
+    );
+  } else if (userRole === "Recruiter" || userRole === "Employer") {
+    actions.push(
+      "create-task",
+      "prioritize-tasks",
+      "suggest-schedule",
+      "organize-tasks",
+      "break-down-task",
+      "productivity-tips",
+    );
+  } else {
+    // Default for other roles
+    actions.push(
+      "create-task",
+      "prioritize-tasks",
+      "organize-tasks",
+      "productivity-tips",
+    );
+  }
+
+  const availableAPIs = getAPIsForContext("tasks");
+
+  return {
+    contextType: "tasks",
+    pageUrl: typeof window !== "undefined" ? window.location.href : "",
+    userRole,
+    timestamp: new Date(),
+    availableAPIs,
+    tasks,
     availableActions: actions,
   };
 }
@@ -298,6 +479,7 @@ export function getContextLabel(contextType: AIContextType): string {
     messaging: "Messaging",
     search: "Search",
     dashboard: "Dashboard",
+    tasks: "Task Management",
     general: "General",
   };
 
@@ -387,6 +569,7 @@ export function getContextIcon(contextType: AIContextType): string {
     messaging: "MessageSquare",
     search: "Search",
     dashboard: "LayoutDashboard",
+    tasks: "CheckSquare",
     general: "Brain",
   };
 

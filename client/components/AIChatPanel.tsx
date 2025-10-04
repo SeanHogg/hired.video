@@ -25,7 +25,7 @@ import {
 } from "@/lib/services/ai-service";
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -39,6 +39,7 @@ import {
   createResumeContext,
   createProfileContext,
   createSearchContext,
+  createTasksContext,
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
 import type { AIAction, AIContextType } from "@/lib/types/ai-context";
@@ -54,18 +55,44 @@ interface Message {
 
 export default function AIChatPanel() {
   const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext } = useAI();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      content:
-        "👋 Hi! I'm your AI HR Assistant. I can help you with recruiting, talent management, resume optimization, job matching, and more. What would you like to know?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
+
+  // Get personalized welcome message based on user role
+  const getWelcomeMessage = () => {
+    if (!isAuthenticated || !user) {
+      return "👋 Hi! I'm your AI Assistant. I can help you with resume optimization, job matching, career advice, and more. What would you like to know?";
+    }
+
+    const roleMessages: Record<string, string> = {
+      [USER_ROLES.JOB_SEEKER]: "👋 Hi! I'm your AI Career Assistant. I can help you optimize your resume, find job matches, prepare for interviews, and advance your career. What would you like to know?",
+      [USER_ROLES.RECRUITER]: "👋 Hi! I'm your AI Recruiting Assistant. I can help you find candidates, optimize job postings, analyze resumes, and streamline your hiring process. What would you like to know?",
+      [USER_ROLES.EMPLOYER]: "👋 Hi! I'm your AI Hiring Assistant. I can help you create job postings, find qualified candidates, manage your hiring pipeline, and build your team. What would you like to know?",
+      [USER_ROLES.AFFILIATE]: "👋 Hi! I'm your AI Partner Assistant. I can help you with marketing strategies, referral optimization, and growing your affiliate business. What would you like to know?",
+      [USER_ROLES.ADMIN]: "👋 Hi! I'm your AI Admin Assistant. I can help you with platform management, user analytics, system insights, and administrative tasks. What would you like to know?",
+      [USER_ROLES.SUPER_ADMIN]: "👋 Hi! I'm your AI System Assistant. I can help you with platform administration, technical insights, system analytics, and advanced management. What would you like to know?",
+    };
+
+    return roleMessages[user.role] || roleMessages[USER_ROLES.JOB_SEEKER];
+  };
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  // Initialize welcome message based on user role
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          content: getWelcomeMessage(),
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [user?.role]); // Re-initialize if user role changes
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>(
     [],
   );
@@ -81,9 +108,10 @@ export default function AIChatPanel() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
 
-  // Auto-detect and set context based on current route
+  // Auto-detect and set context based on current route and user role
   useEffect(() => {
     console.log('[AIChatPanel] Route changed, detecting context for:', location.pathname);
+    console.log('[AIChatPanel] User role:', user?.role || 'unauthenticated');
 
     try {
       const contextType = detectContextFromRoute(location.pathname);
@@ -95,9 +123,10 @@ export default function AIChatPanel() {
         return;
       }
 
-      // Create appropriate context based on type
-      const context = createContextForType(contextType);
-      console.log('[AIChatPanel] Created context:', context);
+      // Create appropriate context based on type and user role
+      const userRole = user?.role;
+      const context = createContextForType(contextType, userRole);
+      console.log('[AIChatPanel] Created context with role:', { contextType, userRole });
 
       setPageContext(context);
     } catch (error) {
@@ -105,7 +134,7 @@ export default function AIChatPanel() {
       // Don't break the AI chat if context detection fails
       setPageContext(undefined);
     }
-  }, [location.pathname, setPageContext]);
+  }, [location.pathname, user?.role, setPageContext]);
 
   // AI Usage tracking
   const [aiUsage, setAiUsage] = useState<{
@@ -279,7 +308,6 @@ export default function AIChatPanel() {
     handleSendMessage(suggestionText, action);
   };
 
-  const { user, isAuthenticated } = useAuth();
   // Allow AI access for all authenticated users (10 requests/month free, unlimited for Pro/Enterprise)
   const hasAIAccess = isAuthenticated;
 
@@ -703,6 +731,11 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
     return "profile-view";
   }
 
+  // Tasks route
+  if (pathname === "/tasks" || pathname.startsWith("/tasks")) {
+    return "tasks";
+  }
+
   // Other routes
   if (pathname === "/outreach") return "outreach";
   if (pathname === "/messages" || pathname.startsWith("/messages/")) return "messaging";
@@ -718,38 +751,41 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
 }
 
 /**
- * Create appropriate context object for a given context type
+ * Create appropriate context object for a given context type and user role
  */
-function createContextForType(contextType: AIContextType) {
+function createContextForType(contextType: AIContextType, userRole?: string) {
   switch (contextType) {
     case "dashboard":
-      return createDashboardContext();
+      return createDashboardContext(undefined, undefined, userRole);
 
     case "resume-list":
     case "resume-create":
     case "resume-edit":
     case "resume-view":
-      return createResumeContext(contextType);
+      return createResumeContext(contextType, undefined, userRole);
 
     case "job-list":
     case "job-create":
     case "job-edit":
     case "job-view":
-      return createJobContext(contextType);
+      return createJobContext(contextType, undefined, userRole);
 
     case "profile-view":
     case "profile-edit":
-      return createProfileContext(contextType);
+      return createProfileContext(contextType, undefined, userRole);
 
     case "search":
-      return createSearchContext();
+      return createSearchContext(undefined, undefined, undefined, undefined, userRole);
+
+    case "tasks":
+      return createTasksContext(undefined, userRole);
 
     case "outreach":
     case "messaging":
-      return createGeneralContext(); // Use general for now, could create specific outreach context
+      return createGeneralContext(userRole);
 
     case "general":
     default:
-      return createGeneralContext();
+      return createGeneralContext(userRole);
   }
 }

@@ -280,6 +280,74 @@ export const DATA_APIS: Record<string, AvailableAPI> = {
       skills: "array",
     },
   },
+
+  // Task Management APIs
+  TASK_GET: {
+    id: "task_get",
+    endpoint: "/api/Task/{id}",
+    method: "GET",
+    description: "Get task by ID",
+    supportedActions: ["break-down-task", "estimate-time", "suggest-deadlines"],
+    requiresAuth: true,
+    responseSchema: {
+      id: "string",
+      text: "string",
+      description: "string",
+      start: "date",
+      end: "date",
+      progress: "number",
+      type: "string",
+      priority: "string",
+    },
+  },
+
+  TASK_LIST: {
+    id: "task_list",
+    endpoint: "/api/Task",
+    method: "GET",
+    description: "Get all tasks for the authenticated user",
+    supportedActions: ["prioritize-tasks", "organize-tasks", "suggest-schedule"],
+    requiresAuth: true,
+    responseSchema: {
+      tasks: "array",
+      total: "number",
+    },
+  },
+
+  TASK_SAVE: {
+    id: "task_save",
+    endpoint: "/api/Task/save",
+    method: "POST",
+    description: "Create or update a task",
+    supportedActions: ["create-task", "break-down-task", "suggest-deadlines"],
+    requiresAuth: true,
+    requestSchema: {
+      id: "string (optional for new tasks)",
+      text: "string (required)",
+      description: "string (optional)",
+      start: "date (required)",
+      end: "date (optional)",
+      progress: "number (0-100)",
+      type: "string (optional)",
+      priority: "string (optional)",
+    },
+    responseSchema: {
+      id: "string",
+      success: "boolean",
+    },
+  },
+
+  TASK_DELETE: {
+    id: "task_delete",
+    endpoint: "/api/Task/{id}",
+    method: "POST",
+    description: "Delete a task by ID",
+    supportedActions: ["organize-tasks"],
+    requiresAuth: true,
+    responseSchema: {
+      success: "boolean",
+    },
+  },
 };
 
 // ============================================================================
@@ -357,6 +425,12 @@ export const CONTEXT_API_MAPPING: Record<AIContextType, string[]> = {
   "dashboard": [
     "RESUME_LIST",
     "JOB_LIST_PUBLIC",
+  ],
+  "tasks": [
+    "TASK_LIST",
+    "TASK_GET",
+    "TASK_SAVE",
+    "TASK_DELETE",
   ],
   "general": [],
 };
