@@ -250,8 +250,8 @@ export default function Jobs() {
           />
 
           <div className="pt-16 p-6">
-            {/* AI Context Provider - Auto-initializes AI context for this page */}
-            <AIContextProvider />
+            {/* AI Context Provider - TEMPORARILY DISABLED FOR DEBUGGING */}
+            {/* <AIContextProvider /> */}
 
             <div className="max-w-7xl mx-auto">
               {/* Header */}

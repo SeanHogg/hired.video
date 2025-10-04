@@ -157,8 +157,8 @@ export default function Dashboard() {
     children,
   }) => (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      {/* AI Context Provider - Auto-initializes AI context for dashboard */}
-      <AIContextProvider />
+      {/* AI Context Provider - TEMPORARILY DISABLED FOR DEBUGGING */}
+      {/* <AIContextProvider /> */}
 
       <Sidebar
         isOpen={sidebarOpen}
