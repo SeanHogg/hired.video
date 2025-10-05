@@ -156,6 +156,20 @@ export default function People() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<string | null>(null);
 
+  // Submit to Job state
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [candidateToSubmit, setCandidateToSubmit] = useState<TalentPoolEntry | null>(null);
+  const [submitForm, setSubmitForm] = useState({
+    jobId: "",
+    resumeId: "",
+    coverLetter: "",
+    recruiterNotes: "",
+    proposedSalary: "",
+    availableStartDate: "",
+  });
+  const [availableJobs, setAvailableJobs] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     relationshipStrength: "",
@@ -470,6 +484,59 @@ export default function People() {
       toast.error("Failed to load submissions");
     } finally {
       setSubmissionsLoading(false);
+    }
+  };
+
+  const handleSubmitToJob = async (candidate: TalentPoolEntry) => {
+    setCandidateToSubmit(candidate);
+    setSubmitForm({
+      jobId: "",
+      resumeId: "",
+      coverLetter: "",
+      recruiterNotes: "",
+      proposedSalary: "",
+      availableStartDate: "",
+    });
+
+    // Load available jobs
+    try {
+      const jobs = await fetch('/api/Job/user-jobs', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      }).then(r => r.json());
+      setAvailableJobs(jobs.data || []);
+    } catch (error) {
+      console.error("Failed to load jobs:", error);
+    }
+
+    setSubmitDialogOpen(true);
+  };
+
+  const handleSubmitCandidate = async () => {
+    if (!candidateToSubmit || !submitForm.jobId) {
+      toast.error("Please select a job");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await submissionService.submitCandidate({
+        candidateUserId: candidateToSubmit.candidateUserId,
+        jobId: submitForm.jobId,
+        resumeId: submitForm.resumeId || undefined,
+        coverLetter: submitForm.coverLetter || undefined,
+        recruiterNotes: submitForm.recruiterNotes || undefined,
+        proposedSalary: submitForm.proposedSalary ? parseFloat(submitForm.proposedSalary) : undefined,
+        availableStartDate: submitForm.availableStartDate || undefined,
+      });
+
+      toast.success("Candidate submitted successfully!");
+      setSubmitDialogOpen(false);
+      loadSubmissions(); // Refresh submissions list
+    } catch (error) {
+      console.error("Failed to submit candidate:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to submit candidate");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -905,6 +972,15 @@ export default function People() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => handleSubmitToJob(candidate)}
+                                    title="Submit to Job"
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Submit to Job
+                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -1635,6 +1711,82 @@ export default function People() {
                     >
                       Remove
                     </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Submit to Job Dialog */}
+              <AlertDialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+                <AlertDialogContent className="max-w-2xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Submit Candidate to Job</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Submit {candidateToSubmit?.candidateName} to a job opening
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label htmlFor="job-select">Job *</Label>
+                      <Select value={submitForm.jobId} onValueChange={(value) => setSubmitForm({...submitForm, jobId: value})}>
+                        <SelectTrigger id="job-select">
+                          <SelectValue placeholder="Select a job" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableJobs.map((job) => (
+                            <SelectItem key={job.id} value={job.id}>
+                              {job.title} - {job.company?.name || 'Unknown Company'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="cover-letter">Cover Letter</Label>
+                      <Textarea
+                        id="cover-letter"
+                        value={submitForm.coverLetter}
+                        onChange={(e) => setSubmitForm({...submitForm, coverLetter: e.target.value})}
+                        placeholder="Optional cover letter..."
+                        rows={4}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="recruiter-notes">Recruiter Notes (Internal)</Label>
+                      <Textarea
+                        id="recruiter-notes"
+                        value={submitForm.recruiterNotes}
+                        onChange={(e) => setSubmitForm({...submitForm, recruiterNotes: e.target.value})}
+                        placeholder="Internal notes about this candidate..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="proposed-salary">Proposed Salary</Label>
+                        <Input
+                          id="proposed-salary"
+                          type="number"
+                          value={submitForm.proposedSalary}
+                          onChange={(e) => setSubmitForm({...submitForm, proposedSalary: e.target.value})}
+                          placeholder="e.g., 75000"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="start-date">Available Start Date</Label>
+                        <Input
+                          id="start-date"
+                          type="date"
+                          value={submitForm.availableStartDate}
+                          onChange={(e) => setSubmitForm({...submitForm, availableStartDate: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+                    <Button onClick={handleSubmitCandidate} disabled={submitting || !submitForm.jobId}>
+                      {submitting ? "Submitting..." : "Submit Candidate"}
+                    </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
