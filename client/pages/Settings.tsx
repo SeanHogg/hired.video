@@ -44,6 +44,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { USER_ROLES } from "@shared/user-roles";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { settingsService, type PrivacySettings, type AccountSettings } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
@@ -65,6 +66,7 @@ function SettingsContent() {
     marketing: false,
     weekly: true,
   });
+  const [selectedPersona, setSelectedPersona] = useState<string>(user?.role || "JobSeeker");
   const [privacy, setPrivacy] = useState<PrivacySettings>({
     profileVisible: true,
     showEmail: false,
@@ -88,6 +90,17 @@ function SettingsContent() {
     if (!isAuthenticated) return;
     // Load verification status for banner
     getVerificationStatus().then(setVerification).catch(() => setVerification(null));
+
+    // Sync selected persona with user role (or active persona from localStorage for superadmin)
+    if (user?.role) {
+      const isSuperAdmin = user.email === "seanhogg@gmail.com" || user.role === "SuperAdmin";
+      if (isSuperAdmin) {
+        const activePersona = localStorage.getItem("superadmin_active_persona");
+        setSelectedPersona(activePersona || user.role);
+      } else {
+        setSelectedPersona(user.role);
+      }
+    }
 
     // Load privacy settings from API
     settingsService
@@ -160,6 +173,37 @@ function SettingsContent() {
       toast({ title: "Failed to save privacy settings", variant: "destructive" });
     } finally {
       setSavingPrivacy(false);
+    }
+  };
+
+  // Check if user is superadmin (seanhogg@gmail.com)
+  const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "SuperAdmin";
+
+  // Handle persona switching for superadmin (local only, no API call)
+  const handlePersonaSwitch = (newPersona: string) => {
+    try {
+      setSelectedPersona(newPersona);
+
+      // Store the active persona in localStorage for testing
+      localStorage.setItem("superadmin_active_persona", newPersona);
+
+      toast({
+        title: "Persona Switched",
+        description: `You are now viewing as ${getRoleDisplayLabel(newPersona)}. Page will reload.`,
+      });
+
+      // Reload the page to refresh all role-based UI with the new persona
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Failed to switch persona", error);
+      toast({
+        title: "Failed to switch persona",
+        variant: "destructive",
+      });
+      // Revert to previous persona
+      setSelectedPersona(user?.role || "JobSeeker");
     }
   };
 
@@ -412,9 +456,34 @@ function SettingsContent() {
                   Manage your account settings and preferences
                 </p>
               </div>
-              <Badge variant="secondary">
-                {getRoleDisplayLabel(user.role)}
-              </Badge>
+
+              {/* Persona Switcher for SuperAdmin */}
+              {isSuperAdmin ? (
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant="secondary" className="mb-1">
+                    SuperAdmin Mode
+                  </Badge>
+                  <Select value={selectedPersona} onValueChange={handlePersonaSwitch}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select Persona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={USER_ROLES.JOB_SEEKER}>Job Seeker</SelectItem>
+                      <SelectItem value={USER_ROLES.RECRUITER}>Recruiter</SelectItem>
+                      <SelectItem value={USER_ROLES.EMPLOYER}>Employer</SelectItem>
+                      <SelectItem value={USER_ROLES.ADMIN}>Administrator</SelectItem>
+                      <SelectItem value={USER_ROLES.SUPER_ADMIN}>Super Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Current: {getRoleDisplayLabel(selectedPersona)}
+                  </p>
+                </div>
+              ) : (
+                <Badge variant="secondary">
+                  {getRoleDisplayLabel(user.role)}
+                </Badge>
+              )}
             </div>
 
             {/* Verification Banner */}

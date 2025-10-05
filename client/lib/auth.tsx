@@ -75,13 +75,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Helper function to convert UserProfile to User
 function userProfileToUser(profile: UserProfile): User {
+  // Check if superadmin has an active persona override
+  let effectiveRole = profile.role as UserRole;
+  const isSuperAdmin = profile.email === "seanhogg@gmail.com" || profile.role === "SuperAdmin";
+
+  if (isSuperAdmin) {
+    const activePersona = localStorage.getItem("superadmin_active_persona");
+    if (activePersona) {
+      effectiveRole = activePersona as UserRole;
+    }
+  }
+
   return {
     id: profile.id,
     email: profile.email,
     firstName: profile.firstName,
     lastName: profile.lastName,
     name: `${profile.firstName} ${profile.lastName}`,
-    role: profile.role as UserRole,
+    role: effectiveRole,
     onboardingComplete: true, // Assume completed if profile exists
     avatar: profile.profilePicture,
     profilePicture: profile.profilePicture,
