@@ -92,9 +92,19 @@ function ProfileContent() {
     role: roleToSelectValue(user?.role),
     location: user?.location || "",
     bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+    headline: user?.headline || "",
     company: user?.currentCompany || "",
     title: user?.currentRole || "",
     website: user?.website || "",
+    linkedIn: user?.linkedIn || "",
+    gitHub: user?.github || "",
+    twitter: user?.twitter || "",
+    skills: user?.skills?.join(", ") || "",
+    industries: user?.industries?.join(", ") || "",
+    openToRemote: user?.openToRemote || false,
+    preferredRoles: user?.preferredRoles?.join(", ") || "",
+    salaryExpectation: user?.salaryExpectation?.toString() || "",
+    salaryCurrency: user?.salaryCurrency || "USD",
   });
 
   const joinedText = (() => {
@@ -117,13 +127,23 @@ function ProfileContent() {
       role: roleToSelectValue(user.role),
       location: user.location || "",
       bio: user.bio || `Passionate ${formatRoleForDisplay(user.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+      headline: user.headline || "",
       company: user.currentCompany || "",
       title: user.currentRole || "",
       website: user.website || "",
+      linkedIn: user.linkedIn || "",
+      gitHub: user.github || "",
+      twitter: user.twitter || "",
+      skills: user.skills?.join(", ") || "",
+      industries: user.industries?.join(", ") || "",
+      openToRemote: user.openToRemote || false,
+      preferredRoles: user.preferredRoles?.join(", ") || "",
+      salaryExpectation: user.salaryExpectation?.toString() || "",
+      salaryCurrency: user.salaryCurrency || "USD",
     });
   }, [user]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -136,11 +156,21 @@ function ProfileContent() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         bio: formData.bio,
+        headline: formData.headline,
         location: formData.location,
         website: formData.website,
+        linkedIn: formData.linkedIn,
+        github: formData.gitHub,
+        twitter: formData.twitter,
         phone: formData.phone,
         currentCompany: formData.company,
         currentRole: formData.title,
+        skills: formData.skills ? formData.skills.split(",").map(s => s.trim()).filter(Boolean) : [],
+        industries: formData.industries ? formData.industries.split(",").map(s => s.trim()).filter(Boolean) : [],
+        openToRemote: formData.openToRemote,
+        preferredRoles: formData.preferredRoles ? formData.preferredRoles.split(",").map(s => s.trim()).filter(Boolean) : [],
+        salaryExpectation: formData.salaryExpectation ? parseFloat(formData.salaryExpectation) : undefined,
+        salaryCurrency: formData.salaryCurrency,
       });
       // Immediately switch to read-only on successful update
       setIsEditing(false);
@@ -165,9 +195,19 @@ function ProfileContent() {
       role: roleToSelectValue(user?.role),
       location: user?.location || "",
       bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+      headline: user?.headline || "",
       company: user?.currentCompany || "",
       title: user?.currentRole || "",
       website: user?.website || "",
+      linkedIn: user?.linkedIn || "",
+      gitHub: user?.github || "",
+      twitter: user?.twitter || "",
+      skills: user?.skills?.join(", ") || "",
+      industries: user?.industries?.join(", ") || "",
+      openToRemote: user?.openToRemote || false,
+      preferredRoles: user?.preferredRoles?.join(", ") || "",
+      salaryExpectation: user?.salaryExpectation?.toString() || "",
+      salaryCurrency: user?.salaryCurrency || "USD",
     });
     setIsEditing(false);
   };
@@ -479,6 +519,172 @@ function ProfileContent() {
                               handleInputChange("website", e.target.value)
                             }
                           />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Headline */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Professional Headline</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="headline">Headline</Label>
+                        <Input
+                          id="headline"
+                          placeholder="e.g. Full-Stack Developer | React & Node.js Expert"
+                          value={formData.headline}
+                          onChange={(e) =>
+                            handleInputChange("headline", e.target.value)
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          A brief professional tagline that appears on your profile
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Social Profiles */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Social Profiles</h3>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="linkedIn">LinkedIn</Label>
+                          <Input
+                            id="linkedIn"
+                            type="url"
+                            placeholder="https://linkedin.com/in/yourprofile"
+                            value={formData.linkedIn}
+                            onChange={(e) =>
+                              handleInputChange("linkedIn", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="gitHub">GitHub</Label>
+                          <Input
+                            id="gitHub"
+                            type="url"
+                            placeholder="https://github.com/yourusername"
+                            value={formData.gitHub}
+                            onChange={(e) =>
+                              handleInputChange("gitHub", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="twitter">Twitter</Label>
+                          <Input
+                            id="twitter"
+                            type="url"
+                            placeholder="https://twitter.com/yourusername"
+                            value={formData.twitter}
+                            onChange={(e) =>
+                              handleInputChange("twitter", e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Skills & Industries */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Skills & Expertise</h3>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="skills">Skills</Label>
+                          <Input
+                            id="skills"
+                            placeholder="e.g. JavaScript, React, Node.js, Python"
+                            value={formData.skills}
+                            onChange={(e) =>
+                              handleInputChange("skills", e.target.value)
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Separate skills with commas
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="industries">Industries</Label>
+                          <Input
+                            id="industries"
+                            placeholder="e.g. Technology, Finance, Healthcare"
+                            value={formData.industries}
+                            onChange={(e) =>
+                              handleInputChange("industries", e.target.value)
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Separate industries with commas
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Job Preferences */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Job Preferences</h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="openToRemote"
+                            checked={formData.openToRemote}
+                            onChange={(e) =>
+                              handleInputChange("openToRemote", e.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor="openToRemote" className="cursor-pointer">
+                            Open to remote work
+                          </Label>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="preferredRoles">Preferred Roles</Label>
+                          <Input
+                            id="preferredRoles"
+                            placeholder="e.g. Senior Developer, Tech Lead, Engineering Manager"
+                            value={formData.preferredRoles}
+                            onChange={(e) =>
+                              handleInputChange("preferredRoles", e.target.value)
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Separate roles with commas
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="salaryExpectation">Salary Expectation</Label>
+                            <Input
+                              id="salaryExpectation"
+                              type="number"
+                              placeholder="e.g. 120000"
+                              value={formData.salaryExpectation}
+                              onChange={(e) =>
+                                handleInputChange("salaryExpectation", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="salaryCurrency">Currency</Label>
+                            <Select
+                              value={formData.salaryCurrency}
+                              onValueChange={(value) =>
+                                handleInputChange("salaryCurrency", value)
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD ($)</SelectItem>
+                                <SelectItem value="EUR">EUR (€)</SelectItem>
+                                <SelectItem value="GBP">GBP (£)</SelectItem>
+                                <SelectItem value="CAD">CAD ($)</SelectItem>
+                                <SelectItem value="AUD">AUD ($)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       </div>
                     </div>

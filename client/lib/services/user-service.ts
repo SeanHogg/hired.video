@@ -39,6 +39,15 @@ export const UserProfileSchema = z.object({
   slug: nullableString(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
+  lastLoginAt: nullableString(),
+  profileViews: nullableNumber(),
+  // Privacy settings - nested in data object from API
+  data: z.object({
+    showEmail: nullableBoolean(),
+    showPhone: nullableBoolean(),
+    showLocation: nullableBoolean(),
+    allowMessaging: nullableBoolean(),
+  }).optional(),
 });
 
 // Public users list item (metadata) from GET /api/Users/public

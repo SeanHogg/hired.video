@@ -505,14 +505,17 @@ export default function PeopleDetail() {
                                 {getRoleDisplayLabel(person?.role || "JobSeeker")}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              <span>
-                                {person.data.location.remote
-                                  ? "Remote"
-                                  : `${person.data.location.city}, ${person.data.location.state}`}
-                              </span>
-                            </div>
+                            {/* Location - Only show if privacy allows or own profile */}
+                            {(isOwnProfile || (userProfile as any)?.data?.showLocation) && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-4 w-4" />
+                                <span>
+                                  {person.data.location.remote
+                                    ? "Remote"
+                                    : `${person.data.location.city}, ${person.data.location.state}`}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           {currentPosition && (
                             <div className="flex items-center gap-2 text-sm">
@@ -654,33 +657,35 @@ export default function PeopleDetail() {
                         </div>
                       )}
 
-                      {/* Stats */}
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                          <div className="text-2xl font-bold text-primary">
-                            {(person as any).connectionCount || 0}
+                      {/* Stats - Only visible to profile owner */}
+                      {isOwnProfile && (
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <div className="text-2xl font-bold text-primary">
+                              {(person as any).connectionCount || 0}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Connections
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            Connections
+                          <div>
+                            <div className="text-2xl font-bold text-primary">
+                              {(person as any).followerCount || 0}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Followers
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-primary">
+                              {userProfile?.profileViews || 0}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Profile Views
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <div className="text-2xl font-bold text-primary">
-                            {(person as any).followerCount || 0}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Followers
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-2xl font-bold text-primary">
-                            {(person as any).profileViews || 0}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Profile Views
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -970,23 +975,27 @@ export default function PeopleDetail() {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                {/* Contact Information */}
+                {/* Contact Information - Respect privacy settings */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Contact Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <a
-                        href={`mailto:${person.data.contact.email}`}
-                        className="text-sm text-primary hover:underline"
-                      >
-                        {person.data.contact.email}
-                      </a>
-                    </div>
+                    {/* Email - Only show if privacy allows or own profile */}
+                    {(isOwnProfile || (userProfile as any)?.data?.showEmail) && person.data.contact.email && (
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a
+                          href={`mailto:${person.data.contact.email}`}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {person.data.contact.email}
+                        </a>
+                      </div>
+                    )}
 
-                    {(person.data.contact as any).phone && (
+                    {/* Phone - Only show if privacy allows or own profile */}
+                    {(isOwnProfile || (userProfile as any)?.data?.showPhone) && (person.data.contact as any).phone && (
                       <div className="flex items-center gap-3">
                         <Phone className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">
@@ -995,6 +1004,7 @@ export default function PeopleDetail() {
                       </div>
                     )}
 
+                    {/* Website - Always public */}
                     {person.data.contact.website && (
                       <div className="flex items-center gap-3">
                         <Globe className="h-4 w-4 text-muted-foreground" />
@@ -1012,6 +1022,7 @@ export default function PeopleDetail() {
                       </div>
                     )}
 
+                    {/* LinkedIn - Always public */}
                     {person.data.contact.linkedin && (
                       <div className="flex items-center gap-3">
                         <Linkedin className="h-4 w-4 text-muted-foreground" />
@@ -1026,6 +1037,7 @@ export default function PeopleDetail() {
                       </div>
                     )}
 
+                    {/* GitHub - Always public */}
                     {person.data.contact.github && (
                       <div className="flex items-center gap-3">
                         <Github className="h-4 w-4 text-muted-foreground" />
@@ -1038,6 +1050,18 @@ export default function PeopleDetail() {
                           GitHub
                         </a>
                       </div>
+                    )}
+
+                    {/* Show message if no contact info is visible */}
+                    {!isOwnProfile &&
+                     !(userProfile as any)?.data?.showEmail &&
+                     !(userProfile as any)?.data?.showPhone &&
+                     !person.data.contact.website &&
+                     !person.data.contact.linkedin &&
+                     !person.data.contact.github && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Contact information is private
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1092,36 +1116,40 @@ export default function PeopleDetail() {
                         </div>
                       )}
 
-                    <Separator />
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Member since
-                        </span>
-                        <span>
-                          {person.createdAt &&
-                          !isNaN(new Date(person.createdAt).getTime())
-                            ? new Date(person.createdAt).toLocaleDateString()
-                            : "Unknown"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Last active
-                        </span>
-                        <span>
-                          {(() => {
-                            const lastActive =
-                              (person as any).lastActiveAt || person.updatedAt;
-                            return lastActive &&
-                              !isNaN(new Date(lastActive).getTime())
-                              ? new Date(lastActive).toLocaleDateString()
-                              : "Unknown";
-                          })()}
-                        </span>
-                      </div>
-                    </div>
+                    {/* Member Since and Last Active - Only visible to profile owner */}
+                    {isOwnProfile && (
+                      <>
+                        <Separator />
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Member since
+                            </span>
+                            <span>
+                              {userProfile?.createdAt &&
+                              !isNaN(new Date(userProfile.createdAt).getTime())
+                                ? new Date(userProfile.createdAt).toLocaleDateString()
+                                : "Unknown"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Last active
+                            </span>
+                            <span>
+                              {(() => {
+                                const lastActive =
+                                  userProfile?.lastLoginAt || userProfile?.updatedAt;
+                                return lastActive &&
+                                  !isNaN(new Date(lastActive).getTime())
+                                  ? new Date(lastActive).toLocaleDateString()
+                                  : "Unknown";
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
 

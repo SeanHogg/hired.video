@@ -71,6 +71,7 @@ function SettingsContent() {
     profileVisible: true,
     showEmail: false,
     showPhone: false,
+    showLocation: false,
     indexable: true,
     allowMessages: true,
     showActivity: true,
@@ -114,6 +115,7 @@ function SettingsContent() {
           showActivity: p.showActivity ?? prev.showActivity,
           showEmail: p.showEmail ?? prev.showEmail,
           showPhone: p.showPhone ?? prev.showPhone,
+          showLocation: p.showLocation ?? prev.showLocation,
         }));
       })
       .catch((err) => {
@@ -710,6 +712,29 @@ function SettingsContent() {
                             await settingsService.updatePrivacySettings({ showPhone: checked });
                           } catch (e) {
                             console.error("Failed to save privacy (show phone)", e);
+                          }
+                        }}
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          Show Location
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Display location on your public profile
+                        </p>
+                      </div>
+                      <Switch
+                        checked={privacy.showLocation}
+                        disabled={savingPrivacy}
+                        onCheckedChange={async (checked) => {
+                          setPrivacy({ ...privacy, showLocation: checked });
+                          try {
+                            await settingsService.updatePrivacySettings({ showLocation: checked });
+                          } catch (e) {
+                            console.error("Failed to save privacy (show location)", e);
                           }
                         }}
                       />

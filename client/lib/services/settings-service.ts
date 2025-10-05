@@ -60,6 +60,7 @@ export const PrivacySettingsSchema = z.object({
   profileVisible: z.boolean(),
   showEmail: z.boolean(),
   showPhone: z.boolean(),
+  showLocation: z.boolean().optional(),
   indexable: z.boolean(),
   allowMessages: z.boolean().optional(),
   showActivity: z.boolean().optional(),

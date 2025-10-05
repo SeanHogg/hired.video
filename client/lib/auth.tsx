@@ -7,29 +7,15 @@ import { apiClient } from "./api-client";
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
 export { USER_ROLES, type UserRole };
 
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
+/**
+ * User interface for frontend context
+ * Extends UserProfile from API with computed/frontend-specific fields
+ */
+export interface User extends Omit<UserProfile, 'role' | 'createdAt' | 'updatedAt'> {
   name: string; // Computed from firstName + lastName
-  role?: UserRole;
-  onboardingComplete: boolean;
-  subscription?: "free" | "pro" | "enterprise";
-  avatar?: string;
-  profilePicture?: string;
-  bio?: string;
-  location?: string;
-  website?: string;
-  linkedIn?: string;
-  github?: string;
-  phone?: string;
-  skills?: string[];
-  openToWork?: boolean;
-  isDemo?: boolean; // Demo user designation
-  slug?: string; // User-friendly URL identifier
-  currentRole?: string; // Current job title
-  currentCompany?: string; // Current company
+  role?: UserRole; // Typed enum instead of string
+  onboardingComplete: boolean; // Frontend-specific flag
+  avatar?: string; // Alias for profilePicture for backward compatibility
 }
 
 interface TwoFactorChallengeUI {
@@ -99,13 +85,21 @@ function userProfileToUser(profile: UserProfile): User {
     avatar: profile.profilePicture,
     profilePicture: profile.profilePicture,
     bio: profile.bio,
+    headline: profile.headline,
     location: profile.location,
     website: profile.website,
     linkedIn: profile.linkedIn,
     github: profile.github,
+    twitter: profile.twitter,
     phone: profile.phone,
     skills: profile.skills,
+    industries: profile.industries,
     openToWork: profile.openToWork,
+    openToRemote: profile.openToRemote,
+    preferredRoles: profile.preferredRoles,
+    salaryExpectation: profile.salaryExpectation,
+    salaryCurrency: profile.salaryCurrency,
+    yearsOfExperience: profile.yearsOfExperience,
     isDemo: profile.isDemo,
     slug: profile.slug,
     currentRole: profile.currentRole,
