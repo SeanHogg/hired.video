@@ -34,6 +34,7 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import ProductDashboard from "@/pages/admin/ProductDashboard";
 
 
 export default function Dashboard() {
@@ -85,13 +86,17 @@ export default function Dashboard() {
       onRefresh: refreshDashboard,
     };
 
+    // SuperAdmin gets the Product Dashboard with SaaS metrics
+    if (rolePermissions.isSuperAdmin) return <ProductDashboard />;
+
+    // Other role-based dashboards
+    if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
     if (rolePermissions.isJobSeeker)
       return <JobSeekerDashboard {...commonProps} />;
     if (rolePermissions.isRecruiter)
       return <RecruiterDashboard {...commonProps} />;
     if (rolePermissions.isEmployer)
       return <EmployerDashboard {...commonProps} />;
-    if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
 
     // Fallback for unknown roles
     return (
