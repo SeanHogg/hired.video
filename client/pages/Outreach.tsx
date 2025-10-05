@@ -136,9 +136,9 @@ export default function Outreach() {
   const [userJobs, setUserJobs] = useState<JobSummary[]>([]);
   const [expirationDate, setExpirationDate] = useState<string>("");
   const [postingFilters, setPostingFilters] = useState({
-    jobId: "",
-    boardId: "",
-    status: "",
+    jobId: "all",
+    boardId: "all",
+    status: "all",
   });
 
   // Dialog states
@@ -1406,7 +1406,7 @@ export default function Outreach() {
                                 <SelectValue placeholder="All Jobs" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">All Jobs</SelectItem>
+                                <SelectItem value="all">All Jobs</SelectItem>
                                 {userJobs.map((job) => (
                                   <SelectItem key={job.id} value={job.id}>
                                     {job.title}
@@ -1428,7 +1428,7 @@ export default function Outreach() {
                                 <SelectValue placeholder="All Boards" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">All Boards</SelectItem>
+                                <SelectItem value="all">All Boards</SelectItem>
                                 {jobBoards.map((board) => (
                                   <SelectItem key={board.id} value={board.id}>
                                     {board.name}
