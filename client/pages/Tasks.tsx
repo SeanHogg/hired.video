@@ -384,8 +384,15 @@ export default function Tasks() {
                 <div>
                   <Label htmlFor="edit-assigned">Assign To</Label>
                   <Select
-                    value={editTask.assignedTo?.id || ""}
+                    value={editTask.assignedTo?.id || "unassigned"}
                     onValueChange={(userId) => {
+                      if (userId === "unassigned") {
+                        setEditTask({
+                          ...editTask,
+                          assignedTo: undefined,
+                        });
+                        return;
+                      }
                       const assignedUser = assignableUsers.find(
                         (u) => u.userProfile?.id === userId,
                       );
@@ -399,7 +406,7 @@ export default function Tasks() {
                       <SelectValue placeholder="Select assignee" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {assignableUsers.map((association) => (
                         <SelectItem
                           key={association.id}

@@ -267,7 +267,7 @@ export default function MetadataModal({
                       </SelectTrigger>
                       <SelectContent>
                         {sectionOptions.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="none" disabled>
                             {loadingResume ? "Loading sections..." : "No sections available"}
                           </SelectItem>
                         ) : (

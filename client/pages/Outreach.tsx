@@ -1495,13 +1495,13 @@ export default function Outreach() {
                             <TableBody>
                               {jobBoardPostings
                                 .filter((posting) => {
-                                  if (postingFilters.jobId && posting.jobId !== postingFilters.jobId) {
+                                  if (postingFilters.jobId !== "all" && posting.jobId !== postingFilters.jobId) {
                                     return false;
                                   }
-                                  if (postingFilters.boardId && posting.jobBoardId !== postingFilters.boardId) {
+                                  if (postingFilters.boardId !== "all" && posting.jobBoardId !== postingFilters.boardId) {
                                     return false;
                                   }
-                                  if (postingFilters.status && posting.status !== postingFilters.status) {
+                                  if (postingFilters.status !== "all" && posting.status !== postingFilters.status) {
                                     return false;
                                   }
                                   return true;
