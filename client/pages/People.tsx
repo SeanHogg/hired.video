@@ -93,6 +93,11 @@ import {
   type AddInteractionRequest,
   type TalentPoolFilters,
 } from "@/lib/services/recruiter-service";
+import {
+  submissionService,
+  type SubmissionDTO,
+  type SubmissionFilters,
+} from "@/lib/services/submission-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
@@ -143,6 +148,11 @@ export default function People() {
   const [selectedCandidate, setSelectedCandidate] = useState<TalentPoolEntry | null>(null);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [interactionSheetOpen, setInteractionSheetOpen] = useState(false);
+
+  // Submissions state (for recruiters)
+  const [submissions, setSubmissions] = useState<SubmissionDTO[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [submissionFilters, setSubmissionFilters] = useState<SubmissionFilters>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [candidateToDelete, setCandidateToDelete] = useState<string | null>(null);
 
@@ -236,6 +246,16 @@ export default function People() {
       loadTalentPool();
     }
   }, [activeTab, isAuthenticated, user, talentPoolFilters]);
+
+  // Load submissions when tab changes (for recruiters)
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const rolePermissions = createRolePermissions(user.role);
+
+    if (rolePermissions.isRecruiter && activeTab === "submissions") {
+      loadSubmissions();
+    }
+  }, [activeTab, isAuthenticated, user, submissionFilters]);
 
   // Get people based on user role and authentication
   const getPeopleForUser = () => {
@@ -439,6 +459,20 @@ export default function People() {
     }
   };
 
+  // Submissions handlers
+  const loadSubmissions = async () => {
+    try {
+      setSubmissionsLoading(true);
+      const data = await submissionService.getSubmissions(submissionFilters);
+      setSubmissions(data);
+    } catch (error) {
+      console.error("Failed to load submissions:", error);
+      toast.error("Failed to load submissions");
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  };
+
   const handleAddToTalentPool = async (candidateUserId: string) => {
     try {
       const request: AddToTalentPoolRequest = {
@@ -633,7 +667,7 @@ export default function People() {
               {/* Tabs for Recruiters, regular view for others */}
               {rolePermissions.isRecruiter ? (
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="browse">
                       <Search className="h-4 w-4 mr-2" />
                       Browse
@@ -641,6 +675,10 @@ export default function People() {
                     <TabsTrigger value="talent-pool">
                       <Briefcase className="h-4 w-4 mr-2" />
                       Talent Pool
+                    </TabsTrigger>
+                    <TabsTrigger value="submissions">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Submissions
                     </TabsTrigger>
                   </TabsList>
 
@@ -926,6 +964,102 @@ export default function People() {
                                   </div>
                                   <span>Added {formatDate(candidate.createdAt)}</span>
                                 </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* Submissions Tab */}
+                  <TabsContent value="submissions" className="space-y-4">
+                    {submissionsLoading ? (
+                      <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                          <Card key={i}>
+                            <CardHeader>
+                              <Skeleton className="h-6 w-3/4 mb-2" />
+                              <Skeleton className="h-4 w-1/2" />
+                            </CardHeader>
+                            <CardContent>
+                              <Skeleton className="h-20 w-full" />
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : submissions.length === 0 ? (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                          <h2 className="text-2xl font-bold mb-2">No submissions yet</h2>
+                          <p className="text-muted-foreground mb-6">
+                            Submit candidates from your talent pool to jobs to start tracking
+                          </p>
+                          <Button onClick={() => handleTabChange("talent-pool")}>
+                            Go to Talent Pool
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {submissions.map((submission) => (
+                          <Card key={submission.id}>
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="text-lg">
+                                    {submission.candidateName} → {submission.jobTitle}
+                                  </CardTitle>
+                                  <CardDescription>
+                                    {submission.companyName} • Submitted {formatDate(submission.submittedAt)}
+                                  </CardDescription>
+                                </div>
+                                <Badge
+                                  variant={
+                                    submission.status === "Hired"
+                                      ? "default"
+                                      : submission.status === "Rejected" || submission.status === "Withdrawn"
+                                      ? "destructive"
+                                      : submission.status === "Interviewing"
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                >
+                                  {submission.status}
+                                </Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2 text-sm">
+                                {submission.proposedSalary && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">Proposed Salary:</span>
+                                    <span className="font-medium">
+                                      ${submission.proposedSalary.toLocaleString()}
+                                    </span>
+                                  </div>
+                                )}
+                                {submission.availableStartDate && (
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Available:</span>
+                                    <span>{formatDate(submission.availableStartDate)}</span>
+                                  </div>
+                                )}
+                                {submission.interviewDate && (
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Interview:</span>
+                                    <span>{formatDate(submission.interviewDate)}</span>
+                                  </div>
+                                )}
+                                {submission.statusNotes && (
+                                  <div className="mt-2 p-2 bg-muted rounded-md">
+                                    <p className="text-xs text-muted-foreground">Notes:</p>
+                                    <p className="text-sm">{submission.statusNotes}</p>
+                                  </div>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
