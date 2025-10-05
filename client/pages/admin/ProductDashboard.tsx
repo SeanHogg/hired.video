@@ -178,7 +178,10 @@ export default function ProductDashboard() {
       setError(null);
 
       console.log("ProductDashboard: Starting to load dashboard data...");
-      const response = await apiClient.get<ProductDashboardData>("/api/ProductDashboard");
+      // Include query parameters to ensure we get all data including SaaS metrics and time series
+      const response = await apiClient.get<ProductDashboardData>(
+        "/api/ProductDashboard?IncludeSaaSMetrics=true&IncludeTimeSeriesData=true"
+      );
       console.log("ProductDashboard: API response received", response);
 
       // ApiClient returns ApiSuccessResponse<T> with structure: { success, data, timestamp }
