@@ -176,16 +176,28 @@ export default function ProductDashboard() {
     try {
       setLoading(true);
       setError(null);
+
+      console.log("ProductDashboard: Starting to load dashboard data...");
       const response = await apiClient.get<ProductDashboardData>("/api/ProductDashboard");
+      console.log("ProductDashboard: API response received", response);
 
       // ApiClient returns ApiSuccessResponse<T> with structure: { success, data, timestamp }
       if (response.success && response.data) {
+        console.log("ProductDashboard: Setting dashboard data", response.data);
         setDashboardData(response.data);
       } else {
-        setError("Failed to load dashboard data");
+        const errorMsg = "Failed to load dashboard data";
+        console.error("ProductDashboard: API response not successful", response);
+        setError(errorMsg);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      console.error("ProductDashboard: Error loading dashboard data", {
+        error: err,
+        message: errorMsg,
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
