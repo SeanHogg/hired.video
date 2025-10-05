@@ -1450,7 +1450,7 @@ export default function Outreach() {
                                 <SelectValue placeholder="All Statuses" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="Pending">Pending</SelectItem>
                                 <SelectItem value="Posted">Posted</SelectItem>
                                 <SelectItem value="Active">Active</SelectItem>
@@ -1463,13 +1463,13 @@ export default function Outreach() {
                         </div>
 
                         {/* Clear Filters Button */}
-                        {(postingFilters.jobId || postingFilters.boardId || postingFilters.status) && (
+                        {(postingFilters.jobId !== "all" || postingFilters.boardId !== "all" || postingFilters.status !== "all") && (
                           <div className="mb-4">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                setPostingFilters({ jobId: "", boardId: "", status: "" })
+                                setPostingFilters({ jobId: "all", boardId: "all", status: "all" })
                               }
                             >
                               Clear Filters
