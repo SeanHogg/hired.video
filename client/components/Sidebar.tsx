@@ -61,17 +61,7 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
-    // SuperAdmin only navigation
-    ...(user?.role === USER_ROLES.SUPER_ADMIN
-      ? [
-          {
-            name: "Product Dashboard",
-            href: "/admin/product-dashboard",
-            icon: BarChart3,
-            exactMatch: false,
-          },
-        ]
-      : []),
+    // Note: Dashboard link is in main navigation and routes to role-specific dashboard
   ];
 
   // Helper function to determine if a menu item is active

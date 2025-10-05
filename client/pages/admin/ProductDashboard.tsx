@@ -78,7 +78,7 @@ interface ProductDashboardData {
     resumesByType: Record<string, number>;
     resumesByStatus: Record<string, number>;
   };
-  saasMetrics: {
+  saasMetrics?: {
     monthlyRecurringRevenue: number;
     annualRecurringRevenue: number;
     averageRevenuePerUser: number;
@@ -822,186 +822,196 @@ export default function ProductDashboard() {
         </TabsContent>
 
         <TabsContent value="saas">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <MetricCard
-              title="MRR"
-              value={`$${dashboardData.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`}
-              change={`${dashboardData.saasMetrics.growthRate > 0 ? "+" : ""}${dashboardData.saasMetrics.growthRate.toFixed(1)}%`}
-              trend={dashboardData.saasMetrics.growthRate > 0 ? "up" : "down"}
-              icon={<DollarSign className="h-4 w-4" />}
-              description="Monthly Recurring Revenue"
-            />
-            <MetricCard
-              title="ARR"
-              value={`$${dashboardData.saasMetrics.annualRecurringRevenue.toLocaleString()}`}
-              icon={<BarChart3 className="h-4 w-4" />}
-              description="Annual Recurring Revenue"
-            />
-            <MetricCard
-              title="ARPU"
-              value={`$${dashboardData.saasMetrics.averageRevenuePerUser.toFixed(2)}`}
-              icon={<Users className="h-4 w-4" />}
-              description="Average Revenue Per User"
-            />
-            <MetricCard
-              title="Churn Rate"
-              value={`${dashboardData.saasMetrics.churnRate.toFixed(1)}%`}
-              trend={dashboardData.saasMetrics.churnRate < 5 ? "up" : "down"}
-              icon={<TrendingDown className="h-4 w-4" />}
-              description="Monthly churn rate"
-            />
-          </div>
+          {dashboardData.saasMetrics ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  title="MRR"
+                  value={`$${dashboardData.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`}
+                  change={`${dashboardData.saasMetrics.growthRate > 0 ? "+" : ""}${dashboardData.saasMetrics.growthRate.toFixed(1)}%`}
+                  trend={dashboardData.saasMetrics.growthRate > 0 ? "up" : "down"}
+                  icon={<DollarSign className="h-4 w-4" />}
+                  description="Monthly Recurring Revenue"
+                />
+                <MetricCard
+                  title="ARR"
+                  value={`$${dashboardData.saasMetrics.annualRecurringRevenue.toLocaleString()}`}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  description="Annual Recurring Revenue"
+                />
+                <MetricCard
+                  title="ARPU"
+                  value={`$${dashboardData.saasMetrics.averageRevenuePerUser.toFixed(2)}`}
+                  icon={<Users className="h-4 w-4" />}
+                  description="Average Revenue Per User"
+                />
+                <MetricCard
+                  title="Churn Rate"
+                  value={`${dashboardData.saasMetrics.churnRate.toFixed(1)}%`}
+                  trend={dashboardData.saasMetrics.churnRate < 5 ? "up" : "down"}
+                  icon={<TrendingDown className="h-4 w-4" />}
+                  description="Monthly churn rate"
+                />
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
-            <MetricCard
-              title="LTV"
-              value={`$${dashboardData.saasMetrics.customerLifetimeValue.toLocaleString()}`}
-              icon={<Activity className="h-4 w-4" />}
-              description="Customer Lifetime Value"
-            />
-            <MetricCard
-              title="CAC"
-              value={`$${dashboardData.saasMetrics.customerAcquisitionCost.toFixed(2)}`}
-              icon={<TrendingUp className="h-4 w-4" />}
-              description="Customer Acquisition Cost"
-            />
-            <MetricCard
-              title="Conversion Rate"
-              value={`${dashboardData.saasMetrics.conversionRate.toFixed(1)}%`}
-              icon={<PieChart className="h-4 w-4" />}
-              description="Trial to paid conversion"
-            />
-            <MetricCard
-              title="Active Subscriptions"
-              value={dashboardData.saasMetrics.activeSubscriptions}
-              icon={<UserCheck className="h-4 w-4" />}
-              description="Currently active subscriptions"
-            />
-          </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
+                <MetricCard
+                  title="LTV"
+                  value={`$${dashboardData.saasMetrics.customerLifetimeValue.toLocaleString()}`}
+                  icon={<Activity className="h-4 w-4" />}
+                  description="Customer Lifetime Value"
+                />
+                <MetricCard
+                  title="CAC"
+                  value={`$${dashboardData.saasMetrics.customerAcquisitionCost.toFixed(2)}`}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  description="Customer Acquisition Cost"
+                />
+                <MetricCard
+                  title="Conversion Rate"
+                  value={`$${dashboardData.saasMetrics.conversionRate.toFixed(1)}%`}
+                  icon={<PieChart className="h-4 w-4" />}
+                  description="Trial to paid conversion"
+                />
+                <MetricCard
+                  title="Active Subscriptions"
+                  value={dashboardData.saasMetrics.activeSubscriptions}
+                  icon={<UserCheck className="h-4 w-4" />}
+                  description="Currently active subscriptions"
+                />
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-2 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue by Tier</CardTitle>
-                <CardDescription>
-                  Monthly revenue breakdown by subscription tier
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(dashboardData.saasMetrics.revenueByTier).map(
-                    ([tier, revenue]) => (
-                      <div
-                        key={tier}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="text-sm font-medium">{tier}</span>
-                        <Badge variant="secondary">
-                          ${revenue.toLocaleString()}
-                        </Badge>
-                      </div>
-                    ),
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Distribution by Account Type</CardTitle>
-                <CardDescription>
-                  Financial breakdown of paid accounts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={Object.entries(
-                          dashboardData.saasMetrics.revenueByTier,
-                        ).map(([tier, revenue]) => ({
-                          name: tier
-                            .replace("_", " ")
-                            .replace(/\b\w/g, (l) => l.toUpperCase()),
-                          value: revenue,
-                          subscriptions:
-                            dashboardData.saasMetrics.subscriptionsByTier[
-                              tier
-                            ] || 0,
-                        }))}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value, percent }) =>
-                          `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(1)}%)`
-                        }
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {Object.entries(
-                          dashboardData.saasMetrics.revenueByTier,
-                        ).map((entry, index) => {
-                          const colors = [
-                            "#00C49F",
-                            "#0088FE",
-                            "#FFBB28",
-                            "#FF8042",
-                            "#8884D8",
-                          ];
-                          return (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={colors[index % colors.length]}
-                            />
-                          );
-                        })}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value, name, props) => [
-                          `$${value.toLocaleString()}`,
-                          `${name} (${props.payload.subscriptions} accounts)`,
-                        ]}
-                        labelFormatter={(label) => `Revenue from ${label}`}
-                      />
-                      <Legend />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="text-sm font-medium">Subscription Tiers:</div>
-                  {Object.entries(
-                    dashboardData.saasMetrics.subscriptionsByTier,
-                  ).map(([tier, count]) => {
-                    const revenue =
-                      dashboardData.saasMetrics.revenueByTier[tier] || 0;
-                    const avgRevenue = count > 0 ? revenue / count : 0;
-                    return (
-                      <div
-                        key={tier}
-                        className="flex justify-between items-center text-sm"
-                      >
-                        <span className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-blue-500" />
-                          {tier
-                            .replace("_", " ")
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </span>
-                        <div className="text-right">
-                          <div className="font-medium">{count} accounts</div>
-                          <div className="text-xs text-muted-foreground">
-                            ${revenue.toLocaleString()} total ($
-                            {avgRevenue.toFixed(0)}/avg)
+              <div className="grid gap-4 md:grid-cols-2 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue by Tier</CardTitle>
+                    <CardDescription>
+                      Monthly revenue breakdown by subscription tier
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(dashboardData.saasMetrics.revenueByTier).map(
+                        ([tier, revenue]) => (
+                          <div
+                            key={tier}
+                            className="flex justify-between items-center"
+                          >
+                            <span className="text-sm font-medium">{tier}</span>
+                            <Badge variant="secondary">
+                              ${revenue.toLocaleString()}
+                            </Badge>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                        ),
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue Distribution by Account Type</CardTitle>
+                    <CardDescription>
+                      Financial breakdown of paid accounts
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPieChart>
+                          <Pie
+                            data={Object.entries(
+                              dashboardData.saasMetrics.revenueByTier,
+                            ).map(([tier, revenue]) => ({
+                              name: tier
+                                .replace("_", " ")
+                                .replace(/\b\w/g, (l) => l.toUpperCase()),
+                              value: revenue,
+                              subscriptions:
+                                dashboardData.saasMetrics.subscriptionsByTier[
+                                  tier
+                                ] || 0,
+                            }))}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, value, percent }) =>
+                              `${name}: $${value.toLocaleString()} (${(percent * 100).toFixed(1)}%)`
+                            }
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {Object.entries(
+                              dashboardData.saasMetrics.revenueByTier,
+                            ).map((_entry, index) => {
+                              const colors = [
+                                "#00C49F",
+                                "#0088FE",
+                                "#FFBB28",
+                                "#FF8042",
+                                "#8884D8",
+                              ];
+                              return (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={colors[index % colors.length]}
+                                />
+                              );
+                            })}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value, name, props) => [
+                              `$${value.toLocaleString()}`,
+                              `${name} (${props.payload.subscriptions} accounts)`,
+                            ]}
+                            labelFormatter={(label) => `Revenue from ${label}`}
+                          />
+                          <Legend />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <div className="text-sm font-medium">Subscription Tiers:</div>
+                      {Object.entries(
+                        dashboardData.saasMetrics.subscriptionsByTier,
+                      ).map(([tier, count]) => {
+                        const revenue =
+                          dashboardData.saasMetrics.revenueByTier[tier] || 0;
+                        const avgRevenue = count > 0 ? revenue / count : 0;
+                        return (
+                          <div
+                            key={tier}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-blue-500" />
+                              {tier
+                                .replace("_", " ")
+                                .replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </span>
+                            <div className="text-right">
+                              <div className="font-medium">{count} accounts</div>
+                              <div className="text-xs text-muted-foreground">
+                                ${revenue.toLocaleString()} total ($
+                                {avgRevenue.toFixed(0)}/avg)
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                SaaS metrics are not available yet. This data will be populated once subscription data is available.
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
