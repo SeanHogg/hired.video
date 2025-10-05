@@ -66,6 +66,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { communicationService } from "@/lib/services/communication-service";
+import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
+import { jobService, type JobSummary } from "@/lib/services/job-service";
 import {
   EmailTemplateDTO,
   EmailCampaignDTO,
@@ -93,7 +95,7 @@ export default function Outreach() {
 
   // State management
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts"
+    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards"
   >("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export default function Outreach() {
   >([]);
   const [communicationStats, setCommunicationStats] =
     useState<CommunicationStats | null>(null);
-   
+
   const [_teamMembers, setTeamMembers] = useState<
     {
       id: string;
@@ -123,6 +125,21 @@ export default function Outreach() {
       };
     }[]
   >([]);
+
+  // Job Board state
+  const [jobBoards, setJobBoards] = useState<JobBoardDTO[]>([]);
+  const [jobBoardPostings, setJobBoardPostings] = useState<JobBoardPostingDTO[]>([]);
+  const [jobBoardStats, setJobBoardStats] = useState<JobBoardStatsDTO | null>(null);
+  const [showJobBoardDialog, setShowJobBoardDialog] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>([]);
+  const [userJobs, setUserJobs] = useState<JobSummary[]>([]);
+  const [expirationDate, setExpirationDate] = useState<string>("");
+  const [postingFilters, setPostingFilters] = useState({
+    jobId: "",
+    boardId: "",
+    status: "",
+  });
 
   // Dialog states
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -170,6 +187,10 @@ export default function Outreach() {
           contactsData,
           statsData,
           teamData,
+          jobBoardsData,
+          jobBoardPostingsData,
+          jobBoardStatsData,
+          userJobsData,
         ] = await Promise.all([
           communicationService.getEmailTemplates(),
           communicationService.getEmailCampaigns(),
@@ -177,6 +198,10 @@ export default function Outreach() {
           communicationService.getExternalContacts(),
           communicationService.getCommunicationStats().catch(() => null),
           communicationService.getTeamMembers().catch(() => []),
+          jobBoardService.getAvailableJobBoards().catch(() => []),
+          jobBoardService.getJobBoardPostings().catch(() => []),
+          jobBoardService.getJobBoardStats().catch(() => null),
+          jobService.getUserJobs().catch(() => []),
         ]);
 
         setEmailTemplates(templatesData);
@@ -185,6 +210,10 @@ export default function Outreach() {
         setExternalContacts(contactsData);
         setCommunicationStats(statsData);
         setTeamMembers(teamData);
+        setJobBoards(jobBoardsData);
+        setJobBoardPostings(jobBoardPostingsData);
+        setJobBoardStats(jobBoardStatsData);
+        setUserJobs(userJobsData);
       } catch (err) {
         console.error("Failed to load outreach data:", err);
         setError(
@@ -646,12 +675,13 @@ export default function Outreach() {
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-5">
+                  <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="templates">Templates</TabsTrigger>
                     <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                     <TabsTrigger value="tracking">Tracking</TabsTrigger>
                     <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                    <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
                   </TabsList>
 
                   {/* Dashboard Tab */}
@@ -729,6 +759,112 @@ export default function Outreach() {
                       </Card>
                     </div>
 
+                    {/* Job Board Analytics */}
+                    {jobBoardStats && jobBoardStats.totalPostings > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Target className="h-5 w-5" />
+                            Job Board Distribution
+                          </CardTitle>
+                          <CardDescription>
+                            Performance metrics across all job boards
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">
+                                {jobBoardStats.totalPostings}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Total Postings
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">
+                                {jobBoardStats.activePostings}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Active Postings
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">
+                                {jobBoardStats.totalViews}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Total Views
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">
+                                {jobBoardStats.totalApplications}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Applications
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold">
+                                ${jobBoardStats.totalCost.toFixed(2)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Total Cost
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Board Performance Table */}
+                          {jobBoardStats.boardPerformance.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-medium mb-3">
+                                Board Performance Comparison
+                              </h4>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Board</TableHead>
+                                    <TableHead className="text-right">Postings</TableHead>
+                                    <TableHead className="text-right">Views</TableHead>
+                                    <TableHead className="text-right">Applications</TableHead>
+                                    <TableHead className="text-right">Cost</TableHead>
+                                    <TableHead className="text-right">Cost/App</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {jobBoardStats.boardPerformance.map((board) => (
+                                    <TableRow key={board.jobBoardId}>
+                                      <TableCell className="font-medium">
+                                        {board.jobBoardName}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {board.totalPostings}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {board.totalViews}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {board.totalApplications}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        ${board.totalCost.toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {board.averageCostPerApplication > 0
+                                          ? `$${board.averageCostPerApplication.toFixed(2)}`
+                                          : "-"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Quick Actions */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <Card>
@@ -762,6 +898,14 @@ export default function Outreach() {
                           >
                             <UserPlus className="h-4 w-4" />
                             Add External Contact
+                          </Button>
+                          <Button
+                            className="w-full justify-start gap-3"
+                            variant="outline"
+                            onClick={() => setShowJobBoardDialog(true)}
+                          >
+                            <Target className="h-4 w-4" />
+                            Post Job to Boards
                           </Button>
                         </CardContent>
                       </Card>
@@ -1153,6 +1297,303 @@ export default function Outreach() {
                       </div>
                     )}
                   </TabsContent>
+
+                  {/* Job Boards Tab */}
+                  <TabsContent value="job-boards" className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold">Job Board Distribution</h2>
+                      <Button onClick={() => setShowJobBoardDialog(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Post to Boards
+                      </Button>
+                    </div>
+
+                    {/* Job Board Stats */}
+                    {jobBoardStats && (
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Total Postings
+                            </CardTitle>
+                            <Target className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">
+                              {jobBoardStats.totalPostings}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Active Postings
+                            </CardTitle>
+                            <Zap className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">
+                              {jobBoardStats.activePostings}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Total Views
+                            </CardTitle>
+                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">
+                              {jobBoardStats.totalViews}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Applications
+                            </CardTitle>
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">
+                              {jobBoardStats.totalApplications}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Total Cost
+                            </CardTitle>
+                            <Target className="h-4 w-4 text-muted-foreground" />
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">
+                              ${jobBoardStats.totalCost.toFixed(2)}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+
+                    {/* Job Board Postings List */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Active Postings</CardTitle>
+                        <CardDescription>
+                          Manage your job postings across multiple boards
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Filters */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                          <div>
+                            <Label htmlFor="filter-job">Filter by Job</Label>
+                            <Select
+                              value={postingFilters.jobId}
+                              onValueChange={(value) =>
+                                setPostingFilters({ ...postingFilters, jobId: value })
+                              }
+                            >
+                              <SelectTrigger id="filter-job">
+                                <SelectValue placeholder="All Jobs" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Jobs</SelectItem>
+                                {userJobs.map((job) => (
+                                  <SelectItem key={job.id} value={job.id}>
+                                    {job.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="filter-board">Filter by Board</Label>
+                            <Select
+                              value={postingFilters.boardId}
+                              onValueChange={(value) =>
+                                setPostingFilters({ ...postingFilters, boardId: value })
+                              }
+                            >
+                              <SelectTrigger id="filter-board">
+                                <SelectValue placeholder="All Boards" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Boards</SelectItem>
+                                {jobBoards.map((board) => (
+                                  <SelectItem key={board.id} value={board.id}>
+                                    {board.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="filter-status">Filter by Status</Label>
+                            <Select
+                              value={postingFilters.status}
+                              onValueChange={(value) =>
+                                setPostingFilters({ ...postingFilters, status: value })
+                              }
+                            >
+                              <SelectTrigger id="filter-status">
+                                <SelectValue placeholder="All Statuses" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Statuses</SelectItem>
+                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="Posted">Posted</SelectItem>
+                                <SelectItem value="Active">Active</SelectItem>
+                                <SelectItem value="Expired">Expired</SelectItem>
+                                <SelectItem value="Failed">Failed</SelectItem>
+                                <SelectItem value="Removed">Removed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Clear Filters Button */}
+                        {(postingFilters.jobId || postingFilters.boardId || postingFilters.status) && (
+                          <div className="mb-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPostingFilters({ jobId: "", boardId: "", status: "" })
+                              }
+                            >
+                              Clear Filters
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardContent>
+                        {jobBoardPostings.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Job Title</TableHead>
+                                <TableHead>Board</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Posted</TableHead>
+                                <TableHead>Views</TableHead>
+                                <TableHead>Applications</TableHead>
+                                <TableHead>Cost</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {jobBoardPostings
+                                .filter((posting) => {
+                                  if (postingFilters.jobId && posting.jobId !== postingFilters.jobId) {
+                                    return false;
+                                  }
+                                  if (postingFilters.boardId && posting.jobBoardId !== postingFilters.boardId) {
+                                    return false;
+                                  }
+                                  if (postingFilters.status && posting.status !== postingFilters.status) {
+                                    return false;
+                                  }
+                                  return true;
+                                })
+                                .map((posting) => (
+                                <TableRow key={posting.id}>
+                                  <TableCell className="font-medium">
+                                    {posting.jobTitle}
+                                  </TableCell>
+                                  <TableCell>{posting.jobBoardName}</TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        posting.status === "Active"
+                                          ? "default"
+                                          : posting.status === "Pending"
+                                          ? "secondary"
+                                          : posting.status === "Expired"
+                                          ? "outline"
+                                          : "destructive"
+                                      }
+                                    >
+                                      {posting.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {new Date(posting.postedAt).toLocaleDateString()}
+                                  </TableCell>
+                                  <TableCell>{posting.views}</TableCell>
+                                  <TableCell>{posting.applications}</TableCell>
+                                  <TableCell>
+                                    {posting.cost ? `$${posting.cost.toFixed(2)}` : "-"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      {posting.externalUrl && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            window.open(posting.externalUrl!, "_blank")
+                                          }
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={async () => {
+                                          if (
+                                            confirm(
+                                              "Are you sure you want to remove this posting?"
+                                            )
+                                          ) {
+                                            await jobBoardService.removeJobBoardPosting(
+                                              posting.id
+                                            );
+                                            setJobBoardPostings(
+                                              jobBoardPostings.filter(
+                                                (p) => p.id !== posting.id
+                                              )
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-12">
+                            <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-medium mb-2">
+                              No job board postings yet
+                            </h3>
+                            <p className="text-muted-foreground mb-4">
+                              Post your jobs to multiple boards to reach more candidates
+                            </p>
+                            <Button onClick={() => setShowJobBoardDialog(true)}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Post to Boards
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
                 </Tabs>
               </>
             )}
@@ -1452,6 +1893,141 @@ export default function Outreach() {
               }
             >
               {editingContact ? "Update Contact" : "Add Contact"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Board Posting Dialog */}
+      <Dialog open={showJobBoardDialog} onOpenChange={setShowJobBoardDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Post Job to Boards</DialogTitle>
+            <DialogDescription>
+              Distribute your job posting to multiple job boards to reach more candidates
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="job-select">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                <SelectTrigger id="job-select">
+                  <SelectValue placeholder="Select a job to post" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userJobs.length > 0 ? (
+                    userJobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-jobs" disabled>
+                      No jobs available
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="expiration-date">Expiration Date (Optional)</Label>
+              <Input
+                id="expiration-date"
+                type="date"
+                value={expirationDate}
+                onChange={(e) => setExpirationDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+
+            <div>
+              <Label>Select Job Boards</Label>
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                {jobBoards.map((board) => (
+                  <div key={board.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`board-${board.id}`}
+                      checked={selectedBoardIds.includes(board.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedBoardIds([...selectedBoardIds, board.id]);
+                        } else {
+                          setSelectedBoardIds(
+                            selectedBoardIds.filter((id) => id !== board.id)
+                          );
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <label
+                      htmlFor={`board-${board.id}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {board.name}
+                      {board.costPerPosting && (
+                        <span className="text-muted-foreground ml-2">
+                          (${board.costPerPosting})
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {jobBoards.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No job boards available. Please contact support to enable job board integrations.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowJobBoardDialog(false);
+                setSelectedJobId("");
+                setSelectedBoardIds([]);
+                setExpirationDate("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedJobId || selectedBoardIds.length === 0) {
+                  alert("Please select a job and at least one job board");
+                  return;
+                }
+
+                try {
+                  const newPostings = await jobBoardService.postJobToBoards({
+                    jobId: selectedJobId,
+                    boardIds: selectedBoardIds,
+                    expirationDate: expirationDate || null,
+                  });
+
+                  setJobBoardPostings([...jobBoardPostings, ...newPostings]);
+                  setShowJobBoardDialog(false);
+                  setSelectedJobId("");
+                  setSelectedBoardIds([]);
+                  setExpirationDate("");
+
+                  // Refresh stats
+                  const stats = await jobBoardService.getJobBoardStats();
+                  setJobBoardStats(stats);
+                } catch (err) {
+                  console.error("Failed to post job to boards:", err);
+                  alert("Failed to post job to boards. Please try again.");
+                }
+              }}
+              disabled={!selectedJobId || selectedBoardIds.length === 0}
+            >
+              Post to {selectedBoardIds.length} Board{selectedBoardIds.length !== 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>
