@@ -28,6 +28,8 @@ export interface User {
   openToWork?: boolean;
   isDemo?: boolean; // Demo user designation
   slug?: string; // User-friendly URL identifier
+  currentRole?: string; // Current job title
+  currentCompany?: string; // Current company
 }
 
 interface TwoFactorChallengeUI {
@@ -106,6 +108,8 @@ function userProfileToUser(profile: UserProfile): User {
     openToWork: profile.openToWork,
     isDemo: profile.isDemo,
     slug: profile.slug,
+    currentRole: profile.currentRole,
+    currentCompany: profile.currentCompany,
   };
 }
 

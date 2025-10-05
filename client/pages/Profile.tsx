@@ -88,12 +88,12 @@ function ProfileContent() {
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
     email: user?.email || "",
-    phone: "",
+    phone: user?.phone || "",
     role: roleToSelectValue(user?.role),
     location: user?.location || "",
-    bio: `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-    company: "",
-    title: "",
+    bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+    company: user?.currentCompany || "",
+    title: user?.currentRole || "",
     website: user?.website || "",
   });
 
@@ -116,9 +116,9 @@ function ProfileContent() {
       phone: user.phone || "",
       role: roleToSelectValue(user.role),
       location: user.location || "",
-      bio: `Passionate ${formatRoleForDisplay(user.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-      company: "",
-      title: "",
+      bio: user.bio || `Passionate ${formatRoleForDisplay(user.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+      company: user.currentCompany || "",
+      title: user.currentRole || "",
       website: user.website || "",
     });
   }, [user]);
@@ -161,12 +161,12 @@ function ProfileContent() {
       firstName: user?.firstName || "",
       lastName: user?.lastName || "",
       email: user?.email || "",
-      phone: "",
+      phone: user?.phone || "",
       role: roleToSelectValue(user?.role),
       location: user?.location || "",
-      bio: `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-      company: "",
-      title: "",
+      bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
+      company: user?.currentCompany || "",
+      title: user?.currentRole || "",
       website: user?.website || "",
     });
     setIsEditing(false);
