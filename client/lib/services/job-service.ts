@@ -263,13 +263,6 @@ export class JobService {
   }
 
   /**
-   * Apply to job
-   */
-  async applyToJob(jobId: string, resumeId?: string): Promise<void> {
-    await apiClient.post(`/api/Job/${jobId}/apply`, { resumeId });
-  }
-
-  /**
    * Save/bookmark job
    */
   async saveJob(jobId: string): Promise<void> {
@@ -303,6 +296,18 @@ export class JobService {
     application: { resumeId: string; coverLetter?: string },
   ): Promise<void> {
     await apiClient.post(`/api/Job/${jobId}/apply`, application);
+  }
+
+  /**
+   * Create a job alert
+   */
+  async createJobAlert(alert: {
+    name: string;
+    keywords: string;
+    location?: string;
+    frequency: string;
+  }): Promise<void> {
+    await apiClient.post("/api/Job/alerts", alert);
   }
 
   /**

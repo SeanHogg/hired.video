@@ -54,8 +54,7 @@ export default function SaveJobButton({
         toast.success("Job saved successfully");
         onSaveChange?.(true);
       }
-    } catch (error) {
-      console.error("Error toggling job save:", error);
+    } catch {
       toast.error(
         isSaved ? "Failed to unsave job" : "Failed to save job"
       );

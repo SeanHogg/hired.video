@@ -24,6 +24,7 @@ interface CardHeaderWithAvatarProps {
   avatar?: AvatarConfig;
   badges?: BadgeConfig[];
   linkTo?: string;
+  actions?: React.ReactNode;
 
   titleClassName?: string;
   subtitleClassName?: string;
@@ -46,6 +47,7 @@ export function CardHeaderWithAvatar({
   avatar,
   badges = [],
   linkTo,
+  actions,
 
   titleClassName = "",
   subtitleClassName = "",
@@ -120,6 +122,9 @@ export function CardHeaderWithAvatar({
             )}
           </div>
         </div>
+
+        {/* Actions (e.g., buttons) */}
+        {actions && <div className="flex-shrink-0">{actions}</div>}
       </div>
 
       {/* Badges moved under the header */}

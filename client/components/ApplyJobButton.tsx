@@ -41,7 +41,7 @@ export default function ApplyJobButton({
   size = "default",
   className,
 }: ApplyJobButtonProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
@@ -67,8 +67,7 @@ export default function ApplyJobButton({
         { id: "1", title: "Software Engineer Resume" },
         { id: "2", title: "Full Stack Developer Resume" },
       ]);
-    } catch (error) {
-      console.error("Error fetching resumes:", error);
+    } catch {
       toast.error("Failed to load your resumes");
     }
   };
@@ -92,9 +91,8 @@ export default function ApplyJobButton({
       setCoverLetter("");
       setSelectedResumeId("");
       onApplicationSubmitted?.();
-    } catch (error: any) {
-      console.error("Error submitting application:", error);
-      const errorMessage = error?.response?.data?.message || "Failed to submit application";
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit application";
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
