@@ -29,6 +29,7 @@ interface CreateJobAlertButtonProps {
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
+  children?: React.ReactNode;
 }
 
 export default function CreateJobAlertButton({
@@ -38,6 +39,7 @@ export default function CreateJobAlertButton({
   variant = "default",
   size = "default",
   className,
+  children,
 }: CreateJobAlertButtonProps) {
   const { isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -100,8 +102,12 @@ export default function CreateJobAlertButton({
         className={className}
         onClick={handleOpenDialog}
       >
-        <Bell className="mr-2 h-4 w-4" />
-        Create Job Alert
+        {children || (
+          <>
+            <Bell className="mr-2 h-4 w-4" />
+            Create Job Alert
+          </>
+        )}
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

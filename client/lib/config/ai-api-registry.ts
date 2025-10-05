@@ -344,6 +344,9 @@ export const DATA_APIS: Record<string, AvailableAPI> = {
     description: "Delete a task by ID",
     supportedActions: ["organize-tasks"],
     requiresAuth: true,
+    requestSchema: {
+      id: "string (task ID in URL path)",
+    },
     responseSchema: {
       success: "boolean",
     },

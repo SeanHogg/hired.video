@@ -19,9 +19,19 @@ import {
   UserCheck,
   Clock,
   Building2,
+  Briefcase,
+  Tag,
+  Edit,
+  Trash2,
+  Phone,
+  Mail,
+  Calendar,
+  Plus,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -39,11 +49,50 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   userService,
   type UserFilters,
   type PublicUser,
 } from "@/lib/services/user-service";
+import {
+  recruiterService,
+  type TalentPoolEntry,
+  type Interaction,
+  type AddToTalentPoolRequest,
+  type UpdateTalentPoolRequest,
+  type AddInteractionRequest,
+  type TalentPoolFilters,
+} from "@/lib/services/recruiter-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
@@ -67,6 +116,8 @@ type PeopleData =
     })[];
 
 export default function People() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "browse";
   const location = useLocation();
   const {
     sidebarOpen,
@@ -84,6 +135,45 @@ export default function People() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPeople, setTotalPeople] = useState<number>(0);
+
+  // Talent Pool state (for recruiters)
+  const [talentPool, setTalentPool] = useState<TalentPoolEntry[]>([]);
+  const [talentPoolLoading, setTalentPoolLoading] = useState(false);
+  const [talentPoolFilters, setTalentPoolFilters] = useState<TalentPoolFilters>({});
+  const [selectedCandidate, setSelectedCandidate] = useState<TalentPoolEntry | null>(null);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [interactionSheetOpen, setInteractionSheetOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [candidateToDelete, setCandidateToDelete] = useState<string | null>(null);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    relationshipStrength: "",
+    tags: [] as string[],
+    poolName: "",
+    status: "",
+    notes: "",
+    currentCompany: "",
+    currentTitle: "",
+    desiredSalary: undefined as number | undefined,
+    preferredLocations: "",
+    contactFrequency: "",
+    nextFollowUpAt: "",
+  });
+
+  // Interaction form state
+  const [interactionForm, setInteractionForm] = useState({
+    interactionType: "Call",
+    subject: "",
+    notes: "",
+    outcome: "",
+    durationMinutes: undefined as number | undefined,
+    requiresFollowUp: false,
+    followUpDate: "",
+  });
+
+  // Tag input state
+  const [tagInput, setTagInput] = useState("");
 
   // Pagination logic
   const {
@@ -136,6 +226,16 @@ export default function People() {
   useEffect(() => {
     fetchPeople();
   }, [searchFilters, currentPage, itemsPerPage]);
+
+  // Load talent pool when tab changes (for recruiters)
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    const rolePermissions = createRolePermissions(user.role);
+
+    if (rolePermissions.isRecruiter && activeTab === "talent-pool") {
+      loadTalentPool();
+    }
+  }, [activeTab, isAuthenticated, user, talentPoolFilters]);
 
   // Get people based on user role and authentication
   const getPeopleForUser = () => {
@@ -321,6 +421,169 @@ export default function People() {
     setSearchFilters({});
   };
 
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
+
+  // Talent Pool handlers
+  const loadTalentPool = async () => {
+    try {
+      setTalentPoolLoading(true);
+      const entries = await recruiterService.getTalentPool(talentPoolFilters);
+      setTalentPool(entries);
+    } catch (error) {
+      console.error("Failed to load talent pool:", error);
+      toast.error("Failed to load talent pool");
+    } finally {
+      setTalentPoolLoading(false);
+    }
+  };
+
+  const handleAddToTalentPool = async (candidateUserId: string) => {
+    try {
+      const request: AddToTalentPoolRequest = {
+        candidateUserId,
+        relationshipStrength: "New",
+        status: "Active",
+        poolName: "General",
+      };
+      await recruiterService.addToTalentPool(request);
+      toast.success("Candidate added to talent pool");
+      if (activeTab === "talent-pool") {
+        loadTalentPool();
+      }
+    } catch (error) {
+      console.error("Failed to add to talent pool:", error);
+      toast.error("Failed to add candidate to talent pool");
+    }
+  };
+
+  const handleEditCandidate = (candidate: TalentPoolEntry) => {
+    setSelectedCandidate(candidate);
+    setEditForm({
+      relationshipStrength: candidate.relationshipStrength,
+      tags: candidate.tags,
+      poolName: candidate.poolName || "",
+      status: candidate.status,
+      notes: candidate.notes || "",
+      currentCompany: candidate.currentCompany || "",
+      currentTitle: candidate.currentTitle || "",
+      desiredSalary: candidate.desiredSalary,
+      preferredLocations: candidate.preferredLocations || "",
+      contactFrequency: candidate.contactFrequency || "",
+      nextFollowUpAt: candidate.nextFollowUpAt || "",
+    });
+    setEditSheetOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedCandidate) return;
+
+    try {
+      const request: UpdateTalentPoolRequest = {
+        relationshipStrength: editForm.relationshipStrength,
+        tags: editForm.tags,
+        poolName: editForm.poolName,
+        status: editForm.status,
+        notes: editForm.notes,
+        currentCompany: editForm.currentCompany,
+        currentTitle: editForm.currentTitle,
+        desiredSalary: editForm.desiredSalary,
+        preferredLocations: editForm.preferredLocations,
+        contactFrequency: editForm.contactFrequency,
+        nextFollowUpAt: editForm.nextFollowUpAt,
+      };
+      await recruiterService.updateTalentPoolEntry(selectedCandidate.id, request);
+      toast.success("Candidate updated successfully");
+      setEditSheetOpen(false);
+      setSelectedCandidate(null);
+      loadTalentPool();
+    } catch (error) {
+      console.error("Failed to update candidate:", error);
+      toast.error("Failed to update candidate");
+    }
+  };
+
+  const handleDeleteCandidate = async () => {
+    if (!candidateToDelete) return;
+
+    try {
+      await recruiterService.removeFromTalentPool(candidateToDelete);
+      toast.success("Candidate removed from talent pool");
+      setDeleteDialogOpen(false);
+      setCandidateToDelete(null);
+      loadTalentPool();
+    } catch (error) {
+      console.error("Failed to remove candidate:", error);
+      toast.error("Failed to remove candidate");
+    }
+  };
+
+  const handleAddInteraction = (candidate: TalentPoolEntry) => {
+    setSelectedCandidate(candidate);
+    setInteractionForm({
+      interactionType: "Call",
+      subject: "",
+      notes: "",
+      outcome: "",
+      durationMinutes: undefined,
+      requiresFollowUp: false,
+      followUpDate: "",
+    });
+    setInteractionSheetOpen(true);
+  };
+
+  const handleSaveInteraction = async () => {
+    if (!selectedCandidate) return;
+
+    try {
+      const request: AddInteractionRequest = {
+        talentPoolId: selectedCandidate.id,
+        interactionType: interactionForm.interactionType,
+        subject: interactionForm.subject,
+        notes: interactionForm.notes,
+        outcome: interactionForm.outcome,
+        durationMinutes: interactionForm.durationMinutes,
+        requiresFollowUp: interactionForm.requiresFollowUp,
+        followUpDate: interactionForm.followUpDate,
+      };
+      await recruiterService.addInteraction(request);
+      toast.success("Interaction logged successfully");
+      setInteractionSheetOpen(false);
+      setSelectedCandidate(null);
+      loadTalentPool();
+    } catch (error) {
+      console.error("Failed to log interaction:", error);
+      toast.error("Failed to log interaction");
+    }
+  };
+
+  const handleAddTag = () => {
+    if (tagInput.trim() && !editForm.tags.includes(tagInput.trim())) {
+      setEditForm({
+        ...editForm,
+        tags: [...editForm.tags, tagInput.trim()],
+      });
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    setEditForm({
+      ...editForm,
+      tags: editForm.tags.filter((t) => t !== tag),
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   // If user is authenticated, show the actual people page
   if (isAuthenticated && user) {
     const peopleData: PeopleData = getPeopleForUser() as PeopleData;
@@ -367,20 +630,33 @@ export default function People() {
                 </div>
               </div>
 
-              {/* Search and Filters */}
-              <div className="mb-6">
-                <SearchBar
-                  context="people"
-                  value={searchFilters.search}
-                  filters={searchFilters}
-                  onSearch={handleSearch}
-                  onFilterChange={handleFilterChange}
-                  onClearFilters={handleClearFilters}
-                />
-              </div>
+              {/* Tabs for Recruiters, regular view for others */}
+              {rolePermissions.isRecruiter ? (
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="browse">
+                      <Search className="h-4 w-4 mr-2" />
+                      Browse
+                    </TabsTrigger>
+                    <TabsTrigger value="talent-pool">
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      Talent Pool
+                    </TabsTrigger>
+                  </TabsList>
 
-              {/* People Listings */}
-              <div className="space-y-6">
+                  {/* Browse Tab */}
+                  <TabsContent value="browse" className="space-y-6">
+                    {/* Search and Filters */}
+                    <div>
+                      <SearchBar
+                        context="people"
+                        value={searchFilters.search}
+                        filters={searchFilters}
+                        onSearch={handleSearch}
+                        onFilterChange={handleFilterChange}
+                        onClearFilters={handleClearFilters}
+                      />
+                    </div>
                 {/* Tracked People */}
                 {("tracked" in peopleData
                   ? peopleData.tracked.length > 0
@@ -498,6 +774,7 @@ export default function People() {
                             onMessage={handleMessage}
                             onAcceptConnection={handleAcceptConnection}
                             onRejectConnection={handleRejectConnection}
+                            onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
                           />
                         );
                       })}
@@ -514,30 +791,719 @@ export default function People() {
                       onItemsPerPageChange={handleItemsPerPageChange}
                     />
                   )}
-                </div>
+                    </div>
+                  </TabsContent>
 
-                {/* Empty State */}
-                {("tracked" in peopleData
-                  ? peopleData.tracked.length === 0
-                  : true) && (
-                  <div className="text-center py-12">
-                    <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">
-                      Start Building Your Network
-                    </h3>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      Connect with professionals in your industry to expand your
-                      network and discover new opportunities.
-                    </p>
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        💡 <strong>Tip:</strong> Use the search and filters
-                        above to find people with specific skills or roles!
+                  {/* Talent Pool Tab */}
+                  <TabsContent value="talent-pool" className="space-y-4">
+                    {talentPoolLoading ? (
+                      <div className="space-y-4">
+                        {[1, 2, 3].map((i) => (
+                          <Card key={i}>
+                            <CardHeader>
+                              <Skeleton className="h-6 w-3/4 mb-2" />
+                              <Skeleton className="h-4 w-1/2" />
+                            </CardHeader>
+                            <CardContent>
+                              <Skeleton className="h-20 w-full" />
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : talentPool.length === 0 ? (
+                      <Card>
+                        <CardContent className="py-12 text-center">
+                          <Briefcase className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                          <h2 className="text-2xl font-bold mb-2">No candidates in talent pool yet</h2>
+                          <p className="text-muted-foreground mb-6">
+                            Start adding candidates from the Browse tab to build your talent pool
+                          </p>
+                          <Button onClick={() => handleTabChange("browse")}>
+                            Browse Candidates
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {talentPool.map((candidate) => (
+                          <Card key={candidate.id} className="hover:shadow-lg transition-shadow">
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    {candidate.candidateProfilePicture && (
+                                      <img
+                                        src={candidate.candidateProfilePicture}
+                                        alt={candidate.candidateName}
+                                        className="w-12 h-12 rounded-full object-cover"
+                                      />
+                                    )}
+                                    <div>
+                                      <Link
+                                        to={`/people/${candidate.candidateUserId}`}
+                                        className="text-xl font-semibold hover:text-primary transition-colors"
+                                      >
+                                        {candidate.candidateName}
+                                      </Link>
+                                      {candidate.candidateTitle && (
+                                        <p className="text-sm text-muted-foreground">
+                                          {candidate.candidateTitle}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <Badge variant="outline">{candidate.relationshipStrength}</Badge>
+                                    <Badge variant="secondary">{candidate.status}</Badge>
+                                    {candidate.poolName && (
+                                      <Badge variant="default">{candidate.poolName}</Badge>
+                                    )}
+                                    {candidate.tags.map((tag) => (
+                                      <Badge key={tag} variant="outline">
+                                        <Tag className="h-3 w-3 mr-1" />
+                                        {tag}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleAddInteraction(candidate)}
+                                    title="Log Interaction"
+                                  >
+                                    <Phone className="h-5 w-5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditCandidate(candidate)}
+                                    title="Edit"
+                                  >
+                                    <Edit className="h-5 w-5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setCandidateToDelete(candidate.id);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Remove"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {candidate.currentCompany && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                                    <span>{candidate.currentCompany}</span>
+                                    {candidate.currentTitle && <span>• {candidate.currentTitle}</span>}
+                                  </div>
+                                )}
+                                {candidate.notes && (
+                                  <div className="p-3 bg-muted rounded-md">
+                                    <p className="text-sm font-medium mb-1">Notes:</p>
+                                    <p className="text-sm text-muted-foreground">{candidate.notes}</p>
+                                  </div>
+                                )}
+                                <div className="flex items-center justify-between pt-3 border-t text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-4">
+                                    {candidate.lastContactedAt && (
+                                      <span>Last contact: {formatDate(candidate.lastContactedAt)}</span>
+                                    )}
+                                    {candidate.nextFollowUpAt && (
+                                      <span className="text-orange-600 font-medium">
+                                        Follow-up: {formatDate(candidate.nextFollowUpAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span>Added {formatDate(candidate.createdAt)}</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                /* Non-recruiter view - original layout */
+                <div className="space-y-6">
+                  {/* Search and Filters */}
+                  <div className="mb-6">
+                    <SearchBar
+                      context="people"
+                      value={searchFilters.search}
+                      filters={searchFilters}
+                      onSearch={handleSearch}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={handleClearFilters}
+                    />
+                  </div>
+
+                  {/* Tracked People */}
+                  {("tracked" in peopleData
+                    ? peopleData.tracked.length > 0
+                    : false) && (
+                    <div>
+                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        Following (
+                        {"tracked" in peopleData ? peopleData.tracked.length : 0})
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {("tracked" in peopleData ? peopleData.tracked : []).map(
+                          (person: UserWithOwnership) => (
+                            <PeopleCard
+                              key={person.id}
+                              person={person}
+                              connectionStatus={
+                                user
+                                  ? getConnectionStatus(user.id, person.id)
+                                  : "none"
+                              }
+                              showOwnership
+                              onTrack={handleTrackPerson}
+                              onUntrack={handleUntrackPerson}
+                              onConnect={handleConnect}
+                              onMessage={handleMessage}
+                              onAcceptConnection={handleAcceptConnection}
+                              onRejectConnection={handleRejectConnection}
+                            />
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Discover People */}
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                      <Search className="h-5 w-5" />
+                      Discover Professionals
+                    </h2>
+                    {isLoading ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <div key={index} className="animate-pulse">
+                            <div className="bg-gray-200 rounded-lg h-48" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : error ? (
+                      <div className="text-center py-12">
+                        <p className="text-red-600 mb-4">{error}</p>
+                        <Button onClick={fetchPeople}>Try Again</Button>
+                      </div>
+                    ) : people.length === 0 ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600 mb-4">
+                          No people found matching your criteria.
+                        </p>
+                        <Button onClick={() => setSearchFilters({})}>
+                          Clear Filters
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {people.map((person) => {
+                          const personMetadata = {
+                            id: person.id,
+                            slug: person.slug,
+                            firstName:
+                              (person as any).firstName ||
+                              person.fullName?.split(" ")[0] ||
+                              "",
+                            lastName:
+                              (person as any).lastName ||
+                              person.fullName?.split(" ").slice(1).join(" ") ||
+                              "",
+                            fullName:
+                              person.fullName ||
+                              `${(person as any).firstName || ""} ${(person as any).lastName || ""}`.trim(),
+                            avatar:
+                              (person as any).profilePicture ||
+                              person.avatar ||
+                              "",
+                            headline: person.headline || "",
+                            bio: (person as any).bio || person.headline || "",
+                            location: person.location || "Location not specified",
+                            role: person.role,
+                            skills: person.skills,
+                            openToWork: person.openToWork,
+                            visibility: "public" as const,
+                            status: "active" as const,
+                            companyId: (person as any).companyId || "",
+                            companyName: person.currentCompany || "",
+                            createdAt: person.createdAt,
+                            updatedAt: person.updatedAt,
+                            lastActiveAt: person.updatedAt || "",
+                            profileViews: (person as any).profileViews || 0,
+                            connectionCount: 0,
+                            followerCount: 0,
+                            isVerified: person.isVerified || false,
+                            isPremium: person.isPremium || false,
+                            experienceLevel: "Mid Level",
+                            currentPosition: person.currentRole || "",
+                            currentCompany: person.currentCompany || "",
+                            ownership: "tracked" as const,
+                          };
+
+                          return (
+                            <PeopleCard
+                              key={person.id}
+                              person={personMetadata}
+                              connectionStatus="none"
+                              onConnect={handleConnect}
+                              onMessage={handleMessage}
+                              onAcceptConnection={handleAcceptConnection}
+                              onRejectConnection={handleRejectConnection}
+                              onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Pagination */}
+                    {!isLoading && !error && people.length > 0 && (
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalPeople}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={handleItemsPerPageChange}
+                      />
+                    )}
+                  </div>
+
+                  {/* Empty State */}
+                  {("tracked" in peopleData
+                    ? peopleData.tracked.length === 0
+                    : true) && (
+                    <div className="text-center py-12">
+                      <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">
+                        Start Building Your Network
+                      </h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Connect with professionals in your industry to expand your
+                        network and discover new opportunities.
                       </p>
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          💡 <strong>Tip:</strong> Use the search and filters
+                          above to find people with specific skills or roles!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Edit Candidate Sheet */}
+              <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
+                <SheetContent side="right" className="sm:max-w-[600px] overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Edit Candidate Details</SheetTitle>
+                    <SheetDescription>
+                      Update candidate information and relationship details
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="space-y-4 py-4">
+                    {/* Relationship Strength */}
+                    <div className="space-y-2">
+                      <Label htmlFor="relationshipStrength">Relationship Strength</Label>
+                      <Select
+                        value={editForm.relationshipStrength}
+                        onValueChange={(value) =>
+                          setEditForm({ ...editForm, relationshipStrength: value })
+                        }
+                      >
+                        <SelectTrigger id="relationshipStrength">
+                          <SelectValue placeholder="Select strength" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="New">New</SelectItem>
+                          <SelectItem value="Warm">Warm</SelectItem>
+                          <SelectItem value="Hot">Hot</SelectItem>
+                          <SelectItem value="Cold">Cold</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select
+                        value={editForm.status}
+                        onValueChange={(value) =>
+                          setEditForm({ ...editForm, status: value })
+                        }
+                      >
+                        <SelectTrigger id="status">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Active">Active</SelectItem>
+                          <SelectItem value="Passive">Passive</SelectItem>
+                          <SelectItem value="Placed">Placed</SelectItem>
+                          <SelectItem value="Inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Pool Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="poolName">Pool Name</Label>
+                      <Input
+                        id="poolName"
+                        value={editForm.poolName}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, poolName: e.target.value })
+                        }
+                        placeholder="e.g., Senior Developers, Sales Team"
+                      />
+                    </div>
+
+                    {/* Tags */}
+                    <div className="space-y-2">
+                      <Label>Tags</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          placeholder="Add tag and press Enter"
+                        />
+                        <Button type="button" onClick={handleAddTag} size="icon">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {editForm.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="gap-1">
+                            {tag}
+                            <X
+                              className="h-3 w-3 cursor-pointer"
+                              onClick={() => handleRemoveTag(tag)}
+                            />
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Current Company */}
+                    <div className="space-y-2">
+                      <Label htmlFor="currentCompany">Current Company</Label>
+                      <Input
+                        id="currentCompany"
+                        value={editForm.currentCompany}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, currentCompany: e.target.value })
+                        }
+                        placeholder="Company name"
+                      />
+                    </div>
+
+                    {/* Current Title */}
+                    <div className="space-y-2">
+                      <Label htmlFor="currentTitle">Current Title</Label>
+                      <Input
+                        id="currentTitle"
+                        value={editForm.currentTitle}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, currentTitle: e.target.value })
+                        }
+                        placeholder="Job title"
+                      />
+                    </div>
+
+                    {/* Desired Salary */}
+                    <div className="space-y-2">
+                      <Label htmlFor="desiredSalary">Desired Salary</Label>
+                      <Input
+                        id="desiredSalary"
+                        type="number"
+                        value={editForm.desiredSalary || ""}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            desiredSalary: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        placeholder="Annual salary"
+                      />
+                    </div>
+
+                    {/* Preferred Locations */}
+                    <div className="space-y-2">
+                      <Label htmlFor="preferredLocations">Preferred Locations</Label>
+                      <Input
+                        id="preferredLocations"
+                        value={editForm.preferredLocations}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, preferredLocations: e.target.value })
+                        }
+                        placeholder="e.g., New York, Remote"
+                      />
+                    </div>
+
+                    {/* Contact Frequency */}
+                    <div className="space-y-2">
+                      <Label htmlFor="contactFrequency">Contact Frequency</Label>
+                      <Select
+                        value={editForm.contactFrequency}
+                        onValueChange={(value) =>
+                          setEditForm({ ...editForm, contactFrequency: value })
+                        }
+                      >
+                        <SelectTrigger id="contactFrequency">
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Weekly">Weekly</SelectItem>
+                          <SelectItem value="Biweekly">Biweekly</SelectItem>
+                          <SelectItem value="Monthly">Monthly</SelectItem>
+                          <SelectItem value="Quarterly">Quarterly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Next Follow-up */}
+                    <div className="space-y-2">
+                      <Label htmlFor="nextFollowUpAt">Next Follow-up Date</Label>
+                      <Input
+                        id="nextFollowUpAt"
+                        type="date"
+                        value={editForm.nextFollowUpAt}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, nextFollowUpAt: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={editForm.notes}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, notes: e.target.value })
+                        }
+                        placeholder="Add notes about this candidate..."
+                        rows={4}
+                      />
                     </div>
                   </div>
-                )}
-              </div>
+
+                  <SheetFooter>
+                    <Button variant="outline" onClick={() => setEditSheetOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit}>Save Changes</Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+
+              {/* Add Interaction Sheet */}
+              <Sheet open={interactionSheetOpen} onOpenChange={setInteractionSheetOpen}>
+                <SheetContent side="right" className="sm:max-w-[500px] overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Log Interaction</SheetTitle>
+                    <SheetDescription>
+                      Record a call, email, meeting, or note with this candidate
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="space-y-4 py-4">
+                    {/* Interaction Type */}
+                    <div className="space-y-2">
+                      <Label htmlFor="interactionType">Interaction Type</Label>
+                      <Select
+                        value={interactionForm.interactionType}
+                        onValueChange={(value) =>
+                          setInteractionForm({ ...interactionForm, interactionType: value })
+                        }
+                      >
+                        <SelectTrigger id="interactionType">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Call">
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Email">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4" />
+                              Email
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Meeting">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Meeting
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="LinkedIn">
+                            <div className="flex items-center gap-2">
+                              <Network className="h-4 w-4" />
+                              LinkedIn
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Note">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Note
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Subject */}
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject</Label>
+                      <Input
+                        id="subject"
+                        value={interactionForm.subject}
+                        onChange={(e) =>
+                          setInteractionForm({ ...interactionForm, subject: e.target.value })
+                        }
+                        placeholder="Brief subject or title"
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="interactionNotes">Notes</Label>
+                      <Textarea
+                        id="interactionNotes"
+                        value={interactionForm.notes}
+                        onChange={(e) =>
+                          setInteractionForm({ ...interactionForm, notes: e.target.value })
+                        }
+                        placeholder="Details about the interaction..."
+                        rows={4}
+                      />
+                    </div>
+
+                    {/* Outcome */}
+                    <div className="space-y-2">
+                      <Label htmlFor="outcome">Outcome</Label>
+                      <Input
+                        id="outcome"
+                        value={interactionForm.outcome}
+                        onChange={(e) =>
+                          setInteractionForm({ ...interactionForm, outcome: e.target.value })
+                        }
+                        placeholder="e.g., Interested, Not interested, Follow-up needed"
+                      />
+                    </div>
+
+                    {/* Duration */}
+                    <div className="space-y-2">
+                      <Label htmlFor="duration">Duration (minutes)</Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        value={interactionForm.durationMinutes || ""}
+                        onChange={(e) =>
+                          setInteractionForm({
+                            ...interactionForm,
+                            durationMinutes: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        placeholder="Optional"
+                      />
+                    </div>
+
+                    {/* Requires Follow-up */}
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="requiresFollowUp"
+                        checked={interactionForm.requiresFollowUp}
+                        onChange={(e) =>
+                          setInteractionForm({
+                            ...interactionForm,
+                            requiresFollowUp: e.target.checked,
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="requiresFollowUp" className="cursor-pointer">
+                        Requires follow-up
+                      </Label>
+                    </div>
+
+                    {/* Follow-up Date */}
+                    {interactionForm.requiresFollowUp && (
+                      <div className="space-y-2">
+                        <Label htmlFor="followUpDate">Follow-up Date</Label>
+                        <Input
+                          id="followUpDate"
+                          type="date"
+                          value={interactionForm.followUpDate}
+                          onChange={(e) =>
+                            setInteractionForm({
+                              ...interactionForm,
+                              followUpDate: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <SheetFooter>
+                    <Button variant="outline" onClick={() => setInteractionSheetOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveInteraction}>Log Interaction</Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+
+              {/* Delete Confirmation Dialog */}
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Remove from Talent Pool?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove the candidate from your talent pool. All interaction
+                      history will be deleted. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteCandidate}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Remove
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
           <Footer />

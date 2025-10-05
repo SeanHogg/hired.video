@@ -14,6 +14,7 @@ import {
   CheckCircle,
   X,
   Star,
+  UserCog,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,7 +29,7 @@ import {
 } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
-import { formatRoleForDisplay, normalizeRole } from "@/lib/role-utils";
+import { formatRoleForDisplay, normalizeRole, createRolePermissions } from "@/lib/role-utils";
 import { USER_ROLES } from "@shared/user-roles";
 import type {
   UserMetadata,
@@ -53,6 +54,8 @@ interface PeopleCardProps {
   onRejectConnection?: (personId: string) => void;
   onView?: () => void;
   onActions?: () => void;
+  onAddToTalentPool?: (personId: string) => void;
+  isInTalentPool?: boolean;
 }
 
 export default function PeopleCard({
@@ -60,8 +63,8 @@ export default function PeopleCard({
   connectionStatus = "none",
   showOwnership = false,
   actions,
-  userContext: _userContext,  
-  itemOwnership: _itemOwnership,  
+  userContext: _userContext,
+  itemOwnership: _itemOwnership,
   onTrack,
   onUntrack,
   onConnect,
@@ -70,6 +73,8 @@ export default function PeopleCard({
   onRejectConnection,
   onView,
   onActions,
+  onAddToTalentPool,
+  isInTalentPool = false,
 }: PeopleCardProps) {
   const { user } = useAuth();
 
@@ -382,6 +387,19 @@ export default function PeopleCard({
                     </Button>
                   )}
                 </div>
+              )}
+
+              {/* Add to Talent Pool (Recruiters only) */}
+              {user && createRolePermissions(user.role).isRecruiter && onAddToTalentPool && (
+                <Button
+                  variant={isInTalentPool ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => onAddToTalentPool(person.id)}
+                  disabled={isInTalentPool}
+                  title={isInTalentPool ? "Already in talent pool" : "Add to talent pool"}
+                >
+                  <UserCog className="h-3 w-3" />
+                </Button>
               )}
             </div>
           )}

@@ -19,9 +19,17 @@ import {
   Plus,
   Filter,
   X,
+  Bookmark,
+  FileText,
+  Bell,
+  Trash2,
+  ExternalLink,
+  Calendar,
+  Edit,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
@@ -39,6 +47,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   jobService,
   type JobFilters,
@@ -48,8 +86,86 @@ import { companyService } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
+import { apiClient } from "@/lib/api-client";
+import { z } from "zod";
+import CreateJobAlertButton from "@/components/CreateJobAlertButton";
+
+// Schemas
+const JobApplicationSchema = z.object({
+  id: z.string(),
+  jobId: z.string(),
+  userId: z.string(),
+  resumeId: z.string(),
+  coverLetter: z.string().optional(),
+  status: z.string(),
+  appliedAt: z.string(),
+  job: z.object({
+    id: z.string(),
+    title: z.string(),
+    company: z.string().optional(),
+    location: z.string().optional(),
+    employmentType: z.string().optional(),
+  }),
+  resume: z
+    .object({
+      id: z.string(),
+      title: z.string(),
+    })
+    .optional(),
+});
+
+const JobAlertSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  searchCriteria: z.string(),
+  alertFrequency: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  lastTriggered: z.string().optional().nullable(),
+});
+
+type JobApplication = z.infer<typeof JobApplicationSchema>;
+type JobAlert = z.infer<typeof JobAlertSchema>;
+
+interface SavedJob {
+  id: string;
+  jobId: string;
+  userId: string;
+  savedAt: string;
+  notes?: string;
+  job: {
+    id: string;
+    title: string;
+    company: string;
+    location?: string;
+    salary?: string;
+    employmentType?: string;
+    postedDate?: string;
+    description?: string;
+  };
+}
+
+const statusColors: Record<string, string> = {
+  Pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  Reviewing: "bg-blue-100 text-blue-800 border-blue-300",
+  Interviewing: "bg-purple-100 text-purple-800 border-purple-300",
+  Offered: "bg-green-100 text-green-800 border-green-300",
+  Rejected: "bg-red-100 text-red-800 border-red-300",
+  Withdrawn: "bg-gray-100 text-gray-800 border-gray-300",
+  Accepted: "bg-emerald-100 text-emerald-800 border-emerald-300",
+};
+
+const frequencyLabels: Record<string, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  immediate: "Immediate",
+};
 
 export default function Jobs() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "browse";
   const location = useLocation();
   const {
     sidebarOpen,
@@ -74,6 +190,28 @@ export default function Jobs() {
   });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
+
+  // Saved Jobs state
+  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
+  const [savedJobsLoading, setSavedJobsLoading] = useState(false);
+
+  // Applications state
+  const [applications, setApplications] = useState<JobApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+
+  // Job Alerts state
+  const [alerts, setAlerts] = useState<JobAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [deleteAlertId, setDeleteAlertId] = useState<string | null>(null);
+  const [editAlert, setEditAlert] = useState<JobAlert | null>(null);
+  const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+
+  // Alert form state
+  const [alertName, setAlertName] = useState("");
+  const [alertKeywords, setAlertKeywords] = useState("");
+  const [alertLocation, setAlertLocation] = useState("");
+  const [alertFrequency, setAlertFrequency] = useState("daily");
+  const [isSubmittingAlert, setIsSubmittingAlert] = useState(false);
 
   // Pagination logic
   const {
@@ -120,6 +258,19 @@ export default function Jobs() {
     fetchJobs();
   }, [searchFilters, currentPage, itemsPerPage]);
 
+  // Load data based on active tab
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if (activeTab === "saved") {
+      loadSavedJobs();
+    } else if (activeTab === "applications") {
+      loadApplications();
+    } else if (activeTab === "alerts") {
+      loadAlerts();
+    }
+  }, [activeTab, isAuthenticated]);
+
   // Handle job tracking
   const handleTrackJob = async (jobId: string) => {
     if (user) {
@@ -155,6 +306,173 @@ export default function Jobs() {
 
   const handleClearFilters = () => {
     setSearchFilters({});
+  };
+
+  const handleTabChange = (value: string) => {
+    setSearchParams({ tab: value });
+  };
+
+  // Saved Jobs handlers
+  const loadSavedJobs = async () => {
+    try {
+      setSavedJobsLoading(true);
+      const jobs = await jobService.getSavedJobs();
+      setSavedJobs(jobs as unknown as SavedJob[]);
+    } catch {
+      toast.error("Failed to load saved jobs");
+    } finally {
+      setSavedJobsLoading(false);
+    }
+  };
+
+  const handleUnsaveJob = async (jobId: string) => {
+    try {
+      await jobService.unsaveJob(jobId);
+      setSavedJobs((prev) => prev.filter((job) => job.jobId !== jobId));
+      toast.success("Job removed from saved");
+    } catch {
+      toast.error("Failed to remove job");
+    }
+  };
+
+  // Applications handlers
+  const loadApplications = async () => {
+    try {
+      setApplicationsLoading(true);
+      const response = await apiClient.get<JobApplication[]>(
+        "/api/Job/applications",
+        z.array(JobApplicationSchema)
+      );
+      setApplications(response.data);
+    } catch {
+      toast.error("Failed to load applications");
+    } finally {
+      setApplicationsLoading(false);
+    }
+  };
+
+  // Job Alerts handlers
+  const loadAlerts = async () => {
+    try {
+      setAlertsLoading(true);
+      const response = await apiClient.get<JobAlert[]>(
+        "/api/Job/alerts",
+        z.array(JobAlertSchema)
+      );
+      setAlerts(response.data);
+    } catch {
+      toast.error("Failed to load job alerts");
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (alertId: string, currentStatus: boolean) => {
+    try {
+      await apiClient.patch(`/api/Job/alerts/${alertId}/toggle`, {
+        isActive: !currentStatus,
+      });
+      setAlerts((prev) =>
+        prev.map((alert) =>
+          alert.id === alertId ? { ...alert, isActive: !currentStatus } : alert
+        )
+      );
+      toast.success(!currentStatus ? "Alert activated" : "Alert deactivated");
+    } catch {
+      toast.error("Failed to update alert status");
+    }
+  };
+
+  const handleDeleteAlert = async () => {
+    if (!deleteAlertId) return;
+
+    try {
+      await apiClient.delete(`/api/Job/alerts/${deleteAlertId}`);
+      setAlerts((prev) => prev.filter((alert) => alert.id !== deleteAlertId));
+      toast.success("Job alert deleted");
+    } catch {
+      toast.error("Failed to delete alert");
+    } finally {
+      setDeleteAlertId(null);
+    }
+  };
+
+  const handleEditAlert = (alert: JobAlert) => {
+    setEditAlert(alert);
+    setAlertName(alert.name);
+
+    // Parse search criteria
+    const parts = alert.searchCriteria.split("|").map((p) => p.trim());
+    setAlertKeywords(parts[0] || "");
+
+    const locationPart = parts.find((p) => p.startsWith("Location:"));
+    setAlertLocation(
+      locationPart ? locationPart.replace("Location:", "").trim() : ""
+    );
+
+    setAlertFrequency(alert.alertFrequency);
+    setAlertSheetOpen(true);
+  };
+
+  const handleSubmitAlert = async () => {
+    if (!editAlert) return;
+
+    if (!alertName.trim()) {
+      toast.error("Please provide an alert name");
+      return;
+    }
+
+    setIsSubmittingAlert(true);
+    try {
+      await apiClient.put(`/api/Job/alerts/${editAlert.id}`, {
+        name: alertName.trim(),
+        keywords: alertKeywords.trim() || undefined,
+        location: alertLocation.trim() || undefined,
+        frequency: alertFrequency,
+      });
+      toast.success("Job alert updated successfully!");
+      setAlertSheetOpen(false);
+      setEditAlert(null);
+      loadAlerts();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update job alert";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingAlert(false);
+    }
+  };
+
+  const parseSearchCriteria = (criteria: string) => {
+    const parts = criteria.split("|").map((p) => p.trim());
+    const keywords = parts[0] || "";
+    const location = parts
+      .find((p) => p.startsWith("Location:"))
+      ?.replace("Location:", "")
+      .trim();
+    return { keywords, location };
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
   };
 
   // Temporary stub until owned/tracked jobs are wired
@@ -272,67 +590,88 @@ export default function Jobs() {
                 </div>
               </div>
 
-              {/* Search and Filters */}
-              <div className="mb-6">
-                <SearchBar
-                  context="jobs"
-                  value={searchFilters.search}
-                  filters={searchFilters}
-                  onSearch={handleSearch}
-                  onFilterChange={handleFilterChange}
-                  onClearFilters={handleClearFilters}
-                />
-              </div>
+              {/* Tabs for different views */}
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="browse">
+                    <Search className="h-4 w-4 mr-2" />
+                    Browse
+                  </TabsTrigger>
+                  <TabsTrigger value="saved">
+                    <Bookmark className="h-4 w-4 mr-2" />
+                    Saved
+                  </TabsTrigger>
+                  <TabsTrigger value="applications">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Applications
+                  </TabsTrigger>
+                  <TabsTrigger value="alerts">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Alerts
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Job Listings */}
-              <div className="space-y-6">
-                {/* Owned Jobs (for recruiters/employers) */}
-                {isRecruiterOrEmployer &&
-                  "owned" in jobsData &&
-                  jobsData.owned.length > 0 && (
+                {/* Browse Tab */}
+                <TabsContent value="browse" className="space-y-6">
+                  {/* Search and Filters */}
+                  <div>
+                    <SearchBar
+                      context="jobs"
+                      value={searchFilters.search}
+                      filters={searchFilters}
+                      onSearch={handleSearch}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={handleClearFilters}
+                    />
+                  </div>
+
+                  {/* Owned Jobs (for recruiters/employers) */}
+                  {isRecruiterOrEmployer &&
+                    "owned" in jobsData &&
+                    jobsData.owned.length > 0 && (
+                      <div>
+                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                          <Briefcase className="h-5 w-5" />
+                          Your Job Postings ({jobsData.owned.length})
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {jobsData.owned.map((job) => (
+                            <JobCard
+                              key={job.id}
+                              job={job}
+                              showOwnership
+                              onTrack={handleTrackJob}
+                              onUntrack={handleUntrackJob}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Tracked Jobs */}
+                  {("tracked" in jobsData
+                    ? jobsData.tracked.length > 0
+                    : false) && (
                     <div>
                       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Briefcase className="h-5 w-5" />
-                        Your Job Postings ({jobsData.owned.length})
+                        <Users className="h-5 w-5" />
+                        Tracked Jobs ({(jobsData as any).tracked.length})
                       </h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {jobsData.owned.map((job) => (
-                          <JobCard
-                            key={job.id}
-                            job={job}
-                            showOwnership
-                            onTrack={handleTrackJob}
-                            onUntrack={handleUntrackJob}
-                          />
-                        ))}
+                        {(jobsData as any).tracked.map(
+                          (job: JobWithOwnership) => (
+                            <JobCard
+                              key={job.id}
+                              job={job}
+                              showOwnership
+                              onTrack={handleTrackJob}
+                              onUntrack={handleUntrackJob}
+                            />
+                          ),
+                        )}
                       </div>
                     </div>
                   )}
-
-                {/* Tracked Jobs */}
-                {("tracked" in jobsData
-                  ? jobsData.tracked.length > 0
-                  : false) && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Tracked Jobs ({(jobsData as any).tracked.length})
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(jobsData as any).tracked.map(
-                        (job: JobWithOwnership) => (
-                          <JobCard
-                            key={job.id}
-                            job={job}
-                            showOwnership
-                            onTrack={handleTrackJob}
-                            onUntrack={handleUntrackJob}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* All Available Jobs */}
                 <div>
@@ -415,7 +754,450 @@ export default function Jobs() {
                     />
                   )}
                 </div>
-              </div>
+                </TabsContent>
+
+                {/* Saved Jobs Tab */}
+                <TabsContent value="saved" className="space-y-4">
+                  {savedJobsLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i}>
+                          <CardHeader>
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-1/2" />
+                          </CardHeader>
+                          <CardContent>
+                            <Skeleton className="h-20 w-full" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : savedJobs.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <Bookmark className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h2 className="text-2xl font-bold mb-2">No saved jobs yet</h2>
+                        <p className="text-muted-foreground mb-6">
+                          Start saving jobs you're interested in to keep track of them here
+                        </p>
+                        <Button onClick={() => handleTabChange("browse")}>
+                          Browse Jobs
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {savedJobs.map((savedJob) => (
+                        <Card key={savedJob.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <Link
+                                  to={`/jobs/${savedJob.jobId}`}
+                                  className="text-xl font-semibold hover:text-primary transition-colors"
+                                >
+                                  {savedJob.job.title}
+                                </Link>
+                                <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                                  <Briefcase className="h-4 w-4" />
+                                  {savedJob.job.company}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleUnsaveJob(savedJob.jobId)}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-wrap gap-4 mb-4">
+                              {savedJob.job.location && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <MapPin className="h-4 w-4" />
+                                  {savedJob.job.location}
+                                </div>
+                              )}
+                              {savedJob.job.salary && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <DollarSign className="h-4 w-4" />
+                                  {savedJob.job.salary}
+                                </div>
+                              )}
+                              {savedJob.job.employmentType && (
+                                <Badge variant="secondary">{savedJob.job.employmentType}</Badge>
+                              )}
+                            </div>
+
+                            {savedJob.job.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                                {savedJob.job.description}
+                              </p>
+                            )}
+
+                            <div className="flex items-center justify-between pt-4 border-t">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3" />
+                                Saved {formatDate(savedJob.savedAt)}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link to={`/jobs/${savedJob.jobId}`}>View Details</Link>
+                                </Button>
+                                <Button size="sm" asChild>
+                                  <Link to={`/jobs/${savedJob.jobId}`}>Apply Now</Link>
+                                </Button>
+                              </div>
+                            </div>
+
+                            {savedJob.notes && (
+                              <div className="mt-4 p-3 bg-muted rounded-md">
+                                <p className="text-sm font-medium mb-1">Your Notes:</p>
+                                <p className="text-sm text-muted-foreground">{savedJob.notes}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Applications Tab */}
+                <TabsContent value="applications" className="space-y-4">
+                  {applicationsLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i}>
+                          <CardHeader>
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-1/2" />
+                          </CardHeader>
+                          <CardContent>
+                            <Skeleton className="h-20 w-full" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : applications.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h2 className="text-2xl font-bold mb-2">No applications yet</h2>
+                        <p className="text-muted-foreground mb-6">
+                          Start applying to jobs to track your applications here
+                        </p>
+                        <Button onClick={() => handleTabChange("browse")}>
+                          Browse Jobs
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {applications.map((application) => (
+                        <Card key={application.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <Link
+                                  to={`/jobs/${application.jobId}`}
+                                  className="text-xl font-semibold hover:text-primary transition-colors flex items-center gap-2"
+                                >
+                                  {application.job.title}
+                                  <ExternalLink className="h-4 w-4" />
+                                </Link>
+                                {application.job.company && (
+                                  <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                                    <Briefcase className="h-4 w-4" />
+                                    {application.job.company}
+                                  </p>
+                                )}
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={statusColors[application.status] || ""}
+                              >
+                                {application.status}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex flex-wrap gap-4 mb-4">
+                              {application.job.location && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <MapPin className="h-4 w-4" />
+                                  {application.job.location}
+                                </div>
+                              )}
+                              {application.job.employmentType && (
+                                <Badge variant="secondary">{application.job.employmentType}</Badge>
+                              )}
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                Applied {formatDate(application.appliedAt)}
+                              </div>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                                {getTimeAgo(application.appliedAt)}
+                              </div>
+                            </div>
+
+                            {application.resume && (
+                              <div className="mb-4 p-3 bg-muted rounded-md">
+                                <p className="text-sm font-medium mb-1">Resume Used:</p>
+                                <Link
+                                  to={`/resumes/${application.resumeId}`}
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  {application.resume.title}
+                                </Link>
+                              </div>
+                            )}
+
+                            {application.coverLetter && (
+                              <div className="mb-4 p-3 bg-muted rounded-md">
+                                <p className="text-sm font-medium mb-1">Cover Letter:</p>
+                                <p className="text-sm text-muted-foreground line-clamp-3">
+                                  {application.coverLetter}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="flex gap-2 pt-4 border-t">
+                              <Button variant="outline" size="sm" asChild>
+                                <Link to={`/jobs/${application.jobId}`}>View Job</Link>
+                              </Button>
+                              {application.resume && (
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link to={`/resumes/${application.resumeId}`}>View Resume</Link>
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Alerts Tab */}
+                <TabsContent value="alerts" className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold">Job Alerts</h2>
+                      <p className="text-muted-foreground">
+                        {alerts.length} {alerts.length === 1 ? "alert" : "alerts"} configured
+                      </p>
+                    </div>
+                    <CreateJobAlertButton
+                      onAlertCreated={loadAlerts}
+                      variant="default"
+                      size="default"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Alert
+                    </CreateJobAlertButton>
+                  </div>
+
+                  {alertsLoading ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i}>
+                          <CardHeader>
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-1/2" />
+                          </CardHeader>
+                          <CardContent>
+                            <Skeleton className="h-20 w-full" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : alerts.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-12 text-center">
+                        <Bell className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h2 className="text-2xl font-bold mb-2">No job alerts yet</h2>
+                        <p className="text-muted-foreground mb-6">
+                          Create job alerts to get notified when new jobs match your criteria
+                        </p>
+                        <CreateJobAlertButton onAlertCreated={loadAlerts}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Your First Alert
+                        </CreateJobAlertButton>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {alerts.map((alert) => {
+                        const { keywords, location } = parseSearchCriteria(alert.searchCriteria);
+                        return (
+                          <Card key={alert.id} className="hover:shadow-lg transition-shadow">
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <CardTitle className="text-xl mb-2">{alert.name}</CardTitle>
+                                  <div className="flex flex-wrap gap-2 items-center">
+                                    <Badge variant={alert.isActive ? "default" : "secondary"}>
+                                      {alert.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                    <Badge variant="outline">
+                                      {frequencyLabels[alert.alertFrequency] || alert.alertFrequency}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={alert.isActive}
+                                    onCheckedChange={() => handleToggleActive(alert.id, alert.isActive)}
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditAlert(alert)}
+                                  >
+                                    <Edit className="h-5 w-5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setDeleteAlertId(alert.id)}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                <div className="flex items-start gap-2">
+                                  <Search className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                                  <div>
+                                    <p className="text-sm font-medium">Keywords:</p>
+                                    <p className="text-sm text-muted-foreground">{keywords || "Any"}</p>
+                                  </div>
+                                </div>
+                                {location && (
+                                  <div className="flex items-start gap-2">
+                                    <MapPin className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                                    <div>
+                                      <p className="text-sm font-medium">Location:</p>
+                                      <p className="text-sm text-muted-foreground">{location}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="pt-3 border-t text-xs text-muted-foreground">
+                                  Created {formatDate(alert.createdAt)}
+                                  {alert.lastTriggered && (
+                                    <> • Last triggered {formatDate(alert.lastTriggered)}</>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+
+              {/* Edit Alert Sheet */}
+              <Sheet open={alertSheetOpen} onOpenChange={setAlertSheetOpen}>
+                <SheetContent side="right" className="sm:max-w-[500px]">
+                  <SheetHeader>
+                    <SheetTitle>Edit Job Alert</SheetTitle>
+                    <SheetDescription>
+                      Update your job alert settings to refine your notifications
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="alert-name">Alert Name *</Label>
+                      <Input
+                        id="alert-name"
+                        placeholder="e.g., Senior Developer Jobs"
+                        value={alertName}
+                        onChange={(e) => setAlertName(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="keywords">Keywords *</Label>
+                      <Input
+                        id="keywords"
+                        placeholder="e.g., React, TypeScript, Node.js"
+                        value={alertKeywords}
+                        onChange={(e) => setAlertKeywords(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Separate multiple keywords with commas
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location (Optional)</Label>
+                      <Input
+                        id="location"
+                        placeholder="e.g., San Francisco, CA"
+                        value={alertLocation}
+                        onChange={(e) => setAlertLocation(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="frequency">Notification Frequency</Label>
+                      <Select value={alertFrequency} onValueChange={setAlertFrequency}>
+                        <SelectTrigger id="frequency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="immediate">Immediate</SelectItem>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <SheetFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setAlertSheetOpen(false)}
+                      disabled={isSubmittingAlert}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSubmitAlert} disabled={isSubmittingAlert}>
+                      {isSubmittingAlert ? "Updating..." : "Update Alert"}
+                    </Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+
+              {/* Delete Alert Dialog */}
+              <AlertDialog open={!!deleteAlertId} onOpenChange={() => setDeleteAlertId(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Job Alert</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this job alert? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAlert} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
           <Footer />
