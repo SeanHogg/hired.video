@@ -337,9 +337,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.userGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.userGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -361,9 +370,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.jobGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.jobGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -500,9 +518,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.userGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.userGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -550,19 +577,25 @@ export default function ProductDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(
-                    ([status, count]) => (
-                      <div
-                        key={status}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="text-sm font-medium">{status}</span>
-                        <Badge variant="secondary">{count}</Badge>
-                      </div>
-                    ),
-                  )}
-                </div>
+                {Object.keys(dashboardData.jobMetrics.jobsByStatus).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(
+                      ([status, count]) => (
+                        <div
+                          key={status}
+                          className="flex justify-between items-center"
+                        >
+                          <span className="text-sm font-medium">{status}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No job status data available
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -573,9 +606,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.jobGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.jobGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -621,19 +663,25 @@ export default function ProductDashboard() {
                 <CardDescription>Company size distribution</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(
-                    dashboardData.companyMetrics.companiesBySize,
-                  ).map(([size, count]) => (
-                    <div
-                      key={size}
-                      className="flex justify-between items-center"
-                    >
-                      <span className="text-sm font-medium">{size}</span>
-                      <Badge variant="secondary">{count}</Badge>
-                    </div>
-                  ))}
-                </div>
+                {Object.keys(dashboardData.companyMetrics.companiesBySize).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(
+                      dashboardData.companyMetrics.companiesBySize,
+                    ).map(([size, count]) => (
+                      <div
+                        key={size}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-sm font-medium">{size}</span>
+                        <Badge variant="secondary">{count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No company size data available
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -646,9 +694,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.companyGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.companyGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />
@@ -717,9 +774,18 @@ export default function ProductDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={dashboardData.resumeGrowthLast90Days}>
+                  <LineChart
+                    data={dashboardData.resumeGrowthLast90Days.map(item => ({
+                      ...item,
+                      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }))}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 12 }}
+                      interval="preserveStartEnd"
+                    />
                     <YAxis />
                     <Tooltip />
                     <Legend />

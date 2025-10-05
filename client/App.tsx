@@ -80,6 +80,7 @@ const JobDetail = lazy(() => import("./pages/JobDetail"));
 // JobUploadPage removed - functionality consolidated into JobCreatePage
 const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
 const JobEditPage = lazy(() => import("./pages/JobEditPage"));
+const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const AccountManagement = lazy(() => import("./pages/AccountManagement"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
@@ -316,6 +317,7 @@ const App = () => (
                         element={<JobCreatePage />}
                       />
                       <Route path="/jobs/edit/:id" element={<JobEditPage />} />
+                      <Route path="/jobs/:id/apply" element={<JobApplicationPage />} />
                       <Route path="/jobs/:id" element={<JobDetail />} />
                       {/* Redirect old upload route to unified create page */}
                       <Route
