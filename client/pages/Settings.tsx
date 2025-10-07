@@ -363,26 +363,26 @@ function SettingsContent() {
               </div>
 
               {/* Settings Categories Preview */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">
+              <div className="mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
                   Comprehensive Settings Categories
                 </h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="text-center p-6">
-                    <User className="h-8 w-8 text-brand-purple mx-auto mb-3" />
-                    <h3 className="font-semibold mb-2">Profile</h3>
-                    <p className="text-sm text-muted-foreground">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <Card className="text-center p-4 sm:p-6">
+                    <User className="h-6 w-6 sm:h-8 sm:w-8 text-brand-purple mx-auto mb-3" />
+                    <h3 className="text-sm sm:text-base font-semibold mb-2">Profile</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Personal info, bio, and professional details
                     </p>
                   </Card>
-                  <Card className="text-center p-6">
-                    <Bell className="h-8 w-8 text-brand-blue mx-auto mb-3" />
-                    <h3 className="font-semibold mb-2">Notifications</h3>
-                    <p className="text-sm text-muted-foreground">
+                  <Card className="text-center p-4 sm:p-6">
+                    <Bell className="h-6 w-6 sm:h-8 sm:w-8 text-brand-blue mx-auto mb-3" />
+                    <h3 className="text-sm sm:text-base font-semibold mb-2">Notifications</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Email, push, and in-app notification preferences
                     </p>
                   </Card>
-                  <Card className="text-center p-6">
+                  <Card className="text-center p-4 sm:p-6">
                     <Shield className="h-8 w-8 text-brand-purple mx-auto mb-3" />
                     <h3 className="font-semibold mb-2">Privacy</h3>
                     <p className="text-sm text-muted-foreground">
@@ -512,34 +512,37 @@ function SettingsContent() {
             )}
 
             {/* Settings Tabs */}
-            <Tabs defaultValue="notifications" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+            <Tabs defaultValue="notifications" className="space-y-4 sm:space-y-6">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
                 <TabsTrigger
                   value="notifications"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 >
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Notifications</span>
+                  <span className="sm:hidden">Notify</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="privacy"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 >
-                  <Shield className="h-4 w-4" />
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Privacy</span>
+                  <span className="sm:hidden">Privacy</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="appearance"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 >
-                  <Palette className="h-4 w-4" />
+                  <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Appearance</span>
+                  <span className="sm:hidden">Theme</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="account"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
                 >
-                  <CreditCard className="h-4 w-4" />
+                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Account</span>
                 </TabsTrigger>
               </TabsList>

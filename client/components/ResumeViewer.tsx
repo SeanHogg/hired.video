@@ -232,25 +232,27 @@ export default function ResumeViewer({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 p-4 sm:p-0">
       {/* Toolbar (optional) */}
       {showToolbar && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{resume.name}</h1>
-            {resume.isMaster && (
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                <Star className="h-3 w-3 mr-1" />
-                Master
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold">{resume.name}</h1>
+            <div className="flex items-center gap-2">
+              {resume.isMaster && (
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  <Star className="h-3 w-3 mr-1" />
+                  Master
+                </Badge>
+              )}
+              <Badge className={getPrivacyColor(privacy)}>
+                {getPrivacyIcon(privacy)}
+                <span className="ml-1">{getPrivacyText(privacy)}</span>
               </Badge>
-            )}
-            <Badge className={getPrivacyColor(privacy)}>
-              {getPrivacyIcon(privacy)}
-              <span className="ml-1">{getPrivacyText(privacy)}</span>
-            </Badge>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {canEdit && (
               <Select value={privacy} onValueChange={handlePrivacyChange}>
                 <SelectTrigger className="w-36">

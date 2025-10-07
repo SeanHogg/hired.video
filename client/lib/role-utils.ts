@@ -44,6 +44,7 @@ export const DASHBOARD_TYPES = {
   JOB_SEEKER: "jobseeker",
   RECRUITER: "recruiter",
   EMPLOYER: "employer",
+  AFFILIATE: "affiliate",
   ADMIN: "admin",
   SUPER_ADMIN: "admin", // SuperAdmin uses admin dashboard
   DEFAULT: "default",
@@ -187,6 +188,10 @@ export class RolePermissions {
     return this.role === USER_ROLES.EMPLOYER;
   }
 
+  get isAffiliate(): boolean {
+    return this.role === USER_ROLES.AFFILIATE;
+  }
+
   get isAdmin(): boolean {
     return this.role === USER_ROLES.ADMIN;
   }
@@ -237,6 +242,7 @@ export class RolePermissions {
     if (this.isSuperAdmin || this.isAdmin) return DASHBOARD_TYPES.ADMIN;
     if (this.isEmployer) return DASHBOARD_TYPES.EMPLOYER;
     if (this.isRecruiter) return DASHBOARD_TYPES.RECRUITER;
+    if (this.isAffiliate) return DASHBOARD_TYPES.AFFILIATE;
     if (this.isJobSeeker) return DASHBOARD_TYPES.JOB_SEEKER;
     return DASHBOARD_TYPES.DEFAULT;
   }
@@ -265,6 +271,9 @@ export const roleUtils = {
     const normalized = normalizeRole(role);
     return normalized === USER_ROLES.EMPLOYER;
   },
+
+  isAffiliate: (role: string | number | undefined | null): boolean =>
+    normalizeRole(role) === USER_ROLES.AFFILIATE,
 
   isAdmin: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.ADMIN,

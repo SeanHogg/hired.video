@@ -11,10 +11,9 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { DollarSign, CheckCircle2, Clock } from "lucide-react";
 
-export default function AffiliateDashboard() {
-  useSEO("/affiliate/dashboard");
+// Content component that can be used with or without layout
+function AffiliateDashboardContent() {
   const { isAuthenticated, user } = useAuth();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -67,16 +66,11 @@ export default function AffiliateDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="pt-16">
-          <section className="max-w-6xl mx-auto px-6 py-10 space-y-6">
-            <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Affiliate Dashboard</h1>
-              <Button variant="outline" onClick={() => navigate("/affiliate-program")}>Affiliate Program</Button>
-            </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Affiliate Dashboard</h1>
+        <Button variant="outline" onClick={() => navigate("/affiliate-program")}>Affiliate Program</Button>
+      </div>
 
 
 	            {/* Not an affiliate notice */}
@@ -265,6 +259,23 @@ export default function AffiliateDashboard() {
                 </div>
               </CardContent>
             </Card>
+    </div>
+  );
+}
+
+// Full page component with layout (for direct route access)
+export default function AffiliateDashboard() {
+  useSEO("/affiliate/dashboard");
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+        <main className="pt-16">
+          <section className="max-w-6xl mx-auto px-6 py-10">
+            <AffiliateDashboardContent />
           </section>
         </main>
         <Footer />
@@ -272,4 +283,7 @@ export default function AffiliateDashboard() {
     </div>
   );
 }
+
+// Export the content component for use in main Dashboard
+export { AffiliateDashboardContent };
 

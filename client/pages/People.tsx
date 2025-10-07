@@ -707,22 +707,22 @@ export default function People() {
             sidebarCollapsed={sidebarCollapsed}
           />
 
-          <div className="pt-16 p-6">
+          <div className="pt-16 p-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold mb-2">
                     Professional Network
                   </h1>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm sm:text-base text-muted-foreground">
                     {isJobSeeker
                       ? "Connect with recruiters, industry leaders, and fellow professionals"
                       : "Discover and connect with talented professionals"}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button asChild variant="outline">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Button asChild variant="outline" className="flex-1 sm:flex-none min-h-[44px]">
                     <Link to="/profile">
                       <UserCheck className="h-4 w-4 mr-2" />
                       My Profile
@@ -772,7 +772,7 @@ export default function People() {
                       Following (
                       {"tracked" in peopleData ? peopleData.tracked.length : 0})
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       {("tracked" in peopleData ? peopleData.tracked : []).map(
                         (person: UserWithOwnership) => (
                           <PeopleCard
@@ -1852,28 +1852,28 @@ export default function People() {
             </div>
 
             {/* Stats Section */}
-            <div className="grid md:grid-cols-4 gap-6 mb-16">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-12 sm:mb-16">
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">
+                <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">
                   250K+
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Active professionals
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">15K+</div>
-                <p className="text-sm text-muted-foreground">
+                <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">15K+</div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Daily connections made
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">89%</div>
-                <p className="text-sm text-muted-foreground">Response rate</p>
+                <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">89%</div>
+                <p className="text-xs sm:text-sm text-muted-foreground">Response rate</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">50+</div>
-                <p className="text-sm text-muted-foreground">
+                <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">50+</div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Countries represented
                 </p>
               </div>

@@ -238,7 +238,7 @@ export default function Companies() {
                         <Building2 className="h-5 w-5" />
                         Your Companies ({companiesData.owned.length})
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {companiesData.owned.map((company) => (
                           <CompanyCard
                             key={company.id}

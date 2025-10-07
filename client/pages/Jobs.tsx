@@ -591,22 +591,24 @@ export default function Jobs() {
               </div>
 
               {/* Tabs for different views */}
-              <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="browse">
-                    <Search className="h-4 w-4 mr-2" />
-                    Browse
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+                  <TabsTrigger value="browse" className="text-xs sm:text-sm">
+                    <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Browse</span>
+                    <span className="sm:hidden">Jobs</span>
                   </TabsTrigger>
-                  <TabsTrigger value="saved">
-                    <Bookmark className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="saved" className="text-xs sm:text-sm">
+                    <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     Saved
                   </TabsTrigger>
-                  <TabsTrigger value="applications">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Applications
+                  <TabsTrigger value="applications" className="text-xs sm:text-sm">
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Applications</span>
+                    <span className="sm:hidden">Apps</span>
                   </TabsTrigger>
-                  <TabsTrigger value="alerts">
-                    <Bell className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="alerts" className="text-xs sm:text-sm">
+                    <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     Alerts
                   </TabsTrigger>
                 </TabsList>
@@ -634,7 +636,7 @@ export default function Jobs() {
                           <Briefcase className="h-5 w-5" />
                           Your Job Postings ({jobsData.owned.length})
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                           {jobsData.owned.map((job) => (
                             <JobCard
                               key={job.id}
@@ -657,7 +659,7 @@ export default function Jobs() {
                         <Users className="h-5 w-5" />
                         Tracked Jobs ({(jobsData as any).tracked.length})
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {(jobsData as any).tracked.map(
                           (job: JobWithOwnership) => (
                             <JobCard

@@ -35,6 +35,7 @@ import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import ProductDashboard from "@/pages/admin/ProductDashboard";
+import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
 
 
 export default function Dashboard() {
@@ -97,6 +98,8 @@ export default function Dashboard() {
       return <RecruiterDashboard {...commonProps} />;
     if (rolePermissions.isEmployer)
       return <EmployerDashboard {...commonProps} />;
+    if (rolePermissions.isAffiliate)
+      return <AffiliateDashboardContent />;
 
     // Fallback for unknown roles
     return (

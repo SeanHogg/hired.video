@@ -318,14 +318,14 @@ export default function ResumeDetail() {
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          <div className="pt-16 p-6">
+          <div className="pt-16 p-4 sm:p-6">
             <div className="max-w-4xl mx-auto">
-              <div className="animate-pulse space-y-6">
-                <div className="h-8 bg-muted rounded w-1/3" />
-                <div className="h-64 bg-muted rounded" />
-                <div className="space-y-4">
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                  <div className="h-4 bg-muted rounded w-1/2" />
+              <div className="animate-pulse space-y-4 sm:space-y-6">
+                <div className="h-6 sm:h-8 bg-muted rounded w-1/3" />
+                <div className="h-48 sm:h-64 bg-muted rounded" />
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="h-3 sm:h-4 bg-muted rounded w-3/4" />
+                  <div className="h-3 sm:h-4 bg-muted rounded w-1/2" />
                 </div>
               </div>
             </div>
@@ -349,13 +349,13 @@ export default function ResumeDetail() {
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-          <div className="pt-16 p-6">
+          <div className="pt-16 p-4 sm:p-6">
             <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
-              <p className="text-muted-foreground mb-6">
+              <h1 className="text-xl sm:text-2xl font-bold mb-4">Resume Not Found</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mb-6">
                 The resume you're looking for doesn't exist or has been removed.
               </p>
-              <Button onClick={() => navigate("/resumes")}>
+              <Button onClick={() => navigate("/resumes")} className="min-h-[44px]">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Resumes
               </Button>
@@ -392,13 +392,13 @@ export default function ResumeDetail() {
           {/* Header with Video */}
           <div className="relative bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground">
             <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />
-            <div className="relative max-w-6xl mx-auto px-6 py-12">
+            <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
               {/* Navigation */}
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
                 <Button
                   variant="ghost"
                   onClick={() => navigate("/resumes")}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                  className="self-start min-h-[44px] text-primary-foreground hover:bg-primary-foreground/10"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Resumes

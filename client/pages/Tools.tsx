@@ -144,11 +144,11 @@ export default function Tools() {
               </div>
 
               {/* Unified Tools Grid */}
-              <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">
+              <div className="mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
                   AI-Powered Career Tools
                 </h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   <Link to="/Tools/ResumeOptimizer">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
@@ -1079,8 +1079,8 @@ export default function Tools() {
             </p>
 
             {/* Unified Tools Grid */}
-            <div className="mb-12">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="mb-8 sm:mb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {/* Resume Optimizer */}
                 <Link to="/Tools/ResumeOptimizer">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">

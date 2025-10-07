@@ -211,8 +211,8 @@ export default function Signup() {
                   {/* Persona selection */}
                   <div className="space-y-2">
                     <Label>Registering as</Label>
-                    <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
-                      <div className="bg-background rounded-full p-1">
+                    <div className="p-[2px] rounded-lg sm:rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
+                      <div className="bg-background rounded-lg sm:rounded-full p-1">
                         <ToggleGroup
                           type="single"
                           value={role}
@@ -221,19 +221,19 @@ export default function Signup() {
                         >
                           <ToggleGroupItem
                             value={USER_ROLES.JOB_SEEKER}
-                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
+                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Users className="h-4 w-4 mr-2" /> Job Seeker
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
-                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
+                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.EMPLOYER}
-                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
+                            className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Building2 className="h-4 w-4 mr-2" /> Employer
                           </ToggleGroupItem>

@@ -400,7 +400,7 @@ export default function Outreach() {
               </div>
 
               {/* Features Grid */}
-              <div className="grid md:grid-cols-3 gap-8 mb-16">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-12 sm:mb-16">
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <MessageSquare className="h-10 w-10 text-brand-purple mb-4" />

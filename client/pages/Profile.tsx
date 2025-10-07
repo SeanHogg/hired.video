@@ -228,14 +228,14 @@ function ProfileContent() {
             sidebarCollapsed={sidebarCollapsed}
           />
 
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto text-center py-16">
-              <User className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
-              <p className="text-muted-foreground mb-6">
+          <div className="pt-16 p-4 sm:p-6">
+            <div className="max-w-4xl mx-auto text-center py-12 sm:py-16">
+              <User className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
+              <h1 className="text-xl sm:text-2xl font-bold mb-4">Sign In Required</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mb-6">
                 Please sign in to view and edit your profile.
               </p>
-              <Button asChild>
+              <Button asChild className="min-h-[44px]">
                 <Link to="/login">Sign In</Link>
               </Button>
             </div>
@@ -260,16 +260,16 @@ function ProfileContent() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="pt-16 p-4 sm:p-6">
+          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
             {/* Profile Header */}
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-start gap-6">
-                  <div className="relative">
-                    <Avatar className="w-24 h-24">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="w-20 h-20 sm:w-24 sm:h-24">
                       <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="text-2xl">
+                      <AvatarFallback className="text-lg sm:text-2xl">
                         {(formData.firstName[0] || "") +
                           (formData.lastName[0] || "")}
                       </AvatarFallback>
@@ -312,23 +312,23 @@ function ProfileContent() {
                     )}
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h1 className="text-2xl font-bold">
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <h1 className="text-xl sm:text-2xl font-bold">
                         {isEditing
                           ? `${formData.firstName} ${formData.lastName}`
                           : user.name}
                       </h1>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row items-center gap-2">
                         {isEditing ? (
                           <>
-                            <Button variant="outline" onClick={handleCancel}>
+                            <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto min-h-[44px]">
                               Cancel
                             </Button>
                             <Button
                               onClick={handleSave}
                               disabled={saving}
-                              className="flex items-center gap-2"
+                              className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]"
                             >
                               <Save className="h-4 w-4" />
                               {saving ? "Saving..." : "Save Changes"}
@@ -338,7 +338,7 @@ function ProfileContent() {
                           <Button
                             variant="outline"
                             onClick={() => setIsEditing(true)}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]"
                           >
                             <Edit className="h-4 w-4" />
                             Edit Profile
@@ -390,7 +390,7 @@ function ProfileContent() {
                       <h3 className="text-lg font-medium mb-4">
                         Personal Information
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="firstName">First Name</Label>
                           <Input
@@ -399,6 +399,7 @@ function ProfileContent() {
                             onChange={(e) =>
                               handleInputChange("firstName", e.target.value)
                             }
+                            className="min-h-[44px]"
                           />
                         </div>
                         <div className="space-y-2">
@@ -409,6 +410,7 @@ function ProfileContent() {
                             onChange={(e) =>
                               handleInputChange("lastName", e.target.value)
                             }
+                            className="min-h-[44px]"
                           />
                         </div>
                       </div>
@@ -726,7 +728,7 @@ function ProfileContent() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   {/* Role-based quick actions */}
                   {(() => {
                     const rolePermissions = createRolePermissions(user?.role);
@@ -735,12 +737,12 @@ function ProfileContent() {
                         <>
                           <Button
                             variant="outline"
-                            className="h-auto p-4 flex flex-col gap-2"
+                            className="h-auto p-3 sm:p-4 flex flex-col gap-2 min-h-[80px] text-center"
                             asChild
                           >
                             <Link to="/resumes">
-                              <FileText className="h-6 w-6" />
-                              <span className="font-medium">Update Resume</span>
+                              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+                              <span className="text-sm sm:text-base font-medium">Update Resume</span>
                               <span className="text-xs text-muted-foreground">
                                 Upload or edit your resume
                               </span>

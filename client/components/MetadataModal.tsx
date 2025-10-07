@@ -202,8 +202,8 @@ export default function MetadataModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Manage Resume Media</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Manage Resume Media</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
             Add videos, images, and links to enhance your resume sections.
           </DialogDescription>
         </DialogHeader>
@@ -215,6 +215,7 @@ export default function MetadataModal({
               variant="outline"
               size="sm"
               onClick={addMeta}
+              className="min-h-[44px]"
             >
               Add Media
             </Button>
@@ -227,21 +228,23 @@ export default function MetadataModal({
           ) : (
             <div className="space-y-4">
               {metaData.map((m, i) => (
-                <div key={m.id} className="grid grid-cols-1 md:grid-cols-6 gap-3 border rounded-lg p-4">
-                  <div className="md:col-span-2">
-                    <Label>Label</Label>
-                    <Input 
-                      value={m.name} 
-                      onChange={(e) => updateMeta(i, "name", e.target.value)} 
-                      placeholder="e.g., Demo Reel" 
+                <div key={m.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 border rounded-lg p-3 sm:p-4">
+                  <div className="sm:col-span-1 lg:col-span-2">
+                    <Label className="text-sm">Label</Label>
+                    <Input
+                      value={m.name}
+                      onChange={(e) => updateMeta(i, "name", e.target.value)}
+                      placeholder="e.g., Demo Reel"
+                      className="min-h-[44px]"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <Label>URL</Label>
-                    <Input 
-                      value={m.url} 
-                      onChange={(e) => updateMeta(i, "url", e.target.value)} 
-                      placeholder="https://..." 
+                  <div className="sm:col-span-1 lg:col-span-2">
+                    <Label className="text-sm">URL</Label>
+                    <Input
+                      value={m.url}
+                      onChange={(e) => updateMeta(i, "url", e.target.value)}
+                      placeholder="https://..."
+                      className="min-h-[44px]"
                     />
                   </div>
                   <div>

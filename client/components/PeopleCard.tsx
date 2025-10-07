@@ -179,13 +179,13 @@ export default function PeopleCard({
 
   return (
     <Card className="hover:shadow-lg transition-shadow relative">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 p-4 sm:p-6">
         <div className="flex items-start justify-between">
-          <div className="flex items-start gap-3 flex-1">
+          <div className="flex items-start gap-2 sm:gap-3 flex-1">
             {/* Profile Avatar */}
-            <Avatar className="w-12 h-12 flex-shrink-0">
+            <Avatar className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={displayFullName} />
-              <AvatarFallback className="text-sm">
+              <AvatarFallback className="text-xs sm:text-sm">
                 {firstInitial}
                 {lastInitial}
               </AvatarFallback>
@@ -193,41 +193,43 @@ export default function PeopleCard({
 
             {/* Person Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-lg hover:text-primary truncate">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                <CardTitle className="text-base sm:text-lg hover:text-primary truncate">
                   <Link to={`/people/${person.slug || person.id}`}>{person.fullName}</Link>
                 </CardTitle>
-                {person.isVerified && (
-                  <CheckCircle className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                )}
-                {person.isPremium && (
-                  <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-                )}
-                {showOwnership && isTracked && (
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
-                  >
-                    <UserCheck className="h-3 w-3 mr-1" />
-                    Following
-                  </Badge>
-                )}
-                {isConnected && (
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-green-50 text-green-700 flex-shrink-0"
-                  >
-                    <Users className="h-3 w-3 mr-1" />
-                    Connected
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {person.isVerified && (
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
+                  )}
+                  {person.isPremium && (
+                    <Star className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
+                  )}
+                  {showOwnership && isTracked && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
+                    >
+                      <UserCheck className="h-3 w-3 mr-1" />
+                      Following
+                    </Badge>
+                  )}
+                  {isConnected && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-green-50 text-green-700 flex-shrink-0"
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      Connected
+                    </Badge>
+                  )}
+                </div>
               </div>
 
-              <CardDescription className="text-sm mb-2 line-clamp-2">
+              <CardDescription className="text-xs sm:text-sm mb-2 line-clamp-2">
                 {person.headline}
               </CardDescription>
 
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   {getRoleIcon(person.role)}
                   <span>{formatRoleForDisplay(person.role)}</span>
