@@ -1,6 +1,5 @@
 import {
   Menu,
-  X,
   Video,
   Sparkles,
   ChevronDown,
@@ -19,7 +18,6 @@ import ShoppingCart from "@/components/ShoppingCart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { cn } from "@/lib/utils";
 
 interface NavigationProps {
@@ -33,9 +31,8 @@ export default function Navigation({
   onSidebarToggle,
   sidebarCollapsed,
 }: NavigationProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const featuresRef = useRef<HTMLDivElement>(null);
 
@@ -116,14 +113,14 @@ export default function Navigation({
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Sidebar Toggle + Logo */}
+          {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
           <div className="flex items-center space-x-3">
-            {/* Mobile Menu Toggle */}
+            {/* Mobile Hamburger Menu Toggle - Opens Sidebar */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onMenuClick}
-              className="lg:hidden"
+              className="md:hidden"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -140,6 +137,7 @@ export default function Navigation({
               <Menu className="h-4 w-4" />
             </Button>
 
+            {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
               <div className="relative">
                 <Video className="h-8 w-8 text-primary" />
@@ -151,7 +149,7 @@ export default function Navigation({
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Hidden on mobile */}
           <div className="hidden md:flex items-center space-x-8">
             {!isAuthenticated && (
               <>
@@ -239,181 +237,47 @@ export default function Navigation({
             )}
           </div>
 
-          {/* Desktop CTA Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Right side: Shopping Cart (mobile + desktop) + Desktop CTA Buttons */}
+          <div className="flex items-center space-x-4">
+            {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />
-            {!isAuthenticated ? (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" className="font-medium">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link to="/signup">
-                  <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                {/* Show upgrade button for free accounts */}
-                {!user?.subscription || user?.subscription === "free" ? (
-                  <Link to="/pricing">
-                    <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
-                      Upgrade Account
+
+            {/* Desktop CTA Buttons - Hidden on mobile */}
+            <div className="hidden md:flex items-center space-x-4">
+              {!isAuthenticated ? (
+                <>
+                  <Link to="/login">
+                    <Button variant="ghost" className="font-medium">
+                      Sign In
                     </Button>
                   </Link>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="capitalize">
-                      {user?.subscription ?? "free"} Plan
-                    </Badge>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-border bg-background/95 backdrop-blur-md">
-            <div className="flex flex-col space-y-4">
-              {!isAuthenticated && (
-                <>
-                  {/* Mobile Features Menu */}
-                  <div>
-                    <button
-                      onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
-                      className="flex items-center justify-between w-full text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                    >
-                      Features
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform ${isFeaturesOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {isFeaturesOpen && (
-                      <div className="mt-2 ml-4 space-y-2">
-                        {navigationItems.map((item) => {
-                          const Icon = item.icon;
-                          return (
-                            <Link
-                              key={item.name}
-                              to={item.href}
-                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
-                              onClick={() => {
-                                setIsMenuOpen(false);
-                                setIsFeaturesOpen(false);
-                              }}
-                            >
-                              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                                <Icon className="h-4 w-4 text-primary" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-sm">
-                                  {item.name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {item.description}
-                                </div>
-                              </div>
-                            </Link>
-                          );
-                        })}
-                        <Link
-                          to="/pricing"
-                          className="flex items-center gap-2 p-2 text-sm font-medium text-primary"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            setIsFeaturesOpen(false);
-                          }}
-                        >
-                          View All Features & Pricing
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-
-                  <Link
-                    to="/pricing"
-                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Pricing
-                  </Link>
-                  <Link
-                    to="/about"
-                    className="text-foreground/70 hover:text-foreground transition-colors font-medium px-2 py-1"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    About
+                  <Link to="/signup">
+                    <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
+                      Get Started
+                    </Button>
                   </Link>
                 </>
-              )}
-              <div className="flex flex-col space-y-2 pt-4 border-t border-border">
-                <div className="px-2 py-1">
-                  <ShoppingCart />
-                </div>
-                {!isAuthenticated ? (
-                  <>
-                    <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start font-medium"
-                      >
-                        Sign In
+              ) : (
+                <>
+                  {/* Show upgrade button for free accounts */}
+                  {!user?.subscription || user?.subscription === "free" ? (
+                    <Link to="/pricing">
+                      <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
+                        Upgrade Account
                       </Button>
                     </Link>
-                    <Link to="/signup" onClick={() => setIsMenuOpen(false)}>
-                      <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <div className="px-2 py-1">
-                      <p className="text-sm font-medium">
-                        Welcome, {user?.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {getRoleDisplayLabel(user?.role)}
-                      </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="capitalize">
+                        {user?.subscription ?? "free"} Plan
+                      </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        logout();
-                        setIsMenuOpen(false);
-                      }}
-                      className="w-full justify-start font-medium"
-                    >
-                      Sign Out
-                    </Button>
-                  </>
-                )}
-              </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

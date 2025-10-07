@@ -20,7 +20,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { USER_ROLES } from "@shared/user-roles";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 
@@ -38,8 +37,7 @@ export default function Sidebar({
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
 
-
-
+  // Main navigation items - shown to all users
   const navigation = [
     { name: "Home", href: "/", icon: Home, exactMatch: true },
     {
@@ -61,7 +59,12 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
-    // Note: Dashboard link is in main navigation and routes to role-specific dashboard
+  ];
+
+  // Additional navigation for unauthenticated users (mobile)
+  const publicNavigation = [
+    { name: "Pricing", href: "/pricing", icon: BarChart3, exactMatch: false },
+    { name: "About", href: "/about", icon: HelpCircle, exactMatch: false },
   ];
 
   // Helper function to determine if a menu item is active
@@ -134,7 +137,7 @@ export default function Sidebar({
               collapsed ? "overflow-hidden" : "overflow-y-auto",
             )}
           >
-            {/* Navigation */}
+            {/* Main Navigation */}
             <div>
               {!collapsed && (
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -164,6 +167,39 @@ export default function Sidebar({
                 ))}
               </nav>
             </div>
+
+            {/* Public Navigation - Only for unauthenticated users */}
+            {!isAuthenticated && (
+              <div>
+                {!collapsed && (
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    Discover
+                  </h3>
+                )}
+                <nav className="space-y-1">
+                  {publicNavigation.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center text-sm font-medium rounded-md transition-colors",
+                        collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
+                        isMenuItemActive(item)
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                      )}
+                      onClick={onClose}
+                      title={collapsed ? item.name : undefined}
+                    >
+                      <item.icon
+                        className={cn("h-4 w-4", !collapsed && "mr-3")}
+                      />
+                      {!collapsed && item.name}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -244,7 +280,26 @@ export default function Sidebar({
               </>
             ) : (
               <>
-                {/* Non-authenticated users see Settings and Help */}
+                {/* Authentication Buttons for Unauthenticated Users */}
+                {!collapsed && (
+                  <div className="space-y-2 mb-4">
+                    <Link to="/login" onClick={onClose} className="block">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start font-medium"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link to="/signup" onClick={onClose} className="block">
+                      <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
+                {/* Settings and Help for Unauthenticated Users */}
                 <Link
                   to="/settings"
                   className={cn(
