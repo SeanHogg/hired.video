@@ -19,6 +19,7 @@ import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error
 // Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
 import FloatingAIButton from "./components/FloatingAIButton";
+import MobileBottomNav from "./components/MobileBottomNav";
 
 // Critical pages (loaded immediately)
 import Index from "./pages/Index";
@@ -467,7 +468,12 @@ const App = () => (
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+
                   </Suspense>
+
+                  {/* Mobile bottom nav spacer to prevent content being hidden */}
+                  <div className="h-16 md:hidden" />
+                  <MobileBottomNav />
 
                   {/* Global AI Components - Available on all pages */}
                   <FloatingAIButton />
