@@ -224,8 +224,8 @@ export default function SentimentAnalysis() {
                 </div>
               </div>
               <Link to="/tools">
-                <Button variant="outline">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Tools
                 </Button>
               </Link>

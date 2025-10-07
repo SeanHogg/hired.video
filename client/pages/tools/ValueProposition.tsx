@@ -157,7 +157,7 @@ export default function ValueProposition() {
             <div className="mb-8">
               <div className="flex items-center gap-4 mb-4">
                 <Link to="/tools">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
