@@ -1,10 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useSEO } from "@/lib/seo";
+import Footer from "@/components/Footer";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, LogOut } from "lucide-react";
+import { useSidebar } from "@/hooks/use-sidebar";
 
 function useQuery() {
   const { search } = useLocation();
@@ -12,10 +17,21 @@ function useQuery() {
 }
 
 export default function VerifyEmail(): JSX.Element {
+  const location = useLocation();
   const navigate = useNavigate();
   const query = useQuery();
   const redirect = query.get("redirect") || "/dashboard";
   const hintedEmail = query.get("email") || undefined;
+
+  // SEO for verify email page
+  useSEO(location.pathname);
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
 
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus, logout } = useAuth();
 
@@ -84,11 +100,25 @@ export default function VerifyEmail(): JSX.Element {
   };
 
   return (
-    <div className="container mx-auto max-w-xl py-10">
-      <Card>
-        <CardHeader>
-          <CardTitle>Verify your email to continue</CardTitle>
-        </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        <div className="pt-16 min-h-screen flex items-center justify-center p-4">
+          <div className="w-full max-w-xl">
+            <Card>
+              <CardHeader>
+                <CardTitle>Verify your email to continue</CardTitle>
+              </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             For your security and to prevent fake profiles, you must verify your email address before accessing your account.
@@ -125,31 +155,46 @@ export default function VerifyEmail(): JSX.Element {
             </Alert>
           )}
         </CardContent>
-        <CardFooter className="flex gap-2">
-          <Button
-            onClick={handleResend}
-            disabled={!isAuthenticated || resendLoading || cooldown > 0}
-          >
-            {resendLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending
-              </>
-            ) : cooldown > 0 ? (
-              <>Resend in {cooldown}s</>
-            ) : (
-              <>Resend Verification Email</>
-            )}
-          </Button>
-          <Button variant="secondary" onClick={() => checkAndRedirectIfVerified()} disabled={statusLoading}>
-            {statusLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-            I already verified
-          </Button>
-          <div className="grow" />
-          <Button variant="ghost" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" /> Logout
-          </Button>
+        <CardFooter className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full">
+            <Button
+              onClick={handleResend}
+              disabled={!isAuthenticated || resendLoading || cooldown > 0}
+              className="w-full sm:w-auto min-h-[44px]"
+            >
+              {resendLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending
+                </>
+              ) : cooldown > 0 ? (
+                <>Resend in {cooldown}s</>
+              ) : (
+                <>Resend Verification Email</>
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => checkAndRedirectIfVerified()}
+              disabled={statusLoading}
+              className="w-full sm:w-auto min-h-[44px]"
+            >
+              {statusLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              I already verified
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full sm:w-auto min-h-[44px] sm:ml-auto"
+            >
+              <LogOut className="h-4 w-4 mr-2" /> Logout
+            </Button>
+          </div>
         </CardFooter>
-      </Card>
+            </Card>
+          </div>
+        </div>
+        <Footer />
+      </div>
     </div>
   );
 }

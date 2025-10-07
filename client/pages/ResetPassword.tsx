@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { useSearchParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useSEO } from "@/lib/seo";
 import Sidebar from "@/components/Sidebar";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -21,6 +22,7 @@ import { apiClient } from "@/lib/api-client";
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +34,9 @@ export default function ResetPassword() {
 
   const userId = searchParams.get("userId");
   const token = searchParams.get("token");
+
+  // SEO for reset password page
+  useSEO(location.pathname);
 
   const {
     sidebarOpen,
@@ -101,7 +106,7 @@ export default function ResetPassword() {
     setValidationErrors([]);
 
     try {
-      const { data } = await apiClient.requestRaw<{ message?: string }>(
+      await apiClient.requestRaw<{ message?: string }>(
         "/api/account/confirm-password-reset",
         {
           method: "POST",
@@ -171,7 +176,7 @@ export default function ResetPassword() {
                   </Alert>
 
                   <div className="space-y-3">
-                    <Button asChild className="w-full">
+                    <Button asChild className="w-full min-h-[44px]">
                       <Link to="/forgot-password">Request New Reset Link</Link>
                     </Button>
 
@@ -232,7 +237,7 @@ export default function ResetPassword() {
                     </AlertDescription>
                   </Alert>
 
-                  <Button asChild className="w-full">
+                  <Button asChild className="w-full min-h-[44px]">
                     <Link to="/login">Sign In Now</Link>
                   </Button>
                 </CardContent>
@@ -342,16 +347,16 @@ export default function ResetPassword() {
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        <ul className="list-disc list-inside space-y-1">
+                        <ul className="list-disc list-inside space-y-1 text-sm">
                           {validationErrors.map((error, index) => (
-                            <li key={index}>{error}</li>
+                            <li key={index} className="break-words">{error}</li>
                           ))}
                         </ul>
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full min-h-[44px]" disabled={loading}>
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />

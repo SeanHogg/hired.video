@@ -159,7 +159,7 @@ export default function Signup() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
                       <div className="relative">
@@ -211,29 +211,29 @@ export default function Signup() {
                   {/* Persona selection */}
                   <div className="space-y-2">
                     <Label>Registering as</Label>
-                    <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue inline-block">
+                    <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
                       <div className="bg-background rounded-full p-1">
                         <ToggleGroup
                           type="single"
                           value={role}
                           onValueChange={(v) => v && setRole(v as UserRole)}
+                          className="grid grid-cols-1 sm:grid-cols-3 gap-1 w-full"
                         >
                           <ToggleGroupItem
                             value={USER_ROLES.JOB_SEEKER}
-                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Users className="h-4 w-4 mr-2" /> Job Seeker
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
-                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
-
+                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Briefcase className="h-4 w-4 mr-2" /> Recruiter
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.EMPLOYER}
-                            className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                            className="rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
                             <Building2 className="h-4 w-4 mr-2" /> Employer
                           </ToggleGroupItem>
@@ -329,7 +329,7 @@ export default function Signup() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                    className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
                     disabled={isLoading}
                   >
                     {isLoading ? "Creating account..." : "Create Account"}

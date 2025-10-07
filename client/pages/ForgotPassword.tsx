@@ -1,6 +1,6 @@
 import { ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -16,13 +16,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
 
 export default function ForgotPassword() {
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  // SEO for forgot password page
+  useSEO(location.pathname);
+
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -49,7 +55,7 @@ export default function ForgotPassword() {
 
     try {
       // Use the API endpoint for password reset
-      const { data } = await apiClient.requestRaw<{ message: string }>(
+      await apiClient.requestRaw<{ message: string }>(
         "/api/account/reset-password",
         {
           method: "POST",
@@ -116,7 +122,7 @@ export default function ForgotPassword() {
 
                     <Button
                       variant="outline"
-                      className="w-full"
+                      className="w-full min-h-[44px]"
                       onClick={() => {
                         setSuccess(false);
                         setEmail("");
@@ -192,7 +198,7 @@ export default function ForgotPassword() {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full min-h-[44px]" disabled={loading}>
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />

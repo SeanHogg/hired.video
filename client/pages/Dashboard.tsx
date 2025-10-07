@@ -63,10 +63,10 @@ export default function Dashboard() {
   const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({
     children,
   }) => (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">{dashboardData?.title}</h1>
-        <p className="text-muted-foreground">{dashboardData?.description}</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold">{dashboardData?.title}</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1">{dashboardData?.description}</p>
         {lastRefresh && (
           <p className="text-xs text-muted-foreground mt-2">
             Last updated: {lastRefresh.toLocaleString()}
@@ -113,10 +113,10 @@ export default function Dashboard() {
   const renderDashboardContent = () => {
     if (dashboardLoading) {
       return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading dashboard...</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Loading dashboard...</p>
           </div>
         </div>
       );
@@ -124,16 +124,16 @@ export default function Dashboard() {
 
     if (dashboardError) {
       return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {dashboardError}
+            <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="flex-1">{dashboardError}</span>
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-4"
                 onClick={refreshDashboard}
+                className="min-h-[44px] w-full sm:w-auto"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
@@ -146,9 +146,9 @@ export default function Dashboard() {
 
     if (!dashboardData) {
       return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
-            <p className="text-muted-foreground">No dashboard data available</p>
+            <p className="text-sm sm:text-base text-muted-foreground">No dashboard data available</p>
           </div>
         </div>
       );
@@ -183,10 +183,10 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <PageLayout>
-        <div className="max-w-7xl mx-auto px-4 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading dashboard...</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Loading dashboard...</p>
           </div>
         </div>
       </PageLayout>

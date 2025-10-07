@@ -194,7 +194,7 @@ export default function Login() {
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                      className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
                       disabled={isLoading}
                     >
                       {isLoading ? "Signing in..." : "Sign in"}
@@ -217,16 +217,18 @@ export default function Login() {
                         required
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button type="submit" disabled={isVerifying} className="flex-1">
+                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                      <Button type="submit" disabled={isVerifying} className="w-full sm:flex-1 min-h-[44px]">
                         {isVerifying ? "Verifying..." : "Verify"}
                       </Button>
-                      <Button type="button" variant="outline" onClick={handleResend}>
-                        Resend code
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={() => setTwoFactor(null)}>
-                        Back
-                      </Button>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button type="button" variant="outline" onClick={handleResend} className="flex-1 sm:flex-none min-h-[44px]">
+                          Resend code
+                        </Button>
+                        <Button type="button" variant="ghost" onClick={() => setTwoFactor(null)} className="flex-1 sm:flex-none min-h-[44px]">
+                          Back
+                        </Button>
+                      </div>
                     </div>
                   </form>
                 )}

@@ -208,61 +208,61 @@ export default function HeroCarousel({
   const currentSlideData = slides[currentSlide];
 
   return (
-    <section className="relative pt-12 pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
-      <div className="max-w-7xl mx-auto relative min-h-[400px] flex items-center">
+    <section className="relative pt-8 sm:pt-12 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
+      <div className="max-w-7xl mx-auto relative min-h-[300px] sm:min-h-[400px] flex items-center">
         {/* Navigation Arrows */}
         <button
           onClick={prevSlide}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 transition-colors"
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
         <button
           onClick={nextSlide}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 transition-colors"
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-foreground hover:bg-white/20 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
 
         {/* Slide Content */}
-        <div className="text-center max-w-4xl mx-auto w-full">
+        <div className="text-center max-w-4xl mx-auto w-full px-4 sm:px-0">
           <Badge
             variant="secondary"
-            className="mb-3 px-3 py-1 text-xs font-medium bg-brand-purple-light text-brand-purple-dark"
+            className="mb-2 sm:mb-3 px-2 sm:px-3 py-1 text-xs font-medium bg-brand-purple-light text-brand-purple-dark"
           >
             <Sparkles className="w-3 h-3 mr-1" />
             {currentSlideData.badge}
           </Badge>
 
-          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 leading-tight">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3 leading-tight px-2">
             {currentSlideData.title}
-          </p>
+          </h1>
 
-          <p className="text-base text-muted-foreground mb-4 max-w-2xl mx-auto line-clamp-2">
+          <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-2xl mx-auto line-clamp-3 px-2">
             {currentSlideData.description}
           </p>
 
           {/* Slide-specific content */}
-          <div className="min-h-[80px] flex items-center justify-center mb-4">
+          <div className="min-h-[60px] sm:min-h-[80px] flex items-center justify-center mb-3 sm:mb-4">
             {currentSlideData.type === "main" && currentSlideData.stats && (
-              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-muted-foreground">
                 {currentSlideData.stats.map((stat, index) => (
                   <div key={index} className="flex items-center gap-1">
                     <stat.icon className="w-3 h-3" />
-                    <span>{stat.label}</span>
+                    <span className="text-center">{stat.label}</span>
                   </div>
                 ))}
               </div>
             )}
 
             {currentSlideData.type === "upload" && (
-              <div className="max-w-sm mx-auto">
+              <div className="max-w-xs sm:max-w-sm mx-auto px-4">
                 <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
-                  <CardContent className="pt-4">
+                  <CardContent className="pt-3 sm:pt-4">
                     <div
                       className={cn(
-                        "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                        "border-2 border-dashed rounded-lg p-3 sm:p-4 text-center transition-colors",
                         dragActive
                           ? "border-primary bg-primary/10"
                           : "border-muted-foreground/30 hover:border-primary/50",
@@ -272,8 +272,8 @@ export default function HeroCarousel({
                       onDragOver={handleDrag}
                       onDrop={handleDrop}
                     >
-                      <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm font-medium mb-1">
+                      <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-xs sm:text-sm font-medium mb-1">
                         Drop your resume here
                       </p>
                       <p className="text-xs text-muted-foreground mb-3">
@@ -282,7 +282,7 @@ export default function HeroCarousel({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1 text-xs"
+                        className="gap-1 text-xs min-h-[44px]"
                       >
                         <Plus className="h-3 w-3" />
                         Browse Files
@@ -295,14 +295,14 @@ export default function HeroCarousel({
 
             {currentSlideData.type === "features" &&
               currentSlideData.features && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-xl mx-auto">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 max-w-sm sm:max-w-xl mx-auto px-4">
                   {currentSlideData.features.map((feature, index) => (
                     <div
                       key={index}
-                      className="flex flex-col items-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
+                      className="flex flex-col items-center p-2 sm:p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 min-h-[60px] justify-center"
                     >
-                      <feature.icon className="w-5 h-5 mb-1 text-brand-purple" />
-                      <span className="text-xs font-medium text-center">
+                      <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 mb-1 text-brand-purple" />
+                      <span className="text-xs font-medium text-center leading-tight">
                         {feature.label}
                       </span>
                     </div>
@@ -312,23 +312,23 @@ export default function HeroCarousel({
           </div>
 
           {/* Action Buttons */}
-          <div className="min-h-[50px] flex items-center justify-center">
+          <div className="min-h-[50px] flex items-center justify-center px-4">
             {currentSlideData.type === "upload" ? (
               <Button
                 onClick={handleGenerateAIVideo}
-                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2"
+                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2 min-h-[44px] w-full sm:w-auto max-w-xs"
               >
                 Generate AI Video
               </Button>
             ) : (
               currentSlideData.actions && (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center w-full sm:w-auto">
                   {currentSlideData.actions.map((action, index) => (
                     <Button
                       key={index}
                       size="sm"
                       variant={action.variant}
-                      className="text-sm px-6 py-2"
+                      className="text-sm px-4 sm:px-6 py-2 min-h-[44px] w-full sm:w-auto"
                       onClick={getActionHandler(action.label)}
                     >
                       {action.label}
@@ -341,18 +341,20 @@ export default function HeroCarousel({
         </div>
 
         {/* Slide Indicators */}
-        <div className="flex justify-center mt-6 gap-2">
+        <div className="flex justify-center mt-4 sm:mt-6 gap-2">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
               className={cn(
-                "w-2 h-2 rounded-full transition-colors",
+                "w-3 h-3 sm:w-2 sm:h-2 rounded-full transition-colors min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center",
                 index === currentSlide
                   ? "bg-brand-purple"
                   : "bg-white/30 hover:bg-white/50",
               )}
-            />
+            >
+              <span className="sr-only">Go to slide {index + 1}</span>
+            </button>
           ))}
         </div>
       </div>

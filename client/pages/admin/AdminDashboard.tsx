@@ -105,17 +105,17 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Manage your team, billing, and organization settings
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Badge variant={isOwner ? "default" : "secondary"}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <Badge variant={isOwner ? "default" : "secondary"} className="self-start sm:self-auto">
             {isOwner ? "Account Owner" : "Admin"}
           </Badge>
           <span className="text-sm text-muted-foreground">
@@ -125,14 +125,14 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
 
-          {isAdmin && <TabsTrigger value="team">Team</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="billing">Billing</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="billing" className="text-xs sm:text-sm">Billing</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>}
 
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">

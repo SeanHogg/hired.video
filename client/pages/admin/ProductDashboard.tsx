@@ -281,42 +281,44 @@ export default function ProductDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Product Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Product Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             System-wide analytics and metrics for platform administration
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Badge variant="default" className="bg-purple-600">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <Badge variant="default" className="bg-purple-600 self-start sm:self-auto">
             Super Admin
           </Badge>
-          <Button variant="outline" onClick={() => exportData("csv")}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button variant="outline" onClick={loadDashboardData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => exportData("csv")} className="flex-1 sm:flex-none min-h-[44px]">
+              <Download className="h-4 w-4 mr-2" />
+              <span className="sm:inline">Export CSV</span>
+            </Button>
+            <Button variant="outline" onClick={loadDashboardData} className="flex-1 sm:flex-none min-h-[44px]">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              <span className="sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="jobs">Jobs</TabsTrigger>
-          <TabsTrigger value="companies">Companies</TabsTrigger>
-          <TabsTrigger value="resumes">Resumes</TabsTrigger>
-          <TabsTrigger value="saas">SaaS Metrics</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
+          <TabsTrigger value="jobs" className="text-xs sm:text-sm">Jobs</TabsTrigger>
+          <TabsTrigger value="companies" className="text-xs sm:text-sm">Companies</TabsTrigger>
+          <TabsTrigger value="resumes" className="text-xs sm:text-sm">Resumes</TabsTrigger>
+          <TabsTrigger value="saas" className="text-xs sm:text-sm">SaaS</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               title="Total Users"
               value={dashboardData.userMetrics.totalUsers}
@@ -351,14 +353,14 @@ export default function ProductDashboard() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 mt-6">
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-4 sm:mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>User Growth (Last 90 Days)</CardTitle>
-                <CardDescription>Daily user registrations</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">User Growth (Last 90 Days)</CardTitle>
+                <CardDescription className="text-sm">Daily user registrations</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <LineChart
                     data={dashboardData.userGrowthLast90Days.map(item => ({
                       ...item,
@@ -368,10 +370,10 @@ export default function ProductDashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 10 }}
                       interval="preserveStartEnd"
                     />
-                    <YAxis />
+                    <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
                     <Legend />
                     <Line
@@ -387,11 +389,11 @@ export default function ProductDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Job Growth (Last 90 Days)</CardTitle>
-                <CardDescription>Daily job postings</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Job Growth (Last 90 Days)</CardTitle>
+                <CardDescription className="text-sm">Daily job postings</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <LineChart
                     data={dashboardData.jobGrowthLast90Days.map(item => ({
                       ...item,
@@ -401,10 +403,10 @@ export default function ProductDashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="date"
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 10 }}
                       interval="preserveStartEnd"
                     />
-                    <YAxis />
+                    <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
                     <Legend />
                     <Line
