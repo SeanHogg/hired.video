@@ -135,20 +135,20 @@ export default function AdminDashboard() {
           <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {quickStats.map((stat, index) => (
               <Card key={index}>
-                <CardContent className="pt-6">
+                <CardContent className="pt-4 sm:pt-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                         {stat.title}
                       </p>
-                      <p className="text-2xl font-bold">{stat.value}</p>
+                      <p className="text-xl sm:text-2xl font-bold truncate">{stat.value}</p>
                     </div>
-                    <div className="p-2 bg-primary/10 rounded-lg">
+                    <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                       {stat.icon}
                     </div>
                   </div>
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
                     className={`flex items-center mt-2 ${getTrendColor(stat.trend)}`}
                   >
                     {getTrendIcon(stat.trend)}
-                    <span className="text-sm ml-1">{stat.change}</span>
+                    <span className="text-xs sm:text-sm ml-1 truncate">{stat.change}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -164,17 +164,17 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {isAdmin && (
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <UserPlus className="h-6 w-6 text-blue-600" />
+              <Card className="cursor-pointer hover:shadow-md transition-shadow min-h-[44px]">
+                <CardContent className="pt-4 sm:pt-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="p-2 sm:p-3 bg-blue-100 rounded-lg flex-shrink-0">
+                      <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold">Invite Team Member</h3>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-semibold">Invite Team Member</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Add new users to your organization
                       </p>
                     </div>
@@ -184,15 +184,15 @@ export default function AdminDashboard() {
             )}
 
             {isAdmin && (
-              <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-green-100 rounded-lg">
-                      <CreditCard className="h-6 w-6 text-green-600" />
+              <Card className="cursor-pointer hover:shadow-md transition-shadow min-h-[44px]">
+                <CardContent className="pt-4 sm:pt-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="p-2 sm:p-3 bg-green-100 rounded-lg flex-shrink-0">
+                      <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold">Manage Billing</h3>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-semibold">Manage Billing</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Update payment methods and plans
                       </p>
                     </div>
