@@ -68,6 +68,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const AICoach = lazy(() => import("./pages/AICoach"));
 
 
 // Other pages (lazy loaded)
@@ -349,6 +350,7 @@ const App = () => (
                       <Route path="/people/:id" element={<PeopleDetail />} />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/tools" element={<Tools />} />
+                      <Route path="/chat" element={<AICoach />} />
                       <Route
                         path="/Tools/SentimentAnalysis"
                         element={<SentimentAnalysis />}

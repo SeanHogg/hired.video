@@ -28,6 +28,7 @@ import Markdown from "@/components/Markdown";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { aiService } from "@/lib/services/ai-service";
 import {
@@ -204,6 +205,7 @@ export default function AIChatPanel() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext } = useAI();
+  const isMobile = useIsMobile();
 
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {
@@ -544,14 +546,26 @@ export default function AIChatPanel() {
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
       <div
-        className="flex-1 bg-black/20 backdrop-blur-sm"
+        className={cn(
+          "flex-1 bg-black/20 backdrop-blur-sm touch-manipulation cursor-pointer",
+          isMobile && "bg-black/30" // Slightly darker backdrop on mobile for better contrast
+        )}
         onClick={closeAIChat}
+        onTouchEnd={closeAIChat} // Additional touch event for better mobile responsiveness
       />
 
       {/* Panel */}
-      <div className="w-[60%] bg-background border-l shadow-2xl flex flex-col">
+      <div className={cn(
+        "bg-background border-l shadow-2xl flex flex-col",
+        isMobile
+          ? "w-[90%] max-w-none" // Mobile: 90% width, no max-width constraint
+          : "w-[60%] max-w-2xl"   // Desktop: 60% width with max-width for very large screens
+      )}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10">
+        <div className={cn(
+          "flex items-center justify-between border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10",
+          isMobile ? "p-3" : "p-4" // Slightly less padding on mobile for more content space
+        )}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full flex items-center justify-center">
               <Brain className="h-5 w-5 text-white" />
@@ -583,7 +597,15 @@ export default function AIChatPanel() {
                 <Info className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={closeAIChat}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={closeAIChat}
+              className={cn(
+                "touch-manipulation", // Optimize for touch on mobile
+                isMobile && "min-w-[44px] min-h-[44px]" // Ensure minimum touch target size on mobile
+              )}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -934,6 +956,11 @@ function detectContextFromRoute(pathname: string): AIContextType | null {
   // Tasks route
   if (pathname === "/tasks" || pathname.startsWith("/tasks")) {
     return "tasks";
+  }
+
+  // AI Coach route
+  if (pathname === "/chat") {
+    return "general"; // Use general context for AI Coach page
   }
 
   // Other routes

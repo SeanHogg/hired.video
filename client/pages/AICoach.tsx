@@ -1,0 +1,233 @@
+import React, { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
+import { useAI } from "@/lib/ai-context";
+import { useSEO } from "@/lib/seo";
+import Sidebar from "@/components/Sidebar";
+import Navigation from "@/components/Navigation";
+import AuthOverlay from "@/components/AuthOverlay";
+import AIChatPanel from "@/components/AIChatPanel";
+import FloatingAIButton from "@/components/FloatingAIButton";
+
+export default function AICoach() {
+  const location = useLocation();
+  const {
+    sidebarOpen,
+    sidebarCollapsed,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
+  } = useSidebar();
+  const { isAuthenticated } = useAuth();
+  const { openAIChat, isAIChatOpen } = useAI();
+
+  // SEO for AI Coach page
+  useSEO(location.pathname);
+
+  // Auto-open AI chat when page loads
+  useEffect(() => {
+    if (isAuthenticated && !isAIChatOpen) {
+      // Small delay to ensure page is loaded
+      setTimeout(() => {
+        openAIChat();
+      }, 500);
+    }
+  }, [isAuthenticated, isAIChatOpen, openAIChat]);
+
+  const showAuthOverlay = !isAuthenticated;
+
+  const coachingFeatures = [
+    {
+      icon: MessageSquare,
+      title: "Interview Practice",
+      description: "Practice common interview questions with AI feedback",
+      badge: "Interactive",
+    },
+    {
+      icon: FileText,
+      title: "Resume Review",
+      description: "Get personalized feedback on your resume content",
+      badge: "AI-Powered",
+    },
+    {
+      icon: Briefcase,
+      title: "Career Guidance",
+      description: "Receive strategic advice for your career path",
+      badge: "Personalized",
+    },
+    {
+      icon: Users,
+      title: "Networking Tips",
+      description: "Learn effective networking and outreach strategies",
+      badge: "Expert",
+    },
+  ];
+
+  const quickStartPrompts = [
+    "Help me prepare for a software engineer interview",
+    "Review my resume for ATS optimization",
+    "What questions should I ask in an interview?",
+    "How can I negotiate my salary effectively?",
+    "Give me tips for networking in my industry",
+    "Help me write a compelling cover letter",
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="ai-coach"
+              title="AI Career Coach"
+              message="Sign in to access your personal AI Career Coach and get expert guidance for interviews, resume optimization, and career advancement."
+            />
+          )}
+
+          <div className="container mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full flex items-center justify-center">
+                  <Brain className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                    AI Career Coach
+                  </h1>
+                  <p className="text-xl text-muted-foreground mt-2">
+                    Your personal AI assistant for career success
+                  </p>
+                </div>
+              </div>
+              
+              {isAuthenticated && (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Chat is {isAIChatOpen ? "open" : "available"} - Click the AI button to start</span>
+                </div>
+              )}
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              {coachingFeatures.map((feature, index) => {
+                const Icon = feature.icon;
+                return (
+                  <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="w-12 h-12 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <Icon className="h-6 w-6 text-brand-purple" />
+                      </div>
+                      <CardTitle className="text-lg">{feature.title}</CardTitle>
+                      <Badge variant="secondary" className="w-fit mx-auto">
+                        {feature.badge}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription>{feature.description}</CardDescription>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Quick Start Section */}
+            {isAuthenticated && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Quick Start Prompts
+                  </CardTitle>
+                  <CardDescription>
+                    Click any prompt below to start a conversation with your AI Coach
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {quickStartPrompts.map((prompt, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        className="text-left justify-start h-auto p-4 whitespace-normal"
+                        onClick={() => {
+                          openAIChat();
+                          // Note: In a real implementation, you'd also send this prompt to the AI
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm">{prompt}</span>
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* How It Works */}
+            <Card>
+              <CardHeader>
+                <CardTitle>How Your AI Career Coach Works</CardTitle>
+                <CardDescription>
+                  Get personalized career guidance powered by advanced AI
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-xl font-bold text-brand-blue">1</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Ask Questions</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Start a conversation about your career goals, interview prep, or resume optimization
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-xl font-bold text-brand-purple">2</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Get AI Insights</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Receive personalized advice based on your profile, industry, and career stage
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <span className="text-xl font-bold text-green-600">3</span>
+                    </div>
+                    <h3 className="font-semibold mb-2">Take Action</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Apply the recommendations to advance your career and achieve your goals
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Components - Always available */}
+      <FloatingAIButton />
+      <AIChatPanel />
+    </div>
+  );
+}
