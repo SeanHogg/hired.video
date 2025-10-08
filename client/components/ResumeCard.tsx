@@ -211,25 +211,28 @@ export default function ResumeCard({
             </p>
           </div>
 
-          {/* Metadata */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                <span>CREATED</span>
-              </div>
+          {/* Metadata - Mobile Responsive Layout */}
+          <div className="space-y-2 text-xs text-muted-foreground">
+            {/* Created Date Row */}
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3 h-3 flex-shrink-0" />
+              <span className="text-xs">CREATED</span>
               <span className="font-medium text-foreground">
-                {formatDate(createdAt)}
+                {formatDate(createdAt, { year: "numeric", month: "short", day: "numeric" }, "No date")}
               </span>
-              {slug && (
-                <span className="ml-3 text-muted-foreground">Slug: <span className="font-mono text-foreground">{slug}</span></span>
-              )}
             </div>
 
-            {views > 0 && (
-              <div className="flex items-center gap-1">
-                <Eye className="w-3 h-3" />
-                <span>{views} views</span>
+            {/* Views Row - Always show, even if 0 */}
+            <div className="flex items-center gap-2">
+              <Eye className="w-3 h-3 flex-shrink-0" />
+              <span>{views || 0} views</span>
+            </div>
+
+            {/* Slug Row - Only show if exists */}
+            {slug && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Slug:</span>
+                <span className="font-mono text-foreground break-all">{slug}</span>
               </div>
             )}
           </div>

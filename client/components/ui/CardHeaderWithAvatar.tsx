@@ -64,11 +64,11 @@ export function CardHeaderWithAvatar({
   const avatarSize = avatar?.size || "md";
 
   return (
-    <div className="p-6 pb-3">
-      <div className="flex items-start justify-between">
+    <div className="p-4 sm:p-6 pb-3">
+      <div className="flex items-start justify-between gap-3">
         <div
           className={cn(
-            "flex items-start gap-3 flex-1",
+            "flex items-start gap-3 flex-1 min-w-0", // Added min-w-0 for proper flex shrinking
             layout === "vertical" && "flex-col items-center text-center",
           )}
         >
@@ -82,12 +82,12 @@ export function CardHeaderWithAvatar({
           )}
 
           <div
-            className={cn("flex-1 min-w-0", layout === "vertical" && "w-full")}
+            className={cn("flex-1 min-w-0 overflow-hidden", layout === "vertical" && "w-full")}
           >
             <CardTitle
               className={cn(
-                "text-lg hover:text-primary leading-tight mb-1",
-                "w-full max-w-[280px] break-words", // Fixed width with word breaking
+                "text-base sm:text-lg hover:text-primary leading-tight mb-1",
+                "break-words overflow-hidden", // Removed fixed width, improved mobile responsiveness
                 layout === "vertical" && "text-center",
                 titleClassName,
               )}
@@ -112,10 +112,16 @@ export function CardHeaderWithAvatar({
             {subtitle && (
               <CardDescription
                 className={cn(
-                  "truncate",
+                  "text-sm break-words overflow-hidden",
                   layout === "vertical" && "text-center",
                   subtitleClassName,
                 )}
+                style={{
+                  display: "-webkit-box",
+                  WebkitLineClamp: 1,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
               >
                 {subtitle}
               </CardDescription>
@@ -123,13 +129,17 @@ export function CardHeaderWithAvatar({
           </div>
         </div>
 
-        {/* Actions (e.g., buttons) */}
-        {actions && <div className="flex-shrink-0">{actions}</div>}
+        {/* Actions (e.g., buttons) - Ensure proper mobile touch targets */}
+        {actions && (
+          <div className="flex-shrink-0 min-h-[44px] flex items-center">
+            {actions}
+          </div>
+        )}
       </div>
 
-      {/* Badges moved under the header */}
+      {/* Badges moved under the header - Mobile responsive */}
       {badges.length > 0 && (
-        <div className="px-6 pb-3">
+        <div className="px-4 sm:px-6 pb-3">
           <div
             className={cn(
               "flex items-center gap-1 flex-wrap",
@@ -140,7 +150,10 @@ export function CardHeaderWithAvatar({
               <Badge
                 key={index}
                 variant={badge.variant || "outline"}
-                className={cn("text-xs flex-shrink-0", badge.className)}
+                className={cn(
+                  "text-xs flex-shrink-0 min-h-[20px] px-2 py-1", // Ensure minimum touch-friendly size
+                  badge.className
+                )}
               >
                 {badge.icon &&
                   (React.isValidElement(badge.icon)
@@ -149,9 +162,9 @@ export function CardHeaderWithAvatar({
                         badge.icon as React.ComponentType<{
                           className?: string;
                         }>,
-                        { className: "h-3 w-3 mr-1" },
+                        { className: "h-3 w-3 mr-1 flex-shrink-0" },
                       ))}
-                {badge.text}
+                <span className="truncate">{badge.text}</span>
               </Badge>
             ))}
           </div>
