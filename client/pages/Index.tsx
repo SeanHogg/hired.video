@@ -2,10 +2,8 @@ import {
   Search,
   Filter,
   TrendingUp,
-  Sparkles,
   User,
   Briefcase,
-  Clock,
   Eye,
   SlidersHorizontal,
   MapPin,
@@ -683,43 +681,6 @@ export default function Index() {
                   >
                     <category.icon className="w-4 h-4" />
                     {category.label}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Sort Filters */}
-              <div className="flex gap-2 justify-start overflow-x-auto pb-2 sm:pb-0 sm:justify-center md:justify-start sm:flex-wrap">
-                <span className="text-sm text-muted-foreground self-center mr-2 flex-shrink-0">
-                  Sort by:
-                </span>
-                {[
-                  { id: "recent", label: "Recent", icon: Clock },
-                  { id: "featured", label: "Featured", icon: Sparkles },
-                  { id: "top", label: "Top", icon: TrendingUp },
-                  { id: "latest", label: "Latest", icon: Clock },
-                ].map((sortOption) => (
-                  <Button
-                    key={sortOption.id}
-                    variant={
-                      searchFilters.sortBy === sortOption.id
-                        ? "default"
-                        : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                      setSearchFilters((prev) => ({
-                        ...prev,
-                        sortBy: sortOption.id as
-                          | "recent"
-                          | "featured"
-                          | "top"
-                          | "latest",
-                      }))
-                    }
-                    className="gap-2 flex-shrink-0 min-h-[44px]"
-                  >
-                    <sortOption.icon className="w-4 h-4" />
-                    {sortOption.label}
                   </Button>
                 ))}
               </div>

@@ -10,6 +10,9 @@ import {
   Users,
   Building2,
   FileText,
+  Clock,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +58,7 @@ export interface SearchFilters {
   education?: string;
   datePosted?: string;
   hasMedia?: boolean;
+  sortBy?: "recent" | "featured" | "top" | "latest";
 }
 
 export interface SearchBarProps {
@@ -495,25 +499,25 @@ export default function SearchBar({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Main Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder={placeholder || config.placeholder}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-10"
+            className="pl-10 min-h-[44px]"
           />
         </div>
 
         {/* Quick Filter Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           {context !== "all" && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className="gap-2"
+              className="gap-2 min-h-[44px]"
             >
               <Filter className="w-4 h-4" />
               Filters
@@ -530,7 +534,7 @@ export default function SearchBar({
               variant="outline"
               size="sm"
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="gap-2"
+              className="gap-2 min-h-[44px]"
             >
               <SlidersHorizontal className="w-4 h-4" />
               Advanced
@@ -698,6 +702,50 @@ export default function SearchBar({
                     <SelectItem value="3d">Last 3 days</SelectItem>
                     <SelectItem value="week">Last week</SelectItem>
                     <SelectItem value="month">Last month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sort By */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  Sort By
+                </label>
+                <Select
+                  value={filters.sortBy || "recent"}
+                  onValueChange={(value) =>
+                    handleFilterChange("sortBy", value as "recent" | "featured" | "top" | "latest")
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3" />
+                        Recent
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="featured">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-3 h-3" />
+                        Featured
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="top">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-3 h-3" />
+                        Top
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="latest">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3" />
+                        Latest
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
