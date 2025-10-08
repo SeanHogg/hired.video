@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface AuthOverlayProps {
-  contentType?: "company" | "job" | "resume" | "person";
+  contentType?: "company" | "job" | "resume" | "person" | "ai-coach";
   title?: string;
   message?: string;
 }
@@ -32,6 +32,8 @@ export default function AuthOverlay({
         return <FileText className="h-5 w-5" />;
       case "person":
         return <User className="h-5 w-5" />;
+      case "ai-coach":
+        return <Lock className="h-5 w-5" />;
       default:
         return <Lock className="h-5 w-5" />;
     }
@@ -47,6 +49,8 @@ export default function AuthOverlay({
         return "Sign in to view complete professional profiles and detailed work experience.";
       case "person":
         return "Sign in to view full professional profiles and connect with industry professionals.";
+      case "ai-coach":
+        return "Sign in to access AI-powered career coaching and personalized guidance.";
       default:
         return "Sign in to access complete details and unlock all features.";
     }

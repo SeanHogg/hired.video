@@ -64,8 +64,8 @@ export function CardHeaderWithAvatar({
   const avatarSize = avatar?.size || "md";
 
   return (
-    <div className="p-4 sm:p-6 pb-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-3 mb-3">
         <div
           className={cn(
             "flex items-start gap-3 flex-1 min-w-0", // Added min-w-0 for proper flex shrinking
@@ -137,37 +137,35 @@ export function CardHeaderWithAvatar({
         )}
       </div>
 
-      {/* Badges moved under the header - Mobile responsive */}
+      {/* Badges under the header - Mobile responsive */}
       {badges.length > 0 && (
-        <div className="px-4 sm:px-6 pb-3">
-          <div
-            className={cn(
-              "flex items-center gap-1 flex-wrap",
-              layout === "vertical" && "justify-center",
-            )}
-          >
-            {badges.map((badge, index) => (
-              <Badge
-                key={index}
-                variant={badge.variant || "outline"}
-                className={cn(
-                  "text-xs flex-shrink-0 min-h-[20px] px-2 py-1", // Ensure minimum touch-friendly size
-                  badge.className
-                )}
-              >
-                {badge.icon &&
-                  (React.isValidElement(badge.icon)
-                    ? badge.icon
-                    : React.createElement(
-                        badge.icon as React.ComponentType<{
-                          className?: string;
-                        }>,
-                        { className: "h-3 w-3 mr-1 flex-shrink-0" },
-                      ))}
-                <span className="truncate">{badge.text}</span>
-              </Badge>
-            ))}
-          </div>
+        <div
+          className={cn(
+            "flex items-center gap-1 flex-wrap",
+            layout === "vertical" && "justify-center",
+          )}
+        >
+          {badges.map((badge, index) => (
+            <Badge
+              key={index}
+              variant={badge.variant || "outline"}
+              className={cn(
+                "text-xs flex-shrink-0 min-h-[20px] px-2 py-1", // Ensure minimum touch-friendly size
+                badge.className
+              )}
+            >
+              {badge.icon &&
+                (React.isValidElement(badge.icon)
+                  ? badge.icon
+                  : React.createElement(
+                      badge.icon as React.ComponentType<{
+                        className?: string;
+                      }>,
+                      { className: "h-3 w-3 mr-1 flex-shrink-0" },
+                    ))}
+              <span className="truncate">{badge.text}</span>
+            </Badge>
+          ))}
         </div>
       )}
     </div>
