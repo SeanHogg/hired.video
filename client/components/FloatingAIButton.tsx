@@ -13,7 +13,7 @@ export default function FloatingAIButton({ className }: FloatingAIButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className={cn("fixed bottom-6 right-6 z-40", className)}>
+    <div className={cn("fixed bottom-6 right-6 z-40 md:bottom-6 bottom-24", className)}>
       <Button
         onClick={openAIChat}
         onMouseEnter={() => setIsHovered(true)}
