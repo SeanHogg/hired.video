@@ -1,51 +1,24 @@
 import {
   Search,
-  Filter,
   TrendingUp,
   User,
   Briefcase,
-  Eye,
-  SlidersHorizontal,
-  MapPin,
-  GraduationCap,
-  Calendar,
-  X,
-  ChevronDown,
   Building2,
   Grid,
   List,
-  Plus,
-  Star,
-  Users,
-  BarChart3,
-  Target,
-  Zap,
-  CheckCircle2,
-  ArrowRight,
+  Eye,
   Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import * as React from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
-import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import HeroCarousel from "@/components/HeroCarousel";
-import JobCard from "@/components/JobCard";
 import Navigation from "@/components/Navigation";
-import ResumeCard from "@/components/ResumeCard";
 import Sidebar from "@/components/Sidebar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
