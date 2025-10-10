@@ -58,6 +58,49 @@ const AffiliateProfileSchema = z.object({
 });
 export type AffiliateProfile = z.infer<typeof AffiliateProfileSchema>;
 
+// Admin stats schemas
+const TopAffiliateSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  email: z.string(),
+  referralCode: z.string(),
+  totalReferrals: z.number(),
+  totalConversions: z.number(),
+  totalCommissionCents: z.number(),
+  conversionRate: z.number(),
+});
+
+const AffiliatePayoutSummarySchema = z.object({
+  payoutId: z.string(),
+  affiliateUserId: z.string(),
+  affiliateUserName: z.string(),
+  affiliateEmail: z.string(),
+  amountCents: z.number(),
+  status: z.string(),
+  requestedAt: z.string(),
+  paidAt: z.string().nullable().optional(),
+  stripeReferenceId: z.string().nullable().optional(),
+});
+
+const AffiliateAdminStatsSchema = z.object({
+  totalAffiliates: z.number(),
+  activeAffiliates: z.number(),
+  newAffiliatesThisMonth: z.number(),
+  totalCommissionsPaidCents: z.number(),
+  pendingPayoutsCents: z.number(),
+  totalReferrals: z.number(),
+  totalConversions: z.number(),
+  conversionRate: z.number(),
+  pendingPayouts: z.number(),
+  completedPayouts: z.number(),
+  topPerformers: z.array(TopAffiliateSchema),
+  recentPayouts: z.array(AffiliatePayoutSummarySchema),
+});
+
+export type TopAffiliate = z.infer<typeof TopAffiliateSchema>;
+export type AffiliatePayoutSummary = z.infer<typeof AffiliatePayoutSummarySchema>;
+export type AffiliateAdminStats = z.infer<typeof AffiliateAdminStatsSchema>;
+
 export class AffiliateService {
   async getProfile(): Promise<AffiliateProfile> {
     const response = await apiClient.get<AffiliateProfile>("/api/Affiliate/profile", AffiliateProfileSchema);
@@ -76,6 +119,15 @@ export class AffiliateService {
     const response = await apiClient.post<{ payoutId?: string; amountCents?: number }>(
       "/api/Affiliate/payout/request",
       undefined,
+    );
+    return response.data;
+  }
+
+  // Admin methods for SuperAdmin dashboard
+  async getAdminStats(): Promise<AffiliateAdminStats> {
+    const response: ApiSuccessResponse<AffiliateAdminStats> = await apiClient.get(
+      "/api/ProductDashboard/affiliate-stats",
+      AffiliateAdminStatsSchema,
     );
     return response.data;
   }

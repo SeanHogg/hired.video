@@ -21,11 +21,11 @@ export interface SubscriptionSummary {
 
 export interface PaymentMethod {
   id: string;
-  type: "card" | "bank_account";
-  brand?: string;
+  type: "card" | "us_bank_account";
+  brand?: string; // For cards: visa, mastercard, etc. For bank accounts: bank name
   last4?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
+  expiryMonth?: number; // Only for cards
+  expiryYear?: number; // Only for cards
   isDefault: boolean;
 }
 

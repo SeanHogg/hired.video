@@ -23,10 +23,14 @@ import {
   DollarSign,
   BarChart3,
   PieChart,
+  UserPlus,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
 import { apiClient } from "@/lib/api-client";
+import { AffiliateService, type AffiliateAdminStats } from "@/lib/services/affiliate-service";
 
 import {
   LineChart,
@@ -158,9 +162,13 @@ export default function ProductDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [dashboardData, setDashboardData] =
     useState<ProductDashboardData | null>(null);
+  const [affiliateStats, setAffiliateStats] = useState<AffiliateAdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [affiliateLoading, setAffiliateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+
+  const affiliateService = new AffiliateService();
 
   // Check if user has admin permissions
   const rolePermissions = createRolePermissions(user?.role);
@@ -171,6 +179,13 @@ export default function ProductDashboard() {
       loadDashboardData();
     }
   }, [isAdmin]);
+
+  // Load affiliate stats when affiliates tab is active
+  useEffect(() => {
+    if (isAdmin && activeTab === "affiliates" && !affiliateStats) {
+      loadAffiliateStats();
+    }
+  }, [isAdmin, activeTab, affiliateStats]);
 
   const loadDashboardData = async () => {
     try {
@@ -203,6 +218,21 @@ export default function ProductDashboard() {
       setError(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAffiliateStats = async () => {
+    try {
+      setAffiliateLoading(true);
+      console.log("ProductDashboard: Loading affiliate stats...");
+      const stats = await affiliateService.getAdminStats();
+      console.log("ProductDashboard: Affiliate stats loaded", stats);
+      setAffiliateStats(stats);
+    } catch (err) {
+      console.error("ProductDashboard: Error loading affiliate stats", err);
+      // Don't set main error state for affiliate stats failure
+    } finally {
+      setAffiliateLoading(false);
     }
   };
 
@@ -308,12 +338,13 @@ export default function ProductDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 gap-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
           <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
           <TabsTrigger value="jobs" className="text-xs sm:text-sm">Jobs</TabsTrigger>
           <TabsTrigger value="companies" className="text-xs sm:text-sm">Companies</TabsTrigger>
           <TabsTrigger value="resumes" className="text-xs sm:text-sm">Resumes</TabsTrigger>
+          <TabsTrigger value="affiliates" className="text-xs sm:text-sm">Affiliates</TabsTrigger>
           <TabsTrigger value="saas" className="text-xs sm:text-sm">SaaS</TabsTrigger>
         </TabsList>
 

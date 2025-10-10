@@ -7,6 +7,7 @@ import {
   Users,
   Calendar,
   DollarSign,
+  Building2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -363,7 +364,7 @@ export default function Checkout() {
                     <CardHeader>
                       <CardTitle>Payment Method</CardTitle>
                       <CardDescription>
-                        Your payment information is encrypted and secure
+                        Choose your preferred payment method. All payment information is encrypted and secure.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -379,6 +380,16 @@ export default function Checkout() {
                           >
                             <CreditCard className="h-4 w-4" />
                             Credit/Debit Card
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="us_bank_account" id="bank" />
+                          <Label
+                            htmlFor="bank"
+                            className="flex items-center gap-2"
+                          >
+                            <Building2 className="h-4 w-4" />
+                            Bank Account (ACH)
                           </Label>
                         </div>
                       </RadioGroup>
@@ -406,6 +417,25 @@ export default function Checkout() {
                               <Label htmlFor="cvv">CVV *</Label>
                               <Input id="cvv" placeholder="123" required />
                             </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === "us_bank_account" && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-blue-800 font-medium mb-2">
+                              <Building2 className="h-4 w-4" />
+                              Bank Account Setup
+                            </div>
+                            <p className="text-sm text-blue-700">
+                              Bank account payments are processed securely through Stripe. You'll be redirected to a secure page to connect your bank account.
+                            </p>
+                            <p className="text-xs text-blue-600 mt-2">
+                              • Lower processing fees than credit cards<br/>
+                              • Payments typically process in 1-3 business days<br/>
+                              • Bank-level security and encryption
+                            </p>
                           </div>
                         </div>
                       )}

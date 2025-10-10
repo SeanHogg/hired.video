@@ -6,11 +6,13 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import affiliateService, { type DashboardData } from "@/lib/services/affiliate-service";
+import { billingService, type PaymentMethod } from "@/lib/services/billing-service";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, CheckCircle2, Clock } from "lucide-react";
+import { DollarSign, CheckCircle2, Clock, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PaymentMethodSetup } from "@/components/billing/PaymentMethodSetup";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
@@ -20,6 +22,7 @@ function AffiliateDashboardContent() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [profile, setProfile] = useState<{ referralCode: string } | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [payoutMessage, setPayoutMessage] = useState<string | null>(null);
@@ -39,8 +42,12 @@ function AffiliateDashboardContent() {
         // Ensure profile exists (generates referral code if missing)
         const prof = await affiliateService.getProfile();
         setProfile({ referralCode: prof.referralCode });
-        const dashboard = await affiliateService.getDashboard();
+        const [dashboard, pms] = await Promise.all([
+          affiliateService.getDashboard(),
+          billingService.getPaymentMethods()
+        ]);
         setData(dashboard);
+        setPaymentMethods(pms);
       } catch (e) {
         console.error("Failed to load affiliate dashboard", e);
         setError("Failed to load affiliate dashboard.");
@@ -53,9 +60,28 @@ function AffiliateDashboardContent() {
 
   const cents = (v: number | undefined) => (typeof v === "number" ? (v / 100).toFixed(2) : "0.00");
 
+  // Reload payment methods when they change
+  async function handlePaymentMethodsChange() {
+    try {
+      const pms = await billingService.getPaymentMethods();
+      setPaymentMethods(pms);
+    } catch (e) {
+      console.error(e);
+      setError((e as Error).message);
+    }
+  }
+
   const requestPayout = async () => {
     try {
       setPayoutMessage(null);
+
+      // Check if user has a bank account for payouts
+      const bankAccounts = paymentMethods.filter(pm => pm.type === "us_bank_account");
+      if (bankAccounts.length === 0) {
+        setPayoutMessage("Please add a bank account in the Payout Methods section below to receive affiliate commissions.");
+        return;
+      }
+
       const res = await affiliateService.requestPayout();
       setPayoutMessage(`Payout requested successfully for $${cents(res.amountCents)}.`);
       // Reload dashboard after payout
@@ -272,6 +298,27 @@ function AffiliateDashboardContent() {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Payout Methods */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Building2 className="h-5 w-5 mr-2" />
+                  Payout Methods
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Add a bank account to receive affiliate commission payouts. Bank accounts are required for automated payouts.
+                </p>
+                <PaymentMethodSetup
+                  paymentMethods={paymentMethods}
+                  onPaymentMethodsChange={handlePaymentMethodsChange}
+                  context="affiliate"
+                  showTitle={false}
+                />
               </CardContent>
             </Card>
     </div>
