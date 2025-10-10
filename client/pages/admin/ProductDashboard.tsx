@@ -26,6 +26,9 @@ import {
   UserPlus,
   CreditCard,
   Banknote,
+  Share2,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
@@ -1048,6 +1051,253 @@ export default function ProductDashboard() {
               </p>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="affiliates" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Overview Metrics */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Affiliates</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {affiliateStats?.totalAffiliates || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {affiliateStats?.activeAffiliates || 0} active
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">New This Month</CardTitle>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {affiliateStats?.newAffiliatesThisMonth || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  New affiliates
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
+                <Share2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {affiliateStats?.totalReferrals || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {affiliateStats?.totalConversions || 0} conversions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {affiliateStats?.conversionRate?.toFixed(1) || 0}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Overall conversion
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Payout Metrics */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${((affiliateStats?.pendingPayoutsCents || 0) / 100).toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {affiliateStats?.pendingPayouts || 0} requests
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+                <Banknote className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${((affiliateStats?.totalCommissionsPaidCents || 0) / 100).toFixed(2)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {affiliateStats?.completedPayouts || 0} completed
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avg Commission</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${affiliateStats?.completedPayouts ?
+                    ((affiliateStats.totalCommissionsPaidCents / affiliateStats.completedPayouts) / 100).toFixed(2) :
+                    '0.00'
+                  }
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Per payout
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Processing</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {(affiliateStats?.pendingPayouts || 0) + (affiliateStats?.completedPayouts || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Total payouts
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Top Performers Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Performing Affiliates</CardTitle>
+              <CardDescription>
+                Highest earning affiliates this period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {affiliateStats?.topPerformers?.length ? (
+                  affiliateStats.topPerformers.map((affiliate, index) => (
+                    <div key={affiliate.userId} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium">#{index + 1}</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">{affiliate.userName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {affiliate.totalReferrals} referrals • {affiliate.totalConversions} conversions
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">${(affiliate.totalCommissionCents / 100).toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {affiliate.totalConversions > 0 ?
+                            ((affiliate.totalConversions / affiliate.totalReferrals) * 100).toFixed(1) :
+                            '0'
+                          }% conversion
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No affiliate data available
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Payouts Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Payouts</CardTitle>
+              <CardDescription>
+                Latest affiliate payout transactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {affiliateStats?.recentPayouts?.length ? (
+                  affiliateStats.recentPayouts.map((payout) => (
+                    <div key={payout.payoutId} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <DollarSign className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{payout.affiliateUserName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(payout.requestedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">${(payout.amountCents / 100).toFixed(2)}</p>
+                        <p className={`text-sm ${
+                          payout.status === 'Paid' ? 'text-green-600' :
+                          payout.status === 'Processing' ? 'text-yellow-600' :
+                          payout.status === 'Failed' ? 'text-red-600' :
+                          'text-muted-foreground'
+                        }`}>
+                          {payout.status}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No recent payouts
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Affiliate Management Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Affiliate Management</CardTitle>
+              <CardDescription>
+                Administrative actions for affiliate program
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
+                  <Users className="h-6 w-6" />
+                  <span>Manage Affiliates</span>
+                </Button>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
+                  <CreditCard className="h-6 w-6" />
+                  <span>Process Payouts</span>
+                </Button>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
+                  <RotateCcw className="h-6 w-6" />
+                  <span>Refund Management</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -17,6 +17,7 @@ export interface SubscriptionSummary {
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd: boolean;
   trialEnd?: string | null;
+  stripeSubscriptionId?: string | null; // For refund and cancellation purposes
 }
 
 export interface PaymentMethod {
