@@ -10,9 +10,9 @@ import { billingService, type PaymentMethod } from "@/lib/services/billing-servi
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, CheckCircle2, Clock, Building2 } from "lucide-react";
+import { DollarSign, CheckCircle2, Clock, CreditCard, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PaymentMethodSetup } from "@/components/billing/PaymentMethodSetup";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
@@ -22,10 +22,11 @@ function AffiliateDashboardContent() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [profile, setProfile] = useState<{ referralCode: string } | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [payoutMessage, setPayoutMessage] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     // Protect route: affiliate role only
@@ -42,12 +43,8 @@ function AffiliateDashboardContent() {
         // Ensure profile exists (generates referral code if missing)
         const prof = await affiliateService.getProfile();
         setProfile({ referralCode: prof.referralCode });
-        const [dashboard, pms] = await Promise.all([
-          affiliateService.getDashboard(),
-          billingService.getPaymentMethods()
-        ]);
+        const dashboard = await affiliateService.getDashboard();
         setData(dashboard);
-        setPaymentMethods(pms);
       } catch (e) {
         console.error("Failed to load affiliate dashboard", e);
         setError("Failed to load affiliate dashboard.");
@@ -58,30 +55,51 @@ function AffiliateDashboardContent() {
     load();
   }, []);
 
-  const cents = (v: number | undefined) => (typeof v === "number" ? (v / 100).toFixed(2) : "0.00");
+  // Load payment methods
+  useEffect(() => {
+    const loadPaymentMethods = async () => {
+      try {
+        setPaymentMethodsLoading(true);
+        const methods = await billingService.getPaymentMethods();
+        setPaymentMethods(methods);
+      } catch (e) {
+        console.error("Failed to load payment methods", e);
+        // Don't show error for payment methods as it's not critical for viewing the dashboard
+      } finally {
+        setPaymentMethodsLoading(false);
+      }
+    };
+    loadPaymentMethods();
+  }, []);
 
-  // Reload payment methods when they change
-  async function handlePaymentMethodsChange() {
-    try {
-      const pms = await billingService.getPaymentMethods();
-      setPaymentMethods(pms);
-    } catch (e) {
-      console.error(e);
-      setError((e as Error).message);
+  // Handle payment method setup success
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('pm_success') === 'true') {
+      toast({
+        title: "Payment method added!",
+        description: "Your payment method has been successfully configured. You can now request payouts.",
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Reload payment methods
+      const reloadPaymentMethods = async () => {
+        try {
+          const methods = await billingService.getPaymentMethods();
+          setPaymentMethods(methods);
+        } catch (e) {
+          console.error("Failed to reload payment methods", e);
+        }
+      };
+      reloadPaymentMethods();
     }
-  }
+  }, [toast]);
+
+  const cents = (v: number | undefined) => (typeof v === "number" ? (v / 100).toFixed(2) : "0.00");
 
   const requestPayout = async () => {
     try {
       setPayoutMessage(null);
-
-      // Check if user has a bank account for payouts
-      const bankAccounts = paymentMethods.filter(pm => pm.type === "us_bank_account");
-      if (bankAccounts.length === 0) {
-        setPayoutMessage("Please add a bank account in the Payout Methods section below to receive affiliate commissions.");
-        return;
-      }
-
       const res = await affiliateService.requestPayout();
       setPayoutMessage(`Payout requested successfully for $${cents(res.amountCents)}.`);
       // Reload dashboard after payout
@@ -90,6 +108,25 @@ function AffiliateDashboardContent() {
     } catch (e: any) {
       console.error("Payout request failed", e);
       setPayoutMessage(typeof e?.message === "string" ? e.message : "Payout request failed");
+    }
+  };
+
+  const handleAddPaymentMethod = async () => {
+    try {
+      setPaymentMethodsLoading(true);
+      const successUrl = `${window.location.origin}/affiliate/dashboard?pm_success=true`;
+      const cancelUrl = `${window.location.origin}/affiliate/dashboard`;
+      const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
+      window.location.href = setupUrl;
+    } catch (e) {
+      console.error("Failed to create payment method setup session", e);
+      toast({
+        title: "Error",
+        description: "Failed to set up payment method. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPaymentMethodsLoading(false);
     }
   };
 
@@ -183,9 +220,37 @@ function AffiliateDashboardContent() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Minimum payout threshold: $25.00</p>
-                  <Button className="mt-3" onClick={requestPayout} disabled={(data?.totals.pendingCents ?? 0) < 2500}>
-                    Request Payout
-                  </Button>
+
+                  {/* Check if payment methods are configured */}
+                  {paymentMethods.length === 0 && !paymentMethodsLoading ? (
+                    <Alert className="mt-3">
+                      <CreditCard className="h-4 w-4" />
+                      <AlertDescription>
+                        You need to add a payment method before requesting payouts.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+
+                  {paymentMethods.length === 0 ? (
+                    <Button
+                      className="mt-3"
+                      onClick={handleAddPaymentMethod}
+                      disabled={paymentMethodsLoading}
+                      variant="outline"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      {paymentMethodsLoading ? "Setting up..." : "Add Payment Method"}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="mt-3"
+                      onClick={requestPayout}
+                      disabled={(data?.totals.pendingCents ?? 0) < 2500}
+                    >
+                      Request Payout
+                    </Button>
+                  )}
+
                   {payoutMessage && <p className="text-sm mt-2">{payoutMessage}</p>}
                 </CardContent>
               </Card>
@@ -298,27 +363,6 @@ function AffiliateDashboardContent() {
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Payout Methods */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Building2 className="h-5 w-5 mr-2" />
-                  Payout Methods
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add a bank account to receive affiliate commission payouts. Bank accounts are required for automated payouts.
-                </p>
-                <PaymentMethodSetup
-                  paymentMethods={paymentMethods}
-                  onPaymentMethodsChange={handlePaymentMethodsChange}
-                  context="affiliate"
-                  showTitle={false}
-                />
               </CardContent>
             </Card>
     </div>
