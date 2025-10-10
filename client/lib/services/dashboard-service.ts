@@ -478,6 +478,8 @@ export class DashboardService {
           return await this.getEmployerDashboard();
         case DASHBOARD_TYPES.ADMIN:
           return await this.getAdminDashboard();
+        case DASHBOARD_TYPES.AFFILIATE:
+          return await this.getAffiliateDashboard();
         case DASHBOARD_TYPES.DEFAULT:
         default:
           return await this.getDashboard();
@@ -584,6 +586,39 @@ export class DashboardService {
           error instanceof Error
             ? error.message
             : "Failed to fetch admin dashboard data",
+      };
+    }
+  }
+
+  /**
+   * Get affiliate specific dashboard data
+   */
+  async getAffiliateDashboard(): Promise<DashboardResponse<BaseDashboard>> {
+    try {
+      const response = (await apiClient.get(
+        "/api/Affiliate/dashboard",
+      )) as { data: any };
+
+      // Transform affiliate dashboard data to match BaseDashboard structure
+      const affiliateData = response.data;
+      const dashboard = {
+        title: "Affiliate Dashboard",
+        description: "Manage your referrals and track your earnings",
+        metrics: [],
+        recentActivity: [],
+        onboardingTasks: [],
+        ...affiliateData
+      };
+
+      return { success: true, data: dashboard };
+    } catch (error) {
+      console.error("Error creating affiliate dashboard:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch affiliate dashboard data",
       };
     }
   }

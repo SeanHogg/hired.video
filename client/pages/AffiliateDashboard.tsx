@@ -10,11 +10,13 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { DollarSign, CheckCircle2, Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [profile, setProfile] = useState<{ referralCode: string } | null>(null);
@@ -104,9 +106,22 @@ function AffiliateDashboardContent() {
                   />
                   <Button
                     type="button"
-                    onClick={() => {
-                      const link = `${window.location.origin}/signup?ref=${profile?.referralCode ?? ""}`;
-                      navigator.clipboard.writeText(link);
+                    onClick={async () => {
+                      try {
+                        const link = `${window.location.origin}/signup?ref=${profile?.referralCode ?? ""}`;
+                        await navigator.clipboard.writeText(link);
+                        toast({
+                          title: "Link copied!",
+                          description: "Your referral link has been copied to the clipboard.",
+                        });
+                      } catch (err) {
+                        console.error("Failed to copy referral link:", err);
+                        toast({
+                          title: "Copy failed",
+                          description: "Failed to copy the referral link. Please try again.",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                   >
                     Copy Link

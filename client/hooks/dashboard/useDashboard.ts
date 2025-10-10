@@ -7,6 +7,7 @@ import {
   type DashboardResponse,
 } from "@/lib/services/dashboard-service";
 import { useAuth } from "@/lib/auth";
+import { createRolePermissions, DASHBOARD_TYPES } from "@/lib/role-utils";
 
 export type DashboardData =
   | BaseDashboard
@@ -33,6 +34,21 @@ export function useDashboard(): UseDashboardReturn {
   const loadDashboardData = useCallback(async () => {
     if (!user) {
       setLoading(false);
+      return;
+    }
+
+    // Check if user is affiliate - they handle their own dashboard data
+    const rolePermissions = createRolePermissions(user.role);
+    if (rolePermissions.dashboardType === DASHBOARD_TYPES.AFFILIATE) {
+      setLoading(false);
+      setDashboardData({
+        title: "Affiliate Dashboard",
+        description: "Manage your referrals and track your earnings",
+        metrics: [],
+        recentActivity: [],
+        onboardingTasks: []
+      });
+      setLastRefresh(new Date());
       return;
     }
 
