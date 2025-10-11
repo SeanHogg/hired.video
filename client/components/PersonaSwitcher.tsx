@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/lib/auth";
+import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { USER_ROLES } from "@shared/user-roles";
+
+interface PersonaSwitcherProps {
+  className?: string;
+  variant?: "default" | "compact";
+  showBadge?: boolean;
+  onPersonaChange?: (newPersona: string) => void;
+}
+
+export function PersonaSwitcher({
+  className = "",
+  variant = "default",
+  showBadge = true,
+  onPersonaChange,
+}: PersonaSwitcherProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [selectedPersona, setSelectedPersona] = useState<string>(user?.role || "JobSeeker");
+
+  // Check if user is superadmin
+  const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "SuperAdmin";
+
+  // Load active persona from localStorage on mount
+  useEffect(() => {
+    if (user?.role) {
+      if (isSuperAdmin) {
+        const activePersona = localStorage.getItem("superadmin_active_persona");
+        setSelectedPersona(activePersona || user.role);
+      } else {
+        setSelectedPersona(user.role);
+      }
+    }
+  }, [user?.role, isSuperAdmin]);
+
+  // Handle persona switching for superadmin
+  const handlePersonaSwitch = (newPersona: string) => {
+    try {
+      setSelectedPersona(newPersona);
+
+      // Store the active persona in localStorage
+      localStorage.setItem("superadmin_active_persona", newPersona);
+
+      // Call optional callback
+      onPersonaChange?.(newPersona);
+
+      toast({
+        title: "Persona Switched",
+        description: `You are now viewing as ${getRoleDisplayLabel(newPersona)}. Page will reload.`,
+      });
+
+      // Reload the page to refresh all role-based UI with the new persona
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Failed to switch persona", error);
+      toast({
+        title: "Failed to switch persona",
+        variant: "destructive",
+      });
+      // Revert to previous persona
+      setSelectedPersona(user?.role || "JobSeeker");
+    }
+  };
+
+  // Don't render if not superadmin
+  if (!isSuperAdmin) {
+    return null;
+  }
+
+  const containerClasses = variant === "compact" 
+    ? "flex items-center gap-2" 
+    : "flex flex-col items-end gap-2";
+
+  const selectWidth = variant === "compact" ? "w-[180px]" : "w-[200px]";
+
+  return (
+    <div className={`${containerClasses} ${className}`}>
+      {showBadge && (
+        <Badge variant="secondary" className={variant === "compact" ? "text-xs" : "mb-1"}>
+          SuperAdmin Mode
+        </Badge>
+      )}
+      
+      <Select value={selectedPersona} onValueChange={handlePersonaSwitch}>
+        <SelectTrigger className={selectWidth}>
+          <SelectValue placeholder="Select Persona" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={USER_ROLES.JOB_SEEKER}>Job Seeker</SelectItem>
+          <SelectItem value={USER_ROLES.RECRUITER}>Recruiter</SelectItem>
+          <SelectItem value={USER_ROLES.EMPLOYER}>Employer</SelectItem>
+          <SelectItem value={USER_ROLES.AFFILIATE}>Affiliate</SelectItem>
+          <SelectItem value={USER_ROLES.ADMIN}>Administrator</SelectItem>
+          <SelectItem value={USER_ROLES.SUPER_ADMIN}>Super Administrator</SelectItem>
+        </SelectContent>
+      </Select>
+      
+      {variant === "default" && (
+        <p className="text-xs text-muted-foreground">
+          Current: {getRoleDisplayLabel(selectedPersona)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default PersonaSwitcher;

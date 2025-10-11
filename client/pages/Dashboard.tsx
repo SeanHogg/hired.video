@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import PersonaSwitcher from "@/components/PersonaSwitcher";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -48,6 +49,9 @@ export default function Dashboard() {
   } = useSidebar();
   const { user, isAuthenticated, isLoading } = useAuth();
 
+  // State to trigger re-render when persona changes
+  const [personaKey, setPersonaKey] = useState(0);
+
   // Use custom dashboard hook for data management
   const {
     dashboardData,
@@ -57,8 +61,28 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // Get role permissions for routing
-  const rolePermissions = createRolePermissions(user?.role);
+  // Get role permissions for routing (use active persona for SuperAdmin)
+  const getActiveRole = () => {
+    if (!user?.role) return null;
+
+    const isSuperAdmin = user.email === "seanhogg@gmail.com" || user.role === "SuperAdmin";
+    if (isSuperAdmin) {
+      const activePersona = localStorage.getItem("superadmin_active_persona");
+      return activePersona || user.role;
+    }
+
+    return user.role;
+  };
+
+  const rolePermissions = createRolePermissions(getActiveRole());
+
+  // Handle persona change callback
+  const handlePersonaChange = useCallback((newPersona: string) => {
+    // Trigger re-render by updating key
+    setPersonaKey(prev => prev + 1);
+    // Refresh dashboard data for new persona
+    refreshDashboard();
+  }, [refreshDashboard]);
 
   // Dashboard wrapper component
   const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({
@@ -66,13 +90,26 @@ export default function Dashboard() {
   }) => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">{dashboardData?.title}</h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1">{dashboardData?.description}</p>
-        {lastRefresh && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Last updated: {lastRefresh.toLocaleString()}
-          </p>
-        )}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold">{dashboardData?.title}</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">{dashboardData?.description}</p>
+            {lastRefresh && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Last updated: {lastRefresh.toLocaleString()}
+              </p>
+            )}
+          </div>
+
+          {/* Persona Switcher for SuperAdmin */}
+          <div className="flex-shrink-0">
+            <PersonaSwitcher
+              variant="compact"
+              onPersonaChange={handlePersonaChange}
+              key={personaKey}
+            />
+          </div>
+        </div>
       </div>
       {children}
     </div>
