@@ -57,6 +57,41 @@ export default function ResumeViewer({
   const [privacy, setPrivacy] = useState<ResumePrivacy>(resume?.privacy || "private");
   const [showShareAlert, setShowShareAlert] = useState(false);
 
+  // Featured Video from metadata (match ResumeDetail behavior) - moved before early returns
+  const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
+    const all = resume?.metaData || [];
+    const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
+    return all.filter((m) => videoTypes.has(m.metaType));
+  }, [resume?.metaData]);
+  const [videoIndex, setVideoIndex] = useState<number>(0);
+  useEffect(() => {
+    if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
+  }, [videoMetaItems.length, videoIndex]);
+
+  // Handle selectedMediaId to automatically select the appropriate video and scroll to section - moved before early returns
+  useEffect(() => {
+    if (selectedMediaId && resume?.metaData) {
+      // Find the media item
+      const mediaItem = resume.metaData.find(m => m.id === selectedMediaId || m.referenceId === selectedMediaId);
+      if (mediaItem) {
+        // If it's a video type, set the video index
+        const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
+        if (videoTypes.has(mediaItem.metaType)) {
+          const index = videoMetaItems.findIndex(v => v.id === mediaItem.id || v.referenceId === mediaItem.referenceId);
+          if (index >= 0) setVideoIndex(index);
+        }
+
+        // Scroll to the section containing this media
+        setTimeout(() => {
+          const element = document.getElementById(`media-${selectedMediaId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+    }
+  }, [selectedMediaId, resume?.metaData, videoMetaItems]);
+
   // Safety check for resume data
   if (!resume) {
     return (
@@ -183,41 +218,6 @@ export default function ResumeViewer({
 
 
 
-  // Featured Video from metadata (match ResumeDetail behavior)
-  const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
-    const all = resume?.metaData || [];
-    const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    return all.filter((m) => videoTypes.has(m.metaType));
-  }, [resume?.metaData]);
-  const [videoIndex, setVideoIndex] = useState<number>(0);
-  useEffect(() => {
-    if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
-  }, [videoMetaItems.length, videoIndex]);
-
-  // Handle selectedMediaId to automatically select the appropriate video and scroll to section
-  useEffect(() => {
-    if (selectedMediaId && resume?.metaData) {
-      // Find the media item
-      const mediaItem = resume.metaData.find(m => m.id === selectedMediaId || m.referenceId === selectedMediaId);
-      if (mediaItem) {
-        // If it's a video, select it in the video carousel
-        if (videoMetaItems.length > 0) {
-          const mediaIndex = videoMetaItems.findIndex(m => m.id === selectedMediaId || m.referenceId === selectedMediaId);
-          if (mediaIndex >= 0) {
-            setVideoIndex(mediaIndex);
-          }
-        }
-
-        // Scroll to the section that contains this media
-        setTimeout(() => {
-          const sectionElement = document.querySelector(`[data-section-id="${mediaItem.referenceId}"]`);
-          if (sectionElement) {
-            sectionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      }
-    }
-  }, [selectedMediaId, resume?.metaData, videoMetaItems]);
   const currentVideoMeta = videoMetaItems.length > 0 ? videoMetaItems[videoIndex] : null;
   const youTubeEmbed = (url: string): string => {
     try {
