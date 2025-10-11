@@ -46,7 +46,9 @@ export function useDashboard(): UseDashboardReturn {
         description: "Manage your referrals and track your earnings",
         metrics: [],
         recentActivity: [],
-        onboardingTasks: []
+        onboardingTasks: [],
+        onboardingCompletionPercentage: 0,
+        lastUpdated: new Date()
       });
       setLastRefresh(new Date());
       return;
