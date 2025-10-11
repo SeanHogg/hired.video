@@ -151,7 +151,12 @@ function SettingsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => setResendCooldown((c) => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
 
   const savePrivacyPatch = async (patch: Partial<PrivacySettings>) => {
     try {
@@ -426,13 +431,6 @@ function SettingsContent() {
       </div>
     );
   }
-
-  // Cooldown timer for resend button
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const id = setInterval(() => setResendCooldown((c) => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(id);
-  }, [resendCooldown]);
 
   return (
     <div className="min-h-screen bg-background">

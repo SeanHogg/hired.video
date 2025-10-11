@@ -29,7 +29,7 @@ const CHECKS = [
   },
   {
     name: 'ESLint Code Quality',
-    command: 'npm run lint',
+    command: process.env.CI ? 'npm run lint:ci' : 'npm run lint',
     description: 'Running ESLint to check code quality and standards...',
     required: true
   },

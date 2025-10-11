@@ -22,7 +22,7 @@ import {
   Linkedin,
   Twitter,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 
 import Footer from "@/components/Footer";
@@ -89,14 +89,14 @@ export default function CompanyDetail() {
     fetchCompany();
   }, [id]);
 
-  // SEO: when company loads, set page metadata and structured data
-  useEffect(() => {
-    if (!company) return;
+  // SEO: compute SEO data when company loads
+  const seoData = useMemo(() => {
+    if (!company) return null;
     const title = `${company.data.name} Company Profile | MyVideoResu.me`;
     const description =
       company.data.tagline ||
       (company.data.description ? company.data.description.slice(0, 160) : "Company profile on MyVideoResu.me");
-    useSEO(location.pathname, {
+    return {
       title,
       description,
       ogTitle: title,
@@ -110,8 +110,11 @@ export default function CompanyDetail() {
           ? `${company.data.headquarters.city}, ${company.data.headquarters.state}`
           : undefined,
       }),
-    });
-  }, [company, location.pathname]);
+    };
+  }, [company]);
+
+  // Apply SEO data
+  useSEO(location.pathname, seoData || {});
 
   const isOwner = user && company && company.userId === user.id;
 

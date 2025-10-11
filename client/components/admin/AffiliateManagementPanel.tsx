@@ -55,8 +55,8 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
 
       const data = await affiliateService.getAllAffiliates(params);
       setAffiliates(data);
-    } catch (error) {
-      // console.error("Failed to load affiliates:", error);
+    } catch (_error) {
+      // console.error("Failed to load affiliates:", _error);
       toast({
         title: "Error",
         description: "Failed to load affiliates",
@@ -65,7 +65,7 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
     } finally {
       setLoading(false);
     }
-  }, [affiliateService, currentPage, searchTerm, statusFilter]);
+  }, [affiliateService, currentPage, searchTerm, statusFilter, toast]);
 
   useEffect(() => {
     if (open) {

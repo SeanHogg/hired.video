@@ -146,6 +146,8 @@ export default function ResumeViewer({
         return <Users className="h-4 w-4" />;
       case "private":
         return <Lock className="h-4 w-4" />;
+      default:
+        return <Lock className="h-4 w-4" />;
     }
   };
 
@@ -159,6 +161,8 @@ export default function ResumeViewer({
         return "Connections";
       case "private":
         return "Private";
+      default:
+        return "Private";
     }
   };
 
@@ -171,6 +175,8 @@ export default function ResumeViewer({
       case "connections":
         return "bg-indigo-100 text-indigo-800";
       case "private":
+        return "bg-gray-100 text-gray-800";
+      default:
         return "bg-gray-100 text-gray-800";
     }
   };
@@ -227,7 +233,9 @@ export default function ResumeViewer({
         const embedIdx = parts.indexOf("embed");
         if (embedIdx >= 0 && parts[embedIdx + 1]) return `https://www.youtube.com/embed/${parts[embedIdx + 1]}`;
       }
-    } catch {}
+    } catch {
+      // Ignore URL parsing errors
+    }
     return url;
   };
 
