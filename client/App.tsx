@@ -38,6 +38,7 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 const About = lazy(() => import("./pages/About"));
 const Careers = lazy(() => import("./pages/Careers"));
 const Checkout = lazy(() => import("./pages/Checkout"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const Companies = lazy(() => import("./pages/Companies"));
 const CompanyCreatePage = lazy(() => import("./pages/CompanyCreatePage"));
 const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
@@ -349,6 +350,7 @@ const App = () => (
                       <Route path="/people" element={<People />} />
                       <Route path="/people/:id" element={<PeopleDetail />} />
                       <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/checkout/success" element={<CheckoutSuccess />} />
                       <Route path="/tools" element={<Tools />} />
                       <Route path="/chat" element={<AICoach />} />
                       <Route

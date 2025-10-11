@@ -10,7 +10,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -37,6 +37,8 @@ import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
+import { billingService } from "@/lib/services/billing-service";
+import { toast } from "sonner";
 
 export default function Checkout() {
   const {
@@ -49,6 +51,7 @@ export default function Checkout() {
   const { user, isAuthenticated } = useAuth();
   const { items, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -78,6 +81,19 @@ export default function Checkout() {
     }
   }, [items.length, isAuthenticated, navigate]);
 
+  // Handle cancellation from Stripe
+  useEffect(() => {
+    const cancelled = searchParams.get("cancelled");
+    if (cancelled === "true") {
+      toast.error("Payment setup was cancelled. You can try again or choose a different payment method.");
+      // Clean up the URL by removing the cancelled parameter
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("cancelled");
+      const newUrl = `${window.location.pathname}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ""}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [searchParams]);
+
   const handleInputChange = (field: string, value: string) => {
     setBillingInfo((prev) => ({ ...prev, [field]: value }));
   };
@@ -86,16 +102,30 @@ export default function Checkout() {
     e.preventDefault();
     setIsProcessing(true);
 
-    // Simulate payment processing
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      if (paymentMethod === "us_bank_account") {
+        // For ACH payments, redirect to Stripe for bank account setup
+        const successUrl = `${window.location.origin}/checkout/success`;
+        const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
 
-      // Clear cart and show success
-      clearCart();
-      alert("Payment successful! Welcome to Premium! 🎉");
-      navigate("/dashboard");
+        const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
+
+        // Redirect to Stripe for ACH setup
+        window.location.href = setupUrl;
+        return; // Don't set isProcessing to false since we're redirecting
+      } else {
+        // For card payments, implement card processing logic here
+        // This is a placeholder - in a real implementation, you'd integrate with Stripe Elements
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        // Clear cart and show success
+        clearCart();
+        toast.success("Payment successful! Welcome to Premium! 🎉");
+        navigate("/dashboard");
+      }
     } catch (error) {
-      alert("Payment failed. Please try again.");
+      console.error("Payment processing error:", error);
+      toast.error("Payment failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -428,14 +458,15 @@ export default function Checkout() {
                               <Building2 className="h-4 w-4" />
                               Bank Account Setup
                             </div>
-                            <p className="text-sm text-blue-700">
-                              Bank account payments are processed securely through Stripe. You'll be redirected to a secure page to connect your bank account.
+                            <p className="text-sm text-blue-700 mb-3">
+                              Bank account payments are processed securely through Stripe. When you click "Complete Purchase", you'll be redirected to a secure Stripe page to connect your bank account.
                             </p>
-                            <p className="text-xs text-blue-600 mt-2">
-                              • Lower processing fees than credit cards<br/>
-                              • Payments typically process in 1-3 business days<br/>
-                              • Bank-level security and encryption
-                            </p>
+                            <div className="text-xs text-blue-600 space-y-1">
+                              <p>✓ Lower processing fees than credit cards</p>
+                              <p>✓ Payments typically process in 1-3 business days</p>
+                              <p>✓ Bank-level security and encryption</p>
+                              <p>✓ You can cancel the setup at any time and return here</p>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -459,12 +490,15 @@ export default function Checkout() {
                     {isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Processing Payment...
+                        {paymentMethod === "us_bank_account" ? "Redirecting to Stripe..." : "Processing Payment..."}
                       </>
                     ) : (
                       <>
                         <DollarSign className="mr-2 h-4 w-4" />
-                        Complete Purchase - ${finalTotal.toFixed(2)}
+                        {paymentMethod === "us_bank_account"
+                          ? `Set Up Bank Account - $${finalTotal.toFixed(2)}`
+                          : `Complete Purchase - $${finalTotal.toFixed(2)}`
+                        }
                       </>
                     )}
                   </Button>
