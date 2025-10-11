@@ -50,6 +50,7 @@ export const OnboardingTaskSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   completed: z.boolean(),
+  completedDate: z.string().optional().transform((val) => val ? new Date(val) : undefined),
   url: z.string().optional(),
   priority: z.number().default(1),
 });
@@ -61,6 +62,7 @@ export const BaseDashboardSchema = z.object({
   metrics: z.array(DashboardMetricSchema),
   recentActivity: z.array(ActivityItemSchema),
   onboardingTasks: z.array(OnboardingTaskSchema),
+  onboardingCompletionPercentage: z.number().default(0),
   lastUpdated: z.string().transform((val) => new Date(val)),
 });
 

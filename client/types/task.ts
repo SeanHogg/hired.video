@@ -20,6 +20,12 @@ export enum TaskType {
   OnboardingProfile = 11, // All Roles but created by the System
   OnboardingProfileSettings = 12, // All Roles but created by the System
   OnboardingPrivacy = 13, // All Roles but created by the System
+  OnboardingCreateTask = 14, // All Roles but created by the System - Universal onboarding task
+  OnboardingCreateResume = 15, // JobSeeker onboarding task
+  OnboardingPostJob = 16, // Company/Employer onboarding task
+  OnboardingFollowCandidate = 17, // Recruiter onboarding task
+  OnboardingFollowResume = 18, // Recruiter onboarding task
+  OnboardingReferUser = 19, // Affiliate onboarding task
   Recruiter = 20, // Recruiter but created by the System
   RecruiterPreferences = 21, // Recruiter but created by System
   JobSeeker = 30, // Job Seeker but created by System
@@ -261,6 +267,18 @@ export const getTaskTypeDisplayName = (taskType: TaskType): string => {
       return "Profile Settings";
     case TaskType.OnboardingPrivacy:
       return "Privacy Settings";
+    case TaskType.OnboardingCreateTask:
+      return "Create First Task";
+    case TaskType.OnboardingCreateResume:
+      return "Create Resume";
+    case TaskType.OnboardingPostJob:
+      return "Post Job";
+    case TaskType.OnboardingFollowCandidate:
+      return "Follow Candidate";
+    case TaskType.OnboardingFollowResume:
+      return "Follow Resume";
+    case TaskType.OnboardingReferUser:
+      return "Refer User";
     case TaskType.Recruiter:
       return "Recruiter Tasks";
     case TaskType.RecruiterPreferences:

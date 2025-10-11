@@ -63,6 +63,7 @@ export function JobSeekerDashboard({
       {/* Onboarding Progress */}
       <OnboardingProgress
         tasks={dashboardData.onboardingTasks || []}
+        completionPercentage={dashboardData.onboardingCompletionPercentage}
         loading={loading}
       />
 

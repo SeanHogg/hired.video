@@ -14,6 +14,7 @@ import type { OnboardingTask } from "@/lib/services/dashboard-service";
 
 interface OnboardingProgressProps {
   tasks: OnboardingTask[];
+  completionPercentage?: number;
   loading?: boolean;
   onTaskComplete?: (taskId: string) => void;
   showAllTasksLink?: boolean;
@@ -22,16 +23,18 @@ interface OnboardingProgressProps {
 
 export function OnboardingProgress({
   tasks,
+  completionPercentage,
   loading = false,
   onTaskComplete,
   showAllTasksLink = true,
   maxVisibleTasks = 2,
 }: OnboardingProgressProps) {
   const completedTasksCount = tasks.filter((task) => task.completed).length;
-  const progressPercentage =
+  const progressPercentage = completionPercentage ?? (
     tasks.length > 0
       ? Math.round((completedTasksCount / tasks.length) * 100)
-      : 0;
+      : 0
+  );
 
   // Don't show the component if progress is 100%
   if (progressPercentage >= 100) {

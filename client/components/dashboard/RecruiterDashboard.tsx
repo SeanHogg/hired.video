@@ -99,6 +99,7 @@ export function RecruiterDashboard({
       {/* Onboarding Progress */}
       <OnboardingProgress
         tasks={dashboardData.onboardingTasks || []}
+        completionPercentage={dashboardData.onboardingCompletionPercentage}
         loading={loading}
       />
 
