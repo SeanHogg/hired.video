@@ -60,6 +60,7 @@ export enum MyVideoResumeRoles {
   EmployerExecutive = 23,
   JobSeeker = 30,
   Recruiter = 40,
+  Affiliate = 50,
 }
 
 // Core task interfaces matching backend exactly

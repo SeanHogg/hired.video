@@ -34,6 +34,8 @@ import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
 import { apiClient } from "@/lib/api-client";
 import { AffiliateService, type AffiliateAdminStats } from "@/lib/services/affiliate-service";
+import { AffiliateManagementPanel } from "@/components/admin/AffiliateManagementPanel";
+import { PayoutProcessingPanel } from "@/components/admin/PayoutProcessingPanel";
 
 import {
   LineChart,
@@ -169,6 +171,8 @@ export default function ProductDashboard() {
   const [loading, setLoading] = useState(true);
   const [affiliateLoading, setAffiliateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [affiliateManagementOpen, setAffiliateManagementOpen] = useState(false);
+  const [payoutProcessingOpen, setPayoutProcessingOpen] = useState(false);
   const { user } = useAuth();
 
   const affiliateService = new AffiliateService();
@@ -1283,11 +1287,19 @@ export default function ProductDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex flex-col items-center justify-center space-y-2"
+                  onClick={() => setAffiliateManagementOpen(true)}
+                >
                   <Users className="h-6 w-6" />
                   <span>Manage Affiliates</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex flex-col items-center justify-center space-y-2"
+                  onClick={() => setPayoutProcessingOpen(true)}
+                >
                   <CreditCard className="h-6 w-6" />
                   <span>Process Payouts</span>
                 </Button>
@@ -1300,6 +1312,16 @@ export default function ProductDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Slide-out Panels */}
+      <AffiliateManagementPanel
+        open={affiliateManagementOpen}
+        onOpenChange={setAffiliateManagementOpen}
+      />
+      <PayoutProcessingPanel
+        open={payoutProcessingOpen}
+        onOpenChange={setPayoutProcessingOpen}
+      />
     </div>
   );
 }

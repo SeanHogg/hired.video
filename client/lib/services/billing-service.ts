@@ -92,11 +92,11 @@ export const billingService = {
   },
 
   async createSetupSession(successUrl: string, cancelUrl: string): Promise<string> {
-    const res: ApiSuccessResponse<{ url: string }> = await apiClient.post(
+    const res: ApiSuccessResponse<{ Url: string }> = await apiClient.post(
       "/api/Payment/create-setup-session",
       { successUrl, cancelUrl }
     );
-    return res.data.url;
+    return res.data.Url;
   },
 
   async deletePaymentMethod(paymentMethodId: string): Promise<string> {
