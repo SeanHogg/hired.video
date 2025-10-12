@@ -154,8 +154,8 @@ export default function PeopleDetail() {
             .replace(/\s+/g, "-"),
         role: userProfile.role, // Add role property for proper role display
         data: {
-          firstName: userProfile.firstName,
-          lastName: userProfile.lastName,
+          firstName: userProfile.firstName || '',
+          lastName: userProfile.lastName || '',
           avatar: userProfile.profilePicture,
           headline: `${getRoleDisplayLabel(userProfile.role)} | ${userProfile.location || "Remote"}`,
           summary:
@@ -472,8 +472,8 @@ export default function PeopleDetail() {
                           alt={`${person.data.firstName} ${person.data.lastName}`}
                         />
                         <AvatarFallback className="text-4xl">
-                          {person.data.firstName.charAt(0)}
-                          {person.data.lastName.charAt(0)}
+                          {(person.data.firstName || '').charAt(0) || '?'}
+                          {(person.data.lastName || '').charAt(0) || '?'}
                         </AvatarFallback>
                       </Avatar>
                     </div>

@@ -228,8 +228,8 @@ function ProfileContent() {
             sidebarCollapsed={sidebarCollapsed}
           />
 
-          <div className="pt-16 p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto text-center py-12 sm:py-16">
+          <div className="pt-16">
+            <div className="max-w-4xl mx-auto text-center py-12 sm:py-16 p-4 sm:p-6">
               <User className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
               <h1 className="text-xl sm:text-2xl font-bold mb-4">Sign In Required</h1>
               <p className="text-sm sm:text-base text-muted-foreground mb-6">
@@ -260,8 +260,8 @@ function ProfileContent() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-4 sm:p-6">
-          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="pt-16">
+          <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 p-4 sm:p-6">
             {/* Profile Header */}
             <Card>
               <CardContent className="p-4 sm:p-6">
