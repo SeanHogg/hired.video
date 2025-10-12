@@ -67,14 +67,30 @@ export const PrivacySettingsSchema = z.object({
 });
 
 export const JobPreferencesSchema = z.object({
-  desiredRoles: z.array(z.string()).optional(),
+  // Job search settings
+  autoApplyEnabled: z.boolean().optional(),
+  preferredJobTypes: z.array(z.string()).optional(),
+  preferredIndustries: z.array(z.string()).optional(),
   preferredLocations: z.array(z.string()).optional(),
-  salaryMin: z.number().optional(),
-  salaryMax: z.number().optional(),
-  employmentTypes: z.array(z.string()).optional(),
-  remoteWork: z.boolean().optional(),
-  openToWork: z.boolean().optional(),
-  availabilityDate: z.string().optional(),
+  remoteOnly: z.boolean().optional(),
+  willingToRelocate: z.boolean().optional(),
+
+  // Salary preferences
+  minSalaryExpectation: z.number().nullable().optional(),
+  maxSalaryExpectation: z.number().nullable().optional(),
+  salaryCurrency: z.string().optional(),
+  salaryPeriod: z.string().optional(), // yearly, monthly, hourly
+
+  // Availability
+  availableFrom: z.string().nullable().optional(), // ISO date string
+  noticePeriodDays: z.number().nullable().optional(),
+
+  // Advanced preferences
+  preferredWorkingHours: z.array(z.string()).optional(),
+  jobMatchThreshold: z.number().nullable().optional(),
+  onlyExactMatches: z.boolean().optional(),
+  excludedCompanies: z.array(z.string()).optional(),
+  excludedKeywords: z.array(z.string()).optional(),
 });
 
 export const AccountSettingsSchema = z.object({

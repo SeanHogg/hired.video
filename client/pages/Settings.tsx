@@ -31,6 +31,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -47,7 +49,7 @@ import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { settingsService, type PrivacySettings, type AccountSettings } from "@/lib/services/settings-service";
+import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -83,6 +85,8 @@ function SettingsContent() {
     timezone: "UTC",
     dateFormat: "MM/dd/yyyy",
   });
+  const [jobPrefs, setJobPrefs] = useState<JobPreferences | null>(null);
+  const [savingJobPrefs, setSavingJobPrefs] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number } | null>(null);
@@ -140,6 +144,15 @@ function SettingsContent() {
       .catch((err) => {
         console.error("Failed to load account settings", err);
       });
+
+    // Load job preferences from API
+    settingsService
+      .getJobPreferences()
+      .then(setJobPrefs)
+      .catch((err) => {
+        console.error("Failed to load job preferences", err);
+      });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
@@ -161,6 +174,8 @@ function SettingsContent() {
       const updated = await settingsService.updatePrivacySettings({
         profileVisible: merged.profileVisible,
         indexable: merged.indexable,
+
+
         allowMessages: merged.allowMessages,
         showActivity: merged.showActivity,
       });
@@ -180,12 +195,27 @@ function SettingsContent() {
 
 
 
+
+  const saveJobPatch = async (patch: Partial<JobPreferences>) => {
+    try {
+      setSavingJobPrefs(true);
+      const updated = await settingsService.updateJobPreferences(patch);
+      setJobPrefs(updated);
+    } catch (error) {
+      console.error("Failed to save job preferences", error);
+      toast({ title: "Failed to save job preferences", variant: "destructive" });
+    } finally {
+      setSavingJobPrefs(false);
+    }
+  };
+
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar
           isOpen={sidebarOpen}
+
           onClose={closeSidebar}
           collapsed={sidebarCollapsed}
         />
@@ -481,6 +511,16 @@ function SettingsContent() {
                   <span className="hidden sm:inline">Appearance</span>
                   <span className="sm:hidden">Theme</span>
                 </TabsTrigger>
+
+                <TabsTrigger
+                  value="job-preferences"
+                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                >
+                  <Target className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Job Preferences</span>
+                  <span className="sm:hidden">Jobs</span>
+                </TabsTrigger>
+
                 <TabsTrigger
                   value="account"
                   className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
@@ -792,6 +832,175 @@ function SettingsContent() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+
+              {/* Job Preferences Tab */}
+              <TabsContent value="job-preferences" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Job Preferences</CardTitle>
+                    <CardDescription>
+                      Tell us what kinds of roles you want and how you like to work.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {!jobPrefs ? (
+                      <p className="text-sm text-muted-foreground">Loading job preferences...</p>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Preferred Roles</Label>
+                            <Input
+                              value={(jobPrefs.preferredJobTypes || []).join(", ")}
+                              placeholder="e.g. Senior Developer, Tech Lead"
+                              onChange={(e) =>
+                                saveJobPatch({
+                                  preferredJobTypes: e.target.value
+                                    .split(",")
+                                    .map((s) => s.trim())
+                                    .filter(Boolean),
+                                })
+                              }
+                              disabled={savingJobPrefs}
+                            />
+                            <p className="text-xs text-muted-foreground">Separate with commas</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Preferred Industries</Label>
+                            <Input
+                              value={(jobPrefs.preferredIndustries || []).join(", ")}
+                              placeholder="e.g. FinTech, HealthTech"
+                              onChange={(e) =>
+                                saveJobPatch({
+                                  preferredIndustries: e.target.value
+                                    .split(",")
+                                    .map((s) => s.trim())
+                                    .filter(Boolean),
+                                })
+                              }
+                              disabled={savingJobPrefs}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Preferred Locations</Label>
+                          <Input
+                            value={(jobPrefs.preferredLocations || []).join(", ")}
+                            placeholder="e.g. Remote, New York, London"
+                            onChange={(e) =>
+                              saveJobPatch({
+                                preferredLocations: e.target.value
+                                  .split(",")
+                                  .map((s) => s.trim())
+                                  .filter(Boolean),
+                              })
+                            }
+                            disabled={savingJobPrefs}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Minimum Salary</Label>
+                            <Input
+                              type="number"
+                              value={jobPrefs.minSalaryExpectation ?? ""}
+                              onChange={(e) =>
+                                saveJobPatch({
+                                  minSalaryExpectation: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
+                                })
+                              }
+                              disabled={savingJobPrefs}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Maximum Salary</Label>
+                            <Input
+                              type="number"
+                              value={jobPrefs.maxSalaryExpectation ?? ""}
+                              onChange={(e) =>
+                                saveJobPatch({
+                                  maxSalaryExpectation: e.target.value
+                                    ? Number(e.target.value)
+                                    : null,
+                                })
+                              }
+                              disabled={savingJobPrefs}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Currency</Label>
+                            <Select
+                              value={jobPrefs.salaryCurrency || "USD"}
+                              onValueChange={(v) => saveJobPatch({ salaryCurrency: v })}
+                              disabled={savingJobPrefs}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Salary Period</Label>
+                            <Select
+                              value={jobPrefs.salaryPeriod || "yearly"}
+                              onValueChange={(v) => saveJobPatch({ salaryPeriod: v })}
+                              disabled={savingJobPrefs}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="yearly">Yearly</SelectItem>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="hourly">Hourly</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label>Remote Only</Label>
+                              <p className="text-xs text-muted-foreground">Only show remote roles</p>
+                            </div>
+                            <Switch
+                              checked={!!jobPrefs.remoteOnly}
+                              onCheckedChange={(checked) => saveJobPatch({ remoteOnly: checked })}
+                              disabled={savingJobPrefs}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label>Willing to Relocate</Label>
+                              <p className="text-xs text-muted-foreground">Open to relocation</p>
+                            </div>
+                            <Switch
+                              checked={!!jobPrefs.willingToRelocate}
+                              onCheckedChange={(checked) => saveJobPatch({ willingToRelocate: checked })}
+                              disabled={savingJobPrefs}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
 
               {/* Account Tab */}
               <TabsContent value="account" className="space-y-6">

@@ -50,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
+import settingsService, { JobPreferences } from "@/lib/services/settings-service";
 import {
   roleToSelectValue,
   formatRoleForDisplay,
@@ -68,7 +69,9 @@ function ProfileContent() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const { user, isAuthenticated, refreshUser, logout } = useAuth();
+  const [jobPrefs, setJobPrefs] = useState<JobPreferences | null>(null);
+
+  const { user, isAuthenticated, refreshUser } = useAuth();
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
@@ -79,6 +82,16 @@ function ProfileContent() {
         // If we get here, the error was already processed
       });
     }
+
+	  // Load Job Preferences for read-only display
+	  useEffect(() => {
+	    if (!isAuthenticated) return;
+	    settingsService
+	      .getJobPreferences()
+	      .then(setJobPrefs)
+	      .catch((e) => console.warn("Profile: failed to load job preferences", e));
+	  }, [isAuthenticated]);
+
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -622,74 +635,7 @@ function ProfileContent() {
                       </div>
                     </div>
 
-                    {/* Job Preferences */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Job Preferences</h3>
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="openToRemote"
-                            checked={formData.openToRemote}
-                            onChange={(e) =>
-                              handleInputChange("openToRemote", e.target.checked)
-                            }
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <Label htmlFor="openToRemote" className="cursor-pointer">
-                            Open to remote work
-                          </Label>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="preferredRoles">Preferred Roles</Label>
-                          <Input
-                            id="preferredRoles"
-                            placeholder="e.g. Senior Developer, Tech Lead, Engineering Manager"
-                            value={formData.preferredRoles}
-                            onChange={(e) =>
-                              handleInputChange("preferredRoles", e.target.value)
-                            }
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Separate roles with commas
-                          </p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="salaryExpectation">Salary Expectation</Label>
-                            <Input
-                              id="salaryExpectation"
-                              type="number"
-                              placeholder="e.g. 120000"
-                              value={formData.salaryExpectation}
-                              onChange={(e) =>
-                                handleInputChange("salaryExpectation", e.target.value)
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="salaryCurrency">Currency</Label>
-                            <Select
-                              value={formData.salaryCurrency}
-                              onValueChange={(value) =>
-                                handleInputChange("salaryCurrency", value)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="EUR">EUR (€)</SelectItem>
-                                <SelectItem value="GBP">GBP (£)</SelectItem>
-                                <SelectItem value="CAD">CAD ($)</SelectItem>
-                                <SelectItem value="AUD">AUD ($)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Job Preferences moved to Settings page for editing */}
 
                     {/* Bio */}
                     <div>
@@ -716,6 +662,78 @@ function ProfileContent() {
                     </p>
                   </div>
                 )}
+
+                    {/* Job Preferences (read-only) */}
+                    <div className="mt-6">
+                      <h3 className="text-lg font-medium mb-3">Job Preferences</h3>
+                      {!jobPrefs ? (
+                        <p className="text-sm text-muted-foreground">Loading job preferences...</p>
+                      ) : (
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Preferred Roles</Label>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {(jobPrefs.preferredJobTypes || []).length === 0 ? (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              ) : (
+                                (jobPrefs.preferredJobTypes || []).map((r, i) => (
+                                  <Badge key={`${r}-${i}`} variant="secondary">{r}</Badge>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Preferred Industries</Label>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {(jobPrefs.preferredIndustries || []).length === 0 ? (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              ) : (
+                                (jobPrefs.preferredIndustries || []).map((r, i) => (
+                                  <Badge key={`${r}-${i}`} variant="outline">{r}</Badge>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Preferred Locations</Label>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {(jobPrefs.preferredLocations || []).length === 0 ? (
+                                <span className="text-sm text-muted-foreground">—</span>
+                              ) : (
+                                (jobPrefs.preferredLocations || []).map((r, i) => (
+                                  <Badge key={`${r}-${i}`}>{r}</Badge>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Remote Only</Label>
+                              <div className="mt-1"><Badge variant={jobPrefs.remoteOnly ? "default" : "secondary"}>{jobPrefs.remoteOnly ? "Yes" : "No"}</Badge></div>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Willing to Relocate</Label>
+                              <div className="mt-1"><Badge variant={jobPrefs.willingToRelocate ? "default" : "secondary"}>{jobPrefs.willingToRelocate ? "Yes" : "No"}</Badge></div>
+                            </div>
+                            <div>
+                              <Label className="text-sm text-muted-foreground">Salary Expectation</Label>
+                              <div className="mt-1 text-sm">
+                                {jobPrefs.minSalaryExpectation || jobPrefs.maxSalaryExpectation ? (
+                                  <span>
+                                    {jobPrefs.minSalaryExpectation ? jobPrefs.minSalaryExpectation.toLocaleString() : ""}
+                                    {jobPrefs.minSalaryExpectation && jobPrefs.maxSalaryExpectation ? " – " : ""}
+                                    {jobPrefs.maxSalaryExpectation ? jobPrefs.maxSalaryExpectation.toLocaleString() : ""} {jobPrefs.salaryCurrency || "USD"} / {jobPrefs.salaryPeriod || "yearly"}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
               </CardContent>
             </Card>
 
@@ -770,6 +788,8 @@ function ProfileContent() {
                             className="h-auto p-4 flex flex-col gap-2"
                             asChild
                           >
+
+
                             <Link to="/settings">
                               <Settings className="h-6 w-6" />
                               <span className="font-medium">
