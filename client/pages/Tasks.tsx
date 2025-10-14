@@ -760,15 +760,45 @@ export default function Tasks() {
           ...request,
           id: task.id,
         };
-        await taskService.updateTask(updateRequest);
+        const updatedTask = await taskService.updateTask(updateRequest);
+
+        // Update the task in state with the response from API
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === task.id ? {
+              ...t,
+              // Map the API response back to UI format
+              title: updatedTask.text || t.title,
+              description: updatedTask.description || t.description,
+              startDate: updatedTask.start ? new Date(updatedTask.start).toISOString().split('T')[0] : t.startDate,
+              dueDate: updatedTask.end ? new Date(updatedTask.end).toISOString().split('T')[0] : t.dueDate,
+              type: mapBackendTaskTypeToUI(updatedTask.taskType),
+              status: mapBackendStatusToUI(updatedTask.status),
+              updatedAt: updatedTask.updateDateTime || new Date().toISOString(),
+              createdAt: updatedTask.creationDateTime || t.createdAt,
+            } : t,
+          ),
+        );
       } else {
         // Create new task
         const createdTask = await taskService.createTask(request);
 
-        // Update the task in state with the new ID
+        // Update the task in state with the new ID and response data
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === task.id ? { ...task, id: createdTask.id || task.id } : t,
+            t.id === task.id ? {
+              ...t,
+              id: createdTask.id || task.id,
+              // Map the API response back to UI format
+              title: createdTask.text || t.title,
+              description: createdTask.description || t.description,
+              startDate: createdTask.start ? new Date(createdTask.start).toISOString().split('T')[0] : t.startDate,
+              dueDate: createdTask.end ? new Date(createdTask.end).toISOString().split('T')[0] : t.dueDate,
+              type: mapBackendTaskTypeToUI(createdTask.taskType),
+              status: mapBackendStatusToUI(createdTask.status),
+              updatedAt: createdTask.updateDateTime || new Date().toISOString(),
+              createdAt: createdTask.creationDateTime || t.createdAt,
+            } : t,
           ),
         );
       }
@@ -778,19 +808,35 @@ export default function Tasks() {
     }
   };
 
-  const updateTaskStatus = (taskId: string, newStatus: ProductivityItemStatus) => {
+  const updateTaskStatus = async (taskId: string, newStatus: ProductivityItemStatus) => {
+    let originalTask: Task | null = null;
+    let updatedTask: Task | null = null;
+
+    // Store original task and update optimistically
     setTasks((prev) => {
+      originalTask = prev.find((t) => t.id === taskId) || null;
       const updated = prev.map((task) =>
         task.id === taskId
           ? { ...task, status: newStatus, updatedAt: new Date().toISOString() }
           : task,
       );
-      const task = updated.find((t) => t.id === taskId);
-      if (task) {
-        saveTaskToApi(task);
-      }
+      updatedTask = updated.find((t) => t.id === taskId) || null;
       return updated;
     });
+
+    // Save to API and handle potential errors
+    if (updatedTask && originalTask) {
+      try {
+        await saveTaskToApi(updatedTask);
+      } catch (error) {
+        // Revert to original state on error
+        console.error("Failed to update task status:", error);
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? originalTask! : t))
+        );
+        setError("Failed to update task status. Changes have been reverted.");
+      }
+    }
   };
 
   // Drag and drop helpers for Kanban view
@@ -806,16 +852,21 @@ export default function Tasks() {
     draggedElement.style.boxShadow = "0 10px 25px rgba(0,0,0,0.3)";
   };
 
-  const onDropOnColumn = (
+  const onDropOnColumn = async (
     e: React.DragEvent<HTMLDivElement>,
     column: ProductivityItemStatus,
   ) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
     if (!id) return;
+
     const now = new Date().toISOString().split("T")[0];
+    let originalTask: Task | null = null;
     let updatedTask: Task | null = null;
+
+    // Store original task for potential rollback
     setTasks((prev) => {
+      originalTask = prev.find((t) => t.id === id) || null;
       const updated = prev.map((t) =>
         t.id === id
           ? {
@@ -830,8 +881,19 @@ export default function Tasks() {
       updatedTask = updated.find((t) => t.id === id) || null;
       return updated;
     });
-    if (updatedTask) {
-      saveTaskToApi(updatedTask);
+
+    // Save to API and handle potential errors
+    if (updatedTask && originalTask) {
+      try {
+        await saveTaskToApi(updatedTask);
+      } catch (error) {
+        // Revert to original state on error
+        console.error("Failed to update task status:", error);
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? originalTask! : t))
+        );
+        setError("Failed to update task status. Changes have been reverted.");
+      }
     }
   };
 
@@ -1158,12 +1220,14 @@ export default function Tasks() {
                           <TableCell>
                             <Select
                               value={task.status.toString()}
-                              onValueChange={(value) =>
+                              onValueChange={(value) => {
                                 updateTaskStatus(
                                   task.id,
                                   parseInt(value) as ProductivityItemStatus,
-                                )
-                              }
+                                ).catch((error) => {
+                                  console.error("Failed to update task status:", error);
+                                });
+                              }}
                             >
                               <SelectTrigger className="w-32">
                                 <SelectValue />
