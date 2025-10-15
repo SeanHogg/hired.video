@@ -882,6 +882,10 @@ export default function Tasks() {
       return updated;
     });
 
+    // Clear drag state immediately after drop
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
+
     // Save to API and handle potential errors
     if (updatedTask && originalTask) {
       try {
@@ -924,7 +928,8 @@ export default function Tasks() {
 
   const onDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     // Only clear if we're leaving the column entirely, not just moving to a child element
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+    const relatedTarget = e.relatedTarget as Node;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
       setDragOverColumn(null);
     }
   };
