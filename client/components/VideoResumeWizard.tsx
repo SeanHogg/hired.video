@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/lib/auth";
 import VideoResumeWizardStep1 from "./wizard/VideoResumeWizardStep1";
 import VideoResumeWizardStep2 from "./wizard/VideoResumeWizardStep2";
 import VideoResumeWizardStep3 from "./wizard/VideoResumeWizardStep3";
@@ -36,6 +37,7 @@ export function VideoResumeWizard({
   onClose,
   onVideoGenerated,
 }: VideoResumeWizardProps) {
+  const { user } = useAuth();
   const [state, setState] = useState<WizardState>({
     step: 1,
     selectedResume: null,
@@ -67,15 +69,27 @@ export function VideoResumeWizard({
 
   const handleStep1Complete = useCallback(
     (resume: Resume, includeAvatar: boolean, avatarFile: File | null) => {
+      // If including avatar, populate the resume's Basics.Image with user's profile avatar
+      const updatedResume = { ...resume };
+      if (includeAvatar && user?.avatar) {
+        updatedResume.data = {
+          ...updatedResume.data,
+          Basics: {
+            ...updatedResume.data.Basics,
+            Image: user.avatar,
+          },
+        };
+      }
+
       updateState({
-        selectedResume: resume,
+        selectedResume: updatedResume,
         includeAvatar,
         avatarFile,
-        summary: resume.data?.Basics?.Summary || "",
+        summary: updatedResume.data?.Basics?.Summary || "",
       });
       handleNext();
     },
-    [handleNext, updateState],
+    [handleNext, updateState, user?.avatar],
   );
 
   const handleStep2Complete = useCallback(

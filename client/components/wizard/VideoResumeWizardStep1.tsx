@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ProfileAvatarEditor from "@/components/ProfileAvatarEditor";
 import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
+import { useAuth } from "@/lib/auth";
 import type { Resume } from "@/types/resume";
 
 interface VideoResumeWizardStep1Props {
@@ -26,6 +27,7 @@ export function VideoResumeWizardStep1({
   onComplete: _onComplete,
   isLoading = false,
 }: VideoResumeWizardStep1Props) {
+  const { user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [includeAvatar, setIncludeAvatar] = useState(false);
@@ -200,6 +202,7 @@ export function VideoResumeWizardStep1({
 
           {includeAvatar && (
             <ProfileAvatarEditor
+              currentAvatarUrl={user?.avatar}
               userName={selectedResume?.data?.Basics?.Name || "User"}
               onAvatarSelect={setAvatarFile}
               isLoading={isLoading}
