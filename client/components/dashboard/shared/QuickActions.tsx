@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   FileText,
   Eye,
@@ -9,10 +9,12 @@ import {
   Building2,
   Download,
   BarChart3,
+  Film,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createRolePermissions } from "@/lib/role-utils";
+import VideoResumeWizard from "@/components/VideoResumeWizard";
 
 interface QuickAction {
   icon: React.ComponentType<{ className?: string }>;
@@ -39,6 +41,7 @@ export function QuickActions({
   customActions = [],
   loading = false,
 }: QuickActionsProps) {
+  const [showVideoWizard, setShowVideoWizard] = useState(false);
   const rolePermissions = createRolePermissions(userRole);
 
   // Define role-specific actions
@@ -47,6 +50,12 @@ export function QuickActions({
 
     if (rolePermissions.isJobSeeker) {
       actions.push(
+        {
+          icon: Film,
+          label: "Generate Video Resume",
+          onClick: () => setShowVideoWizard(true),
+          variant: "default" as const,
+        },
         {
           icon: FileText,
           label: "Update Resume",
@@ -193,37 +202,50 @@ export function QuickActions({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Quick Actions
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {allActions.map((action, index) => (
-          <Button
-            key={index}
-            className="w-full justify-start gap-3"
-            variant={action.variant || "outline"}
-            onClick={action.onClick}
-            asChild={!!action.href}
-          >
-            {action.href ? (
-              <a href={action.href}>
-                <action.icon className="h-4 w-4" />
-                {action.label}
-              </a>
-            ) : (
-              <>
-                <action.icon className="h-4 w-4" />
-                {action.label}
-              </>
-            )}
-          </Button>
-        ))}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {allActions.map((action, index) => (
+            <Button
+              key={index}
+              className="w-full justify-start gap-3"
+              variant={action.variant || "outline"}
+              onClick={action.onClick}
+              asChild={!!action.href}
+            >
+              {action.href ? (
+                <a href={action.href}>
+                  <action.icon className="h-4 w-4" />
+                  {action.label}
+                </a>
+              ) : (
+                <>
+                  <action.icon className="h-4 w-4" />
+                  {action.label}
+                </>
+              )}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Video Resume Wizard Modal */}
+      {showVideoWizard && (
+        <VideoResumeWizard
+          onClose={() => setShowVideoWizard(false)}
+          onVideoGenerated={() => {
+            setShowVideoWizard(false);
+            // Optionally refresh dashboard or navigate to videos
+          }}
+        />
+      )}
+    </>
   );
 }
 

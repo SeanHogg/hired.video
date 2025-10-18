@@ -1,39 +1,39 @@
-// Runtime configuration for static deployment
-// This file can be modified after deployment without rebuilding
+// Runtime configuration for development
+// Copy this to config.js for local development with different settings
 window.APP_CONFIG = {
   // API Configuration
-  API_URL: "https://api.myvideoresu.me/api",
-
+  API_URL: "http://localhost:5000/api", // Local development API
+  
   // Error Tracking (GlitchTip/Sentry)
   ERROR_REPORTING: {
     ENABLED: true,
     DSN: "https://43cf169b17fc4c1780849f0dd708ef39@app.glitchtip.com/12926",
-    ENVIRONMENT: "production", // development, staging, production
-    SAMPLE_RATE: 0.1, // 10% of transactions for performance monitoring
+    ENVIRONMENT: "development",
+    SAMPLE_RATE: 1.0, // 100% sampling in development
   },
-
+  
   // Feature Flags
   FEATURES: {
     AI_CHAT: true,
     VIDEO_RESUMES: true,
-    ANALYTICS: false,
+    ANALYTICS: true, // Enable analytics in development for testing
     NOTIFICATIONS: true,
   },
-
+  
   // Performance Monitoring
   PERFORMANCE: {
-    MONITORING: false,
-    SAMPLE_RATE: 0.1,
+    MONITORING: true, // Enable in development for debugging
+    SAMPLE_RATE: 1.0, // 100% sampling in development
   },
-
+  
   // Logging
   LOGGING: {
-    LEVEL: "info", // debug, info, warn, error
-    MAX_ENTRIES: 100,
+    LEVEL: "debug", // Verbose logging in development
+    MAX_ENTRIES: 200,
   },
-
-  // App Version (update this with each deployment)
-  VERSION: "1.2.0",
-
+  
+  // App Version
+  VERSION: "1.2.0-dev",
+  
 
 };
