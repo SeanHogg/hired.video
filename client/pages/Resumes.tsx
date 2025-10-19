@@ -971,7 +971,7 @@ export default function Resumes() {
                     </div>
                     <h3 className="font-semibold mb-2">1. Upload Resume</h3>
                     <p className="text-sm text-muted-foreground">
-                      Upload your existing resume in any format
+                      Upload your resume or select your existing Master Resume
                     </p>
                   </div>
                   <div className="text-center">
@@ -980,16 +980,16 @@ export default function Resumes() {
                     </div>
                     <h3 className="font-semibold mb-2">2. AI Magic</h3>
                     <p className="text-sm text-muted-foreground">
-                      Our AI creates a personalized video script
+                      Our AI generates a compelling video script tailored to you
                     </p>
                   </div>
                   <div className="text-center">
                     <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Video className="h-8 w-8 text-primary" />
+                      <Eye className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="font-semibold mb-2">3. Record Video</h3>
+                    <h3 className="font-semibold mb-2">3. Review Video</h3>
                     <p className="text-sm text-muted-foreground">
-                      Record your video using our guided tools
+                      Preview and refine your video before sharing
                     </p>
                   </div>
                   <div className="text-center">
