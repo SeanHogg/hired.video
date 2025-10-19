@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { companyService, type CompanyProfile, type UpdateCompanyRequest } from "@/lib/services/company-service";
 import type { CompanyBenefits } from "@/types/company";
+import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
 import {
   Card,
   CardContent,
@@ -16,6 +17,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { X, Save, Loader2 } from "lucide-react";
 
 interface CompanyEditFormProps {
@@ -139,13 +147,21 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="size">Company Size *</Label>
-                  <Input
-                    id="size"
+                  <Select
                     value={formData.size}
-                    onChange={(e) => handleFieldChange("size", e.target.value)}
-                    placeholder="e.g., 11-50, 51-200"
-                    required
-                  />
+                    onValueChange={(value) => handleFieldChange("size", value)}
+                  >
+                    <SelectTrigger id="size">
+                      <SelectValue placeholder="Select company size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPANY_SIZE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="founded">Founded Year</Label>

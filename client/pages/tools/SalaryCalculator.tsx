@@ -31,6 +31,7 @@ import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { aiService } from "@/lib/services/ai-service";
+import { INDUSTRIES, EDUCATION_LEVELS } from "@/lib/constants/industries";
 
 interface SalaryData {
   baseSalary: number;
@@ -73,33 +74,6 @@ export default function SalaryCalculator() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
-
-  const industries = [
-    "Technology",
-    "Healthcare",
-    "Finance",
-    "Education",
-    "Manufacturing",
-    "Retail",
-    "Consulting",
-    "Government",
-    "Non-profit",
-    "Media & Entertainment",
-    "Real Estate",
-    "Transportation",
-    "Energy",
-    "Telecommunications",
-    "Other",
-  ];
-
-  const educationLevels = [
-    "High School",
-    "Associate Degree",
-    "Bachelor's Degree",
-    "Master's Degree",
-    "PhD/Doctorate",
-    "Professional Certification",
-  ];
 
   const calculateSalary = async () => {
     if (!jobTitle.trim() || !location_.trim()) {
@@ -405,7 +379,7 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                           <SelectValue placeholder="Select education level" />
                         </SelectTrigger>
                         <SelectContent>
-                          {educationLevels.map((level) => (
+                          {EDUCATION_LEVELS.map((level) => (
                             <SelectItem key={level} value={level}>
                               {level}
                             </SelectItem>
@@ -423,7 +397,7 @@ Base your analysis on current 2024 market data, considering cost of living adjus
                           <SelectValue placeholder="Select industry" />
                         </SelectTrigger>
                         <SelectContent>
-                          {industries.map((ind) => (
+                          {INDUSTRIES.map((ind) => (
                             <SelectItem key={ind} value={ind}>
                               {ind}
                             </SelectItem>

@@ -20,6 +20,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  EmploymentType,
+  WorkSetting,
+  DisplayPrivacy,
+  JobStatus,
+} from "@/lib/constants/enums";
 
 // Types
 interface JobFormData {
@@ -49,36 +55,6 @@ interface JobEditFormProps {
   onCancel: () => void;
   loading?: boolean;
 }
-
-// Enums (should match backend)
-const EmploymentType = {
-  FullTime: 0,
-  PartTime: 1,
-  Contract: 2,
-  Internship: 3,
-  Temporary: 4,
-  Freelance: 5,
-};
-
-const WorkSetting = {
-  OnSite: 0,
-  Remote: 1,
-  Hybrid: 2,
-};
-
-const DisplayPrivacy = {
-  ToPublic: 0,
-  ToRecruiters: 1,
-  ToConnections: 2,
-  ToSelf: 10,
-};
-
-const JobStatus = {
-  Draft: 0,
-  Open: 1,
-  Closed: 2,
-  Paused: 3,
-};
 
 export default function JobEditForm({
   job,

@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
+import { INDUSTRIES } from "@/lib/constants/industries";
 
 export type SearchContext = "people" | "companies" | "resumes" | "jobs" | "all";
 
@@ -200,15 +202,11 @@ export default function SearchBar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All industries</SelectItem>
-                <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Marketing Technology">
-                  Marketing Technology
-                </SelectItem>
-                <SelectItem value="Cloud Infrastructure">
-                  Cloud Infrastructure
-                </SelectItem>
-                <SelectItem value="Web Development">Web Development</SelectItem>
-                <SelectItem value="Venture Capital">Venture Capital</SelectItem>
+                {INDUSTRIES.map((industry) => (
+                  <SelectItem key={industry} value={industry}>
+                    {industry}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -231,11 +229,11 @@ export default function SearchBar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sizes</SelectItem>
-                <SelectItem value="1-10">1-10 employees</SelectItem>
-                <SelectItem value="10-50">10-50 employees</SelectItem>
-                <SelectItem value="50-200">50-200 employees</SelectItem>
-                <SelectItem value="200-500">200-500 employees</SelectItem>
-                <SelectItem value="500+">500+ employees</SelectItem>
+                {COMPANY_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

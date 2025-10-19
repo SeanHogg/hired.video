@@ -31,6 +31,10 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useSEO } from "@/lib/seo";
+import {
+  JOB_APPLICATION_STATUS_COLORS,
+  JOB_ALERT_FREQUENCY_LABELS,
+} from "@/lib/constants/enums";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import Navigation from "@/components/Navigation";
@@ -145,23 +149,6 @@ interface SavedJob {
     description?: string;
   };
 }
-
-const statusColors: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  Reviewing: "bg-blue-100 text-blue-800 border-blue-300",
-  Interviewing: "bg-purple-100 text-purple-800 border-purple-300",
-  Offered: "bg-green-100 text-green-800 border-green-300",
-  Rejected: "bg-red-100 text-red-800 border-red-300",
-  Withdrawn: "bg-gray-100 text-gray-800 border-gray-300",
-  Accepted: "bg-emerald-100 text-emerald-800 border-emerald-300",
-};
-
-const frequencyLabels: Record<string, string> = {
-  daily: "Daily",
-  weekly: "Weekly",
-  monthly: "Monthly",
-  immediate: "Immediate",
-};
 
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -920,7 +907,7 @@ export default function Jobs() {
                               </div>
                               <Badge
                                 variant="outline"
-                                className={statusColors[application.status] || ""}
+                                className={JOB_APPLICATION_STATUS_COLORS[application.status] || ""}
                               >
                                 {application.status}
                               </Badge>
@@ -1047,7 +1034,7 @@ export default function Jobs() {
                                       {alert.isActive ? "Active" : "Inactive"}
                                     </Badge>
                                     <Badge variant="outline">
-                                      {frequencyLabels[alert.alertFrequency] || alert.alertFrequency}
+                                      {JOB_ALERT_FREQUENCY_LABELS[alert.alertFrequency] || alert.alertFrequency}
                                     </Badge>
                                   </div>
                                 </div>
