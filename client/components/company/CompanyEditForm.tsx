@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { companyService, type CompanyProfile, type UpdateCompanyRequest } from "@/lib/services/company-service";
 import type { CompanyBenefits } from "@/types/company";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
+import { uploadCompanyLogo } from "@/lib/services/upload-service";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
@@ -24,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Save, Loader2 } from "lucide-react";
+import { X, Save, Loader2, Camera } from "lucide-react";
 
 interface CompanyEditFormProps {
   company: CompanyProfile;
@@ -36,6 +38,8 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
   const { toast } = useToast();
   const [formData, setFormData] = useState(company.data);
   const [isSaving, setIsSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Handle field changes
   const handleFieldChange = (field: string, value: any) => {
@@ -72,6 +76,34 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
       benefits: { ...benefits, [benefit]: value },
     };
     setFormData(updated);
+  };
+
+  // Handle logo upload
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLogoUploading(true);
+      const logoUrl = await uploadCompanyLogo(file);
+      handleFieldChange("logo", logoUrl);
+      toast({
+        title: "Success",
+        description: "Company logo uploaded successfully.",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload logo";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) {
+        logoInputRef.current.value = "";
+      }
+    }
   };
 
   // Handle form submission
@@ -186,13 +218,38 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
               </div>
 
               <div>
-                <Label htmlFor="logo">Logo URL</Label>
-                <Input
-                  id="logo"
-                  value={formData.logo || ""}
-                  onChange={(e) => handleFieldChange("logo", e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                />
+                <Label>Company Logo</Label>
+                <div className="flex items-center gap-4 mt-2">
+                  <Avatar className="w-16 h-16">
+                    <AvatarImage src={formData.logo} alt={formData.name} />
+                    <AvatarFallback className="text-lg">
+                      {formData.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                      disabled={logoUploading}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={logoUploading}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {logoUploading ? "Uploading..." : "Upload Logo"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      PNG, JPG, GIF or WebP. Max 5MB.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>
