@@ -5,10 +5,6 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -25,7 +21,7 @@ export default function CompanyEditPage() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -214,6 +210,7 @@ export default function CompanyEditPage() {
             <CompanyEditForm
               company={company}
               onSave={(updated) => setCompany(updated)}
+              onCancel={() => navigate(`/companies/${company.id}`)}
             />
           </div>
         </div>
