@@ -32,6 +32,6 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
     formData,
   );
 
-  // response.data is already the FileUploadResponse object with url property
+  // Backend returns full URL (e.g., https://api.myvideoresu.me/uploads/filename.png)
   return response.data.url || "";
 }

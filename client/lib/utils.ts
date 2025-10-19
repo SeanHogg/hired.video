@@ -38,3 +38,27 @@ export function isValidDate(dateString: string | null | undefined): boolean {
   const dateObj = new Date(dateString);
   return !isNaN(dateObj.getTime());
 }
+
+/**
+ * Build full image URL from relative path
+ * Handles both absolute URLs and relative paths from the API
+ */
+export function buildImageUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined;
+
+  // If it's already an absolute URL (http/https), return as-is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  // If it's a relative path, prepend the API base URL
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ||
+                     import.meta.env.VITE_API_URL ||
+                     'http://localhost:5000';
+
+  // Remove trailing slash from base URL and leading slash from path if present
+  const baseUrl = apiBaseUrl.replace(/\/$/, '');
+  const relativePath = path.startsWith('/') ? path : `/${path}`;
+
+  return `${baseUrl}${relativePath}`;
+}

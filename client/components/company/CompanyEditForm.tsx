@@ -319,7 +319,10 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
               <div>
                 <Label>Company Logo</Label>
                 <div className="flex items-center gap-4 mt-2">
-                  <Avatar className="w-16 h-16">
+                  <Avatar
+                    className="w-16 h-16 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => logoInputRef.current?.click()}
+                  >
                     <AvatarImage src={formData.logo} alt={formData.name} />
                     <AvatarFallback className="text-lg">
                       {formData.name.substring(0, 2).toUpperCase()}
