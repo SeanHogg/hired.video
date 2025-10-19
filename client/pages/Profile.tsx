@@ -82,19 +82,18 @@ function ProfileContent() {
         // If we get here, the error was already processed
       });
     }
-
-	  // Load Job Preferences for read-only display
-	  useEffect(() => {
-	    if (!isAuthenticated) return;
-	    settingsService
-	      .getJobPreferences()
-	      .then(setJobPrefs)
-	      .catch((e) => console.warn("Profile: failed to load job preferences", e));
-	  }, [isAuthenticated]);
-
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load Job Preferences for read-only display
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    settingsService
+      .getJobPreferences()
+      .then(setJobPrefs)
+      .catch((e) => console.warn("Profile: failed to load job preferences", e));
+  }, [isAuthenticated]);
 
   // Form state for editing
   const [formData, setFormData] = useState({

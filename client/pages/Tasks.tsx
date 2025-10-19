@@ -407,17 +407,19 @@ export default function Tasks() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {assignableUsers.map((association) => (
-                        <SelectItem
-                          key={association.id}
-                          value={association.userProfile?.id || ""}
-                        >
-                          {association.userProfile?.firstName}{" "}
-                          {association.userProfile?.lastName}
-                          {association.userProfile?.role &&
-                            ` (${association.userProfile.role})`}
-                        </SelectItem>
-                      ))}
+                      {assignableUsers
+                        .filter((association) => association.userProfile?.id)
+                        .map((association) => (
+                          <SelectItem
+                            key={association.id}
+                            value={association.userProfile?.id || ""}
+                          >
+                            {association.userProfile?.firstName}{" "}
+                            {association.userProfile?.lastName}
+                            {association.userProfile?.role &&
+                              ` (${association.userProfile.role})`}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
