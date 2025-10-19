@@ -32,5 +32,6 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
     formData,
   );
 
-  return (response.data as any).url || "";
+  // response.data is already the FileUploadResponse object with url property
+  return response.data.url || "";
 }

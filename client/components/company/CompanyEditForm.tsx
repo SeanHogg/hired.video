@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Save, Loader2, Camera } from "lucide-react";
+import { X, Save, Loader2, Camera, AlertCircle } from "lucide-react";
 
 interface CompanyEditFormProps {
   company: CompanyProfile;
@@ -34,12 +34,65 @@ interface CompanyEditFormProps {
   onCancel?: () => void;
 }
 
+interface ValidationErrors {
+  [key: string]: string;
+}
+
 export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEditFormProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState(company.data);
   const [isSaving, setIsSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [activeTab, setActiveTab] = useState("basic");
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Validation function
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {};
+
+    // Basic Info tab validations
+    if (!formData.name?.trim()) {
+      errors.name = "Company name is required";
+    }
+    if (!formData.industry?.trim()) {
+      errors.industry = "Industry is required";
+    }
+    if (!formData.size?.trim()) {
+      errors.size = "Company size is required";
+    }
+
+    // Contact & Address tab validations
+    if (!formData.headquarters?.city?.trim()) {
+      errors["headquarters.city"] = "City is required";
+    }
+    if (!formData.headquarters?.state?.trim()) {
+      errors["headquarters.state"] = "State/Province is required";
+    }
+    if (!formData.headquarters?.country?.trim()) {
+      errors["headquarters.country"] = "Country is required";
+    }
+    if (!formData.headquarters?.address?.trim()) {
+      errors["headquarters.address"] = "Address is required";
+    }
+    if (!formData.headquarters?.postalCode?.trim()) {
+      errors["headquarters.postalCode"] = "Postal code is required";
+    }
+
+    setValidationErrors(errors);
+
+    // If there are errors, switch to the first tab with errors
+    if (Object.keys(errors).length > 0) {
+      if (errors.name || errors.industry || errors.size) {
+        setActiveTab("basic");
+      } else if (Object.keys(errors).some(k => k.startsWith("headquarters"))) {
+        setActiveTab("contact");
+      }
+      return false;
+    }
+
+    return true;
+  };
 
   // Handle field changes
   const handleFieldChange = (field: string, value: any) => {
@@ -110,10 +163,23 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate form before submitting
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields. Check the highlighted tab.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSaving(true);
       const updateRequest: UpdateCompanyRequest = { data: formData };
-      const updated = await companyService.updateCompany(company.id, updateRequest);
+      await companyService.updateCompany(company.id, updateRequest);
+
+      // Refresh full company data to ensure all fields (including logo in header) are updated
+      const refreshedCompany = await companyService.getCompanyProfileById(company.id);
 
       toast({
         title: "Saved",
@@ -121,7 +187,7 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
       });
 
       if (onSave) {
-        onSave(updated);
+        onSave(refreshedCompany);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
@@ -135,12 +201,34 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
     }
   };
 
+  // Check if a tab has errors
+  const hasTabErrors = (tabName: string): boolean => {
+    return Object.keys(validationErrors).some(key => {
+      if (tabName === "basic") {
+        return ["name", "industry", "size"].includes(key);
+      } else if (tabName === "contact") {
+        return key.startsWith("headquarters");
+      }
+      return false;
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Tabs defaultValue="basic" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="basic">Basic Info</TabsTrigger>
-          <TabsTrigger value="contact">Contact & Address</TabsTrigger>
+          <TabsTrigger value="basic" className="relative">
+            Basic Info
+            {hasTabErrors("basic") && (
+              <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="contact" className="relative">
+            Contact & Address
+            {hasTabErrors("contact") && (
+              <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
+            )}
+          </TabsTrigger>
           <TabsTrigger value="benefits">Benefits</TabsTrigger>
           <TabsTrigger value="mission">Mission & Values</TabsTrigger>
         </TabsList>
@@ -162,7 +250,11 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
                     onChange={(e) => handleFieldChange("name", e.target.value)}
                     placeholder="Company name"
                     required
+                    className={validationErrors.name ? "border-destructive" : ""}
                   />
+                  {validationErrors.name && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors.name}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="industry">Industry *</Label>
@@ -172,7 +264,11 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
                     onChange={(e) => handleFieldChange("industry", e.target.value)}
                     placeholder="e.g., Technology, Finance"
                     required
+                    className={validationErrors.industry ? "border-destructive" : ""}
                   />
+                  {validationErrors.industry && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors.industry}</p>
+                  )}
                 </div>
               </div>
 
@@ -183,7 +279,7 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
                     value={formData.size}
                     onValueChange={(value) => handleFieldChange("size", value)}
                   >
-                    <SelectTrigger id="size">
+                    <SelectTrigger id="size" className={validationErrors.size ? "border-destructive" : ""}>
                       <SelectValue placeholder="Select company size" />
                     </SelectTrigger>
                     <SelectContent>
@@ -194,6 +290,9 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
                       ))}
                     </SelectContent>
                   </Select>
+                  {validationErrors.size && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors.size}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="founded">Founded Year</Label>
@@ -367,13 +466,17 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="address">Street Address</Label>
+                <Label htmlFor="address">Street Address *</Label>
                 <Input
                   id="address"
                   value={formData.headquarters?.address || ""}
                   onChange={(e) => handleNestedChange("headquarters", "address", e.target.value)}
                   placeholder="123 Main Street"
+                  className={validationErrors["headquarters.address"] ? "border-destructive" : ""}
                 />
+                {validationErrors["headquarters.address"] && (
+                  <p className="text-sm text-destructive mt-1">{validationErrors["headquarters.address"]}</p>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -385,37 +488,53 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
                     onChange={(e) => handleNestedChange("headquarters", "city", e.target.value)}
                     placeholder="San Francisco"
                     required
+                    className={validationErrors["headquarters.city"] ? "border-destructive" : ""}
                   />
+                  {validationErrors["headquarters.city"] && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors["headquarters.city"]}</p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="state">State/Province</Label>
+                  <Label htmlFor="state">State/Province *</Label>
                   <Input
                     id="state"
                     value={formData.headquarters?.state || ""}
                     onChange={(e) => handleNestedChange("headquarters", "state", e.target.value)}
                     placeholder="CA"
+                    className={validationErrors["headquarters.state"] ? "border-destructive" : ""}
                   />
+                  {validationErrors["headquarters.state"] && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors["headquarters.state"]}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="postalCode">Postal Code</Label>
+                  <Label htmlFor="postalCode">Postal Code *</Label>
                   <Input
                     id="postalCode"
                     value={formData.headquarters?.postalCode || ""}
                     onChange={(e) => handleNestedChange("headquarters", "postalCode", e.target.value)}
                     placeholder="94105"
+                    className={validationErrors["headquarters.postalCode"] ? "border-destructive" : ""}
                   />
+                  {validationErrors["headquarters.postalCode"] && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors["headquarters.postalCode"]}</p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">Country *</Label>
                   <Input
                     id="country"
                     value={formData.headquarters?.country || ""}
                     onChange={(e) => handleNestedChange("headquarters", "country", e.target.value)}
                     placeholder="United States"
+                    className={validationErrors["headquarters.country"] ? "border-destructive" : ""}
                   />
+                  {validationErrors["headquarters.country"] && (
+                    <p className="text-sm text-destructive mt-1">{validationErrors["headquarters.country"]}</p>
+                  )}
                 </div>
               </div>
 
