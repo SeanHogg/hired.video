@@ -79,6 +79,7 @@ const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
+const VideoResumeWizardPage = lazy(() => import("./pages/VideoResumeWizardPage"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 // JobUploadPage removed - functionality consolidated into JobCreatePage
 const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
@@ -302,6 +303,10 @@ const App = () => (
                       <Route
                         path="/resumes/upload"
                         element={<RequireVerified><ResumeUploadPage /></RequireVerified>}
+                      />
+                      <Route
+                        path="/resumes/upload/video"
+                        element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
                       />
                       <Route
                         path="/resumes/create/:id"

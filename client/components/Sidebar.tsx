@@ -102,8 +102,8 @@ export default function Sidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out",
-          collapsed ? "w-16 overflow-hidden" : "w-80 overflow-y-auto",
+          "fixed top-0 left-0 h-full bg-background border-r border-border z-50 transform transition-all duration-500 ease-in-out",
+          collapsed ? "w-16 overflow-hidden" : "w-[90%] lg:w-80 overflow-y-auto",
           // Mobile: hidden by default, show when isOpen
           isOpen ? "translate-x-0" : "-translate-x-full",
           // Desktop: always visible, ignore isOpen state

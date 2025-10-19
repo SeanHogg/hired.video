@@ -820,15 +820,27 @@ export default function Resumes() {
                   traditional resumes never could.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link to="/signup">
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
-                    >
-                      Create Your Video Resume
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
+                  {isAuthenticated ? (
+                    <Link to="/resumes/upload/video">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                      >
+                        Create Your Video Resume
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to="/signup">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                      >
+                        Create Your Video Resume
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </Link>
+                  )}
                   <Button size="lg" variant="outline" className="text-lg px-8">
                     <Play className="mr-2 h-5 w-5" />
                     Watch Demo
@@ -1104,15 +1116,27 @@ export default function Resumes() {
                   Join thousands of professionals who have transformed their
                   careers with video resumes.
                 </p>
-                <Link to="/signup">
-                  <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                  >
-                    Get Started Today
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
+                {isAuthenticated ? (
+                  <Link to="/resumes/upload/video">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                    >
+                      Get Started Today
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to="/signup">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                    >
+                      Get Started Today
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
             <Footer />

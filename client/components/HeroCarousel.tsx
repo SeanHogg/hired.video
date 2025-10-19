@@ -69,7 +69,14 @@ export default function HeroCarousel({
     {
       id: 2,
       type: "upload",
-      title: "Upload Your Resume",
+      title: (
+        <>
+          Generate AI{" "}
+          <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+            Resume Video
+          </span>
+        </>
+      ),
       description: "",
       badge: "AI-Powered Resume Videos",
     },
@@ -149,7 +156,8 @@ export default function HeroCarousel({
       (file.type === "application/pdf" || file.type.includes("word"))
     ) {
       console.log("Resume uploaded:", file.name);
-      // Here you would handle the file upload
+      // Navigate to video wizard with the same logic as handleGenerateAIVideo
+      handleGenerateAIVideo();
     }
   };
 
@@ -181,8 +189,8 @@ export default function HeroCarousel({
 
   const handleGenerateAIVideo = () => {
     if (isAuthenticated) {
-      // If user is logged in, take them to resume upload/creation
-      navigate("/resumes/upload");
+      // If user is logged in, take them to the video resume wizard
+      navigate("/resumes/upload/video");
     } else {
       // If not logged in, take them to signup first
       navigate("/signup");
@@ -208,7 +216,7 @@ export default function HeroCarousel({
   const currentSlideData = slides[currentSlide];
 
   return (
-    <section className="relative pt-8 sm:pt-12 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
+    <section className="relative pt-16 sm:pt-12 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 overflow-hidden">
       <div className="max-w-7xl mx-auto relative min-h-[300px] sm:min-h-[400px] flex items-center">
         {/* Navigation Arrows */}
         <button
@@ -227,21 +235,25 @@ export default function HeroCarousel({
 
         {/* Slide Content */}
         <div className="text-center max-w-4xl mx-auto w-full px-4 sm:px-0">
-          <Badge
-            variant="secondary"
-            className="mb-2 sm:mb-3 px-2 sm:px-3 py-1 text-xs font-medium bg-brand-purple-light text-brand-purple-dark"
-          >
-            <Sparkles className="w-3 h-3 mr-1" />
-            {currentSlideData.badge}
-          </Badge>
+          {currentSlideData.badge && (
+            <Badge
+              variant="secondary"
+              className="mb-2 sm:mb-3 px-2 sm:px-3 py-1 text-xs font-medium bg-brand-purple-light text-brand-purple-dark"
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              {currentSlideData.badge}
+            </Badge>
+          )}
 
           <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3 leading-tight px-2">
             {currentSlideData.title}
           </h1>
 
-          <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-2xl mx-auto line-clamp-3 px-2">
-            {currentSlideData.description}
-          </p>
+          {currentSlideData.description && (
+            <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4 max-w-2xl mx-auto line-clamp-3 px-2">
+              {currentSlideData.description}
+            </p>
+          )}
 
           {/* Slide-specific content */}
           <div className="min-h-[60px] sm:min-h-[80px] flex items-center justify-center mb-3 sm:mb-4">
@@ -283,6 +295,7 @@ export default function HeroCarousel({
                         size="sm"
                         variant="outline"
                         className="gap-1 text-xs min-h-[44px]"
+                        onClick={handleGenerateAIVideo}
                       >
                         <Plus className="h-3 w-3" />
                         Browse Files
@@ -312,23 +325,23 @@ export default function HeroCarousel({
           </div>
 
           {/* Action Buttons */}
-          <div className="min-h-[50px] flex items-center justify-center px-4">
+          <div className="h-[80px] sm:min-h-[50px] flex items-center justify-center px-4">
             {currentSlideData.type === "upload" ? (
               <Button
                 onClick={handleGenerateAIVideo}
-                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2 min-h-[44px] w-full sm:w-auto max-w-xs"
+                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-sm px-6 py-2 h-[44px] w-full sm:w-auto max-w-xs"
               >
                 Generate AI Video
               </Button>
             ) : (
               currentSlideData.actions && (
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center w-full sm:w-auto">
+                <div className="flex flex-col gap-2 sm:gap-3 justify-center w-full sm:w-auto sm:flex-row">
                   {currentSlideData.actions.map((action, index) => (
                     <Button
                       key={index}
                       size="sm"
                       variant={action.variant}
-                      className="text-sm px-4 sm:px-6 py-2 min-h-[44px] w-full sm:w-auto"
+                      className="text-sm px-4 sm:px-6 py-2 h-[44px] w-full"
                       onClick={getActionHandler(action.label)}
                     >
                       {action.label}
@@ -341,7 +354,7 @@ export default function HeroCarousel({
         </div>
 
         {/* Slide Indicators */}
-        <div className="flex justify-center mt-4 sm:mt-6 gap-2">
+        <div className="hidden sm:flex justify-center mt-4 sm:mt-6 gap-2">
           {slides.map((_, index) => (
             <button
               key={index}

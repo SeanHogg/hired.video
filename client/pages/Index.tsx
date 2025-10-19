@@ -662,13 +662,13 @@ export default function Index() {
         </section>
 
         {/* Content Grid */}
-        <section className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
+        <section className="pt-16 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             {/* Results Header */}
             <div className="mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-1 sm:mb-2">
+              <div className="flex flex-col gap-0 sm:gap-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
                     {searchFilters.sortBy === "recent" && "Recent "}
                     {searchFilters.sortBy === "featured" && "Featured "}
                     {searchFilters.sortBy === "top" && "Top "}
@@ -687,37 +687,36 @@ export default function Index() {
                                 ? "Jobs"
                                 : "Content"}
                   </h2>
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
-                    {searchFilters.search && ` for "${searchFilters.search}"`}
-                    {searchFilters.sortBy &&
-                      ` sorted by ${searchFilters.sortBy}`}
-                    {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
-                      ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
-                  </p>
+
+                  {/* View Toggle - Inline with heading */}
+                  <div className="flex rounded-md border">
+                    <Button
+                      variant={viewMode === "grid" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("grid")}
+                      className="rounded-r-none min-h-[44px]"
+                    >
+                      <Grid className="h-4 w-4" />
+                      <span className="ml-2 sm:hidden">Grid</span>
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="rounded-l-none min-h-[44px]"
+                    >
+                      <List className="h-4 w-4" />
+                      <span className="ml-2 sm:hidden">List</span>
+                    </Button>
+                  </div>
                 </div>
 
-                {/* View Toggle */}
-                <div className="flex rounded-md border self-start sm:self-auto">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className="rounded-r-none min-h-[44px]"
-                  >
-                    <Grid className="h-4 w-4" />
-                    <span className="ml-2 sm:hidden">Grid</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="rounded-l-none min-h-[44px]"
-                  >
-                    <List className="h-4 w-4" />
-                    <span className="ml-2 sm:hidden">List</span>
-                  </Button>
-                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
+                  {searchFilters.search && ` for "${searchFilters.search}"`}
+                  {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
+                    ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
+                </p>
               </div>
             </div>
 

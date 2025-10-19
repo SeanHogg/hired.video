@@ -540,10 +540,11 @@ export default function AIChatPanel() {
     }
   }, [isAIChatOpen, isAuthenticated]);
 
-  if (!isAIChatOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className={cn(
+      "fixed inset-0 z-50 flex transition-opacity duration-500 ease-in-out",
+      isAIChatOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+    )}>
       {/* Backdrop */}
       <div
         className={cn(
@@ -556,9 +557,10 @@ export default function AIChatPanel() {
 
       {/* Panel */}
       <div className={cn(
-        "bg-background border-l shadow-2xl flex flex-col",
+        "fixed inset-y-0 right-0 z-50 bg-background border-l shadow-2xl flex flex-col transition-all duration-500 ease-in-out",
+        isAIChatOpen ? "translate-x-0" : "translate-x-full",
         isMobile
-          ? "w-[90%] max-w-none" // Mobile: 90% width, no max-width constraint
+          ? "w-[90%]" // Mobile: 90% width, matching sidebar and cart
           : "w-[60%] max-w-2xl"   // Desktop: 60% width with max-width for very large screens
       )}>
         {/* Header */}
