@@ -428,7 +428,32 @@ export class CompanyService {
 
     return response.data;
   }
+
+  /**
+   * Update an existing company
+   */
+  async updateCompany(id: string, request: UpdateCompanyRequest): Promise<CompanyProfile> {
+    const response = await apiClient.put<CompanyProfile>(
+      `/api/Companies/${id}`,
+      request,
+      CompanyProfileSchema,
+    );
+
+    return response.data;
+  }
 }
+
+// ============================================================================
+// UPDATE REQUEST TYPE
+// ============================================================================
+
+export interface UpdateCompanyRequest {
+  data?: Partial<CompanyData>;
+  status?: string;
+  visibility?: string;
+}
+
+export type CompanyData = z.infer<typeof CompanyDataSchema>;
 
 // ============================================================================
 // DEFAULT INSTANCE
