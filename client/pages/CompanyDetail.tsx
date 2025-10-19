@@ -879,33 +879,96 @@ export default function CompanyDetail() {
                   </CardContent>
                 </Card>
 
-                {/* Locations */}
+                {/* Headquarters Address */}
+                {company.data.headquarters && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Headquarters
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {company.data.headquarters.address && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Address</p>
+                          <p className="text-sm font-medium">
+                            {company.data.headquarters.address}
+                          </p>
+                        </div>
+                      )}
+
+                      {(company.data.headquarters.city ||
+                        company.data.headquarters.state ||
+                        company.data.headquarters.country) && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Location</p>
+                          <p className="text-sm font-medium">
+                            {[
+                              company.data.headquarters.city,
+                              company.data.headquarters.state,
+                              company.data.headquarters.country,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        </div>
+                      )}
+
+                      {company.data.headquarters.postalCode && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Postal Code
+                          </p>
+                          <p className="text-sm font-medium">
+                            {company.data.headquarters.postalCode}
+                          </p>
+                        </div>
+                      )}
+
+                      {company.data.headquarters.timezone && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Timezone
+                          </p>
+                          <p className="text-sm font-medium">
+                            {company.data.headquarters.timezone}
+                          </p>
+                        </div>
+                      )}
+
+                      {company.data.headquarters.remote && (
+                        <div className="pt-2 border-t">
+                          <Badge variant="secondary">Remote-first Company</Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Additional Locations */}
                 {company.data.locations &&
                   company.data.locations.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle>Locations</CardTitle>
+                        <CardTitle>Additional Locations</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                            <div>
-                              <div className="text-sm font-medium">
-                                Headquarters
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {company.data.headquarters.city},{" "}
-                                {company.data.headquarters.state}
-                              </div>
-                            </div>
-                          </div>
-
+                        <div className="space-y-3">
                           {company.data.locations.map((location, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div className="text-sm text-muted-foreground">
-                                {location.city}, {location.state}
+                            <div key={index} className="flex items-start gap-2 pb-3 border-b last:border-b-0 last:pb-0">
+                              <Building2 className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                {location.address && (
+                                  <p className="text-sm font-medium">
+                                    {location.address}
+                                  </p>
+                                )}
+                                <p className="text-sm text-muted-foreground">
+                                  {[location.city, location.state, location.country]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </p>
                               </div>
                             </div>
                           ))}
