@@ -38,6 +38,9 @@ export const SearchResultItemSchema = z.object({
   templateName: z.string().optional(),
   updatedAt: z.string().optional(),
   isFeatured: z.boolean().default(false).optional(),
+  // Company-specific fields
+  activeJobCount: z.number().default(0).optional(),
+  followers: z.number().default(0).optional(),
 });
 
 export const SearchResponseSchema = z.object({

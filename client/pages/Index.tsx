@@ -273,9 +273,11 @@ export default function Index() {
               company: companyName,
               createdAt: item.createdAt || new Date().toISOString(),
               location: item.location,
-              size: "Unknown", // TODO: Get from company profile
-              activeJobCount: 0, // TODO: Get from company profile
-              followers: 0, // TODO: Get from company profile
+              industry: item.industry, // Use actual industry from API
+              size: item.size, // Use actual size from API
+              founded: item.founded, // Use actual founded year from API
+              activeJobCount: item.activeJobCount || 0,
+              followers: item.followers || 0,
             };
           case "resume":
             // Filter out DRAFT resumes - they should not be visible
