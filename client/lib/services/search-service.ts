@@ -41,6 +41,8 @@ export const SearchResultItemSchema = z.object({
   // Company-specific fields
   activeJobCount: z.number().default(0).optional(),
   followers: z.number().default(0).optional(),
+  // Job-specific fields
+  applications: z.number().default(0).optional(),
 });
 
 export const SearchResponseSchema = z.object({

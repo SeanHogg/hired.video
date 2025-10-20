@@ -306,7 +306,7 @@ export default function Index() {
               name: item.title,
               summary: `${item.title} at ${item.company || "Unknown Company"}`,
               views: item.views || 0,
-              applications: (item as any).applications || 0,
+              applications: item.applications || 0,
               type: "job" as const,
               contentType: "job" as const,
               profession: item.title,
@@ -314,7 +314,9 @@ export default function Index() {
               createdAt:
                 item.postedDate || item.createdAt || new Date().toISOString(),
               location: item.location,
-              employmentType: item.employmentType || "Full-time",
+              employmentType: item.employmentType,
+              salary: item.salary,
+              experienceLevel: item.experienceLevel,
               salaryMin: 0, // TODO: Get from job data
               salaryMax: 0, // TODO: Get from job data
               jobData: {
@@ -322,7 +324,7 @@ export default function Index() {
                 title: item.title,
                 company: item.company || "Unknown Company",
                 location: item.location || "Unknown Location",
-                employmentType: item.employmentType || "Full-time",
+                employmentType: item.employmentType,
                 postedDate:
                   item.postedDate ||
                   item.createdAt ||
