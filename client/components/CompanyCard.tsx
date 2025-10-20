@@ -1,18 +1,14 @@
 import {
   MapPin,
-  Users,
   Eye,
   Briefcase,
   UserCheck,
-  Edit,
   Calendar,
   Building2,
-  TrendingUp,
   AlertCircle,
   Share,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -84,19 +80,6 @@ export default function CompanyCard({
     }
   };
 
-  const getVisibilityIcon = (visibility: string) => {
-    switch (visibility) {
-      case "public":
-        return null;
-      case "private":
-        return <Eye className="h-3 w-3" />;
-      case "draft":
-        return <Edit className="h-3 w-3" />;
-      default:
-        return null;
-    }
-  };
-
   const getOnboardingStatus = () => {
     if (company.status === "draft" || company.status === "onboarding") {
       const progress = company.onboardingProgress || 0;
@@ -142,12 +125,22 @@ export default function CompanyCard({
     className: getStatusColor(company.status),
   });
 
-  if (getVisibilityIcon(company.visibility)) {
+  // Add company size badge if available
+  if (company.size) {
     badges.push({
-      text: "",
+      text: company.size,
       variant: "outline" as const,
       className: "text-xs",
-      icon: () => getVisibilityIcon(company.visibility),
+      icon: Building2,
+    });
+  }
+
+  // Add industry badge if available
+  if (company.industry) {
+    badges.push({
+      text: company.industry,
+      variant: "outline" as const,
+      className: "text-xs",
     });
   }
 
@@ -212,32 +205,6 @@ export default function CompanyCard({
       />
 
       <CardContent>
-        <div className="space-y-3">
-          {/* Company Details */}
-          <div className="flex items-center flex-wrap gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1 min-w-0">
-              <Building2 className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{company.industry}</span>
-            </div>
-            <div className="flex items-center gap-1 min-w-0">
-              <Users className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{company.size}</span>
-            </div>
-            <div className="flex items-center gap-1 min-w-0">
-              <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{company.location}</span>
-            </div>
-          </div>
-
-          {/* Visibility (status is already shown in header) */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {getVisibilityIcon(company.visibility) && (
-              <Badge variant="outline" className="text-xs">
-                {getVisibilityIcon(company.visibility)}
-              </Badge>
-            )}
-          </div>
-        </div>
 
         {/* Onboarding Progress */}
         {onboardingStatus.show && canEdit && (
@@ -254,36 +221,26 @@ export default function CompanyCard({
           </div>
         )}
         <div className="space-y-3">
-          {/* Job Statistics */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <div className="font-medium">{company.activeJobCount}</div>
-                <div className="text-xs text-muted-foreground">Active Jobs</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <div className="font-medium">{company.followers}</div>
-                <div className="text-xs text-muted-foreground">Followers</div>
-              </div>
-            </div>
-          </div>
-
           {/* Company Stats */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {company.activeJobCount > 0 && (
               <div className="flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {company.views} views
+                <Briefcase className="h-3 w-3" />
+                {company.activeJobCount} Active Job{company.activeJobCount !== 1 ? 's' : ''}
               </div>
+            )}
+            {company.founded && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                Founded {new Date(company.createdAt).getFullYear()}
+                Founded {company.founded}
               </div>
-            </div>
+            )}
+            {company.location && (
+              <div className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {company.location}
+              </div>
+            )}
           </div>
 
           {/* Quick Actions for Jobs */}

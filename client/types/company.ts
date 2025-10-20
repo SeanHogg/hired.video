@@ -126,6 +126,7 @@ export interface CompanyMetadata {
   visibility: CompanyVisibility;
   createdAt: string;
   updatedAt: string;
+  founded?: number; // Year the company was founded
   views: number;
   followers: number;
   jobCount: number;

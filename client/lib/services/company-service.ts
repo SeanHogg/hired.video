@@ -51,6 +51,7 @@ export const CompanyMetadataSchema = z.object({
   ).optional(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
+  founded: nullableNumber(),
   views: nullableNumber(),
   followers: nullableNumber(),
   jobCount: nullableNumber(),
