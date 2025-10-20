@@ -9,7 +9,7 @@ import {
   Eye,
   Play,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import * as React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
@@ -123,10 +123,8 @@ export default function Index() {
     }
   };
 
-  // Load dashboard data on component mount - now with progressive loading
-  useEffect(() => {
-    loadContent();
-  }, []);
+  // Note: loadContent is called by the useEffect at line ~563 when dependencies change
+  // No need for a separate mount effect - the dependency effect handles initial load
 
 
 
