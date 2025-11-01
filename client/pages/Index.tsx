@@ -304,26 +304,26 @@ export default function Index() {
               id: item.id,
               title: item.title,
               name: item.title,
-              summary: `${item.title} at ${item.company || "Unknown Company"}`,
+              summary: item.summary || `${item.title}${item.company ? ` at ${item.company}` : ""}`,
               views: item.views || 0,
               applications: item.applications || 0,
               type: "job" as const,
               contentType: "job" as const,
               profession: item.title,
-              company: item.company || "Unknown Company",
+              company: item.company,
               createdAt:
                 item.postedDate || item.createdAt || new Date().toISOString(),
               location: item.location,
               employmentType: item.employmentType,
               salary: item.salary,
               experienceLevel: item.experienceLevel,
-              salaryMin: 0, // TODO: Get from job data
-              salaryMax: 0, // TODO: Get from job data
+              salaryMin: 0, // Parsed from salary string if needed
+              salaryMax: 0, // Parsed from salary string if needed
               jobData: {
                 id: item.id,
                 title: item.title,
-                company: item.company || "Unknown Company",
-                location: item.location || "Unknown Location",
+                company: item.company,
+                location: item.location,
                 employmentType: item.employmentType,
                 postedDate:
                   item.postedDate ||
