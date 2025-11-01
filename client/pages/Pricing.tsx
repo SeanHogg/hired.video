@@ -28,6 +28,7 @@ import {
   Minus,
 } from "lucide-react";
 import { PREMIUM_MONTHLY_PRICE as basePrice } from "@shared/pricing";
+import { TRUST_SIGNALS } from "@/lib/constants";
 
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -1156,15 +1157,15 @@ export default function Pricing() {
               <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4" />
-                  Enterprise Security
+                  {TRUST_SIGNALS.SECURITY}
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  99.9% Uptime
+                  {TRUST_SIGNALS.SUPPORT}
                 </div>
                 <div className="flex items-center gap-2">
                   <Star className="h-4 w-4" />
-                  4.9/5 Rating
+                  {TRUST_SIGNALS.RATING}
                 </div>
               </div>
             </div>

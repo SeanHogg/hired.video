@@ -460,9 +460,10 @@ export function AdminDashboard({
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {dashboardData.systemHealth?.uptimePercentage.toFixed(1) ||
-                    "99.9"}
-                  %
+                  {dashboardData.systemHealth?.uptimePercentage
+                    ? dashboardData.systemHealth.uptimePercentage.toFixed(1)
+                    : "N/A"}
+                  {dashboardData.systemHealth?.uptimePercentage ? "%" : ""}
                 </div>
                 <div className="text-xs text-muted-foreground">Uptime</div>
               </div>

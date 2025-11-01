@@ -48,6 +48,9 @@ const ConfigSchema = z.object({
   FEATURE_AI_CHAT: z.coerce.boolean().default(true),
   FEATURE_VIDEO_RESUMES: z.coerce.boolean().default(true),
   FEATURE_ANALYTICS: z.coerce.boolean().default(false),
+
+  // System Health
+  SYSTEM_HEALTH_DEFAULT_UPTIME: z.coerce.number().min(0).max(100).default(99.8),
   FEATURE_NOTIFICATIONS: z.coerce.boolean().default(true),
 
   // UI Configuration

@@ -468,15 +468,15 @@ export default function Companies() {
                 <p className="text-sm text-muted-foreground">Open positions</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">98%</div>
+                <div className="text-3xl font-bold text-primary mb-2">Verified</div>
                 <p className="text-sm text-muted-foreground">
-                  Profile accuracy
+                  Company profiles
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-primary mb-2">24h</div>
+                <div className="text-3xl font-bold text-primary mb-2">Fast</div>
                 <p className="text-sm text-muted-foreground">
-                  Average response time
+                  Response times
                 </p>
               </div>
             </div>
