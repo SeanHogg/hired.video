@@ -285,8 +285,8 @@ function AccountManagementContent() {
             sidebarCollapsed={sidebarCollapsed}
           />
 
-          <div className="pt-16">
-            <div className="container mx-auto py-8">
+          <div className="pt-16 p-6">
+            <div className="max-w-7xl mx-auto">
               <AccountManagementSkeleton />
             </div>
           </div>
@@ -501,8 +501,8 @@ function AccountManagementContent() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16">
-          <div className="container mx-auto py-8 space-y-6">
+        <div className="pt-16 p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
