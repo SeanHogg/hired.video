@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDate } from "@/lib/utils";
 import type { MasterResumeGroup } from "@/lib/services/resume-service";
+import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
+import type { ResumePrivacy } from "@/types/resume";
 
 interface MasterResumeGroupProps {
   group: MasterResumeGroup;
@@ -46,7 +48,7 @@ export default function MasterResumeGroupComponent({
     setIsExpanded(!isExpanded);
   };
 
-  const getPrivacyBadgeColor = (privacy: string) => {
+  const getPrivacyBadgeColor = (privacy: ResumePrivacy) => {
     switch (privacy) {
       case "public":
         return "bg-green-100 text-green-800";
@@ -63,7 +65,7 @@ export default function MasterResumeGroupComponent({
     }
   };
 
-  const getPrivacyLabel = (privacy: string) => {
+  const getPrivacyLabel = (privacy: ResumePrivacy) => {
     switch (privacy) {
       case "public":
         return "Public";
@@ -77,6 +79,9 @@ export default function MasterResumeGroupComponent({
         return "Private";
     }
   };
+
+  // Map numeric privacy_ShowResume to string privacy value
+  const masterPrivacy = mapDisplayPrivacyToResumePrivacy(group.masterResume.privacy_ShowResume ?? 10);
 
   return (
     <Card className="mb-4">
@@ -116,8 +121,8 @@ export default function MasterResumeGroupComponent({
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge className={getPrivacyBadgeColor(group.masterResume.privacy as string)}>
-              {getPrivacyLabel(group.masterResume.privacy as string)}
+            <Badge className={getPrivacyBadgeColor(masterPrivacy)}>
+              {getPrivacyLabel(masterPrivacy)}
             </Badge>
             <div className="flex items-center text-sm text-muted-foreground">
               <Eye className="h-4 w-4 mr-1" />
@@ -227,8 +232,8 @@ export default function MasterResumeGroupComponent({
                           Active
                         </Badge>
                       )}
-                      <Badge className={`${getPrivacyBadgeColor(variation.privacy as string)} text-xs`}>
-                        {getPrivacyLabel(variation.privacy as string)}
+                      <Badge className={`${getPrivacyBadgeColor(mapDisplayPrivacyToResumePrivacy(variation.privacy_ShowResume ?? 10))} text-xs`}>
+                        {getPrivacyLabel(mapDisplayPrivacyToResumePrivacy(variation.privacy_ShowResume ?? 10))}
                       </Badge>
                     </div>
                     <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
