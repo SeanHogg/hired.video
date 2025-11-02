@@ -149,6 +149,7 @@ export class SettingsService {
       profileVisible: dto.profileVisibleToPublic ?? true,
       showEmail: dto.showEmail ?? false,
       showPhone: dto.showPhone ?? false,
+      showLocation: dto.showLocation ?? false,
       indexable: dto.allowSearchEngineIndexing ?? true,
       allowMessages: dto.allowMessaging ?? dto.allowDirectMessages ?? true,
       showActivity: dto.showActivityStatus ?? true,
@@ -209,6 +210,9 @@ export class SettingsService {
     }
     if (typeof settings.showPhone === "boolean") {
       payload.showPhone = settings.showPhone;
+    }
+    if (typeof settings.showLocation === "boolean") {
+      payload.showLocation = settings.showLocation;
     }
     if (typeof settings.allowMessages === "boolean") {
       payload.allowDirectMessages = settings.allowMessages;
