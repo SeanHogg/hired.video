@@ -19,6 +19,7 @@ import {
   Zap,
   Target,
   Network,
+  CreditCard,
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -528,19 +529,44 @@ function AccountManagementContent() {
             </div>
 
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <TabsList>
-                <TabsTrigger value="billing">Billing & Subscription</TabsTrigger>
-                {!isJobSeeker && (
-                  <>
-                    <TabsTrigger value="users">Team Members</TabsTrigger>
-                    <TabsTrigger value="invitations">
-                      Invitation Analytics
-                    </TabsTrigger>
-                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                  </>
-                )}
-              </TabsList>
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
+              {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
+              <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+                <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isJobSeeker ? 'sm:grid-cols-1' : 'sm:grid-cols-4'} gap-1 min-w-max sm:min-w-0`}>
+                  <TabsTrigger
+                    value="billing"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span>Billing & Subscription</span>
+                  </TabsTrigger>
+                  {!isJobSeeker && (
+                    <>
+                      <TabsTrigger
+                        value="users"
+                        className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span>Team Members</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="invitations"
+                        className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                      >
+                        <Mail className="h-4 w-4" />
+                        <span>Invitation Analytics</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="analytics"
+                        className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                        <span>Analytics</span>
+                      </TabsTrigger>
+                    </>
+                  )}
+                </TabsList>
+              </div>
 
               <TabsContent value="billing" className="space-y-6">
                 {activeTab === "billing" && <BillingManagement />}
