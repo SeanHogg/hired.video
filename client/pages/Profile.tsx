@@ -272,8 +272,8 @@ function ProfileContent() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-4 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="pt-16 p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
             {/* Profile Header */}
             <Card>
               <CardContent className="p-4 sm:p-6">
