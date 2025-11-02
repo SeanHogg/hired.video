@@ -29,6 +29,7 @@ import {
   Share2,
   Clock,
   RotateCcw,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
@@ -344,16 +345,40 @@ export default function ProductDashboard() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 gap-1">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-          <TabsTrigger value="users" className="text-xs sm:text-sm">Users</TabsTrigger>
-          <TabsTrigger value="jobs" className="text-xs sm:text-sm">Jobs</TabsTrigger>
-          <TabsTrigger value="companies" className="text-xs sm:text-sm">Companies</TabsTrigger>
-          <TabsTrigger value="resumes" className="text-xs sm:text-sm">Resumes</TabsTrigger>
-          <TabsTrigger value="affiliates" className="text-xs sm:text-sm">Affiliates</TabsTrigger>
-          <TabsTrigger value="saas" className="text-xs sm:text-sm">SaaS</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
+        <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-7 gap-1 min-w-max sm:min-w-0">
+            <TabsTrigger value="overview" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <BarChart3 className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <Users className="h-4 w-4" />
+              <span>Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="jobs" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <Briefcase className="h-4 w-4" />
+              <span>Jobs</span>
+            </TabsTrigger>
+            <TabsTrigger value="companies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <Building2 className="h-4 w-4" />
+              <span>Companies</span>
+            </TabsTrigger>
+            <TabsTrigger value="resumes" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <FileText className="h-4 w-4" />
+              <span>Resumes</span>
+            </TabsTrigger>
+            <TabsTrigger value="affiliates" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <UserPlus className="h-4 w-4" />
+              <span>Affiliates</span>
+            </TabsTrigger>
+            <TabsTrigger value="saas" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <Zap className="h-4 w-4" />
+              <span>SaaS</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview">
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

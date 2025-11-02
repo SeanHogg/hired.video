@@ -27,6 +27,7 @@ export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.AFFILIATE]: "Affiliate",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
+  "Unassigned": "Unassigned", // Users without a role or profile
 } as const;
 
 // Role descriptions for dropdowns and forms
@@ -37,6 +38,7 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.AFFILIATE]: "Partner or affiliate marketer",
   [USER_ROLES.ADMIN]: "System administration",
   [USER_ROLES.SUPER_ADMIN]: "Full system control and product management",
+  "Unassigned": "Users without a role or profile assigned",
 } as const;
 
 // Dashboard type constants - single source of truth
@@ -124,6 +126,11 @@ export function normalizeRole(
 export function getRoleDisplayLabel(
   role: string | number | undefined | null,
 ): string {
+  // Handle special case for "Unassigned" string from backend
+  if (role === "Unassigned") {
+    return ROLE_DISPLAY_LABELS["Unassigned"];
+  }
+
   const normalizedRole = normalizeRole(role);
   return (
     ROLE_DISPLAY_LABELS[normalizedRole] ||

@@ -124,16 +124,40 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
+        <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+          <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-2'} gap-1 min-w-max sm:min-w-0`}>
+            <TabsTrigger value="overview" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <BarChart3 className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
 
-          {isAdmin && <TabsTrigger value="team" className="text-xs sm:text-sm">Team</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="billing" className="text-xs sm:text-sm">Billing</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>}
+            {isAdmin && (
+              <TabsTrigger value="team" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+                <Users className="h-4 w-4" />
+                <span>Team</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+                <CreditCard className="h-4 w-4" />
+                <span>Billing</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="analytics" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+                <TrendingUp className="h-4 w-4" />
+                <span>Analytics</span>
+              </TabsTrigger>
+            )}
 
-          <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="settings" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
+              <Settings className="h-4 w-4" />
+              <span>Settings</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           {/* Quick Stats */}
