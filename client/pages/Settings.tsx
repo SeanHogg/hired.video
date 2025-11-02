@@ -91,6 +91,7 @@ function SettingsContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number } | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState("notifications");
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -145,16 +146,20 @@ function SettingsContent() {
         console.error("Failed to load account settings", err);
       });
 
-    // Load job preferences from API
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  // Lazy-load job preferences only when the job-preferences tab is active
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== "job-preferences" || jobPrefs !== null) return;
+
     settingsService
       .getJobPreferences()
       .then(setJobPrefs)
       .catch((err) => {
         console.error("Failed to load job preferences", err);
       });
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeTab, jobPrefs]);
 
   // Cooldown timer for resend button
   useEffect(() => {
@@ -485,50 +490,47 @@ function SettingsContent() {
             )}
 
             {/* Settings Tabs */}
-            <Tabs defaultValue="notifications" className="space-y-4 sm:space-y-6">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
-                <TabsTrigger
-                  value="notifications"
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                >
-                  <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Notifications</span>
-                  <span className="sm:hidden">Notify</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="privacy"
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                >
-                  <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Privacy</span>
-                  <span className="sm:hidden">Privacy</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="appearance"
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                >
-                  <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Appearance</span>
-                  <span className="sm:hidden">Theme</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="job-preferences"
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                >
-                  <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Job Preferences</span>
-                  <span className="sm:hidden">Jobs</span>
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="account"
-                  className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                >
-                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Account</span>
-                </TabsTrigger>
-              </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+              {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
+              <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-5 gap-1 min-w-max sm:min-w-0">
+                  <TabsTrigger
+                    value="notifications"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>Notifications</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="privacy"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Privacy</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="appearance"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Palette className="h-4 w-4" />
+                    <span>Appearance</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="job-preferences"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Target className="h-4 w-4" />
+                    <span>Job Preferences</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="account"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span>Account</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               {/* Notifications Tab */}
               <TabsContent value="notifications" className="space-y-6">
