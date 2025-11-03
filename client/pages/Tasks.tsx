@@ -142,7 +142,7 @@ export default function Tasks() {
 
   const [currentView, setCurrentView] = useState<
     "calendar" | "table" | "kanban"
-  >("table");
+  >("kanban");
   const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
@@ -190,8 +190,8 @@ export default function Tasks() {
         <SheetHeader>
           <SheetTitle>
             {isEditing
-              ? editTask?.title || "Edit Task"
-              : selectedTask?.title || "Task Details"}
+              ? (editTask ? (isGuid(editTask.id) ? (editTask.title || "Edit Task") : "Create New Task") : "Edit Task")
+              : "Task Details"}
           </SheetTitle>
           {!isEditing && selectedTask?.description && (
             <SheetDescription>{selectedTask.description}</SheetDescription>
@@ -199,6 +199,10 @@ export default function Tasks() {
         </SheetHeader>
         {selectedTask && !isEditing && (
           <div className="mt-4 space-y-3 text-sm">
+            <div>
+              <Label htmlFor="view-title">Task Title</Label>
+              <Input id="view-title" value={selectedTask.title} readOnly disabled />
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Type</span>
               <Badge className={taskTypeColors[selectedTask.type]}>
@@ -259,7 +263,7 @@ export default function Tasks() {
         {isEditing && editTask && (
           <div className="mt-4 space-y-3 text-sm">
             <div>
-              <Label htmlFor="edit-title">Title</Label>
+              <Label htmlFor="edit-title">Task Title</Label>
               <Input
                 id="edit-title"
                 value={editTask.title}
@@ -999,7 +1003,7 @@ export default function Tasks() {
 
             {/* Loading State */}
             {isLoading && (
-              <div className="flex items-center justify-center py-12">
+              <div data-testid="loader" className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin mr-2" />
                 <span>Loading tasks...</span>
               </div>
@@ -1016,7 +1020,7 @@ export default function Tasks() {
             )}
 
             {/* Quick Stats */}
-            {!isLoading && !error && (
+            {!isLoading && !error && currentView === "table" && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1097,17 +1101,17 @@ export default function Tasks() {
                 }
               >
                 <TabsList>
-                  <TabsTrigger value="table" className="gap-2">
+                  <TabsTrigger value="table" className="gap-2" onClick={() => setCurrentView("table")}>
                     <TableIcon className="h-4 w-4" />
-                    Table View
+                    List
                   </TabsTrigger>
-                  <TabsTrigger value="calendar" className="gap-2">
+                  <TabsTrigger value="calendar" className="gap-2" onClick={() => setCurrentView("calendar")}>
                     <CalendarDays className="h-4 w-4" />
-                    Calendar View
+                    Calendar
                   </TabsTrigger>
-                  <TabsTrigger value="kanban" className="gap-2">
+                  <TabsTrigger value="kanban" className="gap-2" onClick={() => setCurrentView("kanban")}>
                     <List className="h-4 w-4" />
-                    Kanban View
+                    Kanban
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -1167,7 +1171,7 @@ export default function Tasks() {
 
             {/* Table View */}
             {currentView === "table" && (
-              <Card>
+              <Card data-testid="list-view">
                 <CardHeader>
                   <CardTitle>Tasks List</CardTitle>
                   <CardDescription>
@@ -1300,7 +1304,7 @@ export default function Tasks() {
 
             {/* Calendar View */}
             {currentView === "calendar" && (
-              <Card>
+              <Card data-testid="calendar-view">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Calendar View</CardTitle>
@@ -1453,7 +1457,7 @@ export default function Tasks() {
 
             {/* Kanban View */}
             {currentView === "kanban" && (
-              <Card>
+              <Card data-testid="kanban-view">
                 <CardHeader>
                   <CardTitle>Kanban View</CardTitle>
                   <CardDescription>
@@ -1523,7 +1527,7 @@ export default function Tasks() {
                     </div>
 
                     {/* To Do Column */}
-                    <div
+                    <div data-testid="todo-column"
                       className={`rounded-lg border p-3 transition-all duration-200 ${
                         dragOverColumn === ProductivityItemStatus.ToDo
                           ? "bg-yellow-50 border-yellow-300 border-2 scale-105"
@@ -1585,7 +1589,7 @@ export default function Tasks() {
                     </div>
 
                     {/* In Progress Column */}
-                    <div
+                    <div data-testid="inprogress-column"
                       className={`rounded-lg border p-3 transition-all duration-200 ${
                         dragOverColumn === ProductivityItemStatus.InProgress
                           ? "bg-orange-50 border-orange-300 border-2 scale-105"
@@ -1645,7 +1649,7 @@ export default function Tasks() {
                     </div>
 
                     {/* Completed Column */}
-                    <div
+                    <div data-testid="completed-column"
                       className={`rounded-lg border p-3 transition-all duration-200 ${
                         dragOverColumn === ProductivityItemStatus.Completed
                           ? "bg-green-50 border-green-300 border-2 scale-105"

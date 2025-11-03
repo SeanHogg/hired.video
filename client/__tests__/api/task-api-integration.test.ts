@@ -26,37 +26,35 @@ describe('Task API Integration Tests', () => {
   });
 
   describe('GET /api/task - List Tasks', () => {
-    it('should return ApiResponse wrapper with tasks array', async () => {
-      // Mock the expected API response structure based on TaskController
-      const mockApiResponse = {
-        data: {
-          success: true,
-          data: [
-            {
-              id: '123e4567-e89b-12d3-a456-426614174000',
-              text: 'Test Task',
-              description: 'Test Description',
-              start: '2024-01-01T00:00:00Z',
-              end: '2024-01-02T00:00:00Z',
-              taskType: TaskType.General,
-              status: ProductivityItemStatus.ToDo,
-              creationDateTime: '2024-01-01T00:00:00Z',
-              updateDateTime: '2024-01-01T00:00:00Z',
-              createdByUserId: 'user-123',
-              assignedToUserId: 'user-123',
-            } as TaskDTO,
-          ],
-          errorMessage: null,
-          errorCode: null,
-        },
+    it('should return tasks array from ApiClient success response', async () => {
+      // Mock the ApiClient success response shape
+      const mockResponse = {
+        success: true,
+        data: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            text: 'Test Task',
+            description: 'Test Description',
+            start: '2024-01-01T00:00:00Z',
+            end: '2024-01-02T00:00:00Z',
+            taskType: TaskType.General,
+            status: ProductivityItemStatus.ToDo,
+            creationDateTime: '2024-01-01T00:00:00Z',
+            updateDateTime: '2024-01-01T00:00:00Z',
+            createdByUserId: 'user-123',
+            assignedToUserId: 'user-123',
+          } as TaskDTO,
+        ],
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 
       expect(mockApiClient.get).toHaveBeenCalledWith('/api/task');
-      expect(result).toEqual(mockApiResponse.data.data);
+      expect(result).toEqual(mockResponse.data);
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(1);
       expect(result[0]).toHaveProperty('id');
@@ -64,17 +62,15 @@ describe('Task API Integration Tests', () => {
     });
 
     it('should handle empty tasks array response', async () => {
-      // Test the case where API returns 200 OK but empty array
-      const mockApiResponse = {
-        data: {
-          success: true,
-          data: [], // Empty array - this might be the issue
-          errorMessage: null,
-          errorCode: null,
-        },
+      // API returns 200 OK with empty array
+      const mockResponse = {
+        success: true,
+        data: [],
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 
@@ -85,17 +81,15 @@ describe('Task API Integration Tests', () => {
     });
 
     it('should handle null data response', async () => {
-      // Test the case where API returns 200 OK but null data
-      const mockApiResponse = {
-        data: {
-          success: true,
-          data: null, // Null data - another potential issue
-          errorMessage: null,
-          errorCode: null,
-        },
+      // API returns 200 OK with null data
+      const mockResponse = {
+        success: true,
+        data: null as any,
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 
@@ -103,30 +97,33 @@ describe('Task API Integration Tests', () => {
       expect(result).toEqual(null);
     });
 
-    it('should handle malformed API response', async () => {
-      // Test the case where API returns unexpected structure
-      const mockApiResponse = {
-        data: {
-          // Missing success, data, errorMessage, errorCode properties
-          tasks: [], // Wrong property name
-        },
+    it('should handle malformed API response data shape', async () => {
+      // API returns success but data is not an array
+      const mockResponse = {
+        success: true,
+        data: { tasks: [] }, // Wrong shape
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 
       expect(mockApiClient.get).toHaveBeenCalledWith('/api/task');
-      expect(result).toBeUndefined();
+      expect(result).toEqual({ tasks: [] });
     });
 
-    it('should handle completely empty response', async () => {
-      // Test the case where API returns completely empty response
-      const mockApiResponse = {
-        data: {}, // Completely empty object
+    it('should handle undefined data gracefully', async () => {
+      // Non-standard: success without data (should be avoided but handled)
+      const mockResponse = {
+        success: true,
+        data: undefined as any,
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 
@@ -135,17 +132,15 @@ describe('Task API Integration Tests', () => {
     });
 
     it('should handle response with wrong data type', async () => {
-      // Test the case where API returns wrong data type
-      const mockApiResponse = {
-        data: {
-          success: true,
-          data: 'not an array', // Wrong data type
-          errorMessage: null,
-          errorCode: null,
-        },
+      // API returns wrong data type
+      const mockResponse = {
+        success: true,
+        data: 'not an array' as any,
+        message: undefined,
+        timestamp: new Date().toISOString(),
       };
 
-      mockApiClient.get.mockResolvedValue(mockApiResponse);
+      mockApiClient.get.mockResolvedValue(mockResponse);
 
       const result = await taskService.getTasks();
 

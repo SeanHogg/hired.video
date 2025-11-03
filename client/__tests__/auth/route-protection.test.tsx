@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { authService } from '../../lib/services/auth-service';
 
@@ -24,8 +24,18 @@ const RequireVerified = ({ children }: { children: JSX.Element }) => {
 };
 
 // Mock dependencies
-vi.mock('../../lib/auth');
-vi.mock('../../lib/services/auth-service');
+vi.mock('../../lib/auth', () => ({
+  useAuth: vi.fn(),
+}));
+vi.mock('../../lib/services/auth-service', () => ({
+  authService: {
+    isAuthenticated: vi.fn(),
+    getStoredUser: vi.fn(),
+    getToken: vi.fn(),
+    logout: vi.fn(),
+    getVerificationStatus: vi.fn(),
+  },
+}));
 
 describe('Route Protection and Authentication Edge Cases', () => {
   let mockUseAuth: Mock;
@@ -43,20 +53,20 @@ describe('Route Protection and Authentication Edge Cases', () => {
 
   const renderProtectedRoute = () => {
     return render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/tasks']}>
         <Routes>
-          <Route 
-            path="/tasks" 
+          <Route
+            path="/tasks"
             element={
               <RequireVerified>
                 <TestProtectedComponent />
               </RequireVerified>
-            } 
+            }
           />
           <Route path="/login" element={<div data-testid="login-page">Login Page</div>} />
           <Route path="/verify-email" element={<div data-testid="verify-page">Verify Email Page</div>} />
         </Routes>
-      </BrowserRouter>
+      </MemoryRouter>
     );
   };
 
@@ -267,18 +277,18 @@ describe('Route Protection and Authentication Edge Cases', () => {
       });
 
       rerender(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/tasks']}>
           <Routes>
-            <Route 
-              path="/tasks" 
+            <Route
+              path="/tasks"
               element={
                 <RequireVerified>
                   <TestProtectedComponent />
                 </RequireVerified>
-              } 
+              }
             />
           </Routes>
-        </BrowserRouter>
+        </MemoryRouter>
       );
 
       // Assert final authenticated state
@@ -310,18 +320,18 @@ describe('Route Protection and Authentication Edge Cases', () => {
       });
 
       rerender(
-        <BrowserRouter>
+        <MemoryRouter initialEntries={['/tasks']}>
           <Routes>
-            <Route 
-              path="/tasks" 
+            <Route
+              path="/tasks"
               element={
                 <RequireVerified>
                   <TestProtectedComponent />
                 </RequireVerified>
-              } 
+              }
             />
           </Routes>
-        </BrowserRouter>
+        </MemoryRouter>
       );
 
       // Assert redirect to login

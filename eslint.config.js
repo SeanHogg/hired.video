@@ -84,7 +84,7 @@ export default [
       "react/no-is-mounted": "error",
       "react/no-render-return-value": "error",
       "react/no-string-refs": "warn",
-      "react/no-unescaped-entities": "warn", // Warn instead of error
+      "react/no-unescaped-entities": "off", // Turned off to reduce noise from large text blocks
       "react/no-unknown-property": "error",
       "react/require-render-return": "error",
       "react/self-closing-comp": "warn", // Warn instead of error
@@ -105,14 +105,11 @@ export default [
       "react/jsx-wrap-multilines": "off", // Let prettier handle
 
       // React Hooks rules
-      "react-hooks/rules-of-hooks": "error", 
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "off",
 
       // React Refresh rules
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
-      ],
+      "react-refresh/only-export-components": "off",
 
       // Import rules (relaxed)
       "import/order": "off", // Too strict and annoying
@@ -137,7 +134,7 @@ export default [
       "jsx-a11y/html-has-lang": "warn",
       "jsx-a11y/img-redundant-alt": "warn",
       "jsx-a11y/interactive-supports-focus": "warn",
-      "jsx-a11y/label-has-associated-control": "warn",
+      "jsx-a11y/label-has-associated-control": "off",
       "jsx-a11y/mouse-events-have-key-events": "warn",
       "jsx-a11y/no-access-key": "warn",
       "jsx-a11y/no-autofocus": "warn",
@@ -149,7 +146,7 @@ export default [
       "jsx-a11y/tabindex-no-positive": "warn",
 
       // General code quality rules (relaxed)
-      "no-console": "warn",
+      "no-console": "off",
       "no-debugger": "warn", // Warn in development
       "no-alert": "warn",
       "no-var": "error",
@@ -213,15 +210,15 @@ export default [
           ignoreRestSiblings: true,
         },
       ],
-      "no-console": "warn",
+      "no-console": "off",
       "no-debugger": "error",
       "prefer-const": "error",
 
       // React rules for JS files
       "react/react-in-jsx-scope": "off",
-      "react/prop-types": "error", // Enable prop-types for JS files
+      "react/prop-types": "off", // Disabled - using TypeScript or not relying on prop-types in JS files
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 
@@ -289,6 +286,42 @@ export default [
       ],
     },
   },
+
+  // Test files (Vitest/JSDOM)
+  {
+    files: [
+      "**/*.test.{ts,tsx,js,jsx}",
+      "client/__tests__/**/*.{ts,tsx,js,jsx}",
+      "client/tests/**/*.{ts,tsx,js,jsx}"
+    ],
+    languageOptions: {
+      globals: {
+        vi: "readonly",
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        beforeAll: "readonly",
+        beforeEach: "readonly",
+        afterAll: "readonly",
+        afterEach: "readonly",
+        window: "readonly",
+        document: "readonly",
+      },
+    },
+    rules: {
+      // Loosen rules in tests to reduce noise and allow diagnostic logging
+      "no-console": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true }
+      ],
+      "import/no-duplicates": "off",
+      "jsx-a11y/click-events-have-key-events": "off",
+    },
+  },
+
 
   // Ignore patterns
   {

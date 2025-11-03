@@ -11,7 +11,7 @@ const TEST_ENDPOINT = '/api/task';
 
 describe('Task API Response Validation', () => {
   describe('Authentication Error Response Issue', () => {
-    it('should identify the empty response body issue on 401', async () => {
+    it('should return a JSON error body on 401', async () => {
       const response = await fetch(`${API_BASE_URL}${TEST_ENDPOINT}`, {
         method: 'GET',
         headers: {
@@ -21,31 +21,23 @@ describe('Task API Response Validation', () => {
       });
 
       const text = await response.text();
-      
-      console.log('=== AUTHENTICATION ERROR ANALYSIS ===');
-      console.log('Status:', response.status);
-      console.log('Status Text:', response.statusText);
-      console.log('Content-Type:', response.headers.get('content-type'));
-      console.log('Content-Length:', response.headers.get('content-length'));
-      console.log('Response Body Length:', text.length);
-      console.log('Response Body:', text);
-      console.log('Is Empty Body:', text.length === 0);
-      console.log('=====================================');
 
-      // Document the issue
+      // Validate correct behavior
       expect(response.status).toBe(401);
-      expect(text.length).toBe(0); // This is the problem!
-      
-      // What SHOULD happen:
-      // expect(text.length).toBeGreaterThan(0);
-      // expect(JSON.parse(text)).toMatchObject({
-      //   success: false,
-      //   errorMessage: expect.any(String),
-      //   errorCode: expect.any(String)
-      // });
+      expect(text.length).toBeGreaterThan(0);
+      const json = JSON.parse(text);
+      expect(json.success).toBe(false);
+      // Accept new structured error or legacy fields
+      if (json.error) {
+        expect(json.error.code).toBeTruthy();
+        expect(json.error.message).toBeTruthy();
+      } else {
+        expect(json.errorMessage).toBeTruthy();
+        expect(json.errorCode).toBeTruthy();
+      }
     });
 
-    it('should validate that 401 responses should have JSON error body', async () => {
+    it('should return JSON error with application/json content type on 401', async () => {
       const response = await fetch(`${API_BASE_URL}${TEST_ENDPOINT}`, {
         method: 'GET',
         headers: {
@@ -53,22 +45,16 @@ describe('Task API Response Validation', () => {
         },
       });
 
-      // Current behavior (broken)
       expect(response.status).toBe(401);
       const text = await response.text();
-      expect(text).toBe(''); // Empty response body - this is the bug
-
-      // Expected behavior (what should happen)
-      // The API should return a proper JSON error response like:
-      // {
-      //   "success": false,
-      //   "data": null,
-      //   "errorMessage": "User not authenticated",
-      //   "errorCode": "Unauthorized"
-      // }
+      expect(text).not.toBe('');
+      const json = JSON.parse(text);
+      expect(json.success).toBe(false);
+      const contentType = response.headers.get('content-type') || '';
+      expect(contentType).toContain('application/json');
     });
 
-    it('should validate content-type header for 401 responses', async () => {
+    it('should set application/json content type for 401 responses', async () => {
       const response = await fetch(`${API_BASE_URL}${TEST_ENDPOINT}`, {
         method: 'GET',
         headers: {
@@ -77,54 +63,49 @@ describe('Task API Response Validation', () => {
       });
 
       expect(response.status).toBe(401);
-      
-      // The content-type should be application/json for API errors
-      const contentType = response.headers.get('content-type');
-      console.log('Content-Type for 401:', contentType);
-      
-      // Currently this might be null or not application/json
-      // It should be 'application/json' for proper API error responses
+      const contentType = response.headers.get('content-type') || '';
+      expect(contentType).toContain('application/json');
     });
   });
 
   describe('Expected API Response Structure', () => {
     it('should define the expected ApiResponse structure for errors', () => {
-      // This is what the API SHOULD return for 401 errors
-      const expectedErrorResponse = {
+      // Preferred new error structure
+      const expectedErrorResponseNew = {
+        success: false,
+        error: { code: 'Unauthorized', message: 'User not authenticated' },
+        data: null,
+      };
+
+      // Legacy error structure (still accepted by some tests)
+      const expectedErrorResponseLegacy = {
         success: false,
         data: null,
         errorMessage: 'User not authenticated',
-        errorCode: 'Unauthorized'
+        errorCode: 'Unauthorized',
       };
 
-      // Validate the structure we expect
-      expect(expectedErrorResponse).toHaveProperty('success');
-      expect(expectedErrorResponse).toHaveProperty('data');
-      expect(expectedErrorResponse).toHaveProperty('errorMessage');
-      expect(expectedErrorResponse).toHaveProperty('errorCode');
-      expect(expectedErrorResponse.success).toBe(false);
-      expect(typeof expectedErrorResponse.errorMessage).toBe('string');
-      expect(typeof expectedErrorResponse.errorCode).toBe('string');
+      expect(expectedErrorResponseNew).toHaveProperty('success');
+      expect(expectedErrorResponseNew).toHaveProperty('error');
+      expect(expectedErrorResponseNew.error).toHaveProperty('code');
+      expect(expectedErrorResponseNew.error).toHaveProperty('message');
+
+      expect(expectedErrorResponseLegacy).toHaveProperty('errorMessage');
+      expect(expectedErrorResponseLegacy).toHaveProperty('errorCode');
     });
 
     it('should define the expected ApiResponse structure for success', () => {
-      // This is what the API SHOULD return for 200 success
+      // Standard success response
       const expectedSuccessResponse = {
         success: true,
         data: [], // Array of TaskDTO objects
-        errorMessage: null,
-        errorCode: null
+        message: null,
+        timestamp: new Date().toISOString(),
       };
 
-      // Validate the structure we expect
       expect(expectedSuccessResponse).toHaveProperty('success');
       expect(expectedSuccessResponse).toHaveProperty('data');
-      expect(expectedSuccessResponse).toHaveProperty('errorMessage');
-      expect(expectedSuccessResponse).toHaveProperty('errorCode');
-      expect(expectedSuccessResponse.success).toBe(true);
       expect(Array.isArray(expectedSuccessResponse.data)).toBe(true);
-      expect(expectedSuccessResponse.errorMessage).toBeNull();
-      expect(expectedSuccessResponse.errorCode).toBeNull();
     });
   });
 

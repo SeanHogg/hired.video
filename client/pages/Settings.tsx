@@ -146,7 +146,7 @@ function SettingsContent() {
         console.error("Failed to load account settings", err);
       });
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isAuthenticated]);
 
   // Lazy-load job preferences only when the job-preferences tab is active

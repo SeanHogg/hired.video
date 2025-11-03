@@ -61,8 +61,14 @@ describe('Live Task API Tests', () => {
       if (response.data) {
         expect(response.data).toHaveProperty('success');
         expect(response.data.success).toBe(false);
-        expect(response.data).toHaveProperty('errorMessage');
-        expect(response.data).toHaveProperty('errorCode');
+        // Accept new structured error or legacy fields
+        if ('error' in response.data) {
+          expect(response.data.error).toHaveProperty('code');
+          expect(response.data.error).toHaveProperty('message');
+        } else {
+          expect(response.data).toHaveProperty('errorMessage');
+          expect(response.data).toHaveProperty('errorCode');
+        }
       }
     });
 
@@ -74,13 +80,20 @@ describe('Live Task API Tests', () => {
       expect(response.status).toBe(401);
       
       if (response.data) {
-        // Validate ApiResponse<List<TaskDTO>> error structure
-        expect(response.data).toMatchObject({
-          success: false,
-          data: null,
-          errorMessage: expect.any(String),
-          errorCode: expect.any(String),
-        });
+        // Validate ApiResponse<List<TaskDTO>> error structure (new or legacy)
+        expect(response.data).toHaveProperty('success', false);
+        expect(response.data).toHaveProperty('data');
+        if ('error' in response.data) {
+          expect(response.data.error).toMatchObject({
+            code: expect.any(String),
+            message: expect.any(String),
+          });
+        } else {
+          expect(response.data).toMatchObject({
+            errorMessage: expect.any(String),
+            errorCode: expect.any(String),
+          });
+        }
       }
     });
   });
@@ -177,10 +190,13 @@ describe('Live Task API Tests', () => {
         expect(response.data).toBeTruthy();
         expect(response.data).toHaveProperty('success');
         expect(response.data.success).toBe(false);
-        expect(response.data).toHaveProperty('errorMessage');
-        expect(response.data).toHaveProperty('errorCode');
-        expect(response.data.errorMessage).toBeTruthy();
-        expect(response.data.errorCode).toBeTruthy();
+        if ('error' in response.data) {
+          expect(response.data.error).toHaveProperty('code');
+          expect(response.data.error).toHaveProperty('message');
+        } else {
+          expect(response.data).toHaveProperty('errorMessage');
+          expect(response.data).toHaveProperty('errorCode');
+        }
       }
     });
   });
