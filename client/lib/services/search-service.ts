@@ -84,6 +84,7 @@ export type SearchFilters = z.infer<typeof SearchFiltersSchema>;
 // ============================================================================
 
 export class SearchService {
+  private inflight = new Map<string, Promise<SearchResponse>>();
   /**
    * Search across all content types with unified pagination
    */
@@ -107,113 +108,128 @@ export class SearchService {
 
     // Use the new unified search endpoint
     const unifiedUrl = `/api/Dashboard/search/public?${params.toString()}`;
+    const key = unifiedUrl;
 
-    // Schema for the unified search response - matches UnifiedSearchResultDTO from backend
-    const UnifiedSearchItemSchema = z.object({
-      id: z.string(),
-      type: z.string(),
-      title: z.string(),
-      name: z.string().optional().nullable(),
-      summary: z.string().optional().nullable(),
-      description: z.string().optional().nullable(),
-      location: z.string().optional().nullable(),
-      company: z.string().optional().nullable(),
-      industry: z.string().optional().nullable(),
-      employmentType: z.string().optional().nullable(),
-      postedDate: z.string().optional().nullable(),
-      createdAt: z.string().optional().nullable(),
-      updatedAt: z.string().optional().nullable(),
-      views: z.number().default(0),
-      avatar: z.string().optional().nullable(),
-      logo: z.string().optional().nullable(),
-      skills: z.string().optional().nullable(),
-      salary: z.string().optional().nullable(),
-      experienceLevel: z.string().optional().nullable(),
-      headline: z.string().optional().nullable(),
-      tagline: z.string().optional().nullable(),
-      size: z.string().optional().nullable(),
-      founded: z.number().optional().nullable(),
-      isPublic: z.boolean().optional().nullable(),
-      templateName: z.string().optional().nullable(),
-      isFeatured: z.boolean().default(false),
-    });
+    const existing = this.inflight.get(key);
+    if (existing) {
+      return existing;
+    }
 
-    const UnifiedSearchResponseSchema = z.object({
-      items: z.array(UnifiedSearchItemSchema),
-      total: z.number(),
-      page: z.number(),
-      limit: z.number(),
-      totalPages: z.number(),
-      hasNextPage: z.boolean(),
-      hasPreviousPage: z.boolean(),
-    });
+    const promise = (async (): Promise<SearchResponse> => {
+      // Schema for the unified search response - matches UnifiedSearchResultDTO from backend
+      const UnifiedSearchItemSchema = z.object({
+        id: z.string(),
+        type: z.string(),
+        title: z.string(),
+        name: z.string().optional().nullable(),
+        summary: z.string().optional().nullable(),
+        description: z.string().optional().nullable(),
+        location: z.string().optional().nullable(),
+        company: z.string().optional().nullable(),
+        industry: z.string().optional().nullable(),
+        employmentType: z.string().optional().nullable(),
+        postedDate: z.string().optional().nullable(),
+        createdAt: z.string().optional().nullable(),
+        updatedAt: z.string().optional().nullable(),
+        views: z.number().default(0),
+        avatar: z.string().optional().nullable(),
+        logo: z.string().optional().nullable(),
+        skills: z.string().optional().nullable(),
+        salary: z.string().optional().nullable(),
+        experienceLevel: z.string().optional().nullable(),
+        headline: z.string().optional().nullable(),
+        tagline: z.string().optional().nullable(),
+        size: z.string().optional().nullable(),
+        founded: z.number().optional().nullable(),
+        isPublic: z.boolean().optional().nullable(),
+        templateName: z.string().optional().nullable(),
+        isFeatured: z.boolean().default(false),
+      });
 
-    // Call the unified search endpoint
-    const response = await apiClient.get<z.infer<typeof UnifiedSearchResponseSchema>>(
-      unifiedUrl,
-      UnifiedSearchResponseSchema,
-    );
-    const unifiedData = response.data;
+      const UnifiedSearchResponseSchema = z.object({
+        items: z.array(UnifiedSearchItemSchema),
+        total: z.number(),
+        page: z.number(),
+        limit: z.number(),
+        totalPages: z.number(),
+        hasNextPage: z.boolean(),
+        hasPreviousPage: z.boolean(),
+      });
 
-    // Transform the unified response to our SearchResponse format
-    const items: SearchResultItem[] = unifiedData.items.map((item) => ({
-      id: item.id,
-      type: item.type as "job" | "company" | "people" | "resume" | "media",
-      title: item.title,
-      summary: item.description || item.summary || "",
-      description: item.description || item.summary || "",
-      location: item.location || "",
-      createdAt: item.createdAt || "",
-      views: item.views || 0,
-      // Add type-specific properties
-      ...(item.type === "job" && {
-        postedDate: item.postedDate || item.createdAt,
-        company: item.company,
-        industry: item.industry,
-        employmentType: item.employmentType,
-        salary: item.salary,
-        experienceLevel: item.experienceLevel,
-      }),
-      ...(item.type === "company" && {
-        name: item.name || item.title,
-        industry: item.industry,
-        logo: item.logo,
-        tagline: item.tagline,
-        size: item.size,
-        founded: item.founded,
-      }),
-      ...(item.type === "people" && {
-        name: item.name || item.title,
-        headline: item.headline,
-        avatar: item.avatar,
-      }),
-      ...(item.type === "resume" && {
-        name: item.name || item.title,
-        isPublic: item.isPublic ?? true,
-        templateName: item.templateName,
-      }),
-      ...(item.type === "media" && {
-        name: item.name || item.title,
-        // Media metadata is stored in different fields by the backend
-        // skills field contains metaType, location contains userId, company contains referenceId, experienceLevel contains url
-        metaType: item.skills ? parseInt(item.skills) : undefined,
-        url: item.experienceLevel,
-        userId: item.location,
-        referenceId: item.company,
-      }),
-    }));
+      // Call the unified search endpoint
+      const response = await apiClient.get<z.infer<typeof UnifiedSearchResponseSchema>>(
+        unifiedUrl,
+        UnifiedSearchResponseSchema,
+      );
+      const unifiedData = response.data;
 
-    const searchResponse: SearchResponse = {
-      items,
-      total: unifiedData.total,
-      page: unifiedData.page,
-      limit: unifiedData.limit,
-      totalPages: unifiedData.totalPages,
-      hasNextPage: unifiedData.hasNextPage,
-      hasPreviousPage: unifiedData.hasPreviousPage,
-    };
+      // Transform the unified response to our SearchResponse format
+      const items: SearchResultItem[] = unifiedData.items.map((item) => ({
+        id: item.id,
+        type: item.type as "job" | "company" | "people" | "resume" | "media",
+        title: item.title,
+        summary: item.description || item.summary || "",
+        description: item.description || item.summary || "",
+        location: item.location || "",
+        createdAt: item.createdAt || "",
+        views: item.views || 0,
+        // Add type-specific properties
+        ...(item.type === "job" && {
+          postedDate: item.postedDate || item.createdAt,
+          company: item.company,
+          industry: item.industry,
+          employmentType: item.employmentType,
+          salary: item.salary,
+          experienceLevel: item.experienceLevel,
+        }),
+        ...(item.type === "company" && {
+          name: item.name || item.title,
+          industry: item.industry,
+          logo: item.logo,
+          tagline: item.tagline,
+          size: item.size,
+          founded: item.founded,
+        }),
+        ...(item.type === "people" && {
+          name: item.name || item.title,
+          headline: item.headline,
+          avatar: item.avatar,
+        }),
+        ...(item.type === "resume" && {
+          name: item.name || item.title,
+          isPublic: item.isPublic ?? true,
+          templateName: item.templateName,
+        }),
+        ...(item.type === "media" && {
+          name: item.name || item.title,
+          // Media metadata is stored in different fields by the backend
+          // skills field contains metaType, location contains userId, company contains referenceId, experienceLevel contains url
+          metaType: item.skills ? parseInt(item.skills) : undefined,
+          url: item.experienceLevel,
+          userId: item.location,
+          referenceId: item.company,
+        }),
+      }));
 
-    return SearchResponseSchema.parse(searchResponse);
+      const searchResponse: SearchResponse = {
+        items,
+        total: unifiedData.total,
+        page: unifiedData.page,
+        limit: unifiedData.limit,
+        totalPages: unifiedData.totalPages,
+        hasNextPage: unifiedData.hasNextPage,
+        hasPreviousPage: unifiedData.hasPreviousPage,
+      };
+
+      return SearchResponseSchema.parse(searchResponse);
+    })();
+
+    this.inflight.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      this.inflight.delete(key);
+    }
   }
 
   /**

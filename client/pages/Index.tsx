@@ -98,6 +98,9 @@ export default function Index() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
 
+  // Deduplicate rapid successive loads (e.g., double effects or quick state churn)
+  const lastRequestRef = React.useRef<string>("");
+
   // Load dashboard data function
   const loadContent = async (category?: string, pageArg?: number, limitArg?: number) => {
     try {
@@ -108,6 +111,14 @@ export default function Index() {
       const searchCategory = category || selectedCategory;
       const pageToUse = typeof pageArg === "number" ? pageArg : 1;
       const limitToUse = typeof limitArg === "number" ? limitArg : 12;
+
+      // Prevent immediate duplicate requests with identical params
+      const requestKey = JSON.stringify({ c: searchCategory, p: pageToUse, l: limitToUse });
+      if (lastRequestRef.current === requestKey) {
+        return;
+      }
+      lastRequestRef.current = requestKey;
+
       const content = await searchService.searchPublicContent({
         page: pageToUse,
         limit: limitToUse,
