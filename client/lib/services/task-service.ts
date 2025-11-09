@@ -9,7 +9,6 @@ import {
   CreateTaskRequest,
   UpdateTaskRequest,
   TaskAssignmentRequest,
-  TaskListResponse,
   TaskFilters,
   TaskSortOptions,
   UserCompanyRoleAssociation,
@@ -17,7 +16,6 @@ import {
   ProductivityItemStatus,
   MyVideoResumeRoles,
 } from "@/types/task";
-import { UserProfile } from "./user-service";
 
 export class TaskService {
   private readonly baseUrl = "/api/task";
@@ -65,17 +63,32 @@ export class TaskService {
       const queryString = params.toString();
       const url = queryString ? `${this.baseUrl}?${queryString}` : this.baseUrl;
 
-      const response = await apiClient.get<TaskDTO[]>(url) as any;
-      // Two possible shapes under test:
-      // 1) ApiSuccessResponse<T> -> { success: true, data: T, ... }
-      // 2) Axios-like -> { data: T }
-      if (response && typeof response === "object" && "success" in response) {
-        // Pass-through exactly what API wrapped as success (even if malformed), per api/* tests
-        return (response as { data: unknown }).data as TaskDTO[];
+      const raw = await apiClient.get<TaskDTO[]>(url);
+      const response: unknown = raw;
+
+      // Type guards
+      const hasSuccess = (obj: unknown): obj is { success: boolean; data: unknown } =>
+        typeof obj === "object" && obj !== null && "success" in obj && "data" in obj;
+      const hasData = (obj: unknown): obj is { data: unknown } =>
+        typeof obj === "object" && obj !== null && "data" in obj;
+
+      // A) Direct ApiSuccessResponse<T>
+      if (hasSuccess(response)) {
+        return response.data as TaskDTO[];
       }
-      const data = (response as { data?: unknown })?.data;
-      if (Array.isArray(data)) return data as TaskDTO[];
-      // For axios-like responses without success wrapper, enforce array shape
+
+      // B/C) Axios-like { data: T } or { data: { success: true, data: T } }
+      if (hasData(response)) {
+        const outerData = response.data;
+        if (hasSuccess(outerData)) {
+          return outerData.data as TaskDTO[];
+        }
+        if (Array.isArray(outerData)) {
+          return outerData as TaskDTO[];
+        }
+      }
+
+      // For axios-like responses without success wrapper and non-array data, enforce array shape
       throw new Error("Invalid tasks response");
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
