@@ -41,8 +41,29 @@ export const UserProfileSchema = z.object({
   updatedAt: nullableString(),
   lastLoginAt: nullableString(),
   profileViews: nullableNumber(),
-  // Privacy settings - nested in data object from API
+  // Nested data object from API - contains all the profile details
   data: z.object({
+    firstName: nullableString(),
+    lastName: nullableString(),
+    avatar: nullableString(),
+    headline: nullableString(),
+    summary: nullableString(),
+    location: nullableString(),
+    website: nullableString(),
+    linkedIn: nullableString(),
+    gitHub: nullableString(),
+    twitter: nullableString(),
+    phone: nullableString(),
+    skills: z.array(z.string()).optional(),
+    industries: z.array(z.string()).optional(),
+    currentRole: nullableString(),
+    currentCompany: nullableString(),
+    yearsOfExperience: nullableNumber(),
+    openToWork: nullableBoolean(),
+    openToRemote: nullableBoolean(),
+    preferredRoles: z.array(z.string()).optional(),
+    salaryExpectation: nullableNumber(),
+    salaryCurrency: nullableString(),
     showEmail: nullableBoolean(),
     showPhone: nullableBoolean(),
     showLocation: nullableBoolean(),
@@ -258,7 +279,11 @@ export class UserService {
     const response = await apiClient.get<any>(`/api/Users/${id}`);
     const payload = response.data;
 
+    console.log("UserService.getUserById: Raw API response:", response);
+    console.log("UserService.getUserById: Payload:", payload);
+
     const dataBlock = payload?.data ?? {};
+    console.log("UserService.getUserById: DataBlock:", dataBlock);
 
     const normalized: UserProfile = {
       id: String(payload.id ?? ""),
@@ -282,6 +307,11 @@ export class UserService {
       updatedAt: payload.updatedAt ?? undefined,
     };
 
+    console.log("UserService.getUserById: Normalized profile:", normalized);
+    console.log("UserService.getUserById: firstName:", normalized.firstName);
+    console.log("UserService.getUserById: lastName:", normalized.lastName);
+    console.log("UserService.getUserById: profilePicture:", normalized.profilePicture);
+
     return normalized;
   }
 
@@ -289,11 +319,45 @@ export class UserService {
    * Get user by slug/username
    */
   async getUserBySlug(slug: string): Promise<UserProfile> {
-    const response = await apiClient.get<UserProfile>(
-      `/api/Users/slug/${slug}`,
-      UserProfileSchema,
-    );
-    return response.data;
+    // Use the same endpoint as getUserById since the API supports both
+    // The /api/Users/{id} endpoint accepts both GUID and slug
+    const response = await apiClient.get<any>(`/api/Users/${slug}`);
+    const payload = response.data;
+
+    console.log("UserService.getUserBySlug: Raw API response:", response);
+    console.log("UserService.getUserBySlug: Payload:", payload);
+
+    const dataBlock = payload?.data ?? {};
+    console.log("UserService.getUserBySlug: DataBlock:", dataBlock);
+
+    const normalized: UserProfile = {
+      id: String(payload.id ?? ""),
+      email: payload.email ?? undefined,
+      firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
+      lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
+      role:
+        typeof payload.role === "number"
+          ? String(payload.role)
+          : (payload.role ?? undefined),
+      profilePicture: (payload.profilePicture ?? dataBlock.avatar) || undefined,
+      bio: dataBlock.summary ?? undefined,
+      location: dataBlock.location ?? undefined,
+      website: dataBlock.website ?? undefined,
+      linkedIn: dataBlock.linkedIn ?? dataBlock.linkedin ?? undefined,
+      github: dataBlock.gitHub ?? dataBlock.github ?? undefined,
+      skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
+      openToWork: dataBlock.openToWork ?? undefined,
+      slug: payload.slug ?? undefined,
+      createdAt: payload.createdAt ?? undefined,
+      updatedAt: payload.updatedAt ?? undefined,
+    };
+
+    console.log("UserService.getUserBySlug: Normalized profile:", normalized);
+    console.log("UserService.getUserBySlug: firstName:", normalized.firstName);
+    console.log("UserService.getUserBySlug: lastName:", normalized.lastName);
+    console.log("UserService.getUserBySlug: profilePicture:", normalized.profilePicture);
+
+    return normalized;
   }
 
   /**
