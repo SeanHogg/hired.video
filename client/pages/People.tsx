@@ -230,14 +230,10 @@ export default function People() {
       };
 
       const result = await userService.getPublicUsers(filters);
-      // Filter out current user if authenticated
-      const filteredPeople = result.items.filter(
-        (person) => person.id !== user?.id,
-      );
-
-      setPeople(filteredPeople);
-      setTotalPeople(result.total - (user ? 1 : 0)); // Subtract 1 if current user was in results
-      handleTotalItemsChange(result.total - (user ? 1 : 0));
+      // Include all users (including current user's own profile)
+      setPeople(result.items);
+      setTotalPeople(result.total);
+      handleTotalItemsChange(result.total);
     } catch (err) {
       console.error("Failed to fetch people:", err);
       setError("Failed to load people. Please try again.");
