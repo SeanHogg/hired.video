@@ -649,7 +649,7 @@ export default function PeopleDetail() {
                       {isOwnProfile && (
                         <div className="mb-4">
                           <Button asChild>
-                            <Link to="/profile">
+                            <Link to="/profile?edit=true">
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Profile
                             </Link>

@@ -20,7 +20,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import { uploadAvatar } from "@/lib/services/upload-service";
 import Navigation from "@/components/Navigation";
@@ -65,7 +65,8 @@ function ProfileContent() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const [isEditing, setIsEditing] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [isEditing, setIsEditing] = useState(searchParams.get("edit") === "true");
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
