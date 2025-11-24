@@ -30,6 +30,9 @@ export const UserProfileSchema = z.object({
   website: nullableString(),
   linkedIn: nullableString(),
   github: nullableString(),
+  phone: nullableString(),
+  currentRole: nullableString(),
+  currentCompany: nullableString(),
   skills: z
     .array(z.string())
     .nullable()
@@ -41,6 +44,9 @@ export const UserProfileSchema = z.object({
   updatedAt: nullableString(),
   lastLoginAt: nullableString(),
   profileViews: nullableNumber(),
+  isVerified: nullableBoolean(),
+  isPremium: nullableBoolean(),
+  subscription: nullableString(),
   // Nested data object from API - contains all the profile details
   data: z.object({
     firstName: nullableString(),
