@@ -630,6 +630,16 @@ export default function People() {
     setInteractionSheetOpen(true);
   };
 
+  const handleCardActions = (personId: string) => {
+    // Find the candidate in talent pool
+    const candidate = talentPool.find(c => c.candidateUserId === personId);
+    if (candidate) {
+      // Show a menu with available actions
+      // For now, we'll open the edit sheet
+      handleEditCandidate(candidate);
+    }
+  };
+
   const handleSaveInteraction = async () => {
     if (!selectedCandidate) return;
 
@@ -786,6 +796,7 @@ export default function People() {
                             onMessage={handleMessage}
                             onAcceptConnection={handleAcceptConnection}
                             onRejectConnection={handleRejectConnection}
+                            onActions={() => handleCardActions(person.id)}
                           />
                         ),
                       )}
@@ -1179,6 +1190,7 @@ export default function People() {
                               showOwnership
                               onTrack={handleTrackPerson}
                               onUntrack={handleUntrackPerson}
+                              onActions={() => handleCardActions(person.id)}
                               onConnect={handleConnect}
                               onMessage={handleMessage}
                               onAcceptConnection={handleAcceptConnection}
