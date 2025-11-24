@@ -71,16 +71,42 @@ export const UserProfileSchema = z.object({
   }).optional(),
 });
 
-// Public users list item (metadata) from GET /api/Users/public
+// Public users list item from GET /api/Users/public
+// Now returns full UserProfileDTO with computed properties
 export const PublicUserSchema = z.object({
   id: nullableString(),
   slug: nullableString(),
+  email: nullableString(),
+  userName: nullableString(),
+  // Computed properties from nested Data object
   fullName: nullableString(),
   avatar: nullableString(),
   headline: nullableString(),
   location: nullableString(),
   currentRole: nullableString(),
   currentCompany: nullableString(),
+  openToWork: nullableBoolean(),
+  skills: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
+  // Nested data object
+  data: z.object({
+    firstName: nullableString(),
+    lastName: nullableString(),
+    avatar: nullableString(),
+    headline: nullableString(),
+    location: nullableString(),
+    currentRole: nullableString(),
+    currentCompany: nullableString(),
+    openToWork: nullableBoolean(),
+    skills: z
+      .array(z.string())
+      .nullable()
+      .transform((val) => (val === null ? undefined : val))
+      .optional(),
+  }).optional(),
   role: z
     .union([z.string(), z.number()])
     .nullable()
@@ -88,12 +114,6 @@ export const PublicUserSchema = z.object({
     .optional(),
   isVerified: nullableBoolean(),
   isPremium: nullableBoolean(),
-  openToWork: nullableBoolean(),
-  skills: z
-    .array(z.string())
-    .nullable()
-    .transform((val) => (val === null ? undefined : val))
-    .optional(),
   profileViews: nullableNumber(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
@@ -231,6 +251,42 @@ export type SendConnectionRequest = z.infer<typeof SendConnectionRequestSchema>;
 
 export class UserService {
   /**
+   * Normalize a PublicUser DTO to UserProfile
+   * Single source of truth for user data transformation
+   */
+  private normalizePublicUserToProfile(payload: any): UserProfile {
+    const dataBlock = payload?.data ?? {};
+
+    return {
+      id: String(payload.id ?? ""),
+      email: payload.email ?? undefined,
+      firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
+      lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
+      role:
+        typeof payload.role === "number"
+          ? String(payload.role)
+          : (payload.role ?? undefined),
+      profilePicture: (payload.profilePicture ?? payload.avatar ?? dataBlock.avatar) || undefined,
+      bio: dataBlock.summary ?? undefined,
+      location: payload.location ?? dataBlock.location ?? undefined,
+      website: dataBlock.website ?? undefined,
+      linkedIn: dataBlock.linkedIn ?? dataBlock.linkedin ?? undefined,
+      github: dataBlock.gitHub ?? dataBlock.github ?? undefined,
+      phone: dataBlock.phone ?? undefined,
+      currentRole: payload.currentRole ?? dataBlock.currentRole ?? undefined,
+      currentCompany: payload.currentCompany ?? dataBlock.currentCompany ?? undefined,
+      skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
+      openToWork: payload.openToWork ?? dataBlock.openToWork ?? undefined,
+      slug: payload.slug ?? undefined,
+      createdAt: payload.createdAt ?? undefined,
+      updatedAt: payload.updatedAt ?? undefined,
+      isVerified: payload.isVerified ?? undefined,
+      isPremium: payload.isPremium ?? undefined,
+      subscription: payload.isPremium ? "pro" : "free",
+    };
+  }
+
+  /**
    * Get all public users with optional filters
    */
   async getPublicUsers(filters?: UserFilters): Promise<PaginatedPublicUsers> {
@@ -275,100 +331,28 @@ export class UserService {
    * Get user by ID
    */
   async getUserById(id: string): Promise<UserProfile> {
-    // Now using standard ApiResponse format
-    const response = await apiClient.get<any>(`/api/Users/${id}`);
-    const payload = response.data;
-
-    console.log("UserService.getUserById: Raw API response:", response);
-    console.log("UserService.getUserById: Payload:", payload);
-
-    const dataBlock = payload?.data ?? {};
-    console.log("UserService.getUserById: DataBlock:", dataBlock);
-
-    const normalized: UserProfile = {
-      id: String(payload.id ?? ""),
-      email: payload.email ?? undefined,
-      firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
-      lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
-      role:
-        typeof payload.role === "number"
-          ? String(payload.role)
-          : (payload.role ?? undefined),
-      profilePicture: (payload.profilePicture ?? dataBlock.avatar) || undefined,
-      bio: dataBlock.summary ?? undefined,
-      location: dataBlock.location ?? undefined,
-      website: dataBlock.website ?? undefined,
-      linkedIn: dataBlock.linkedIn ?? dataBlock.linkedin ?? undefined,
-      github: dataBlock.gitHub ?? dataBlock.github ?? undefined,
-      skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
-      openToWork: dataBlock.openToWork ?? undefined,
-      slug: payload.slug ?? undefined,
-      createdAt: payload.createdAt ?? undefined,
-      updatedAt: payload.updatedAt ?? undefined,
-    };
-
-    console.log("UserService.getUserById: Normalized profile:", normalized);
-    console.log("UserService.getUserById: firstName:", normalized.firstName);
-    console.log("UserService.getUserById: lastName:", normalized.lastName);
-    console.log("UserService.getUserById: profilePicture:", normalized.profilePicture);
-
-    return normalized;
+    const response = await apiClient.get<PublicUser>(`/api/Users/${id}`, PublicUserSchema);
+    return this.normalizePublicUserToProfile(response.data);
   }
 
   /**
    * Get user by slug/username
    */
   async getUserBySlug(slug: string): Promise<UserProfile> {
-    // Use the same endpoint as getUserById since the API supports both
-    // The /api/Users/{id} endpoint accepts both GUID and slug
-    const response = await apiClient.get<any>(`/api/Users/${slug}`);
-    const payload = response.data;
-
-    console.log("UserService.getUserBySlug: Raw API response:", response);
-    console.log("UserService.getUserBySlug: Payload:", payload);
-
-    const dataBlock = payload?.data ?? {};
-    console.log("UserService.getUserBySlug: DataBlock:", dataBlock);
-
-    const normalized: UserProfile = {
-      id: String(payload.id ?? ""),
-      email: payload.email ?? undefined,
-      firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
-      lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
-      role:
-        typeof payload.role === "number"
-          ? String(payload.role)
-          : (payload.role ?? undefined),
-      profilePicture: (payload.profilePicture ?? dataBlock.avatar) || undefined,
-      bio: dataBlock.summary ?? undefined,
-      location: dataBlock.location ?? undefined,
-      website: dataBlock.website ?? undefined,
-      linkedIn: dataBlock.linkedIn ?? dataBlock.linkedin ?? undefined,
-      github: dataBlock.gitHub ?? dataBlock.github ?? undefined,
-      skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
-      openToWork: dataBlock.openToWork ?? undefined,
-      slug: payload.slug ?? undefined,
-      createdAt: payload.createdAt ?? undefined,
-      updatedAt: payload.updatedAt ?? undefined,
-    };
-
-    console.log("UserService.getUserBySlug: Normalized profile:", normalized);
-    console.log("UserService.getUserBySlug: firstName:", normalized.firstName);
-    console.log("UserService.getUserBySlug: lastName:", normalized.lastName);
-    console.log("UserService.getUserBySlug: profilePicture:", normalized.profilePicture);
-
-    return normalized;
+    const response = await apiClient.get<PublicUser>(`/api/Users/${slug}`, PublicUserSchema);
+    return this.normalizePublicUserToProfile(response.data);
   }
 
   /**
-   * Get current user profile
+   * Get current user profile (/api/Users/me)
+   * Uses same logic as public users but returns authenticated user's own profile
    */
   async getCurrentUser(): Promise<UserProfile> {
-    const response = await apiClient.get<UserProfile>(
+    const response = await apiClient.get<PublicUser>(
       "/api/Users/me",
-      UserProfileSchema,
+      PublicUserSchema,
     );
-    return response.data;
+    return this.normalizePublicUserToProfile(response.data);
   }
 
   /**
@@ -468,7 +452,7 @@ export class UserService {
         ConnectionSchema,
       );
       return response.data;
-    } catch (error) {
+    } catch {
       // If no connection exists, return null
       return null;
     }
@@ -499,7 +483,7 @@ export class UserService {
         z.object({ canMessage: z.boolean() }),
       );
       return response.data.canMessage;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
