@@ -630,15 +630,7 @@ export default function People() {
     setInteractionSheetOpen(true);
   };
 
-  const handleCardActions = (personId: string) => {
-    // Find the candidate in talent pool
-    const candidate = talentPool.find(c => c.candidateUserId === personId);
-    if (candidate) {
-      // Show a menu with available actions
-      // For now, we'll open the edit sheet
-      handleEditCandidate(candidate);
-    }
-  };
+
 
   const handleSaveInteraction = async () => {
     if (!selectedCandidate) return;
@@ -698,6 +690,18 @@ export default function People() {
     const isJobSeeker = rolePermissions.isJobSeeker;
     const isRecruiterOrEmployer =
       rolePermissions.isRecruiter || rolePermissions.isEmployer;
+
+    const handleCardActions = (personId: string) => {
+      // Find the candidate in talent pool
+      const candidate = talentPool.find(c => c.candidateUserId === personId);
+      if (candidate) {
+        // If in talent pool, open the edit sheet
+        handleEditCandidate(candidate);
+      } else if (rolePermissions.isRecruiter) {
+        // If not in talent pool but user is a recruiter, add to talent pool
+        handleAddToTalentPool(personId);
+      }
+    };
 
     return (
       <div className="min-h-screen bg-background">
@@ -887,6 +891,7 @@ export default function People() {
                             onAcceptConnection={handleAcceptConnection}
                             onRejectConnection={handleRejectConnection}
                             onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
+                            onActions={() => handleCardActions(person.id)}
                           />
                         );
                       })}
