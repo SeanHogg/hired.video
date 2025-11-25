@@ -27,6 +27,8 @@ import {
   Send,
   Loader2,
   FileText,
+  UserCog,
+  MoreVertical,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
@@ -55,13 +57,24 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { userService, type UserProfile } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
+import {
+  recruiterService,
+  type AddToTalentPoolRequest,
+} from "@/lib/services/recruiter-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { getRoleDisplayLabel, createRolePermissions } from "@/lib/role-utils";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { dashboardService } from "@/lib/services/dashboard-service";
+import { toast } from "sonner";
 
 import ResumeCard from "@/components/ResumeCard";
 
@@ -89,6 +102,8 @@ export default function PeopleDetail() {
   });
   const [connectionMessage, setConnectionMessage] = useState("");
   const [showConnectionDialog, setShowConnectionDialog] = useState(false);
+  const [isInTalentPool, setIsInTalentPool] = useState(false);
+  const [isCheckingTalentPool, setIsCheckingTalentPool] = useState(false);
 
   // API state management
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -283,6 +298,28 @@ export default function PeopleDetail() {
     recordView();
   }, [userProfile?.id]);
 
+  // Check if person is in talent pool (for recruiters)
+  useEffect(() => {
+    const checkTalentPool = async () => {
+      if (!user || !userProfile?.id) return;
+
+      const rolePermissions = createRolePermissions(user.role);
+      if (!rolePermissions.isRecruiter) return;
+
+      try {
+        setIsCheckingTalentPool(true);
+        const inPool = await recruiterService.checkInTalentPool(userProfile.id);
+        setIsInTalentPool(inPool);
+      } catch (error) {
+        console.error("Failed to check talent pool:", error);
+      } finally {
+        setIsCheckingTalentPool(false);
+      }
+    };
+
+    checkTalentPool();
+  }, [user, userProfile?.id]);
+
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
       ...prev,
@@ -335,6 +372,31 @@ export default function PeopleDetail() {
   const handleMessage = () => {
     // Navigate to messaging or open message modal
     console.log("Message person:", userProfile?.id);
+  };
+
+  const handleAddToTalentPool = async () => {
+    if (!user || !userProfile?.id) return;
+
+    const rolePermissions = createRolePermissions(user.role);
+    if (!rolePermissions.isRecruiter) {
+      toast.error("Only recruiters can add candidates to talent pool");
+      return;
+    }
+
+    try {
+      const request: AddToTalentPoolRequest = {
+        candidateUserId: userProfile.id,
+        relationshipStrength: "New",
+        status: "Active",
+        poolName: "General",
+      };
+      await recruiterService.addToTalentPool(request);
+      setIsInTalentPool(true);
+      toast.success(`${userProfile.firstName} ${userProfile.lastName} added to talent pool`);
+    } catch (error) {
+      console.error("Failed to add to talent pool:", error);
+      toast.error("Failed to add candidate to talent pool");
+    }
   };
 
   // Loading state
@@ -642,6 +704,35 @@ export default function PeopleDetail() {
                           <Button variant="outline" size="icon">
                             <Share className="h-4 w-4" />
                           </Button>
+
+                          {/* Recruiter Actions Dropdown */}
+                          {user && createRolePermissions(user.role).isRecruiter && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="default">
+                                  <MoreVertical className="h-4 w-4 mr-2" />
+                                  Actions
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={handleAddToTalentPool}
+                                  disabled={isInTalentPool || isCheckingTalentPool}
+                                >
+                                  <UserCog className="h-4 w-4 mr-2" />
+                                  {isInTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    toast.info("Submit to Job feature coming soon");
+                                  }}
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Submit to Job
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                       )}
 
