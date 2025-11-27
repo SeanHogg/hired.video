@@ -433,6 +433,7 @@ export class AuthService {
     if (updates.bio !== undefined) payload.summary = updates.bio; // server expects 'summary'
     if (updates.location !== undefined) payload.location = updates.location;
     if (updates.website !== undefined) payload.website = updates.website;
+
     // Optional mappings if present in updates cast: phone/currentRole/currentCompany/headline
     const anyUpdates = updates as any;
     if (anyUpdates.phone !== undefined) payload.phone = anyUpdates.phone;
@@ -442,6 +443,27 @@ export class AuthService {
       payload.currentCompany = anyUpdates.currentCompany;
     if (anyUpdates.headline !== undefined)
       payload.headline = anyUpdates.headline;
+
+    // Social profiles
+    if (updates.linkedIn !== undefined) payload.linkedIn = updates.linkedIn;
+    if (updates.github !== undefined) payload.gitHub = updates.github; // server expects 'gitHub'
+    if (anyUpdates.twitter !== undefined) payload.twitter = anyUpdates.twitter;
+
+    // Skills and preferences
+    if (updates.skills !== undefined) payload.skills = updates.skills;
+    if (anyUpdates.industries !== undefined) payload.industries = anyUpdates.industries;
+    if (anyUpdates.preferredRoles !== undefined) payload.preferredRoles = anyUpdates.preferredRoles;
+
+    // Work preferences
+    if (anyUpdates.openToRemote !== undefined) payload.openToRemote = anyUpdates.openToRemote;
+    if (anyUpdates.openToWork !== undefined) payload.openToWork = anyUpdates.openToWork;
+
+    // Salary
+    if (anyUpdates.salaryExpectation !== undefined) payload.salaryExpectation = anyUpdates.salaryExpectation;
+    if (anyUpdates.salaryCurrency !== undefined) payload.salaryCurrency = anyUpdates.salaryCurrency;
+
+    // Years of experience
+    if (anyUpdates.yearsOfExperience !== undefined) payload.yearsOfExperience = anyUpdates.yearsOfExperience;
 
     logger.info("authService.updateProfile: PUT /api/Users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(
