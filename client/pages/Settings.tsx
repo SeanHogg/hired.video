@@ -14,6 +14,11 @@ import {
   Zap,
   Target,
   Sliders,
+  Youtube,
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  Loader2,
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
@@ -50,6 +55,7 @@ import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
+import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -92,6 +98,11 @@ function SettingsContent() {
   const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number } | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTab, setActiveTab] = useState("notifications");
+
+  // YouTube integration state
+  const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
+  const [youtubeLoading, setYoutubeLoading] = useState(false);
+  const [youtubeConnecting, setYoutubeConnecting] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -161,6 +172,25 @@ function SettingsContent() {
       });
   }, [isAuthenticated, activeTab, jobPrefs]);
 
+  // Lazy-load YouTube account when integrations tab is active
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== "integrations") return;
+
+    setYoutubeLoading(true);
+    youtubeService
+      .getAccount()
+      .then((response) => {
+        setYoutubeAccount(response.data);
+      })
+      .catch((err) => {
+        console.error("Failed to load YouTube account", err);
+        setYoutubeAccount(null);
+      })
+      .finally(() => {
+        setYoutubeLoading(false);
+      });
+  }, [isAuthenticated, activeTab]);
+
   // Cooldown timer for resend button
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -211,6 +241,38 @@ function SettingsContent() {
       toast({ title: "Failed to save job preferences", variant: "destructive" });
     } finally {
       setSavingJobPrefs(false);
+    }
+  };
+
+  // YouTube integration handlers
+  const handleConnectYouTube = async () => {
+    try {
+      setYoutubeConnecting(true);
+      const response = await youtubeService.getAuthUrl();
+      if (response.data?.authUrl) {
+        window.location.href = response.data.authUrl;
+      } else {
+        toast({ title: "Failed to get YouTube authorization URL", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Failed to connect YouTube", error);
+      toast({ title: "Failed to connect to YouTube", variant: "destructive" });
+    } finally {
+      setYoutubeConnecting(false);
+    }
+  };
+
+  const handleDisconnectYouTube = async () => {
+    try {
+      setYoutubeLoading(true);
+      await youtubeService.disconnect();
+      setYoutubeAccount(null);
+      toast({ title: "YouTube account disconnected successfully" });
+    } catch (error) {
+      console.error("Failed to disconnect YouTube", error);
+      toast({ title: "Failed to disconnect YouTube account", variant: "destructive" });
+    } finally {
+      setYoutubeLoading(false);
     }
   };
 
@@ -493,7 +555,7 @@ function SettingsContent() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
               {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
               <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-5 gap-1 min-w-max sm:min-w-0">
+                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-6 gap-1 min-w-max sm:min-w-0">
                   <TabsTrigger
                     value="notifications"
                     className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
@@ -514,6 +576,13 @@ function SettingsContent() {
                   >
                     <Palette className="h-4 w-4" />
                     <span>Appearance</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="integrations"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Youtube className="h-4 w-4" />
+                    <span>Integrations</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="job-preferences"
@@ -835,6 +904,123 @@ function SettingsContent() {
                 </Card>
               </TabsContent>
 
+              {/* Integrations Tab */}
+              <TabsContent value="integrations" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Youtube className="h-5 w-5 text-red-600" />
+                      YouTube Integration
+                    </CardTitle>
+                    <CardDescription>
+                      Connect your YouTube account to publish video resumes directly to your channel.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {youtubeLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : youtubeAccount ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                          <CheckCircle className="h-6 w-6 text-green-600" />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-green-800 dark:text-green-200">Connected</h4>
+                            <p className="text-sm text-green-600 dark:text-green-400">
+                              Your YouTube account is connected
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 p-4 border rounded-lg">
+                          {youtubeAccount.channelThumbnail && (
+                            <img
+                              src={youtubeAccount.channelThumbnail}
+                              alt={youtubeAccount.channelTitle}
+                              className="h-12 w-12 rounded-full"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-medium">{youtubeAccount.channelTitle}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {youtubeAccount.subscriberCount?.toLocaleString() ?? 0} subscribers • {youtubeAccount.videoCount?.toLocaleString() ?? 0} videos
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Connected {new Date(youtubeAccount.connectedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://youtube.com/channel/${youtubeAccount.channelId}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View Channel
+                          </Button>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                          <h4 className="text-sm font-medium mb-2 text-destructive">Disconnect Account</h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Disconnecting will remove the ability to publish videos to YouTube. Your existing videos will not be affected.
+                          </p>
+                          <Button
+                            variant="destructive"
+                            onClick={handleDisconnectYouTube}
+                            disabled={youtubeLoading}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Disconnect YouTube
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                          <Youtube className="h-10 w-10 text-red-600" />
+                          <div className="flex-1">
+                            <h4 className="font-medium">Connect Your YouTube Account</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Link your YouTube account to publish video resumes directly to your channel with one click.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Benefits of connecting:</h4>
+                          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                            <li>Publish video resumes directly to your YouTube channel</li>
+                            <li>Choose privacy settings (public, unlisted, or private)</li>
+                            <li>Automatic video optimization for YouTube</li>
+                            <li>Track views and engagement from your dashboard</li>
+                          </ul>
+                        </div>
+
+                        <Button
+                          onClick={handleConnectYouTube}
+                          disabled={youtubeConnecting}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {youtubeConnecting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            <>
+                              <Youtube className="h-4 w-4 mr-2" />
+                              Connect YouTube Account
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
               {/* Job Preferences Tab */}
               <TabsContent value="job-preferences" className="space-y-6">
