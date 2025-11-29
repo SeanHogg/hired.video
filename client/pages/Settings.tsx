@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -69,6 +69,7 @@ function SettingsContent() {
   } = useSidebar();
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
@@ -103,6 +104,30 @@ function SettingsContent() {
   const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [youtubeConnecting, setYoutubeConnecting] = useState(false);
+
+  // Handle YouTube OAuth callback query params
+  useEffect(() => {
+    const youtubeSuccess = searchParams.get("youtube_success");
+    const youtubeError = searchParams.get("youtube_error");
+
+    if (youtubeSuccess === "true") {
+      toast({ title: "YouTube account connected successfully!" });
+      // Switch to integrations tab to show the result
+      setActiveTab("integrations");
+      // Clear the query param
+      searchParams.delete("youtube_success");
+      setSearchParams(searchParams, { replace: true });
+    } else if (youtubeError) {
+      toast({
+        title: "Failed to connect YouTube",
+        description: youtubeError === "callback_failed" ? "Something went wrong during authorization" : youtubeError,
+        variant: "destructive"
+      });
+      setActiveTab("integrations");
+      searchParams.delete("youtube_error");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, toast]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -910,6 +935,40 @@ function SettingsContent() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Youtube className="h-5 w-5 text-red-600" />
+                      Video Storage
+                    </CardTitle>
+                    <CardDescription>
+                      Your video resumes are automatically stored and hosted for you.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-green-800 dark:text-green-200">Video Hosting Active</h4>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          Videos you record in the mobile app are automatically uploaded and hosted.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">How it works:</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Record videos in the MyVideoResume mobile app</li>
+                        <li>Videos are automatically uploaded and processed</li>
+                        <li>Your videos appear in your profile and the public feed</li>
+                        <li>No setup required - it just works!</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Hidden: Per-user YouTube connection (kept for future use)
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Youtube className="h-5 w-5 text-red-600" />
                       YouTube Integration
                     </CardTitle>
                     <CardDescription>
@@ -926,38 +985,14 @@ function SettingsContent() {
                         <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                           <CheckCircle className="h-6 w-6 text-green-600" />
                           <div className="flex-1">
-                            <h4 className="font-medium text-green-800 dark:text-green-200">Connected</h4>
+                            <h4 className="font-medium text-green-800 dark:text-green-200">YouTube Connected</h4>
                             <p className="text-sm text-green-600 dark:text-green-400">
-                              Your YouTube account is connected
+                              You can now upload videos directly to your YouTube channel
                             </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 p-4 border rounded-lg">
-                          {youtubeAccount.channelThumbnail && (
-                            <img
-                              src={youtubeAccount.channelThumbnail}
-                              alt={youtubeAccount.channelTitle}
-                              className="h-12 w-12 rounded-full"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-medium">{youtubeAccount.channelTitle}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {youtubeAccount.subscriberCount?.toLocaleString() ?? 0} subscribers • {youtubeAccount.videoCount?.toLocaleString() ?? 0} videos
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
                               Connected {new Date(youtubeAccount.connectedAt).toLocaleDateString()}
                             </p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(`https://youtube.com/channel/${youtubeAccount.channelId}`, '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View Channel
-                          </Button>
                         </div>
 
                         <Separator />
@@ -984,15 +1019,15 @@ function SettingsContent() {
                           <div className="flex-1">
                             <h4 className="font-medium">Connect Your YouTube Account</h4>
                             <p className="text-sm text-muted-foreground">
-                              Link your YouTube account to publish video resumes directly to your channel with one click.
+                              Link your YouTube account to upload video resumes directly to your channel.
                             </p>
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Benefits of connecting:</h4>
+                          <h4 className="text-sm font-medium">What you can do:</h4>
                           <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                            <li>Publish video resumes directly to your YouTube channel</li>
+                            <li>Upload video resumes directly to your YouTube channel</li>
                             <li>Choose privacy settings (public, unlisted, or private)</li>
                             <li>Automatic video optimization for YouTube</li>
                             <li>Track views and engagement from your dashboard</li>
@@ -1020,6 +1055,7 @@ function SettingsContent() {
                     )}
                   </CardContent>
                 </Card>
+                */}
               </TabsContent>
 
               {/* Job Preferences Tab */}
