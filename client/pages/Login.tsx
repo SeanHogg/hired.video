@@ -1,6 +1,7 @@
 import { Video, Sparkles, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -116,7 +117,11 @@ export default function Login() {
   const handleResend = async () => {
     setError("");
     const sent = await resendTwoFactorCode();
-    if (!sent) {
+    if (sent) {
+      toast.success("Verification code sent", {
+        description: "A new verification code has been sent to your email.",
+      });
+    } else {
       setError("Failed to resend code. Please wait a moment and try again.");
     }
   };
