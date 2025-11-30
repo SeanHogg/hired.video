@@ -126,6 +126,22 @@ export const youtubeService = {
       return false;
     }
   },
+
+  // ========== COMPANY CHANNEL METHODS (SuperAdmin only) ==========
+
+  /**
+   * Get company YouTube channel status (is it configured?)
+   */
+  async getCompanyStatus(): Promise<ApiSuccessResponse<boolean>> {
+    return apiClient.get("/api/YouTube/company/status", z.boolean());
+  },
+
+  /**
+   * Get company YouTube OAuth authorization URL (SuperAdmin only)
+   */
+  async getCompanyAuthUrl(): Promise<ApiSuccessResponse<YouTubeAuthUrlResponse>> {
+    return apiClient.get("/api/YouTube/company/auth-url", YouTubeAuthUrlResponseSchema);
+  },
 };
 
 export default youtubeService;

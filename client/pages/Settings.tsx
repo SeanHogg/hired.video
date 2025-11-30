@@ -104,17 +104,19 @@ function SettingsContent() {
   const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [youtubeConnecting, setYoutubeConnecting] = useState(false);
+  const [companyYoutubeConfigured, setCompanyYoutubeConfigured] = useState(false);
+  const [companyYoutubeLoading, setCompanyYoutubeLoading] = useState(false);
 
-  // Handle YouTube OAuth callback query params
+  // Handle YouTube OAuth callback query params (both user and company)
   useEffect(() => {
     const youtubeSuccess = searchParams.get("youtube_success");
     const youtubeError = searchParams.get("youtube_error");
+    const companySuccess = searchParams.get("youtube_company_success");
+    const companyError = searchParams.get("youtube_company_error");
 
     if (youtubeSuccess === "true") {
       toast({ title: "YouTube account connected successfully!" });
-      // Switch to integrations tab to show the result
       setActiveTab("integrations");
-      // Clear the query param
       searchParams.delete("youtube_success");
       setSearchParams(searchParams, { replace: true });
     } else if (youtubeError) {
@@ -125,6 +127,24 @@ function SettingsContent() {
       });
       setActiveTab("integrations");
       searchParams.delete("youtube_error");
+      setSearchParams(searchParams, { replace: true });
+    }
+
+    // Handle company YouTube callback
+    if (companySuccess === "true") {
+      toast({ title: "Company YouTube channel connected successfully!" });
+      setCompanyYoutubeConfigured(true);
+      setActiveTab("integrations");
+      searchParams.delete("youtube_company_success");
+      setSearchParams(searchParams, { replace: true });
+    } else if (companyError) {
+      toast({
+        title: "Failed to connect company YouTube",
+        description: companyError,
+        variant: "destructive"
+      });
+      setActiveTab("integrations");
+      searchParams.delete("youtube_company_error");
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams, toast]);
@@ -197,7 +217,7 @@ function SettingsContent() {
       });
   }, [isAuthenticated, activeTab, jobPrefs]);
 
-  // Lazy-load YouTube account when integrations tab is active
+  // Lazy-load YouTube account and company status when integrations tab is active
   useEffect(() => {
     if (!isAuthenticated || activeTab !== "integrations") return;
 
@@ -213,6 +233,16 @@ function SettingsContent() {
       })
       .finally(() => {
         setYoutubeLoading(false);
+      });
+
+    // Check company YouTube status (for SuperAdmin)
+    youtubeService
+      .getCompanyStatus()
+      .then((response) => {
+        setCompanyYoutubeConfigured(response.data ?? false);
+      })
+      .catch((err) => {
+        console.error("Failed to check company YouTube status", err);
       });
   }, [isAuthenticated, activeTab]);
 
@@ -269,7 +299,7 @@ function SettingsContent() {
     }
   };
 
-  // YouTube integration handlers
+  // YouTube integration handlers (kept for future per-user YouTube connection)
   const handleConnectYouTube = async () => {
     try {
       setYoutubeConnecting(true);
@@ -298,6 +328,24 @@ function SettingsContent() {
       toast({ title: "Failed to disconnect YouTube account", variant: "destructive" });
     } finally {
       setYoutubeLoading(false);
+    }
+  };
+
+  // Company YouTube connection handler (SuperAdmin only)
+  const handleConnectCompanyYouTube = async () => {
+    try {
+      setCompanyYoutubeLoading(true);
+      const response = await youtubeService.getCompanyAuthUrl();
+      if (response.data?.authUrl) {
+        window.location.href = response.data.authUrl;
+      } else {
+        toast({ title: "Failed to get company YouTube authorization URL", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Failed to connect company YouTube", error);
+      toast({ title: "Failed to connect company YouTube channel", variant: "destructive" });
+    } finally {
+      setCompanyYoutubeLoading(false);
     }
   };
 
@@ -931,6 +979,76 @@ function SettingsContent() {
 
               {/* Integrations Tab */}
               <TabsContent value="integrations" className="space-y-6">
+                {/* SuperAdmin: Company YouTube Channel Configuration */}
+                {isSuperAdmin && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Youtube className="h-5 w-5 text-red-600" />
+                        Company YouTube Channel
+                        <Badge variant="secondary" className="ml-2">Admin Only</Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        Configure the company YouTube channel for hosting all user video uploads.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {companyYoutubeConfigured ? (
+                        <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                          <CheckCircle className="h-6 w-6 text-green-600" />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-green-800 dark:text-green-200">Company YouTube Connected</h4>
+                            <p className="text-sm text-green-600 dark:text-green-400">
+                              The company YouTube channel is configured. All user videos will be uploaded here.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <XCircle className="h-6 w-6 text-amber-600" />
+                            <div className="flex-1">
+                              <h4 className="font-medium text-amber-800 dark:text-amber-200">Company YouTube Not Connected</h4>
+                              <p className="text-sm text-amber-600 dark:text-amber-400">
+                                Connect the company YouTube channel to enable video uploads for all users.
+                              </p>
+                            </div>
+                          </div>
+
+                          <Button
+                            onClick={handleConnectCompanyYouTube}
+                            disabled={companyYoutubeLoading}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            {companyYoutubeLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              <>
+                                <Youtube className="h-4 w-4 mr-2" />
+                                Connect Company YouTube Channel
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">How it works:</h4>
+                        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                          <li>Connect the company YouTube channel (one-time setup)</li>
+                          <li>All user videos are uploaded to this channel as unlisted</li>
+                          <li>Videos are accessible via direct link only</li>
+                          <li>Users don't need to connect their own YouTube accounts</li>
+                        </ul>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Regular users: Video hosting info */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
