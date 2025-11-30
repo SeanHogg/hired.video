@@ -11,8 +11,11 @@ import {
   X,
   Video,
   FileVideo,
+  CheckCircle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadVideo } from "@/lib/services/upload-service";
 
 interface VideoUploadProps {
   onVideoUploaded: (videoData: VideoUploadResult) => void;
@@ -20,11 +23,16 @@ interface VideoUploadProps {
   maxSizeBytes?: number;
   acceptedFormats?: string[];
   className?: string;
+  /** If true, automatically upload to server after processing. Default: false */
+  autoUpload?: boolean;
 }
 
 interface VideoUploadResult {
   file: File;
+  /** Local blob URL or server URL depending on autoUpload setting */
   url: string;
+  /** Server URL if uploaded to server */
+  serverUrl?: string;
   duration: number;
   thumbnail?: string;
   metadata: {
@@ -51,10 +59,13 @@ export function VideoUpload({
   maxSizeBytes = MAX_FILE_SIZE,
   acceptedFormats = DEFAULT_ACCEPTED_FORMATS,
   className,
+  autoUpload = false,
 }: VideoUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadComplete, setUploadComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<{
@@ -120,14 +131,15 @@ export function VideoUpload({
   const processVideo = async (file: File) => {
     setIsProcessing(true);
     setError(null);
+    setUploadComplete(false);
 
     try {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      const localUrl = URL.createObjectURL(file);
+      setPreviewUrl(localUrl);
 
       // Create video element for metadata extraction
       const video = document.createElement("video");
-      video.src = url;
+      video.src = localUrl;
 
       await new Promise((resolve, reject) => {
         video.onloadedmetadata = resolve;
@@ -151,14 +163,39 @@ export function VideoUpload({
       });
 
       if (videoRef.current) {
-        videoRef.current.src = url;
+        videoRef.current.src = localUrl;
       }
 
       const thumbnail = await generateThumbnail(video);
 
+      // Upload to server if autoUpload is enabled
+      let serverUrl: string | undefined;
+      if (autoUpload) {
+        setIsProcessing(false);
+        setIsUploading(true);
+        setUploadProgress(0);
+
+        try {
+          const uploadResponse = await uploadVideo(file, (progress) => {
+            setUploadProgress(progress);
+          });
+          serverUrl = uploadResponse.url;
+          setUploadComplete(true);
+        } catch (uploadErr) {
+          throw new Error(
+            uploadErr instanceof Error
+              ? uploadErr.message
+              : "Failed to upload video to server"
+          );
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
       const result: VideoUploadResult = {
         file,
-        url,
+        url: serverUrl || localUrl,
+        serverUrl,
         duration: video.duration,
         thumbnail,
         metadata: {
@@ -174,6 +211,7 @@ export function VideoUpload({
       setError(err instanceof Error ? err.message : "Failed to process video");
     } finally {
       setIsProcessing(false);
+      setIsUploading(false);
     }
   };
 
@@ -224,6 +262,8 @@ export function VideoUpload({
     setError(null);
     setUploadProgress(0);
     setIsProcessing(false);
+    setIsUploading(false);
+    setUploadComplete(false);
     setIsPlaying(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -356,21 +396,54 @@ export function VideoUpload({
             {isProcessing && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>Processing video...</span>
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing video...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Upload Progress */}
+            {isUploading && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading to server...
+                  </span>
                   <span>{uploadProgress}%</span>
                 </div>
                 <Progress value={uploadProgress} />
               </div>
             )}
 
+            {/* Upload Complete */}
+            {uploadComplete && (
+              <Alert>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-600">
+                  Video uploaded successfully!
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2">
-              <Button onClick={resetUpload} variant="outline">
+              <Button
+                onClick={resetUpload}
+                variant="outline"
+                disabled={isProcessing || isUploading}
+              >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Choose Different Video
               </Button>
               {onCancel && (
-                <Button onClick={onCancel} variant="outline">
+                <Button
+                  onClick={onCancel}
+                  variant="outline"
+                  disabled={isProcessing || isUploading}
+                >
                   Cancel
                 </Button>
               )}
