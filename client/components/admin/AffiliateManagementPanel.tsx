@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -38,7 +38,8 @@ export function AffiliateManagementPanel({ open, onOpenChange }: AffiliateManage
   const [activeTab, setActiveTab] = useState("list");
   const { toast } = useToast();
 
-  const affiliateService = new AffiliateService();
+  // Memoize the service instance to prevent infinite loop
+  const affiliateService = useMemo(() => new AffiliateService(), []);
 
   const loadAffiliates = useCallback(async () => {
     try {

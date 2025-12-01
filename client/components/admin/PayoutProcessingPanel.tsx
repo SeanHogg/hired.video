@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -50,7 +50,8 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
   const [approvalNotes, setApprovalNotes] = useState("");
   const { toast } = useToast();
 
-  const affiliateService = new AffiliateService();
+  // Memoize the service instance to prevent infinite loop
+  const affiliateService = useMemo(() => new AffiliateService(), []);
 
   const loadPendingPayouts = useCallback(async () => {
     try {
@@ -67,7 +68,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
     } finally {
       setLoading(false);
     }
-  }, [affiliateService]);
+  }, [affiliateService, toast]);
 
   useEffect(() => {
     if (open) {

@@ -55,6 +55,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import {
   Table,
   TableBody,
   TableCell,
@@ -1602,21 +1610,21 @@ export default function Outreach() {
         <Footer />
       </div>
 
-      {/* Email Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
+      {/* Email Template Sheet (Slide-out Panel) */}
+      <Sheet open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>
               {editingTemplate
                 ? "Edit Email Template"
                 : "Create Email Template"}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Create reusable email templates for your outreach campaigns
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="template-name">Template Name</Label>
               <Input
@@ -1724,7 +1732,7 @@ export default function Outreach() {
             </div>
           </div>
 
-          <DialogFooter>
+          <SheetFooter className="flex gap-2 pt-4">
             <Button
               variant="outline"
               onClick={() => {
@@ -1742,9 +1750,9 @@ export default function Outreach() {
             >
               {editingTemplate ? "Update Template" : "Create Template"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* External Contact Dialog */}
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
