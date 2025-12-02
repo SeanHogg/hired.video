@@ -71,6 +71,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const AICoach = lazy(() => import("./pages/AICoach"));
+const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 
 
 // Other pages (lazy loaded)
@@ -466,6 +467,14 @@ const App = () => (
                         element={
                           <Navigate to="/Tools/JobResumeMatch" replace />
                         }
+                      />
+                      <Route
+                        path="/chrome-extension"
+                        element={<ChromeExtension />}
+                      />
+                      <Route
+                        path="/insights/how-to-use-job-seeker-chrome-plugin-extension"
+                        element={<ChromeExtension />}
                       />
                       <Route path="/cookies" element={<CookiePolicy />} />
 
