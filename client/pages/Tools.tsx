@@ -824,11 +824,7 @@ export default function Tools() {
                   </Link>
 
                   {/* Best Resume Generator - Chrome Extension */}
-                  <a
-                    href="https://myvideoresu.me/insights/how-to-use-job-seeker-chrome-plugin-extension"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
+                  <Link to="/chrome-extension">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-center justify-between">
@@ -888,12 +884,12 @@ export default function Tools() {
                             </div>
                           </div>
                           <Button className="w-full mt-4" variant="outline">
-                            Install Extension
+                            Learn More
                           </Button>
                         </div>
                       </CardContent>
                     </Card>
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
