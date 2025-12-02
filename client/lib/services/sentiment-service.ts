@@ -24,14 +24,18 @@ export class SentimentService {
   /**
    * Analyze sentiment of raw text using the Sentiment API controller
    * Route: /sentiment/sentimentprediction
+   * Note: The endpoint expects a JSON-encoded string body (e.g., "text" with quotes)
    */
   async analyzeSentiment(text: string): Promise<number> {
-    const response = await apiClient.post<{ result: number }>(
+    // The backend expects [FromBody] string, which requires a JSON-encoded string
+    // Since apiClient passes strings as-is, we need to JSON.stringify the string
+    // The API returns { success: true, data: float } and apiClient unwraps it
+    const response = await apiClient.post<number>(
       "/sentiment/sentimentprediction",
-      text,
-      z.object({ result: z.number() }),
+      JSON.stringify(text), // This produces "text" with quotes for proper JSON
+      z.number(),
     );
-    return response.data.result;
+    return response.data;
   }
 
   /**
@@ -47,14 +51,18 @@ export class SentimentService {
   /**
    * Analyze an existing resume using the dedicated resume sentiment endpoint
    * Route: /api/Resume/SentimentPrediction
+   * Note: The endpoint expects a JSON-encoded string body (e.g., "resumeId" with quotes)
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
-    const response = await apiClient.post<{ result: number }>(
+    // The backend expects [FromBody] string id, which requires a JSON-encoded string
+    // Since apiClient passes strings as-is, we need to JSON.stringify the string
+    // The API returns { success: true, data: float } and apiClient unwraps it
+    const response = await apiClient.post<number>(
       "/api/Resume/SentimentPrediction",
-      resumeId,
-      z.object({ result: z.number() }),
+      JSON.stringify(resumeId), // This produces "resumeId" with quotes
+      z.number(),
     );
-    return response.data.result;
+    return response.data;
   }
 
   /**
