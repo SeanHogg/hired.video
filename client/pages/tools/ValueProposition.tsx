@@ -100,10 +100,12 @@ export default function ValueProposition() {
     setIsGenerating(true);
 
     try {
-      // Call the value proposition service with the collected data
-      const result = await valuePropositionService.generateByContent({
-        jobContent: jobData?.jobContent,
-        resumeContent: resumeData?.resumeContent,
+      // Use the smart helper method that routes to the correct endpoint
+      const result = await valuePropositionService.generate({
+        jobId: jobData?.source === "existing" ? jobData?.jobId : undefined,
+        jobContent: jobData?.source !== "existing" ? jobData?.jobContent : undefined,
+        resumeId: resumeData?.source === "existing" ? resumeData?.resumeId : undefined,
+        resumeContent: resumeData?.source !== "existing" ? resumeData?.resumeContent : undefined,
         companyName: data.name,
         companyMission: data.mission,
         companyValues: data.values,
@@ -113,7 +115,8 @@ export default function ValueProposition() {
       setCurrentStep("results");
     } catch (err) {
       console.error("Value proposition generation failed:", err);
-      setError("Failed to generate value proposition. Please try again.");
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate value proposition. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsGenerating(false);
     }

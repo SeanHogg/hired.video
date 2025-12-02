@@ -79,6 +79,62 @@ export class ValuePropositionService {
   }
 
   /**
+   * Helper method to determine which API endpoint to use based on input types
+   */
+  async generate(params: {
+    jobId?: string;
+    jobContent?: string;
+    resumeId?: string;
+    resumeContent?: string;
+    companyName?: string;
+    companyMission?: string;
+    companyValues?: string;
+  }): Promise<ValuePropositionResponse> {
+    const { jobId, jobContent, resumeId, resumeContent, companyName, companyMission, companyValues } = params;
+
+    // Validate inputs
+    if (!jobId && !jobContent) {
+      throw new Error("Either jobId or jobContent must be provided");
+    }
+    if (!resumeId && !resumeContent) {
+      throw new Error("Either resumeId or resumeContent must be provided");
+    }
+
+    const companyInfo = { companyName, companyMission, companyValues };
+
+    // Route to appropriate endpoint based on available data
+    if (jobId && resumeId) {
+      // Both IDs available - use job-id-resume-id endpoint
+      return this.generateByJobIdResumeId({ jobId, resumeId, ...companyInfo });
+    } else if (jobContent && resumeId) {
+      // Job content + resume ID - use job-content-resume-id endpoint
+      return this.generateByJobContentResumeId({ jobContent, resumeId, ...companyInfo });
+    } else if (jobContent && resumeContent) {
+      // Both content strings - use content endpoint
+      return this.generateByContent({ jobContent, resumeContent, ...companyInfo });
+    } else if (jobId && resumeContent) {
+      // Job ID + resume content - use job-id-resume-content endpoint
+      return this.generateByJobIdResumeContent({ jobId, resumeContent, ...companyInfo });
+    } else {
+      throw new Error("Invalid combination of parameters.");
+    }
+  }
+
+  /**
+   * Generate value proposition using job ID and resume content
+   */
+  async generateByJobIdResumeContent(
+    request: ValuePropositionRequest,
+  ): Promise<ValuePropositionResponse> {
+    const response = await apiClient.post<ValuePropositionResponse>(
+      "/api/ValueProposition/generate/job-id-resume-content",
+      request,
+      ValuePropositionResponseSchema,
+    );
+    return response.data;
+  }
+
+  /**
    * Generate value proposition with file upload support
    */
   async generateWithFile(
