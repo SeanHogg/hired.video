@@ -111,99 +111,29 @@ export default function ResumeOptimizer() {
     }
   };
 
-  const optimizeResume = async (content: string) => {
-    const prompt = `You are an expert resume optimizer and ATS specialist. Analyze the following resume and provide optimization suggestions.
-
-Resume Content: ${content}
-${jobDescription ? `Job Description: ${jobDescription}` : ""}
-
-Please provide a detailed analysis with:
-1. Overall optimization score (0-100)
-2. ATS compatibility score (0-100)
-3. Keyword optimization score (0-100)
-4. Format score (0-100)
-5. Content quality score (0-100)
-6. Specific suggestions for improvement
-
-Return the response in JSON format with the following structure:
-{
-  "overallScore": number,
-  "atsScore": number,
-  "keywordScore": number,
-  "formatScore": number,
-  "contentScore": number,
-  "suggestions": [
-    {
-      "type": "critical|important|minor",
-      "category": "ats|keywords|format|content",
-      "title": "suggestion title",
-      "description": "detailed description",
-      "impact": "expected impact"
+  const optimizeResume = async (content: string): Promise<OptimizationResult> => {
+    // Validate content before making API call
+    if (!content || !content.trim()) {
+      throw new Error("Resume content is required for optimization.");
     }
-  ]
-}`;
 
-    try {
-      const response = await apiClient.post("/api/ResumeOptimizer/optimize", {
-        resumeText: resumeText,
-        jobDescription: jobDescription || undefined
-      });
+    const response = await apiClient.post("/api/ResumeOptimizer/optimize", {
+      resumeText: content,
+      jobDescription: jobDescription || undefined
+    });
 
-      // Try to parse the result
-      try {
-        const data: any = response.data;
-        const parsedResult = typeof data.result === 'string'
-          ? JSON.parse(data.result)
-          : data.result || data;
-        return parsedResult;
-      } catch {
-        // Return mock optimization result
-        return {
-          overallScore: Math.floor(Math.random() * 30) + 60, // 60-90
-          atsScore: Math.floor(Math.random() * 25) + 70, // 70-95
-          keywordScore: Math.floor(Math.random() * 35) + 55, // 55-90
-          formatScore: Math.floor(Math.random() * 20) + 75, // 75-95
-          contentScore: Math.floor(Math.random() * 30) + 65, // 65-95
-          suggestions: [
-            {
-              type: "critical",
-              category: "ats",
-              title: "Add more relevant keywords",
-              description:
-                "Your resume lacks industry-specific keywords that ATS systems look for. Include terms from the job description.",
-              impact: "Could increase ATS pass rate by 25-40%",
-            },
-            {
-              type: "important",
-              category: "format",
-              title: "Use standard section headers",
-              description:
-                "Use conventional headers like 'Work Experience' instead of creative alternatives.",
-              impact: "Improves ATS parsing accuracy",
-            },
-            {
-              type: "important",
-              category: "content",
-              title: "Quantify achievements",
-              description:
-                "Add specific numbers, percentages, and metrics to demonstrate impact.",
-              impact: "Makes accomplishments more compelling",
-            },
-            {
-              type: "minor",
-              category: "keywords",
-              title: "Include soft skills",
-              description:
-                "Balance technical skills with relevant soft skills mentioned in job postings.",
-              impact: "Provides more comprehensive skill coverage",
-            },
-          ],
-        };
-      }
-    } catch (error) {
-      console.error("Optimization failed:", error);
-      throw error;
+    const data: any = response.data;
+
+    // Check for API error response
+    if (data.success === false && data.error) {
+      throw new Error(data.error.message || "Optimization failed");
     }
+
+    // Parse the result
+    const parsedResult = typeof data.result === 'string'
+      ? JSON.parse(data.result)
+      : data.result || data;
+    return parsedResult;
   };
 
   const handleTextOptimization = async () => {
@@ -225,9 +155,10 @@ Return the response in JSON format with the following structure:
     try {
       const result = await optimizeResume(resumeText);
       setOptimizationResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Optimization failed:", err);
-      setError("Failed to optimize resume. Please try again.");
+      const errorMessage = err?.message || "Failed to optimize resume. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsOptimizing(false);
     }
@@ -266,9 +197,10 @@ Return the response in JSON format with the following structure:
       // Now optimize the parsed content
       const result = await optimizeResume(resumeContent);
       setOptimizationResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("File optimization failed:", err);
-      setError("Failed to optimize resume file. Please try again.");
+      const errorMessage = err?.message || "Failed to optimize resume file. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsOptimizing(false);
     }
@@ -289,11 +221,17 @@ Return the response in JSON format with the following structure:
 
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
-      const result = await optimizeResume(JSON.stringify(resume.data) || "");
+      // Convert resume data to a readable format for the AI
+      const resumeContent = resume.data ? JSON.stringify(resume.data) : "";
+      if (!resumeContent) {
+        throw new Error("Selected resume has no content to optimize.");
+      }
+      const result = await optimizeResume(resumeContent);
       setOptimizationResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Resume optimization failed:", err);
-      setError("Failed to optimize resume. Please try again.");
+      const errorMessage = err?.message || "Failed to optimize resume. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsOptimizing(false);
     }

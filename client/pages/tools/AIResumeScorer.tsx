@@ -112,125 +112,28 @@ export default function AIResumeScorer() {
     }
   };
 
-  const scoreResume = async (content: string) => {
-    const prompt = `You are an expert resume scorer and ATS specialist. Analyze the following resume and provide a comprehensive score.
-
-Resume Content: ${content}
-
-Please analyze and score the resume on:
-1. Overall Score (0-100)
-2. ATS Compatibility (0-100) - How well it passes ATS systems
-3. Content Quality (0-100) - Writing quality, clarity, relevance
-4. Keyword Score (0-100) - Industry keywords and relevance
-5. Format Score (0-100) - Structure, readability, organization
-6. Impact Score (0-100) - Quantified achievements and results
-
-Also provide:
-- Letter grade (A+, A, B+, B, C+, C, D, F)
-- Top 3 strengths
-- Top 3 weaknesses
-- Specific recommendations for improvement
-
-Return the response in JSON format with the following structure:
-{
-  "overallScore": number,
-  "atsCompatibility": number,
-  "contentQuality": number,
-  "keywordScore": number,
-  "formatScore": number,
-  "impactScore": number,
-  "grade": "letter grade",
-  "strengths": ["strength1", "strength2", "strength3"],
-  "weaknesses": ["weakness1", "weakness2", "weakness3"],
-  "recommendations": [
-    {
-      "category": "critical|important|minor",
-      "title": "recommendation title",
-      "description": "detailed description",
-      "impact": number (1-10)
+  const scoreResume = async (content: string): Promise<ResumeScore> => {
+    // Validate content before making API call
+    if (!content || !content.trim()) {
+      throw new Error("Resume content is required for scoring.");
     }
-  ]
-}`;
 
-    try {
-      const response = await apiClient.post("/api/ResumeScorer/score", {
-        resumeText: resumeText
-      });
+    const response = await apiClient.post("/api/ResumeScorer/score", {
+      resumeText: content
+    });
 
-      // Try to parse the result
-      try {
-        const data: any = response.data;
-        const parsedResult = typeof data.result === 'string'
-          ? JSON.parse(data.result)
-          : data.result || data;
-        return parsedResult;
-      } catch {
-        // Return mock scoring result
-        const mockScore = {
-          overallScore: Math.floor(Math.random() * 25) + 70, // 70-95
-          atsCompatibility: Math.floor(Math.random() * 20) + 75, // 75-95
-          contentQuality: Math.floor(Math.random() * 30) + 65, // 65-95
-          keywordScore: Math.floor(Math.random() * 35) + 60, // 60-95
-          formatScore: Math.floor(Math.random() * 25) + 70, // 70-95
-          impactScore: Math.floor(Math.random() * 40) + 55, // 55-95
-          grade: "B+",
-          strengths: [
-            "Clear professional experience section",
-            "Good use of action verbs",
-            "Relevant technical skills listed",
-          ],
-          weaknesses: [
-            "Lacks quantified achievements",
-            "Missing industry keywords",
-            "Could improve formatting consistency",
-          ],
-          recommendations: [
-            {
-              category: "critical",
-              title: "Add quantified achievements",
-              description:
-                "Include specific numbers, percentages, and metrics to demonstrate your impact and results.",
-              impact: 8,
-            },
-            {
-              category: "important",
-              title: "Optimize for ATS keywords",
-              description:
-                "Research and include industry-specific keywords that ATS systems look for in your field.",
-              impact: 7,
-            },
-            {
-              category: "important",
-              title: "Improve section formatting",
-              description:
-                "Use consistent formatting, bullet points, and spacing throughout your resume.",
-              impact: 6,
-            },
-            {
-              category: "minor",
-              title: "Add professional summary",
-              description:
-                "Include a compelling 2-3 line summary at the top highlighting your key qualifications.",
-              impact: 5,
-            },
-          ],
-        };
+    const data: any = response.data;
 
-        // Adjust grade based on overall score
-        if (mockScore.overallScore >= 90) mockScore.grade = "A+";
-        else if (mockScore.overallScore >= 85) mockScore.grade = "A";
-        else if (mockScore.overallScore >= 80) mockScore.grade = "B+";
-        else if (mockScore.overallScore >= 75) mockScore.grade = "B";
-        else if (mockScore.overallScore >= 70) mockScore.grade = "C+";
-        else if (mockScore.overallScore >= 65) mockScore.grade = "C";
-        else mockScore.grade = "D";
-
-        return mockScore;
-      }
-    } catch (error) {
-      console.error("Scoring failed:", error);
-      throw error;
+    // Check for API error response
+    if (data.success === false && data.error) {
+      throw new Error(data.error.message || "Scoring failed");
     }
+
+    // Parse the result
+    const parsedResult = typeof data.result === 'string'
+      ? JSON.parse(data.result)
+      : data.result || data;
+    return parsedResult;
   };
 
   const handleTextScoring = async () => {
@@ -252,9 +155,10 @@ Return the response in JSON format with the following structure:
     try {
       const result = await scoreResume(resumeText);
       setScoreResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Scoring failed:", err);
-      setError("Failed to score resume. Please try again.");
+      const errorMessage = err?.message || "Failed to score resume. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsScoring(false);
     }
@@ -293,9 +197,10 @@ Return the response in JSON format with the following structure:
       // Now score the parsed content
       const result = await scoreResume(resumeContent);
       setScoreResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("File scoring failed:", err);
-      setError("Failed to score resume file. Please try again.");
+      const errorMessage = err?.message || "Failed to score resume file. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsScoring(false);
     }
@@ -316,11 +221,17 @@ Return the response in JSON format with the following structure:
 
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
-      const result = await scoreResume(JSON.stringify(resume.data) || "");
+      // Convert resume data to a readable format for the AI
+      const resumeContent = resume.data ? JSON.stringify(resume.data) : "";
+      if (!resumeContent) {
+        throw new Error("Selected resume has no content to score.");
+      }
+      const result = await scoreResume(resumeContent);
       setScoreResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Resume scoring failed:", err);
-      setError("Failed to score resume. Please try again.");
+      const errorMessage = err?.message || "Failed to score resume. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsScoring(false);
     }

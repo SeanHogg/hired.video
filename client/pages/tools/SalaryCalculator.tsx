@@ -7,7 +7,6 @@ import {
   TrendingUp,
   MapPin,
   Briefcase,
-  GraduationCap,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
@@ -30,9 +29,73 @@ import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { aiService } from "@/lib/services/ai-service";
+import { apiClient } from "@/lib/api-client";
 import { INDUSTRIES, EDUCATION_LEVELS } from "@/lib/constants/industries";
 
+// API response types (matching backend SalaryAnalysisResult)
+interface SalaryRange {
+  min: number;
+  max: number;
+  percentile25: number;
+  percentile50: number;
+  percentile75: number;
+  percentile90: number;
+}
+
+interface LocationAdjustmentData {
+  factor: number;
+  description: string;
+}
+
+interface ExperienceImpact {
+  currentLevel: string;
+  salaryBoost: number;
+  nextMilestone: string;
+}
+
+interface IndustryComparisonData {
+  industryAverage: number;
+  comparison: string;
+  topPayingCompanies: string[];
+}
+
+interface SkillsPremium {
+  skill: string;
+  premium: number;
+  demand: string;
+}
+
+interface CareerGrowth {
+  nextRole: string;
+  timeframe: string;
+  salaryIncrease: number;
+}
+
+interface NegotiationRangeData {
+  conservative: number;
+  target: number;
+  aggressive: number;
+}
+
+interface MarketTrends {
+  trend: string;
+  growthRate: string;
+  outlook: string;
+}
+
+interface SalaryAnalysisResult {
+  averageSalary: number;
+  salaryRange: SalaryRange;
+  locationAdjustment: LocationAdjustmentData;
+  experienceImpact: ExperienceImpact;
+  industryComparison: IndustryComparisonData;
+  skillsPremium: SkillsPremium[];
+  careerGrowth: CareerGrowth;
+  negotiationRange: NegotiationRangeData;
+  marketTrends: MarketTrends;
+}
+
+// Legacy interface for UI display (will be computed from API response)
 interface SalaryData {
   baseSalary: number;
   lowRange: number;
@@ -48,6 +111,11 @@ interface SalaryData {
     averageSalary: number;
     difference: number;
   }[];
+  // Extended data from API
+  careerGrowth?: CareerGrowth;
+  negotiationRange?: NegotiationRangeData;
+  marketTrends?: MarketTrends;
+  skillsPremium?: SkillsPremium[];
 }
 
 export default function SalaryCalculator() {
@@ -81,6 +149,11 @@ export default function SalaryCalculator() {
       return;
     }
 
+    if (!industry) {
+      setError("Please select an industry.");
+      return;
+    }
+
     // Check authentication before proceeding
     if (!isAuthenticated) {
       setShowAuthOverlay(true);
@@ -92,134 +165,111 @@ export default function SalaryCalculator() {
     setSalaryData(null);
 
     try {
-      // Create AI prompt for salary analysis
-      const prompt = `You are a professional salary analyst with access to current market data. Analyze the following job details and provide a comprehensive salary breakdown in JSON format.
+      // Call the dedicated Salary Calculator API endpoint
+      const response = await apiClient.post("/api/SalaryCalculator/analyze", {
+        jobTitle: jobTitle.trim(),
+        location: location_.trim(),
+        yearsExperience: experience[0],
+        industry: industry,
+      });
 
-Job Details:
-- Job Title: ${jobTitle}
-- Location: ${location_}
-- Years of Experience: ${experience[0]}
-- Education Level: ${education || "Not specified"}
-- Industry: ${industry || "Not specified"}
-- Company: ${company || "Not specified"}
+      // Type the API response properly
+      interface ApiErrorResponse {
+        success: false;
+        error: { message: string };
+      }
+      interface ApiSuccessResponse {
+        success: true;
+        data: SalaryAnalysisResult;
+      }
+      type ApiResponse = ApiErrorResponse | ApiSuccessResponse | SalaryAnalysisResult;
 
-Please provide a detailed salary analysis in the following JSON format (return ONLY valid JSON, no additional text):
+      const apiResponse = response.data as ApiResponse;
 
-{
-  "baseSalary": [estimated base salary as number],
-  "lowRange": [25th percentile salary as number],
-  "highRange": [75th percentile salary as number],
-  "marketAverage": [market average salary as number],
-  "percentile25": [25th percentile as number],
-  "percentile75": [75th percentile as number],
-  "totalCompensation": [total comp including benefits as number],
-  "locationAdjustment": [percentage adjustment for location as number, can be negative],
-  "experienceAdjustment": [percentage adjustment for experience as number],
-  "industryComparison": [
-    {"industry": "Technology", "averageSalary": [number], "difference": [percentage difference as number]},
-    {"industry": "Finance", "averageSalary": [number], "difference": [percentage difference as number]},
-    {"industry": "Healthcare", "averageSalary": [number], "difference": [percentage difference as number]},
-    {"industry": "Education", "averageSalary": [number], "difference": [percentage difference as number]}
-  ]
-}
-
-Base your analysis on current 2024 market data, considering cost of living adjustments, industry standards, and experience premiums. Ensure all numbers are realistic and based on actual market conditions.`;
-
-      // Call AI service
-      const response = await aiService.sendChatMessage(
-        [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        {
-          model: "meta-llama/llama-3.1-8b-instruct:free",
-          maxTokens: 1000,
-          temperature: 0.3, // Lower temperature for more consistent numerical outputs
-        },
-      );
-
-      // Parse AI response
-      let aiSalaryData: SalaryData;
-      try {
-        // Extract JSON from response (in case AI adds extra text)
-        const jsonMatch = response.message.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : response.message;
-        aiSalaryData = JSON.parse(jsonString);
-
-        // Validate and sanitize the data
-        if (
-          !aiSalaryData.baseSalary ||
-          typeof aiSalaryData.baseSalary !== "number"
-        ) {
-          throw new Error("Invalid salary data from AI");
-        }
-
-        // Ensure all required fields exist with reasonable defaults
-        aiSalaryData = {
-          baseSalary: Math.round(aiSalaryData.baseSalary),
-          lowRange: Math.round(
-            aiSalaryData.lowRange || aiSalaryData.baseSalary * 0.8,
-          ),
-          highRange: Math.round(
-            aiSalaryData.highRange || aiSalaryData.baseSalary * 1.3,
-          ),
-          marketAverage: Math.round(
-            aiSalaryData.marketAverage || aiSalaryData.baseSalary * 1.05,
-          ),
-          percentile25: Math.round(
-            aiSalaryData.percentile25 || aiSalaryData.baseSalary * 0.85,
-          ),
-          percentile75: Math.round(
-            aiSalaryData.percentile75 || aiSalaryData.baseSalary * 1.2,
-          ),
-          totalCompensation: Math.round(
-            aiSalaryData.totalCompensation || aiSalaryData.baseSalary * 1.25,
-          ),
-          locationAdjustment: Math.round(aiSalaryData.locationAdjustment || 0),
-          experienceAdjustment: Math.round(
-            aiSalaryData.experienceAdjustment || experience[0] * 5,
-          ),
-          industryComparison: aiSalaryData.industryComparison || [
-            {
-              industry: "Technology",
-              averageSalary: Math.round(aiSalaryData.baseSalary * 1.1),
-              difference: 10,
-            },
-            {
-              industry: "Finance",
-              averageSalary: Math.round(aiSalaryData.baseSalary * 1.05),
-              difference: 5,
-            },
-            {
-              industry: "Healthcare",
-              averageSalary: Math.round(aiSalaryData.baseSalary * 0.95),
-              difference: -5,
-            },
-            {
-              industry: "Education",
-              averageSalary: Math.round(aiSalaryData.baseSalary * 0.8),
-              difference: -20,
-            },
-          ],
-        };
-      } catch (parseError) {
-        console.error("Failed to parse AI response:", parseError);
-        console.log("AI Response:", response.message);
-        throw new Error(
-          "Failed to parse salary analysis from AI. Please try again.",
-        );
+      // Check for API error response
+      if ('success' in apiResponse && apiResponse.success === false && 'error' in apiResponse) {
+        throw new Error(apiResponse.error.message || "Salary analysis failed");
       }
 
-      setSalaryData(aiSalaryData);
-    } catch (err) {
+      // Get the result data
+      const result: SalaryAnalysisResult = 'data' in apiResponse && apiResponse.data
+        ? apiResponse.data
+        : apiResponse as SalaryAnalysisResult;
+
+      // Validate the response has required data
+      if (!result.averageSalary && !result.salaryRange) {
+        throw new Error("Invalid salary data received from server.");
+      }
+
+      // Map API response to UI display format
+      const baseSalary = result.averageSalary || result.salaryRange?.percentile50 || 0;
+      const locationFactor = result.locationAdjustment?.factor || 1;
+      const locationAdjustmentPercent = Math.round((locationFactor - 1) * 100);
+      const experienceBoost = result.experienceImpact?.salaryBoost || 0;
+      const experienceAdjustmentPercent = baseSalary > 0
+        ? Math.round((experienceBoost / baseSalary) * 100)
+        : experience[0] * 5;
+
+      // Create industry comparison from API data
+      const industryComparison = [
+        {
+          industry: "Technology",
+          averageSalary: Math.round(baseSalary * 1.1),
+          difference: 10,
+        },
+        {
+          industry: "Finance",
+          averageSalary: Math.round(baseSalary * 1.05),
+          difference: 5,
+        },
+        {
+          industry: "Healthcare",
+          averageSalary: Math.round(baseSalary * 0.95),
+          difference: -5,
+        },
+        {
+          industry: "Education",
+          averageSalary: Math.round(baseSalary * 0.8),
+          difference: -20,
+        },
+      ];
+
+      // If we have industry comparison data from the API, adjust values
+      if (result.industryComparison?.industryAverage) {
+        const industryAvg = result.industryComparison.industryAverage;
+        industryComparison.forEach((item) => {
+          if (item.industry === industry) {
+            item.averageSalary = industryAvg;
+            item.difference = baseSalary > 0
+              ? Math.round(((industryAvg - baseSalary) / baseSalary) * 100)
+              : 0;
+          }
+        });
+      }
+
+      const salaryDataResult: SalaryData = {
+        baseSalary: baseSalary,
+        lowRange: result.salaryRange?.min || Math.round(baseSalary * 0.8),
+        highRange: result.salaryRange?.max || Math.round(baseSalary * 1.3),
+        marketAverage: result.averageSalary || baseSalary,
+        percentile25: result.salaryRange?.percentile25 || Math.round(baseSalary * 0.85),
+        percentile75: result.salaryRange?.percentile75 || Math.round(baseSalary * 1.2),
+        totalCompensation: Math.round(baseSalary * 1.25), // Estimate total comp with benefits
+        locationAdjustment: locationAdjustmentPercent,
+        experienceAdjustment: experienceAdjustmentPercent,
+        industryComparison: industryComparison,
+        // Extended data
+        careerGrowth: result.careerGrowth,
+        negotiationRange: result.negotiationRange,
+        marketTrends: result.marketTrends,
+        skillsPremium: result.skillsPremium,
+      };
+
+      setSalaryData(salaryDataResult);
+    } catch (err: unknown) {
       console.error("Salary calculation failed:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to calculate salary. Please try again.",
-      );
+      const errorMessage = err instanceof Error ? err.message : "Failed to calculate salary. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsCalculating(false);
     }
