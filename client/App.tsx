@@ -63,6 +63,7 @@ const ResumeOptimizer = lazy(() => import("./pages/tools/ResumeOptimizer"));
 const SalaryCalculator = lazy(() => import("./pages/tools/SalaryCalculator"));
 const AIResumeScorer = lazy(() => import("./pages/tools/AIResumeScorer"));
 const ValueProposition = lazy(() => import("./pages/tools/ValueProposition"));
+const ResumeTailor = lazy(() => import("./pages/tools/ResumeTailor"));
 const Outreach = lazy(() => import("./pages/Outreach"));
 const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -418,6 +419,14 @@ const App = () => (
                       <Route
                         path="/tools/value-proposition"
                         element={<ValueProposition />}
+                      />
+                      <Route
+                        path="/Tools/ResumeTailor"
+                        element={<ResumeTailor />}
+                      />
+                      <Route
+                        path="/tools/resume-tailor"
+                        element={<ResumeTailor />}
                       />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />

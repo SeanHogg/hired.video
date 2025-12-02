@@ -32,6 +32,26 @@ export const JobResumeMatchResponseSchema = z.object({
   score: z.number(), // 0-100 match score
 });
 
+// New v2 API schemas for analyze and tailor endpoints
+export const JobHtmlAnalyzeRequestSchema = z.object({
+  jobHtml: z.string(),
+  resumeId: z.string().optional(),
+  sourceUrl: z.string().optional(),
+});
+
+export const JobHtmlTailorRequestSchema = z.object({
+  jobHtml: z.string(),
+  resumeId: z.string().optional(),
+  sourceUrl: z.string().optional(),
+});
+
+export const JobTailorResponseSchema = z.object({
+  markdownResume: z.string(),
+  summaryRecommendations: z.string(),
+  oldScore: z.number(),
+  newScore: z.number(),
+});
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -48,6 +68,11 @@ export type JobResumeByContentMatchRequest = z.infer<
 export type JobResumeMatchResponse = z.infer<
   typeof JobResumeMatchResponseSchema
 >;
+
+// New v2 types
+export type JobHtmlAnalyzeRequest = z.infer<typeof JobHtmlAnalyzeRequestSchema>;
+export type JobHtmlTailorRequest = z.infer<typeof JobHtmlTailorRequestSchema>;
+export type JobTailorResponse = z.infer<typeof JobTailorResponseSchema>;
 
 // ============================================================================
 // SERVICE CLASS
@@ -136,6 +161,42 @@ export class MatchService {
         "Invalid combination of parameters. Cannot match job ID with resume content.",
       );
     }
+  }
+
+  // ==========================================================================
+  // NEW V2 ENDPOINTS - Standardized API for Chrome extension and frontend tools
+  // ==========================================================================
+
+  /**
+   * Analyze job HTML against a resume
+   * Uses POST /api/Match/analyze endpoint
+   * This is the new standardized endpoint (v2)
+   */
+  async analyzeJobHtml(
+    request: JobHtmlAnalyzeRequest,
+  ): Promise<JobResumeMatchResponse> {
+    const response = await apiClient.post<JobResumeMatchResponse>(
+      "/api/Match/analyze",
+      request,
+      JobResumeMatchResponseSchema,
+    );
+    return response.data;
+  }
+
+  /**
+   * Generate a tailored resume from job HTML
+   * Uses POST /api/Match/tailor endpoint
+   * This is the new standardized endpoint (v2)
+   */
+  async tailorResumeFromJobHtml(
+    request: JobHtmlTailorRequest,
+  ): Promise<JobTailorResponse> {
+    const response = await apiClient.post<JobTailorResponse>(
+      "/api/Match/tailor",
+      request,
+      JobTailorResponseSchema,
+    );
+    return response.data;
   }
 }
 
