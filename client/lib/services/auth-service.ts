@@ -167,7 +167,6 @@ export type { TwoFactorChallenge } from "@shared/api";
 export const VerificationStatusSchema = z.object({
   email: z.string().email().optional(),
   emailConfirmed: z.boolean(),
-  isEmailVerified: z.boolean(),
   sentAt: z.string().optional(),
   sendCount: z.number().int().nonnegative().optional(),
 });

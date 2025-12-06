@@ -111,7 +111,7 @@ export interface NormalizedPersonData extends BaseCardData {
   profileViews: number;
   connectionCount: number;
   followerCount: number;
-  isVerified: boolean;
+  emailConfirmed: boolean;
   isPremium: boolean;
   openToWork: boolean;
   experienceLevel?: "entry" | "mid" | "senior" | "executive";

@@ -39,7 +39,7 @@ interface AuthContextType {
   verifyTwoFactor: (code: string) => Promise<boolean>;
   resendTwoFactorCode: () => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
-  getVerificationStatus: () => Promise<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number }>;
+  getVerificationStatus: () => Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }>;
   signup: (
     email: string,
     password: string,
@@ -150,7 +150,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           // Prime verification state early so route guards behave correctly
           try {
             const status = await authService.getVerificationStatus();
-            setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+            setIsEmailVerified(status.emailConfirmed);
           } catch (err) {
             logger.warn?.("AuthProvider: failed to fetch verification status on init", err);
             setIsEmailVerified(undefined);
@@ -253,7 +253,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         // After login, prime verification state lazily
         try {
           const status = await authService.getVerificationStatus();
-          setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+          setIsEmailVerified(status.emailConfirmed);
         } catch {
           setIsEmailVerified(undefined);
         }
@@ -398,7 +398,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       // After successful 2FA, prime verification status so route guards behave correctly
       try {
         const status = await authService.getVerificationStatus();
-        setIsEmailVerified(status.emailConfirmed || status.isEmailVerified);
+        setIsEmailVerified(status.emailConfirmed);
       } catch (err) {
         // Leave as undefined on failure; guards will avoid false redirects when loading
         setIsEmailVerified(undefined);
@@ -431,7 +431,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
-  const getVerificationStatus = async (): Promise<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number }> => {
+  const getVerificationStatus = async (): Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }> => {
     try {
       return await authService.getVerificationStatus();
     } catch (error) {

@@ -301,7 +301,7 @@ export default function People() {
       profileViews: person.profileViews || 0,
       connectionCount: 0, // Not available in UserMetadataDTO
       followerCount: 0, // Not available in UserMetadataDTO
-      isVerified: person.isVerified || false,
+      emailConfirmed: person.emailConfirmed || false,
       isPremium: person.isPremium || false,
       openToWork: person.openToWork || false,
       experienceLevel: getExperienceLevel(person),
@@ -873,7 +873,7 @@ export default function People() {
                           profileViews: (person as any).profileViews || 0,
                           connectionCount: 0,
                           followerCount: 0,
-                          isVerified: person.isVerified || false,
+                          emailConfirmed: person.emailConfirmed || false,
                           isPremium: person.isPremium || false,
                           experienceLevel: "Mid Level",
                           currentPosition: person.currentRole || "",
@@ -1272,7 +1272,7 @@ export default function People() {
                             profileViews: (person as any).profileViews || 0,
                             connectionCount: 0,
                             followerCount: 0,
-                            isVerified: person.isVerified || false,
+                            emailConfirmed: person.emailConfirmed || false,
                             isPremium: person.isPremium || false,
                             experienceLevel: "Mid Level",
                             currentPosition: person.currentRole || "",
@@ -1920,7 +1920,7 @@ export default function People() {
                     profileViews: person.profileViews || 0,
                     connectionCount: 0, // Not available in PublicUser
                     followerCount: 0, // Not available in PublicUser
-                    isVerified: person.isVerified || false,
+                    emailConfirmed: person.emailConfirmed || false,
                     isPremium: person.isPremium || false,
                     openToWork: person.openToWork || false,
                     experienceLevel: getExperienceLevel(person),

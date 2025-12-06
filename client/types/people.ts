@@ -164,7 +164,7 @@ export interface UserMetadata {
   profileViews: number;
   connectionCount: number;
   followerCount: number;
-  isVerified: boolean;
+  emailConfirmed: boolean;
   isPremium: boolean;
   openToWork: boolean;
   experienceLevel?: string; // Derived from experience

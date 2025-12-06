@@ -118,7 +118,7 @@ export const PublicUserSchema = z.object({
     .nullable()
     .transform((val) => (val === null ? undefined : val))
     .optional(),
-  isVerified: nullableBoolean(),
+  emailConfirmed: nullableBoolean(),
   isPremium: nullableBoolean(),
   profileViews: nullableNumber(),
   createdAt: nullableString(),

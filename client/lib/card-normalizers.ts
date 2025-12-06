@@ -145,7 +145,7 @@ export function normalizePersonData(
     profileViews: item.profileViews || item.views || 0,
     connectionCount: item.connectionCount || 0,
     followerCount: item.followerCount || 0,
-    isVerified: item.isVerified || false,
+    emailConfirmed: item.emailConfirmed || false,
     isPremium: item.isPremium || false,
     openToWork: item.openToWork || false,
     experienceLevel: item.experienceLevel,

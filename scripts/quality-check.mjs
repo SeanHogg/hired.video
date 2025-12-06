@@ -68,7 +68,7 @@ for (const check of CHECKS) {
       duration,
       required: check.required
     });
-  } catch (_error) {
+  } catch {
     const duration = Date.now() - startTime;
     console.log(`[${new Date().toLocaleTimeString()}] ❌ ${check.name} failed (${duration}ms)\n`);
 

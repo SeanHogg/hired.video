@@ -198,7 +198,7 @@ export default function PeopleCard({
                   <Link to={`/people/${person.slug || person.id}`}>{person.fullName}</Link>
                 </CardTitle>
                 <div className="flex items-center gap-1 sm:gap-2">
-                  {person.isVerified && (
+                  {person.emailConfirmed && (
                     <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
                   )}
                   {person.isPremium && (

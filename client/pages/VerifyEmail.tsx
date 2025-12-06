@@ -52,7 +52,7 @@ export default function VerifyEmail(): JSX.Element {
     try {
       setStatusLoading(true);
       const status = await getVerificationStatus();
-      if (status.isEmailVerified || status.emailConfirmed) {
+      if (status.emailConfirmed) {
         navigate(redirect, { replace: true });
         return true;
       }

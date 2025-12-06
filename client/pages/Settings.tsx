@@ -96,7 +96,7 @@ function SettingsContent() {
   const [savingJobPrefs, setSavingJobPrefs] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; isEmailVerified: boolean; sentAt?: string; sendCount?: number } | null>(null);
+  const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number } | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTab, setActiveTab] = useState("notifications");
 
@@ -603,7 +603,7 @@ function SettingsContent() {
             </div>
 
             {/* Verification Banner */}
-            {verification && !(verification.emailConfirmed || verification.isEmailVerified) && (
+            {verification && !verification.emailConfirmed && (
               <Alert>
                 <AlertDescription>
                   ⚠️ Your email is not verified. You won't appear in public search results until verified.
@@ -1363,11 +1363,11 @@ function SettingsContent() {
                             {verification?.email}
                           </p>
                         </div>
-                        <Badge variant={verification && (verification.emailConfirmed || verification.isEmailVerified) ? "default" : "destructive"}>
-                          {verification && (verification.emailConfirmed || verification.isEmailVerified) ? "Verified ✅" : "Not Verified ❌"}
+                        <Badge variant={verification?.emailConfirmed ? "default" : "destructive"}>
+                          {verification?.emailConfirmed ? "Verified ✅" : "Not Verified ❌"}
                         </Badge>
                       </div>
-                      {!verification || !(verification.emailConfirmed || verification.isEmailVerified) ? (
+                      {!verification?.emailConfirmed ? (
                         <div className="mt-3 flex items-center gap-2">
                           <Button
                             size="sm"
