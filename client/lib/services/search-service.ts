@@ -106,8 +106,8 @@ export class SearchService {
     params.append("page", filters.page.toString());
     params.append("limit", filters.limit.toString());
 
-    // Use the new unified search endpoint
-    const unifiedUrl = `/api/Dashboard/search/public?${params.toString()}`;
+    // Use the unified search endpoint
+    const unifiedUrl = `/api/Search/public?${params.toString()}`;
     const key = unifiedUrl;
 
     const existing = this.inflight.get(key);
