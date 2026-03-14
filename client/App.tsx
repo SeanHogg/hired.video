@@ -72,6 +72,7 @@ const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const AICoach = lazy(() => import("./pages/AICoach"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
+const Feed = lazy(() => import("./pages/Feed"));
 
 
 // Other pages (lazy loaded)
@@ -289,6 +290,7 @@ const App = () => (
                       />
                       <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
                       <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/feed" element={<RequireVerified><Feed /></RequireVerified>} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"

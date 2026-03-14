@@ -15,6 +15,7 @@ import {
   UserCog,
   X,
   BarChart3,
+  MessageSquare,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -44,6 +45,12 @@ export default function Sidebar({
       name: "Dashboard",
       href: "/dashboard",
       icon: TrendingUp,
+      exactMatch: false,
+    },
+    {
+      name: "Feed",
+      href: "/feed",
+      icon: MessageSquare,
       exactMatch: false,
     },
     { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
