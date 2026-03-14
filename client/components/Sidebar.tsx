@@ -54,6 +54,7 @@ export default function Sidebar({
       exactMatch: false,
     },
     { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
+    { name: "Studio", href: "/studio", icon: Video, exactMatch: false },
     { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
     {
       name: "Companies",
