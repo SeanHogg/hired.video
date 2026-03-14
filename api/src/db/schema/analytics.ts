@@ -71,7 +71,7 @@ export const userEngagementMetrics = pgTable("user_engagement_metrics", {
   loginCount: integer("login_count").default(0).notNull(),
   resumeViews: integer("resume_views").default(0).notNull(),
   jobApplications: integer("job_applications").default(0).notNull(),
-  messageseSent: integer("messages_sent").default(0).notNull(),
+  messagesSent: integer("messages_sent").default(0).notNull(),
   videosCreated: integer("videos_created").default(0).notNull(),
   lastActive: timestamp("last_active", { withTimezone: true }),
   periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
