@@ -2,7 +2,14 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./frontend/**/*.{ts,tsx}"],
+  // Include only source files where Tailwind classes are used (avoid scanning node_modules)
+  content: [
+    "./index.html",
+    "./App.tsx",
+    "./components/**/*.{ts,tsx}",
+    "./pages/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
+  ],
   prefix: "",
   theme: {
     container: {
