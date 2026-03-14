@@ -36,3 +36,6 @@ html
 **/tmp/
 
 .config/
+
+# Ignore legacy/alternative API implementation sources
+myvideoresume-api/

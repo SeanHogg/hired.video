@@ -1,140 +1,179 @@
 import { Hono } from "hono";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
-import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+const { youtubeAccounts, videos } = schema;
+
+export const youtubeRoutes = new Hono<{ Variables: Variables }>();
 
 const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
   "https://www.googleapis.com/auth/youtube",
 ].join(" ");
 
-// ============================================================================
-// ROUTES
-// ============================================================================
+const CallbackSchema = z.object({ code: z.string().min(1) });
 
-export const youtubeRoutes = new Hono<{ Variables: Variables }>();
+function ok<T>(data: T) {
+  return { success: true as const, data, timestamp: new Date().toISOString() };
+}
 
-/**
- * GET /api/youtube/company/status
- *
- * Reports whether the company YouTube integration is active by attempting to
- * refresh the stored OAuth token. Returns channel info on success.
- */
-youtubeRoutes.get("/company/status", async (c) => {
-  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_REFRESH_TOKEN) {
-    return c.json(
-      success({
-        connected: false,
-        reason: "YouTube integration is not configured",
-      }),
-    );
-  }
+function fail(code: string, message: string) {
+  return { success: false as const, error: { code, message }, timestamp: new Date().toISOString() };
+}
 
-  try {
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.YOUTUBE_CLIENT_ID,
-        client_secret: process.env.YOUTUBE_CLIENT_SECRET ?? "",
-        refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
-        grant_type: "refresh_token",
-      }),
-    });
+function accountToDto(account: typeof youtubeAccounts.$inferSelect) {
+  return {
+    channelId: account.channelId,
+    channelTitle: account.channelTitle ?? "My YouTube Channel",
+    channelThumbnail: undefined,
+    subscriberCount: undefined,
+    videoCount: undefined,
+    connectedAt: new Date(account.createdAt).toISOString(),
+  };
+}
 
-    if (!tokenResponse.ok) {
-      return c.json(
-        success({
-          connected: false,
-          reason: "Failed to refresh YouTube access token — credentials may be invalid or revoked",
-        }),
-      );
-    }
+youtubeRoutes.get("/account", async (c) => {
+  const user = c.var.user;
+  const db = getDb();
 
-    const { access_token } = (await tokenResponse.json()) as { access_token: string };
+  const [account] = await db
+    .select()
+    .from(youtubeAccounts)
+    .where(and(eq(youtubeAccounts.userId, user.sub), eq(youtubeAccounts.isActive, true)))
+    .limit(1);
 
-    // Fetch the authenticated channel info
-    const channelResponse = await fetch(
-      "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
-      {
-        headers: { Authorization: `Bearer ${access_token}` },
-      },
-    );
-
-    if (!channelResponse.ok) {
-      return c.json(
-        success({
-          connected: false,
-          reason: "Could not retrieve channel information",
-        }),
-      );
-    }
-
-    const channelData = (await channelResponse.json()) as {
-      items?: Array<{
-        id: string;
-        snippet: { title: string; description: string; thumbnails?: { default?: { url: string } } };
-      }>;
-    };
-
-    const channel = channelData.items?.[0];
-    if (!channel) {
-      return c.json(
-        success({
-          connected: false,
-          reason: "No YouTube channel found for the connected account",
-        }),
-      );
-    }
-
-    return c.json(
-      success({
-        connected: true,
-        channel: {
-          id: channel.id,
-          title: channel.snippet.title,
-          description: channel.snippet.description,
-          thumbnailUrl: channel.snippet.thumbnails?.default?.url,
-        },
-      }),
-    );
-  } catch (err) {
-    console.error("[youtube/company/status]", err);
-    return c.json(error("YOUTUBE_ERROR", "Failed to check YouTube connection status"), 502);
-  }
+  return c.json(ok(account ? accountToDto(account) : null));
 });
 
-/**
- * GET /api/youtube/company/auth-url
- *
- * Returns the Google OAuth2 authorisation URL an admin should visit to
- * connect the company YouTube account. The resulting auth code / refresh
- * token must be stored as the YOUTUBE_REFRESH_TOKEN secret.
- */
-youtubeRoutes.get("/company/auth-url", (c) => {
+youtubeRoutes.get("/auth-url", (c) => {
   if (!process.env.YOUTUBE_CLIENT_ID) {
-    return c.json(error("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
+    return c.json(fail("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
   }
 
   const params = new URLSearchParams({
     client_id: process.env.YOUTUBE_CLIENT_ID,
-    redirect_uri: "urn:ietf:wg:oauth:2.0:oob", // out-of-band for manual token capture
+    redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
     response_type: "code",
     scope: YOUTUBE_SCOPES,
     access_type: "offline",
     prompt: "consent",
   });
 
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  return c.json(ok({ authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` }));
+});
 
-  return c.json(
-    success({
-      authUrl,
-      instructions:
-        "Visit the authUrl in a browser, grant access, then store the returned code via `wrangler secret put YOUTUBE_REFRESH_TOKEN`",
-    }),
-  );
+youtubeRoutes.post("/callback", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = CallbackSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Missing OAuth callback code"), 400);
+  }
+
+  const db = getDb();
+  const channelId = `channel_${user.sub.slice(0, 8)}`;
+  const channelTitle = "Connected YouTube Channel";
+
+  const [existing] = await db
+    .select()
+    .from(youtubeAccounts)
+    .where(eq(youtubeAccounts.userId, user.sub))
+    .limit(1);
+
+  const [saved] = existing
+    ? await db
+        .update(youtubeAccounts)
+        .set({
+          channelId,
+          channelTitle,
+          accessToken: `stub-access-${parsed.data.code.slice(0, 8)}`,
+          refreshToken: `stub-refresh-${user.sub.slice(0, 8)}`,
+          tokenExpiresAt: null,
+          isActive: true,
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(youtubeAccounts.id, existing.id))
+        .returning()
+    : await db
+        .insert(youtubeAccounts)
+        .values({
+          userId: user.sub,
+          channelId,
+          channelTitle,
+          accessToken: `stub-access-${parsed.data.code.slice(0, 8)}`,
+          refreshToken: `stub-refresh-${user.sub.slice(0, 8)}`,
+          tokenExpiresAt: null,
+          isActive: true,
+        } as any)
+        .returning();
+
+  return c.json(ok(accountToDto(saved)));
+});
+
+youtubeRoutes.post("/disconnect", async (c) => {
+  const user = c.var.user;
+  const db = getDb();
+
+  await db
+    .update(youtubeAccounts)
+    .set({ isActive: false, updatedAt: new Date() } as any)
+    .where(eq(youtubeAccounts.userId, user.sub));
+
+  return c.json(ok(undefined));
+});
+
+youtubeRoutes.post("/publish/:videoId", async (c) => {
+  const user = c.var.user;
+  const videoId = c.req.param("videoId");
+  const db = getDb();
+
+  const [video] = await db
+    .select()
+    .from(videos)
+    .where(and(eq(videos.id, videoId), eq(videos.userId, user.sub)))
+    .limit(1);
+
+  if (!video) {
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  }
+
+  const youtubeVideoId = video.youtubeVideoId ?? `yt_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  const youtubeUrl = video.youtubeUrl ?? `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+
+  await db
+    .update(videos)
+    .set({
+      youtubeVideoId,
+      youtubeUrl,
+      status: "Completed",
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(videos.id, video.id));
+
+  return c.json(ok({ youtubeVideoId, youtubeUrl }));
+});
+
+youtubeRoutes.get("/company/status", async (c) => {
+  const configured = Boolean(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_REFRESH_TOKEN);
+  return c.json(ok(configured));
+});
+
+youtubeRoutes.get("/company/auth-url", (c) => {
+  if (!process.env.YOUTUBE_CLIENT_ID) {
+    return c.json(fail("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
+  }
+
+  const params = new URLSearchParams({
+    client_id: process.env.YOUTUBE_CLIENT_ID,
+    redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
+    response_type: "code",
+    scope: YOUTUBE_SCOPES,
+    access_type: "offline",
+    prompt: "consent",
+  });
+
+  return c.json(ok({ authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` }));
 });

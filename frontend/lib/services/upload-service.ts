@@ -75,7 +75,7 @@ export async function uploadAvatar(file: File): Promise<string> {
   formData.append("avatar", file);
 
   const response = await apiClient.post<UploadAvatarResponse>(
-    "/Users/me/avatar",
+    "/api/upload/image",
     formData,
   );
 
@@ -90,7 +90,7 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
   formData.append("file", file);
 
   const response = await apiClient.post<FileUploadResponse>(
-    "/upload/image",
+    "/api/upload/image",
     formData,
   );
 
@@ -111,7 +111,7 @@ export async function uploadImage(file: File): Promise<string> {
   formData.append("file", file);
 
   const response = await apiClient.post<FileUploadResponse>(
-    "/upload/image",
+    "/api/upload/image",
     formData,
   );
 
@@ -183,7 +183,7 @@ export async function uploadVideo(
 
   // Without progress tracking, use the apiClient
   const response = await apiClient.post<VideoUploadResponse>(
-    "/upload/video",
+    "/api/upload/video",
     formData,
   );
 
@@ -198,7 +198,7 @@ export async function uploadFile(file: File): Promise<string> {
   formData.append("file", file);
 
   const response = await apiClient.post<FileUploadResponse>(
-    "/upload/single",
+    "/api/upload/single",
     formData,
   );
 

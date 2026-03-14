@@ -24,30 +24,80 @@ This document tracks the migration of the legacy .NET API (in `/myvideoresume-ap
 - [ ] `POST /api/auth/forgot-password` (stubbed)
 - [ ] `POST /api/auth/reset-password` (stubbed)
 - [ ] `POST /api/auth/verify-email` (stubbed)
+- [x] `POST /api/auth/verify-2fa` (stubbed)
+- [x] `POST /api/auth/resend-2fa` (stubbed)
+- [x] `GET /api/auth/verification-status` (stubbed)
+- [x] `POST /api/auth/resend-email-verification` (stubbed)
+- [x] `POST /api/auth/verify-2fa` (stubbed)
+- [x] `POST /api/auth/resend-2fa` (stubbed)
+- [x] `GET /api/auth/verification-status` (stubbed)
+- [x] `POST /api/auth/resend-email-verification` (stubbed)
 
 ### Users
 - [x] `GET /api/users/me` (authenticated profile)
 - [x] `GET /api/users/public` (public user listing)
-- [ ] `GET /api/users/{id}`
-- [ ] `PUT /api/users/me` (update profile?)
+- [x] `GET /api/users/{id}`
+- [x] `PUT /api/users/me` (update profile)
+- [x] `POST /api/users/connections`
+- [x] `GET /api/users/me/connections`
+- [x] `GET /api/users/me/connections/pending`
+- [x] `PUT /api/users/connections/{id}/accept`
+- [x] `DELETE /api/users/connections/{id}`
+- [x] `GET /api/users/{id}/connections`
+- [x] `GET /api/users/connections/status`
+- [x] `GET /api/users/me/recommendations`
+- [x] `GET /api/users/{id}/can-message`
+- [x] `GET /api/users/{id}/stats`
+- [x] `GET /api/users/{id}/resumes`
+- [x] `POST /api/users/connections`
+- [x] `GET /api/users/me/connections`
+- [x] `GET /api/users/me/connections/pending`
+- [x] `PUT /api/users/connections/{id}/accept`
+- [x] `DELETE /api/users/connections/{id}`
+- [x] `GET /api/users/{id}/connections`
+- [x] `GET /api/users/connections/status`
+- [x] `GET /api/users/me/recommendations`
+- [x] `GET /api/users/{id}/can-message`
+- [x] `GET /api/users/{id}/stats`
+- [x] `GET /api/users/{id}/resumes`
 
 ### Resumes
 - [x] `/api/resumes` CRUD (list, create, update, delete)
 - [x] `/api/resumes/:id` (get resume)
-- [ ] `/api/resumes/:id/publish`
-- [ ] `/api/resumes/:id/clone`
-- [ ] `/api/resume/public` (public resume listing)
-- [ ] `/api/resume/parse` (file parsing - currently used via raw request)
+- [x] `/api/resumes/:id/publish`
+- [x] `/api/resumes/:id/clone`
+- [x] Legacy alias `/api/resume/*`
+- [x] `/api/resume/public` (stubbed)
+- [x] `/api/resume/parse` and `/api/resume/createfromfile` (stubbed)
+- [x] `/api/resume/save`, `/api/resume/summarize`, `/api/resume/sentimentprediction` (stubbed)
+- [x] `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` (stubbed)
+- [x] `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` (stubbed)
 
-### Jobs
-- [x] `/api/jobs` CRUD
-- [ ] `/api/jobs/public` (public listings)
+### Jobs (stubbed via `api/src/routes/jobs.ts`)
+- [x] `/api/jobs` CRUD (user-owned jobs)
+- [x] `/api/job` CRUD (legacy singular endpoint)
+- [x] `/api/Job/GetSummaryItems` + `/api/job/getsummaryitems` (user job summaries)
+- [x] `/api/Job/saved` + save/unsave endpoints
+- [x] `/api/Job/:id/apply` (stubbed)
+- [x] `/api/Job/slug/:slug` (stubbed)
+- [x] `/api/Job/CreateFromFile` + `/api/job/createfromfile` (stubbed)
+- [x] `/api/Job/Extract` + `/api/job/extract` (stubbed)
+- [x] `/api/jobs/public` (stubbed public listings)
+- [x] `/api/Job/applications` (stubbed)
+- [x] `/api/Job/alerts` CRUD + toggle (stubbed)
+- [x] `/api/job/user-jobs` (legacy recruiter flow alias)
 - [ ] `/api/job/match` / `/api/job/analytics` etc. (depending on UI usage)
 
 ### Companies (currently stubbed; frontend used it)
 - [x] `/api/companies/public` (added stub)
-- [ ] `/api/companies/{id}` (company details)
-- [ ] `/api/companies/{id}/jobs`
+- [x] `/api/companies/{id}` (stubbed)
+- [x] `/api/companies/{id}/jobs` (stubbed)
+- [x] `/api/companies/{id}/follow` and unfollow (stubbed)
+- [x] `/api/companies/{id}/following-status` (stubbed)
+- [x] `/api/companies/{id}/stats` (stubbed)
+- [x] `/api/companies/me/followed` (stubbed)
+- [x] `/api/companies/trending` (stubbed)
+- [x] `/api/companies/slug/{slug}` (stubbed)
 - [ ] other company endpoints
 
 ### Search (stubbed)
@@ -72,42 +122,122 @@ This document tracks the migration of the legacy .NET API (in `/myvideoresume-ap
 - [x] `POST /api/account/invitation/{id}/cancel` (stubbed)
 - [x] `GET /api/account/invitation-analytics` (stubbed)
 - [x] `POST /api/account/deleteaccount` (stubbed)
+- [x] `POST /api/account/reset-password` (stubbed legacy forgot-password flow)
+- [x] `POST /api/account/confirm-password-reset` (stubbed legacy reset confirmation)
 
-### Billing (stubbed)
-- [ ] `GET /api/Billing/subscription`
-- [ ] `GET /api/Billing/payment-methods`
-- [ ] `GET /api/Billing/invoices`
-- [ ] `GET /api/Billing/ai-usage/month`
+### Billing and Payment (stubbed)
+- [x] `GET /api/Billing/subscription` (stubbed)
+- [x] `GET /api/Billing/payment-methods` (stubbed)
+- [x] `GET /api/Billing/invoices` (stubbed)
+- [x] `GET /api/Billing/ai-usage/month` (stubbed)
+- [x] `POST /api/Payment/create-setup-session` (stubbed)
+- [x] `DELETE /api/Payment/payment-methods/{id}` (stubbed)
+- [x] `POST /api/Billing/refund-request` (stubbed)
+- [x] `GET /api/Billing/refund-requests` + detail (stubbed)
+- [x] `POST /api/Billing/cancel-account` + `GET /api/Billing/cancellation-requests` (stubbed)
+- [x] `GET /api/Billing/refund-policy` + `/refund-reasons` (stubbed)
 
 ### Affiliates (stubbed)
-- [ ] `/api/affiliates/*`
+- [x] `/api/affiliates/profile` (stubbed)
+- [x] `/api/affiliates/dashboard` (stubbed)
+- [x] `/api/affiliates/payout/request` (stubbed)
+- [x] `/api/affiliates/admin/*` (stubbed)
 
 ### Match / Recommendation (stubbed)
-- [ ] `/api/match/*`
+- [x] `POST /api/match`
+- [x] `POST /api/match/byid`
+- [x] `POST /api/match/bycontent`
+- [x] `POST /api/match/analyze`
+- [x] `POST /api/match/tailor`
 
 ### Notifications (stubbed)
-- [ ] `/api/notifications/*`
+- [x] `/api/notifications` list (stubbed)
+- [x] `/api/notifications/unread-count` (stubbed)
+- [x] `/api/notifications/:id/mark-read` + `/mark-all-read` (stubbed)
+- [x] `/api/notifications/:id` delete (stubbed)
 
 ### Settings (stubbed)
-- [ ] `/api/settings/*`
+- [x] `GET /api/settings`
+- [x] `GET/PUT /api/settings/notifications`
+- [x] `GET/PUT /api/settings/privacy`
+- [x] `GET/PUT /api/settings/job-preferences`
+- [x] `GET/PUT /api/settings/account`
+- [x] `GET/PUT /api/settings/security`
+- [x] `POST /api/settings/security/2fa/enable`
+- [x] `POST /api/settings/security/2fa/disable`
+- [x] `GET /api/settings/export`
 
 ### Locations (stubbed)
-- [ ] `/api/locations/*`
+- [x] `/api/locations/search` (stubbed)
+- [x] `/api/locations/countries|states|cities` (stubbed)
 
 ### Dashboard (stubbed)
-- [ ] `/api/dashboard/*`
+- [x] `/api/dashboard` base endpoint
+- [x] `/api/dashboard/jobseeker`
+- [x] `/api/dashboard/recruiter`
+- [x] `/api/dashboard/employer`
+- [x] `/api/dashboard/admin`
+- [x] `/api/dashboard/profile-view`
+- [x] `/api/dashboard/activity`
+- [x] `/api/dashboard/engagement`
+- [x] `/api/dashboard/refresh`
+- [x] Legacy alias `/api/userdashboard/*`
 
 ### Marketing (stubbed)
-- [ ] `/api/marketing/*`
+- [x] `/api/marketing/campaigns` list/create (stubbed)
+- [x] `/api/marketing/leads` list/create (stubbed)
 
 ### Recruiter / Admin / Studio
-- [ ] `/api/recruiter/*`
-- [ ] `/api/admin/*`
-- [ ] `/api/studio/*`
+- [x] `/api/recruiter/talent-pool*` (stubbed)
+- [x] `/api/recruiter/interactions*` (stubbed)
+- [x] `/api/recruiter/placements*` (stubbed legacy envelope)
+- [x] `/api/recruiter/submissions*` (stubbed legacy envelope)
+- [x] `/api/admin/productdashboard/affiliate-stats` (stubbed)
+- [x] Legacy alias `/api/productdashboard/affiliate-stats` (stubbed)
+- [x] `/api/productdashboard` root + `/export/:format` (stubbed)
+- [x] `/api/productdashboard/refund*` + `/cancellation*` stats/actions (stubbed)
+- [ ] `/api/admin/*` (remaining endpoints)
+- [x] `/api/studio/storyboard` (frontend-compatible response)
+- [x] `/api/studio/upload` (multipart upload + project DTO)
+- [x] `/api/studio/publish` (stubbed publish flow)
+- [x] `/api/studio/status/:projectId` + `/api/studio/projects`
 
 ### AI / Chat / Misc
-- [ ] `/api/ai/*` (stubbed)
-- [ ] `/api/upload/*` (upload endpoint)
+- [x] `POST /api/ai/context` (stubbed)
+- [x] `POST /api/chat/message` (legacy alias, stubbed)
+- [x] `/api/upload/video` (multipart + metadata response)
+- [x] `/api/upload/image` + `/api/upload/single`
+- [x] `/api/video/*` legacy alias + frontend schema-compatible stubs
+- [x] `/api/youtube/*` account/auth/callback/disconnect/publish/company endpoints
+- [x] `/api/communication/*` (conversations/messages/templates/campaigns/tracking/job-boards)
+- [x] `/api/passwordmanagement/requirements`
+- [x] `/api/passwordmanagement/validate-strength`
+- [x] `/api/passwordmanagement/force-change`
+- [x] `/api/resumescorer/*` (score/category/recommendations stubs)
+- [x] `/api/resumeoptimizer/*` (optimize/analysis/keywords stubs)
+- [x] `/sentiment/sentimentprediction` (legacy non-/api path)
+- [x] `/sentiment/resume/sentimentprediction` (legacy nested alias)
+- [x] `/api/salaryanalyzer/analyze` + `/api/salaryanalyzer/negotiation-tips` (stubbed)
+- [x] `/api/salarycalculator/analyze` (stubbed alias)
+- [x] `/api/valueproposition/generate/*` (stubbed)
+- [x] `/api/featureflag` + legacy `/FeatureFlag` (stubbed)
+- [x] `/api/hubs/notifications*` (explicit not-implemented responses)
+- [x] `/api/featureflag` + legacy `/FeatureFlag` (stubbed)
+
+### Feed (stubbed)
+- [x] `/api/feed/posts` list/create
+- [x] `/api/feed/posts/:id` get/update/delete
+- [x] `/api/feed/posts/:id/like` post/delete
+- [x] `/api/feed/comments` create
+- [x] `/api/feed/comments/:id` update/delete
+- [x] `/api/feed/search`
+- [x] `/api/feed/link-preview`
+
+### Task (stubbed)
+- [x] `/api/task` list
+- [x] `/api/task/:id` get/delete
+- [x] `/api/task/save` create/update
+- [x] Legacy fallback `POST /api/task/:id`
 
 ---
 

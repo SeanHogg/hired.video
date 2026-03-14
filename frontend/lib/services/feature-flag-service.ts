@@ -54,7 +54,7 @@ export class FeatureFlagService {
    */
   async getFeatureFlags(): Promise<FeatureFlagsResponse> {
     const response = await apiClient.get<FeatureFlagsResponse>(
-      "/FeatureFlag",
+      "/api/featureflag",
       FeatureFlagsResponseSchema,
     );
 

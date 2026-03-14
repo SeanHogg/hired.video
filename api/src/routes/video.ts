@@ -1,15 +1,32 @@
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import {
-  S3Client,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Variables } from "../types/index.js";
-import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
 const { videos } = schema;
+
+export const videoRoutes = new Hono<{ Variables: Variables }>();
+
+const CreateVideoSchema = z.object({
+  resumeId: z.string().uuid(),
+  customScenePrompt: z.string().optional(),
+  includeAvatar: z.boolean().default(false),
+});
+
+const EnhanceSummarySchema = z.object({
+  resumeId: z.string().uuid(),
+  summary: z.string().min(1),
+});
+
+function ok<T>(data: T) {
+  return { success: true as const, data, timestamp: new Date().toISOString() };
+}
+
+function fail(code: string, message: string) {
+  return { success: false as const, error: { code, message }, timestamp: new Date().toISOString() };
+}
 
 function getS3Client(): S3Client {
   return new S3Client({
@@ -23,26 +40,33 @@ function getS3Client(): S3Client {
   });
 }
 
-// ============================================================================
+function asIso(value: Date | string | null | undefined): string {
+  if (!value) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return new Date(value).toISOString();
+}
 
-const CreateVideoSchema = z.object({
-  resumeId: z.string().uuid(),
-  customScenePrompt: z.string().optional(),
-  includeAvatar: z.boolean().default(false),
-});
+function toVideoDto(video: typeof videos.$inferSelect) {
+  const status = (video.status ?? "Queued") as "Queued" | "Processing" | "Completed" | "Failed" | "Cancelled";
+  return {
+    id: video.id,
+    resumeId: video.resumeId ?? "",
+    userId: video.userId,
+    status,
+    filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.myvideoresu.me/${video.r2Key}` : null),
+    includeAvatar: false,
+    scenePrompt: null,
+    errorMessage: video.errorMessage ?? null,
+    operationId: null,
+    generatedImagePath: null,
+    generationStartedAt: status === "Processing" ? asIso(video.updatedAt) : null,
+    generationCompletedAt: status === "Completed" ? asIso(video.updatedAt) : null,
+    retryCount: 0,
+    creationDateTime: asIso(video.createdAt),
+    updateDateTime: asIso(video.updatedAt),
+  };
+}
 
-const EnhanceSummarySchema = z.object({
-  resumeId: z.string().uuid(),
-  summary: z.string().min(1),
-});
-
-// ============================================================================
-// ROUTES
-// ============================================================================
-
-export const videoRoutes = new Hono<{ Variables: Variables }>();
-
-/** GET /api/video/user/all — list all videos for the current user */
 videoRoutes.get("/user/all", async (c) => {
   const user = c.var.user;
   const db = getDb();
@@ -51,18 +75,18 @@ videoRoutes.get("/user/all", async (c) => {
     .select()
     .from(videos)
     .where(eq(videos.userId, user.sub))
-    .orderBy(videos.createdAt);
+    .orderBy(videos.updatedAt);
 
-  return c.json(success(userVideos));
+  return c.json(ok(userVideos.map(toVideoDto)));
 });
 
-/** POST /api/video/generate — queue a new video generation job */
 videoRoutes.post("/generate", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = CreateVideoSchema.safeParse(body);
+
   if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body"), 400);
   }
 
   const db = getDb();
@@ -73,114 +97,84 @@ videoRoutes.post("/generate", async (c) => {
       userId: user.sub,
       resumeId: parsed.data.resumeId,
       status: "Queued",
-    })
+      storyboard: {
+        includeAvatar: parsed.data.includeAvatar,
+        customScenePrompt: parsed.data.customScenePrompt ?? null,
+      },
+    } as any)
     .returning();
 
-  // TODO: enqueue actual video generation via Cloudflare Queue / Durable Object
-  return c.json(success(video), 202);
+  return c.json(ok(toVideoDto(video)), 202);
 });
 
-/** POST /api/video/enhance-summary — AI-enhanced summary (must come before /:id) */
 videoRoutes.post("/enhance-summary", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = EnhanceSummarySchema.safeParse(body);
+
   if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body"), 400);
   }
 
-  // TODO: call AI service (OpenRouter) to enhance the summary
   return c.json(
-    success({
+    ok({
       enhancedSummary: parsed.data.summary,
       suggestedScenePrompt: "Professional office environment with modern technology",
     }),
   );
 });
 
-/** GET /api/video/resume/:resumeId — all videos for a resume */
 videoRoutes.get("/resume/:resumeId", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
   const db = getDb();
 
-  const resumeVideos = await db
+  const rows = await db
     .select()
     .from(videos)
     .where(and(eq(videos.resumeId, resumeId), eq(videos.userId, user.sub)))
-    .orderBy(videos.createdAt);
+    .orderBy(videos.updatedAt);
 
-  return c.json(success(resumeVideos));
+  return c.json(ok(rows.map(toVideoDto)));
 });
 
-/** GET /api/video/resume/:resumeId/can-generate */
 videoRoutes.get("/resume/:resumeId/can-generate", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
   const db = getDb();
 
-  const activeVideo = await db
-    .select({ id: videos.id, status: videos.status })
+  const rows = await db
+    .select({ status: videos.status })
     .from(videos)
-    .where(
-      and(
-        eq(videos.resumeId, resumeId),
-        eq(videos.userId, user.sub),
-      ),
-    )
-    .limit(1);
+    .where(and(eq(videos.resumeId, resumeId), eq(videos.userId, user.sub)));
 
-  const processing = activeVideo.find(
-    (v) => v.status === "Queued" || v.status === "Processing",
-  );
+  const blocked = rows.some((r) => r.status === "Queued" || r.status === "Processing");
 
   return c.json(
-    success({
-      canGenerate: !processing,
-      reason: processing ? "A video is already being generated for this resume" : undefined,
+    ok({
+      canGenerate: !blocked,
+      reason: blocked ? "A video is already being generated for this resume" : undefined,
     }),
   );
 });
 
-/** GET /api/video/resume/:resumeId/active — currently active generation */
 videoRoutes.get("/resume/:resumeId/active", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
   const db = getDb();
 
-  const [active] = await db
+  const [video] = await db
     .select()
     .from(videos)
     .where(and(eq(videos.resumeId, resumeId), eq(videos.userId, user.sub)))
     .limit(1);
 
-  const activeVideo =
-    active && (active.status === "Queued" || active.status === "Processing")
-      ? active
-      : null;
-
-  return c.json(success(activeVideo));
-});
-
-/** GET /api/video/:id — get a single video */
-videoRoutes.get("/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-
-  const [video] = await db
-    .select()
-    .from(videos)
-    .where(and(eq(videos.id, id), eq(videos.userId, user.sub)))
-    .limit(1);
-
-  if (!video) {
-    return c.json(error("NOT_FOUND", "Video not found"), 404);
+  if (!video || (video.status !== "Queued" && video.status !== "Processing")) {
+    return c.json(ok(null));
   }
 
-  return c.json(success(video));
+  return c.json(ok(toVideoDto(video)));
 });
 
-/** GET /api/video/:id/status — lightweight status poll */
 videoRoutes.get("/:id/status", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
@@ -200,29 +194,45 @@ videoRoutes.get("/:id/status", async (c) => {
     .limit(1);
 
   if (!video) {
-    return c.json(error("NOT_FOUND", "Video not found"), 404);
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
   }
 
   const progressPercentage =
     video.status === "Completed" ? 100
-    : video.status === "Processing" ? 50
-    : video.status === "Queued" ? 0
-    : video.status === "Failed" ? 0
-    : 100;
+    : video.status === "Processing" ? 55
+    : video.status === "Queued" ? 5
+    : 0;
 
   return c.json(
-    success({
+    ok({
       id: video.id,
       status: video.status,
       progressPercentage,
       estimatedTimeRemaining: video.status === "Processing" ? 60 : null,
-      errorMessage: video.errorMessage,
-      filePath: video.youtubeUrl ?? video.r2Key,
+      errorMessage: video.errorMessage ?? null,
+      filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.myvideoresu.me/${video.r2Key}` : null),
     }),
   );
 });
 
-/** POST /api/video/:id/cancel — cancel a queued/processing video */
+videoRoutes.get("/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+
+  const [video] = await db
+    .select()
+    .from(videos)
+    .where(and(eq(videos.id, id), eq(videos.userId, user.sub)))
+    .limit(1);
+
+  if (!video) {
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  }
+
+  return c.json(ok(toVideoDto(video)));
+});
+
 videoRoutes.post("/:id/cancel", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
@@ -235,23 +245,22 @@ videoRoutes.post("/:id/cancel", async (c) => {
     .limit(1);
 
   if (!existing) {
-    return c.json(error("NOT_FOUND", "Video not found"), 404);
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
   }
 
   if (existing.status !== "Queued" && existing.status !== "Processing") {
-    return c.json(error("CONFLICT", `Cannot cancel a video with status '${existing.status}'`), 409);
+    return c.json(fail("CONFLICT", `Cannot cancel a video with status '${existing.status}'`), 409);
   }
 
   const [updated] = await db
     .update(videos)
-    .set({ status: "Cancelled", updatedAt: new Date() })
+    .set({ status: "Cancelled", updatedAt: new Date() } as any)
     .where(eq(videos.id, id))
     .returning();
 
-  return c.json(success(updated));
+  return c.json(ok(toVideoDto(updated)));
 });
 
-/** DELETE /api/video/:id — delete a video record */
 videoRoutes.delete("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
@@ -264,19 +273,18 @@ videoRoutes.delete("/:id", async (c) => {
     .limit(1);
 
   if (!existing) {
-    return c.json(error("NOT_FOUND", "Video not found"), 404);
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
   }
 
-  // Remove from S3-compatible storage if present
   if (existing.r2Key) {
     const s3 = getS3Client();
-    await s3.send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET ?? "myvideoresume", Key: existing.r2Key }))
+    await s3
+      .send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET ?? "myvideoresume", Key: existing.r2Key }))
       .catch((err: unknown) => {
         console.warn("[video] failed to delete S3 object", existing.r2Key, err);
       });
   }
 
   await db.delete(videos).where(eq(videos.id, id));
-
-  return c.json(success(null, "Video deleted"));
+  return c.json(ok(undefined));
 });

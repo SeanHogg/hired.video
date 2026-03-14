@@ -11,7 +11,7 @@ import {
   getAvailableAccounts,
   getInvitationAnalytics,
   getInvitationDetails,
-  getPendingInvitations,
+  listPendingInvitations,
   inviteAccountUser,
   listAccountUsers,
   removeAccountUser,
@@ -61,7 +61,7 @@ accountRoutes.post("/accept-invitation/:id", async (c) =>
 );
 
 accountRoutes.get("/invitations/pending", async (c) =>
-  c.json({ success: true, data: await getPendingInvitations() }, 200),
+  c.json({ success: true, data: await listPendingInvitations() }, 200),
 );
 
 accountRoutes.get("/settings", async (c) =>
@@ -97,6 +97,55 @@ accountRoutes.get("/invitation-analytics", async (c) =>
 accountRoutes.post("/deleteaccount", async (c) => {
   await deleteAccount();
   return c.json(success({ success: true }), 200);
+});
+
+// Legacy password reset flow endpoints used by frontend pages
+accountRoutes.post("/reset-password", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const email = body && typeof body.email === "string" ? body.email : "";
+  return c.json(
+    {
+      success: true,
+      data: {
+        message: "If an account exists for this email, password reset instructions were sent.",
+        email,
+      },
+      timestamp: new Date().toISOString(),
+    },
+    200,
+  );
+});
+
+accountRoutes.post("/confirm-password-reset", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const hasRequiredFields =
+    body &&
+    typeof body.userId === "string" &&
+    typeof body.token === "string" &&
+    typeof body.newPassword === "string";
+
+  if (!hasRequiredFields) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "userId, token, and newPassword are required.",
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  return c.json(
+    {
+      success: true,
+      data: { message: "Password reset successful." },
+      timestamp: new Date().toISOString(),
+    },
+    200,
+  );
 });
 
 // Fallback for other account routes
