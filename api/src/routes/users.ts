@@ -22,6 +22,32 @@ const UpdateProfileSchema = z.object({
 
 export const userRoutes = new Hono<{ Variables: Variables }>();
 
+/** GET /api/users/public — list public users (no auth required) */
+userRoutes.get("/public", async (c) => {
+  const db = getDb();
+  const page = Number(c.req.query("page") ?? 1) || 1;
+  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
+  const offset = (page - 1) * limit;
+
+  const items = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      emailVerified: users.emailVerified,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .limit(limit)
+    .offset(offset);
+
+  const total = items.length;
+
+  return c.json(success({ items, total, page, limit }));
+});
+
 /** GET /api/users/profile — get the authenticated user's profile */
 userRoutes.get("/profile", async (c) => {
   const user = c.var.user;

@@ -267,7 +267,7 @@ export const DATA_APIS: Record<string, AvailableAPI> = {
   // User Profile APIs
   USER_PROFILE_GET: {
     id: "user_profile_get",
-    endpoint: "/api/Users/{id}",
+    endpoint: "/api/users/{id}",
     method: "GET",
     description: "Get user profile (supports slug or GUID)",
     supportedActions: ["optimize-headline", "improve-summary", "enhance-profile"],

@@ -177,13 +177,14 @@ export class ApiClient {
     const baseEndsWithApi = /\/api$/i.test(cleanBaseUrl);
     const endpointStartsWithApi = /^api\//i.test(cleanEndpoint);
 
-    if (baseEndsWithApi && endpointStartsWithApi) {
-      // Avoid double /api (e.g. base: .../api + endpoint: api/Users)
-      const withoutApi = cleanEndpoint.replace(/^api\//i, "");
-      return `${cleanBaseUrl}/${withoutApi}`;
-    }
+    // Build the final URL, ensuring we never introduce double-slashes in the path.
+    const rawUrl = baseEndsWithApi && endpointStartsWithApi
+      ? `${cleanBaseUrl}/${cleanEndpoint.replace(/^api\//i, "")}`
+      : `${cleanBaseUrl}/${cleanEndpoint}`;
 
-    return `${cleanBaseUrl}/${cleanEndpoint}`;
+    // Collapse any accidental double-slashes in the path portion (excluding protocol)
+    // e.g. http://localhost:8787/api//api/Users -> http://localhost:8787/api/api/Users
+    return rawUrl.replace(/([^:]\/\/)+/g, "$1");
   }
 
   private async executeRequest(

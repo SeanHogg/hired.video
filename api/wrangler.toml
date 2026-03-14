@@ -16,6 +16,10 @@ bucket_name = "hired-videos-temp"
 
 [vars]
 FRONTEND_URL = "https://hired.video"
+# Local development DB connection (used by `neon()` in serverless DB client)
+# Replace this with your local Neon/DB connection string when running `wrangler dev`.
+# If you want to keep it secret, remove it from this file and set the env var directly.
+DATABASE_URL = "postgresql://neondb_owner:npg_lsjDXv6B5gdG@ep-quiet-block-aj62u9e9-pooler.c-3.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
 
 [env.production]
 name = "hired-api"

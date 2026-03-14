@@ -77,7 +77,7 @@ export const UserProfileSchema = z.object({
   }).optional(),
 });
 
-// Public users list item from GET /api/Users/public
+// Public users list item from GET /api/users/public
 // Now returns full UserProfileDTO with computed properties
 export const PublicUserSchema = z.object({
   id: nullableString(),
@@ -125,7 +125,7 @@ export const PublicUserSchema = z.object({
   updatedAt: nullableString(),
 });
 
-// Resume summary (normalized) returned by /api/Users/{id}/resumes
+// Resume summary (normalized) returned by /api/users/{id}/resumes
 export const ResumeSummarySchema = z.object({
   id: z.string(),
   slug: z.string().optional(),
@@ -310,7 +310,7 @@ export class UserService {
       });
     }
 
-    const endpoint = `/api/Users/public${params.toString() ? `?${params.toString()}` : ""}`;
+    const endpoint = `/api/users/public${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<any>(
       endpoint,
       PaginatedPublicUsersSchema,
@@ -337,7 +337,7 @@ export class UserService {
    * Get user by ID
    */
   async getUserById(id: string): Promise<UserProfile> {
-    const response = await apiClient.get<PublicUser>(`/api/Users/${id}`, PublicUserSchema);
+    const response = await apiClient.get<PublicUser>(`/api/users/${id}`, PublicUserSchema);
     return this.normalizePublicUserToProfile(response.data);
   }
 
@@ -345,7 +345,7 @@ export class UserService {
    * Get user by slug/username
    */
   async getUserBySlug(slug: string): Promise<UserProfile> {
-    const response = await apiClient.get<PublicUser>(`/api/Users/${slug}`, PublicUserSchema);
+    const response = await apiClient.get<PublicUser>(`/api/users/${slug}`, PublicUserSchema);
     return this.normalizePublicUserToProfile(response.data);
   }
 
@@ -355,7 +355,7 @@ export class UserService {
    */
   async getCurrentUser(): Promise<UserProfile> {
     const response = await apiClient.get<PublicUser>(
-      "/api/Users/me",
+      "/api/users/me",
       PublicUserSchema,
     );
     return this.normalizePublicUserToProfile(response.data);
@@ -366,7 +366,7 @@ export class UserService {
    */
   async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
     const response = await apiClient.put<UserProfile>(
-      "/api/Users/me",
+      "/api/users/me",
       updates,
       UserProfileSchema,
     );
@@ -391,7 +391,7 @@ export class UserService {
     request: SendConnectionRequest,
   ): Promise<Connection> {
     const response = await apiClient.post<Connection>(
-      "/api/Users/connections",
+      "/api/users/connections",
       request,
       ConnectionSchema,
     );
@@ -403,7 +403,7 @@ export class UserService {
    */
   async getMyConnections(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      "/api/Users/me/connections",
+      "/api/users/me/connections",
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -414,7 +414,7 @@ export class UserService {
    */
   async getPendingConnectionRequests(): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      "/api/Users/me/connections/pending",
+      "/api/users/me/connections/pending",
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -424,7 +424,7 @@ export class UserService {
    * Accept connection request
    */
   async acceptConnectionRequest(connectionId: string): Promise<void> {
-    await apiClient.put(`/api/Users/connections/${connectionId}/accept`);
+    await apiClient.put(`/api/users/connections/${connectionId}/accept`);
   }
 
   /**
@@ -439,7 +439,7 @@ export class UserService {
    */
   async getUserConnections(userId: string): Promise<Connection[]> {
     const response = await apiClient.get<Connection[]>(
-      `/api/Users/${userId}/connections`,
+      `/api/users/${userId}/connections`,
       z.array(ConnectionSchema),
     );
     return response.data;
@@ -454,7 +454,7 @@ export class UserService {
   ): Promise<Connection | null> {
     try {
       const response = await apiClient.get<Connection>(
-        `/api/Users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
+        `/api/users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
         ConnectionSchema,
       );
       return response.data;
@@ -469,7 +469,7 @@ export class UserService {
    */
   async getRecommendedConnections(): Promise<UserProfile[]> {
     const response = await apiClient.get<UserProfile[]>(
-      "/api/Users/me/recommendations",
+      "/api/users/me/recommendations",
       z.array(UserProfileSchema),
     );
     return response.data;
@@ -485,7 +485,7 @@ export class UserService {
   async canMessageUser(userId: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ canMessage: boolean }>(
-        `/api/Users/${userId}/can-message`,
+        `/api/users/${userId}/can-message`,
         z.object({ canMessage: z.boolean() }),
       );
       return response.data.canMessage;
@@ -507,7 +507,7 @@ export class UserService {
       connectionCount: number;
       jobApplicationCount: number;
     }>(
-      `/api/Users/${userId}/stats`,
+      `/api/users/${userId}/stats`,
       z.object({
         resumeCount: z.number(),
         connectionCount: z.number(),

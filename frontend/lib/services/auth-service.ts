@@ -383,9 +383,9 @@ export class AuthService {
    * Get current user profile
    */
   async getCurrentUser(): Promise<UserProfile> {
-    logger.info("authService.getCurrentUser: GET /api/Users/me");
+    logger.info("authService.getCurrentUser: GET /api/users/me");
     const response = await apiClient.get<UserProfileDTO>(
-      "/api/Users/me",
+      "/api/users/me",
       UserProfileDTOSchema,
     );
     logger.info("authService.getCurrentUser: response received");
@@ -464,9 +464,9 @@ export class AuthService {
     // Years of experience
     if (anyUpdates.yearsOfExperience !== undefined) payload.yearsOfExperience = anyUpdates.yearsOfExperience;
 
-    logger.info("authService.updateProfile: PUT /api/Users/me", payload);
+    logger.info("authService.updateProfile: PUT /api/users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(
-      "/api/Users/me",
+      "/api/users/me",
       payload,
       UserProfileDTOSchema,
     );

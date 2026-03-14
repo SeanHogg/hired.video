@@ -45,15 +45,27 @@ export function createApp() {
 
   // Allow local dev origin(s) when running locally
   if (process.env.NODE_ENV !== "production") {
-    allowedOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+    allowedOrigins.push(
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:4003",
+      "http://127.0.0.1:4003",
+    );
   }
+
+  // Also allow any localhost port for convenience (covers docker/VM networking)
+  const isLocalhostOrigin = (origin: string) =>
+    origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
 
   app.use(
     "*",
     cors({
       origin: (origin) => {
-        if (!origin) return true; // allow non-browser requests (e.g., server-side)
-        return allowedOrigins.includes(origin);
+        if (!origin) return "*"; // allow non-browser requests (e.g., server-side)
+        if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) {
+          return origin;
+        }
+        return false;
       },
       allowHeaders: ["Content-Type", "Authorization"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -66,7 +78,12 @@ export function createApp() {
     return rateLimiterMiddleware(c, next);
   });
 
+  // Simple health check
   app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+
+  // Temporary route to quiet accidental /api/collab requests from dev tools/extensions
+  // (no business logic currently needed)
+  app.get("/api/collab/:id", (c) => c.body(null, 204));
 
   app.route("/api/auth", authRoutes);
   app.route("/api/account", accountRoutes);

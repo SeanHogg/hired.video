@@ -24,5 +24,15 @@ html
 *.sln
 *.sw?
 
+# Environment files (local only)
+.env
+**/.env
+
+# Wrangler dev temp files
+.wrangler/
+**/.wrangler/
+
+# General temporary build/cache folders
+**/tmp/
+
 .config/
-!.env
