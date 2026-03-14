@@ -49,7 +49,7 @@ const ORIGINAL_FETCH = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const urlStr = typeof input === 'string' ? input : ((input as Request).url ?? String(input));
   try {
-    if (urlStr.startsWith('https://api.myvideoresu.me')) {
+    if (urlStr.startsWith('https://api.hired.video')) {
       const url = new URL(urlStr);
       const path = url.pathname;
       const headers: Record<string, string> = { 'Content-Type': 'application/json', 'access-control-allow-origin': '*', 'Access-Control-Allow-Origin': '*' };

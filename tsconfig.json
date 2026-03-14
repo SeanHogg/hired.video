@@ -28,18 +28,17 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./client/*"],
+      "@/*": ["./frontend/*"],
       "@shared/*": ["./shared/*"]
     }
   },
   "include": [
-    "client/**/*",
+    "frontend/**/*",
     "server/**/*",
     "shared/**/*",
-    "vite.config.ts",
-    "vite.config.server.ts",
-    "tailwind.config.ts",
-    "vitest.config.ts"
+    "frontend/vite.config.ts",
+    "frontend/tailwind.config.ts",
+    "frontend/vitest.config.ts"
   ],
   "exclude": ["node_modules", "dist", "scripts"]
 }

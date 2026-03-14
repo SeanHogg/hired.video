@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1009.0",
+    "@hono/node-server": "^1.19.11",
     "@neondatabase/serverless": "^0.10.4",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.12.4",

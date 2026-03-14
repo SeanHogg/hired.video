@@ -48,3 +48,6 @@ export function success<T>(data: T, meta?: PaginationMeta) {
 export function apiError(code: string, message: string, details?: unknown) {
   return { error: { code, message, ...(details !== undefined ? { details } : {}) } };
 }
+
+// Legacy export for common error response shape
+export const error = apiError;

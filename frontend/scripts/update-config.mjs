@@ -18,7 +18,8 @@ const configPath = path.join(__dirname, '../dist/config.js');
 const DIST_DIR = path.join(__dirname, '../dist');
 const distIndexPath = path.join(DIST_DIR, 'index.html');
 
-const packagePath = path.join(__dirname, '../package.json');
+// In a monorepo layout, the root package.json lives one level above `frontend/`
+const packagePath = path.join(__dirname, '../../package.json');
 
 try {
   // Read package.json for version

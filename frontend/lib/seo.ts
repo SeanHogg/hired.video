@@ -22,18 +22,18 @@ export interface SEOData {
  * Default SEO configuration for the application
  */
 export const DEFAULT_SEO: SEOData = {
-  title: "MyVideoResu.me - AI-Powered Video Resume Platform",
+  title: "Hired.video - AI-Powered Video Resume Platform",
   description:
-    "Create compelling video resumes and connect with top talent through AI-powered matching. The future of recruitment is here.",
+    "Create compelling video resumes and connect with top talent through AI-powered matching. The future of hiring is here.",
   keywords:
     "video resume, recruitment, talent management, AI matching, job search, hiring, career development",
-  ogTitle: "MyVideoResu.me - Video Resume Platform",
+  ogTitle: "Hired.video - Video Resume Platform",
   ogDescription:
     "Create compelling video resumes and connect with top talent through AI-powered matching.",
-  ogImage: "https://myvideoresu.me/og-image.jpg",
-  ogUrl: "https://myvideoresu.me",
+  ogImage: "https://hired.video/og-image.jpg",
+  ogUrl: "https://hired.video",
   twitterCard: "summary_large_image",
-  author: "MyVideoResu.me",
+  author: "Hired.video",
   robots: "index, follow",
 };
 
@@ -42,99 +42,99 @@ export const DEFAULT_SEO: SEOData = {
  */
 export const PAGE_SEO: Record<string, SEOData> = {
   "/": {
-    title: "MyVideoResu.me - AI-Powered Video Resume Platform",
+    title: "Hired.video - AI-Powered Video Resume Platform",
     description:
-      "Create compelling video resumes and connect with top talent through AI-powered matching. Join thousands of professionals revolutionizing recruitment.",
+      "Create compelling video resumes and connect with top talent through AI-powered matching. Join thousands of professionals revolutionizing hiring.",
     keywords:
       "video resume, AI recruitment, talent matching, job search, career development, professional networking",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      name: "MyVideoResu.me",
-      description: "AI-powered video resume platform for modern recruitment",
-      url: "https://myvideoresu.me",
+      name: "Hired.video",
+      description: "AI-powered video resume platform for modern hiring",
+      url: "https://hired.video",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web Browser",
     },
   },
   "/login": {
-    title: "Login - MyVideoResu.me",
+    title: "Login - Hired.video",
     description:
-      "Sign in to your MyVideoResu.me account to access your video resumes, job applications, and professional network.",
+      "Sign in to your Hired.video account to access your video resumes, job applications, and professional network.",
     robots: "noindex, nofollow",
   },
   "/signup": {
-    title: "Sign Up - MyVideoResu.me",
+    title: "Sign Up - Hired.video",
     description:
-      "Join MyVideoResu.me today and create your professional video resume. Connect with top employers and advance your career.",
+      "Join Hired.video today and create your professional video resume. Connect with top employers and advance your career.",
     keywords:
-      "sign up, create account, video resume registration, join MyVideoResu.me",
+      "sign up, create account, video resume registration, join Hired.video",
   },
   "/pricing": {
-    title: "Pricing Plans - MyVideoResu.me",
+    title: "Pricing Plans - Hired.video",
     description:
       "Choose the perfect plan for your career goals. Affordable pricing for job seekers, recruiters, and employers.",
     keywords:
       "pricing, plans, subscription, video resume cost, recruitment pricing",
   },
   "/for-recruiters": {
-    title: "For Recruiters - MyVideoResu.me",
+    title: "For Recruiters - Hired.video",
     description:
       "Discover top talent through video resumes. Advanced AI matching, candidate screening, and recruitment tools for modern hiring.",
     keywords:
       "recruiters, hiring, talent acquisition, candidate screening, recruitment tools",
   },
   "/about": {
-    title: "About Us - MyVideoResu.me",
+    title: "About Us - Hired.video",
     description:
-      "Learn about MyVideoResu.me's mission to revolutionize recruitment through AI-powered video resumes and talent matching.",
+      "Learn about Hired.video's mission to revolutionize recruitment through AI-powered video resumes and talent matching.",
     keywords:
       "about us, company mission, video resume platform, recruitment innovation",
   },
   "/careers": {
-    title: "Careers at MyVideoResu.me",
+    title: "Careers at Hired.video",
     description:
       "Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.",
     keywords:
-      "careers, jobs at MyVideoResu.me, hiring, open roles, work with us",
+      "careers, jobs at Hired.video, hiring, open roles, work with us",
   },
   "/resumes": {
-    title: "Video Resumes - MyVideoResu.me",
+    title: "Video Resumes - Hired.video",
     description:
       "Create, manage, and share your professional video resumes. Stand out from the crowd with AI-enhanced resume building.",
     keywords:
       "video resumes, resume builder, professional videos, career portfolio",
   },
   "/jobs": {
-    title: "Job Search - MyVideoResu.me",
+    title: "Job Search - Hired.video",
     description:
       "Find your dream job with AI-powered matching. Browse thousands of opportunities and apply with your video resume.",
     keywords:
       "job search, career opportunities, employment, job listings, AI job matching",
   },
   "/companies": {
-    title: "Companies - MyVideoResu.me",
+    title: "Companies - Hired.video",
     description:
       "Discover top companies hiring through video resumes. Connect with innovative employers and explore career opportunities.",
     keywords:
       "companies, employers, hiring companies, career opportunities, company profiles",
   },
   "/people": {
-    title: "Professional Network - MyVideoResu.me",
+    title: "Professional Network - Hired.video",
     description:
       "Connect with professionals, recruiters, and industry leaders. Build your network and advance your career.",
     keywords:
       "professional networking, career connections, industry professionals, networking platform",
   },
   "/tasks": {
-    title: "Task Management - MyVideoResu.me",
+    title: "Task Management - Hired.video",
     description:
       "Organize your job search and career development with powerful task management tools. Stay on top of applications and follow-ups.",
     keywords:
       "task management, job search organization, career planning, productivity tools",
   },
   "/outreach": {
-    title: "Professional Outreach - MyVideoResu.me",
+    title: "Professional Outreach - Hired.video",
     description:
       "Manage your professional communications and networking outreach. Build relationships that advance your career.",
     keywords:

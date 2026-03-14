@@ -38,13 +38,18 @@ export function createApp() {
 
   app.use("*", requestLoggerMiddleware);
 
+  const allowedOrigins = (process.env.FRONTEND_URL ?? "https://hired.video,https://myvideoresu.me")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.use(
     "*",
     cors({
-      origin:
-        process.env.NODE_ENV === "production"
-          ? (process.env.FRONTEND_URL ?? "https://myvideoresu.me")
-          : "*",
+      origin: (origin) => {
+        if (!origin) return true; // allow non-browser requests (e.g., server-side)
+        return allowedOrigins.includes(origin);
+      },
       allowHeaders: ["Content-Type", "Authorization"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,

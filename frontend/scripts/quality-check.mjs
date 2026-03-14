@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Quality check script for MyVideoResume Frontend
+ * Quality check script for Hired.video Frontend
  * Runs typecheck, lint, and optionally build to verify code quality
  */
 
@@ -40,7 +40,7 @@ const CHECKS = [
 const results = [];
 let hasRequiredFailure = false;
 
-console.log('🚀 Starting Quality Checks for MyVideoResume Frontend\n');
+console.log('🚀 Starting Quality Checks for Hired.video Frontend\n');
 
 for (const check of CHECKS) {
   if (requiredOnly && !check.required) {

@@ -73,7 +73,7 @@ The platform supports sophisticated multi-tenant account structures with role-ba
 ## 📁 Project Structure
 
 ```
-client/                   # React SPA frontend
+frontend/                   # React SPA frontend
 ├── pages/                # Route components (Index.tsx = home)
 │   ├── Index.tsx         # Home page
 │   ├── Login.tsx         # Authentication

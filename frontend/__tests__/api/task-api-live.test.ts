@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
 // Test configuration
-const API_BASE_URL = 'https://api.myvideoresu.me';
+const API_BASE_URL = 'https://api.hired.video';
 const TEST_ENDPOINT = '/api/task';
 
 // Helper function to make authenticated API calls

@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 
 // Test configuration
-const API_BASE_URL = 'https://api.myvideoresu.me';
+const API_BASE_URL = 'https://api.hired.video';
 const TEST_ENDPOINT = '/api/task';
 
 describe('Task API Response Validation', () => {

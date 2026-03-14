@@ -63,7 +63,7 @@ interface Message {
  * Create an enhanced system prompt with context and action awareness
  */
 function createEnhancedSystemPrompt(context: AIContext, action?: AIAction): string {
-  const basePrompt = `You are an AI HR Assistant for MyVideoResume, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
+  const basePrompt = `You are an AI HR Assistant for Hired.video, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
 
 Your role is to help users with:
 - Resume optimization and ATS compatibility

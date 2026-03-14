@@ -11,9 +11,9 @@
     ]
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node ./scripts/update-config.mjs && node ./scripts/prerender.mjs",
-    "start": "vite preview",
+    "dev": "cd frontend && vite",
+    "build": "cd frontend && vite build && node ./scripts/update-config.mjs && node ./scripts/prerender.mjs",
+    "start": "cd frontend && vite preview",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 1000",
     "lint:strict": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:ci": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0 --quiet",
@@ -21,11 +21,11 @@
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "check": "npm run typecheck && npm run lint",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "quality-check": "node ./scripts/quality-check.mjs",
-    "quality-check:required": "node ./scripts/quality-check.mjs --required-only"
+    "test": "cd frontend && vitest run",
+    "test:watch": "cd frontend && vitest",
+    "test:coverage": "cd frontend && vitest run --coverage",
+    "quality-check": "cd frontend && node ./scripts/quality-check.mjs",
+    "quality-check:required": "cd frontend && node ./scripts/quality-check.mjs --required-only"
   },
   "dependencies": {
     "@microsoft/signalr": "^9.0.6",

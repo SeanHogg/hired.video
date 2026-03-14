@@ -132,7 +132,7 @@ export default function About() {
                   <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  MyVideoResume
+                  Hired.video
                 </span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold mb-6">

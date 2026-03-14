@@ -17,14 +17,14 @@ const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '../dist');
 const ENTRY_HTML = path.join(DIST_DIR, 'index.html');
 
-const CANONICAL_ORIGIN = 'https://myvideoresu.me';
+const CANONICAL_ORIGIN = 'https://hired.video';
 
-// Default/fallback SEO (aligns with client/lib/seo.ts DEFAULT_SEO)
+// Default/fallback SEO (aligns with frontend/lib/seo.ts DEFAULT_SEO)
 const DEFAULTS = {
-  title: 'MyVideoResu.me - AI-Powered Video Resume Platform',
+  title: 'Hired - AI-Powered Video Resume Platform',
   description:
-    'Create compelling video resumes and connect with top talent through AI-powered matching. The future of recruitment is here.',
-  ogTitle: 'MyVideoResu.me - Video Resume Platform',
+    'Create compelling video resumes and connect with top talent through AI-powered matching.',
+  ogTitle: 'Hired - Video Resume Platform',
   ogDescription:
     'Create compelling video resumes and connect with top talent through AI-powered matching.',
 };
@@ -32,14 +32,14 @@ const DEFAULTS = {
 // Routes to prerender with their SEO metadata
 const ROUTES = [
   { path: '/', title: DEFAULTS.title, description: DEFAULTS.description },
-  { path: '/about', title: 'About Us - MyVideoResu.me', description: 'Learn about our mission to revolutionize hiring with video resumes.' },
-  { path: '/pricing', title: 'Pricing - MyVideoResu.me', description: 'Flexible pricing plans for job seekers and recruiters.' },
-  { path: '/careers', title: 'Careers - MyVideoResu.me', description: 'Join our team and help shape the future of hiring.' },
-  { path: '/contact', title: 'Contact Us - MyVideoResu.me', description: 'Get in touch with our team.' },
-  { path: '/help', title: 'Help Center - MyVideoResu.me', description: 'Find answers to common questions.' },
-  { path: '/privacy', title: 'Privacy Policy - MyVideoResu.me', description: 'Our commitment to protecting your privacy.' },
-  { path: '/terms', title: 'Terms of Service - MyVideoResu.me', description: 'Terms and conditions for using MyVideoResu.me.' },
-  { path: '/cookies', title: 'Cookie Policy - MyVideoResu.me', description: 'How we use cookies on our platform.' },
+  { path: '/about', title: 'About Us - Hired.video', description: 'Learn about our mission to revolutionize hiring with video resumes.' },
+  { path: '/pricing', title: 'Pricing - Hired.video', description: 'Flexible pricing plans for job seekers and recruiters.' },
+  { path: '/careers', title: 'Careers - Hired.video', description: 'Join our team and help shape the future of hiring.' },
+  { path: '/contact', title: 'Contact Us - Hired.video', description: 'Get in touch with our team.' },
+  { path: '/help', title: 'Help Center - Hired.video', description: 'Find answers to common questions.' },
+  { path: '/privacy', title: 'Privacy Policy - Hired.video', description: 'Our commitment to protecting your privacy.' },
+  { path: '/terms', title: 'Terms of Service - Hired.video', description: 'Terms and conditions for using Hired.video.' },
+  { path: '/cookies', title: 'Cookie Policy - Hired.video', description: 'How we use cookies on our platform.' },
 ];
 
 function escapeHtml(str) {

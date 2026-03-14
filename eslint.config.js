@@ -291,8 +291,8 @@ export default [
   {
     files: [
       "**/*.test.{ts,tsx,js,jsx}",
-      "client/__tests__/**/*.{ts,tsx,js,jsx}",
-      "client/tests/**/*.{ts,tsx,js,jsx}"
+      "frontend/__tests__/**/*.{ts,tsx,js,jsx}",
+      "frontend/tests/**/*.{ts,tsx,js,jsx}"
     ],
     languageOptions: {
       globals: {
@@ -338,10 +338,10 @@ export default [
       "**/*.bundle.js",
       "**/*.vendor.js",
       "**/vendor/**",
-      "client/lib/router.tsx", // Third-party router library with many lint violations
-      "client/lib/data-manager.ts", // Third-party data manager library with many lint violations
-      "client/lib/card-factory.tsx", // Dynamic card factory - requires flexible typing for various API formats
-      "client/lib/card-normalizers.ts", // Dynamic data normalizers - handles inconsistent API responses
+      "frontend/lib/router.tsx", // Third-party router library with many lint violations
+      "frontend/lib/data-manager.ts", // Third-party data manager library with many lint violations
+      "frontend/lib/card-factory.tsx", // Dynamic card factory - requires flexible typing for various API formats
+      "frontend/lib/card-normalizers.ts", // Dynamic data normalizers - handles inconsistent API responses
     ],
   },
 ];

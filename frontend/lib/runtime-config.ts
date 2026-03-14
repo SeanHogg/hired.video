@@ -54,7 +54,7 @@ class RuntimeConfig {
     // Fallback to build-time environment variables (for development)
     console.log("Using build-time environment variables");
     return {
-      API_URL: import.meta.env.VITE_API_URL || "https://api.myvideoresu.me/api",
+      API_URL: import.meta.env.VITE_API_URL || "https://api.hired.video/api",
       ERROR_REPORTING: {
         ENABLED: import.meta.env.VITE_ERROR_REPORTING_ENABLED === "true",
         DSN: import.meta.env.VITE_ERROR_REPORTING_DSN || "",

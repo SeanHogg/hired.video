@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     ).toLowerCase() === "true";
 
   return {
+    root: path.resolve(__dirname),
     server: {
       host: "::",
       port: 4003,
@@ -23,7 +24,7 @@ export default defineConfig(({ mode }) => {
         interval: 100,
       },
       fs: {
-        allow: ["./client", "./shared"],
+        allow: ["./", "../shared"],
         deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**"],
       },
     },
@@ -72,8 +73,8 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./client"),
-        "@shared": path.resolve(__dirname, "./shared"),
+        "@": path.resolve(__dirname, "./"),
+        "@shared": path.resolve(__dirname, "../shared"),
       },
     },
     optimizeDeps: {

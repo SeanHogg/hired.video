@@ -1,19 +1,38 @@
-name = "myvideoresume-api"
-main = "src/index.ts"
+name = "hired-api"
+account_id = "15a91c1cf46bbc3377e7aad68190e1f1"
+main = "src/worker.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# Routes (both new and legacy domains)
+routes = [
+  "api.hired.video/*",
+  "api.myvideoresu.me/*",
+]
+
 [[r2_buckets]]
 binding = "VIDEO_BUCKET"
-bucket_name = "myvideoresume-videos-temp"
+bucket_name = "hired-videos-temp"
 
 [vars]
-FRONTEND_URL = "https://myvideoresu.me"
+FRONTEND_URL = "https://hired.video"
 
 [env.production]
-name = "myvideoresume-api"
-vars = { FRONTEND_URL = "https://myvideoresu.me" }
+name = "hired-api"
+vars = { FRONTEND_URL = "https://hired.video" }
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"
-bucket_name = "myvideoresume-videos-temp"
+bucket_name = "hired-videos-temp"
+
+# To expose the worker via your custom domains, set your Cloudflare zone_id below and
+# add routes for both the new and legacy domains.
+#
+# Replace <YOUR_ZONE_ID> with the zone ID for the domain(s) you want to use.
+# e.g. `wrangler zones list` to find it.
+
+# zone_id = "<YOUR_ZONE_ID>"
+# routes = [
+#   "api.hired.video/*",
+#   "api.myvideoresu.me/*",
+# ]

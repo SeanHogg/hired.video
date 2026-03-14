@@ -87,7 +87,7 @@ export class ApiClient {
       config.baseUrl ||
       import.meta.env.VITE_API_URL ||
       import.meta.env.VITE_API_BASE_URL ||
-      "https://api.myvideoresu.me"; // Do not include trailing /api; endpoints include /api
+      "https://api.hired.video"; // Do not include trailing /api; endpoints include /api
     this.timeout = config.timeout || 30000; // Increased timeout for backend calls
     this.retries = config.retries || 3;
     this.defaultHeaders = {
