@@ -3,40 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20.0.0" },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.835.0",
-    "@aws-sdk/s3-request-presigner": "^3.835.0",
-    "@hono/node-server": "^1.13.7",
     "@neondatabase/serverless": "^0.10.4",
-    "@sentry/node": "^9.14.0",
-    "@splitsoftware/splitio": "^11.1.1",
-    "bcryptjs": "^2.4.3",
-    "bullmq": "^5.34.8",
     "drizzle-orm": "^0.36.4",
-    "googleapis": "^148.0.0",
     "hono": "^4.12.4",
-    "ioredis": "^5.6.1",
     "jose": "^5.9.6",
-    "resend": "^4.5.2",
-    "stripe": "^17.7.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
+    "@cloudflare/workers-types": "^4.20241218.0",
     "@types/node": "^22.5.5",
     "drizzle-kit": "^0.28.1",
-    "tsx": "^4.7.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "wrangler": "^3.114.17"
   }
 }

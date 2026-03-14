@@ -1,23 +1,36 @@
-import type { Context } from "hono";
+// ── Cloudflare Worker Bindings ───────────────────────────────────────────────
+export interface Env {
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+  FRONTEND_URL: string;
+  OPENROUTER_API_KEY?: string;
+  YOUTUBE_CLIENT_ID?: string;
+  YOUTUBE_CLIENT_SECRET?: string;
+  YOUTUBE_REFRESH_TOKEN?: string;
+  VIDEO_BUCKET: R2Bucket;
+  // YouTube company OAuth
+  YOUTUBE_COMPANY_CLIENT_ID?: string;
+  YOUTUBE_COMPANY_CLIENT_SECRET?: string;
+}
+
+// ── Hono context variables ───────────────────────────────────────────────────
+export interface Variables {
+  user: JwtPayload;
+}
+
+export type AppEnv = { Bindings: Env; Variables: Variables };
 
 // ── JWT payload ──────────────────────────────────────────────────────────────
 export interface JwtPayload {
-  sub: string;          // user id
+  sub: string;
   email: string;
   roles: string[];
   emailVerified: boolean;
   mustChangePassword: boolean;
-  companyId?: string;   // active company context
+  companyId?: string;
   iat?: number;
   exp?: number;
 }
-
-// ── Hono context variables ───────────────────────────────────────────────────
-export type Variables = {
-  user: JwtPayload;
-};
-
-export type AppContext = Context<{ Variables: Variables }>;
 
 // ── Pagination ───────────────────────────────────────────────────────────────
 export interface PaginationMeta {
@@ -28,31 +41,10 @@ export interface PaginationMeta {
 }
 
 // ── API response helpers ─────────────────────────────────────────────────────
-export function success<T>(data: T, metaOrMessage?: PaginationMeta | string) {
-  if (typeof metaOrMessage === "string") {
-    return { success: true as const, data, message: metaOrMessage, timestamp: new Date().toISOString() };
-  }
-  return { data, ...(metaOrMessage ? { meta: metaOrMessage } : {}) };
+export function success<T>(data: T, meta?: PaginationMeta) {
+  return { data, ...(meta ? { meta } : {}) };
 }
 
-export function apiError(
-  code: string,
-  message: string,
-  details?: unknown,
-  status = 400,
-) {
-  return { error: { code, message, ...(details !== undefined ? { details } : {}) }, _status: status };
-}
-
-// ── Legacy compatibility alias ───────────────────────────────────────────────
-export function error(
-  code: string,
-  message: string,
-  details?: Record<string, unknown>,
-) {
-  return {
-    success: false as const,
-    error: { code, message, ...(details ? { details } : {}) },
-    timestamp: new Date().toISOString(),
-  };
+export function apiError(code: string, message: string, details?: unknown) {
+  return { error: { code, message, ...(details !== undefined ? { details } : {}) } };
 }
