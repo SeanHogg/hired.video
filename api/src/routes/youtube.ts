@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
 
 // ============================================================================
 // CONSTANTS
@@ -15,7 +15,7 @@ const YOUTUBE_SCOPES = [
 // ROUTES
 // ============================================================================
 
-export const youtubeRoutes = new Hono<AppEnv>();
+export const youtubeRoutes = new Hono<{ Variables: Variables }>();
 
 /**
  * GET /api/youtube/company/status
@@ -24,7 +24,7 @@ export const youtubeRoutes = new Hono<AppEnv>();
  * refresh the stored OAuth token. Returns channel info on success.
  */
 youtubeRoutes.get("/company/status", async (c) => {
-  if (!c.env.YOUTUBE_CLIENT_ID || !c.env.YOUTUBE_REFRESH_TOKEN) {
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_REFRESH_TOKEN) {
     return c.json(
       success({
         connected: false,
@@ -38,9 +38,9 @@ youtubeRoutes.get("/company/status", async (c) => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: c.env.YOUTUBE_CLIENT_ID,
-        client_secret: c.env.YOUTUBE_CLIENT_SECRET,
-        refresh_token: c.env.YOUTUBE_REFRESH_TOKEN,
+        client_id: process.env.YOUTUBE_CLIENT_ID,
+        client_secret: process.env.YOUTUBE_CLIENT_SECRET ?? "",
+        refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
         grant_type: "refresh_token",
       }),
     });
@@ -115,12 +115,12 @@ youtubeRoutes.get("/company/status", async (c) => {
  * token must be stored as the YOUTUBE_REFRESH_TOKEN secret.
  */
 youtubeRoutes.get("/company/auth-url", (c) => {
-  if (!c.env.YOUTUBE_CLIENT_ID) {
+  if (!process.env.YOUTUBE_CLIENT_ID) {
     return c.json(error("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
   }
 
   const params = new URLSearchParams({
-    client_id: c.env.YOUTUBE_CLIENT_ID,
+    client_id: process.env.YOUTUBE_CLIENT_ID,
     redirect_uri: "urn:ietf:wg:oauth:2.0:oob", // out-of-band for manual token capture
     response_type: "code",
     scope: YOUTUBE_SCOPES,

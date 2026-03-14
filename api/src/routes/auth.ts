@@ -2,9 +2,9 @@ import { Hono } from "hono";
 import { SignJWT } from "jose";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv, JwtPayload } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import type { Variables, JwtPayload } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 const { users } = schema;
 
@@ -60,7 +60,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 
 async function createJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: string): Promise<string> {
   const secretKey = new TextEncoder().encode(secret);
-  return new SignJWT({ email: payload.email, name: payload.name, role: payload.role })
+  return new SignJWT({ email: payload.email, roles: payload.roles, emailVerified: payload.emailVerified, mustChangePassword: payload.mustChangePassword })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -103,7 +103,7 @@ const VerifyEmailSchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const authRoutes = new Hono<AppEnv>();
+export const authRoutes = new Hono<{ Variables: Variables }>();
 
 /** POST /api/auth/register */
 authRoutes.post("/register", async (c) => {
@@ -113,7 +113,7 @@ authRoutes.post("/register", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
   const { email, password, name, role } = parsed.data;
 
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
@@ -132,8 +132,8 @@ authRoutes.post("/register", async (c) => {
   }
 
   const token = await createJwt(
-    { sub: user.id, email: user.email, name: user.name, role: user.role },
-    c.env.JWT_SECRET,
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: false, mustChangePassword: false },
+    process.env.JWT_SECRET ?? "",
   );
 
   return c.json(
@@ -154,7 +154,7 @@ authRoutes.post("/login", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
   const { email, password } = parsed.data;
 
   const [user] = await db
@@ -173,8 +173,8 @@ authRoutes.post("/login", async (c) => {
   }
 
   const token = await createJwt(
-    { sub: user.id, email: user.email, name: user.name, role: user.role },
-    c.env.JWT_SECRET,
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: false, mustChangePassword: false },
+    process.env.JWT_SECRET ?? "",
   );
 
   return c.json(
@@ -196,17 +196,17 @@ authRoutes.post("/refresh", async (c) => {
   const { jwtVerify } = await import("jose");
   const token = authHeader.slice(7);
   try {
-    const secretKey = new TextEncoder().encode(c.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
     const newToken = await createJwt(
       {
         sub: payload.sub as string,
         email: payload["email"] as string,
-        name: payload["name"] as string,
-        role: payload["role"] as string,
+        
+        roles: (payload["roles"] as string[]) ?? [], emailVerified: (payload["emailVerified"] as boolean) ?? false, mustChangePassword: (payload["mustChangePassword"] as boolean) ?? false,
       },
-      c.env.JWT_SECRET,
+      process.env.JWT_SECRET ?? "",
     );
 
     return c.json(
@@ -273,10 +273,10 @@ authRoutes.get("/me", async (c) => {
   const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
-    const secretKey = new TextEncoder().encode(c.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
-    const db = getDb(c.env.DATABASE_URL);
+    const db = getDb();
     const [user] = await db
       .select({
         id: users.id,

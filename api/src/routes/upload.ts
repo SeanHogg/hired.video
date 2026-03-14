@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+import {
+  S3Client,
+  PutObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
+import type { Variables } from "../types/index.js";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -17,22 +18,30 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf",
 ]);
 
-// ============================================================================
-// SCHEMAS
-// ============================================================================
-
 const UploadSchema = z.object({
   filename: z.string().min(1),
   contentType: z.string().min(1),
 });
 
-// ============================================================================
-// ROUTES
-// ============================================================================
+function getS3Client(): S3Client {
+  return new S3Client({
+    endpoint: process.env.STORAGE_ENDPOINT,
+    region: process.env.STORAGE_REGION ?? "auto",
+    credentials: {
+      accessKeyId: process.env.STORAGE_ACCESS_KEY ?? "",
+      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
+    },
+    forcePathStyle: true,
+  });
+}
 
-export const uploadRoutes = new Hono<AppEnv>();
+function getBucket(): string {
+  return process.env.STORAGE_BUCKET ?? "myvideoresume";
+}
 
-/** POST /api/upload — upload a file to R2 (avatars, documents, etc.) */
+export const uploadRoutes = new Hono<{ Variables: Variables }>();
+
+/** POST /api/upload — upload a file to S3-compatible storage (avatars, documents, etc.) */
 uploadRoutes.post("/", async (c) => {
   const user = c.var.user;
 
@@ -42,14 +51,12 @@ uploadRoutes.post("/", async (c) => {
 
   const parsed = UploadSchema.safeParse({ filename, contentType });
   if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Missing required headers: X-Filename, Content-Type"), 400);
+    return c.json({ error: { code: "VALIDATION_ERROR", message: "Missing required headers: X-Filename, Content-Type" } }, 400);
   }
 
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return c.json(
-      error("VALIDATION_ERROR", `Content type '${contentType}' is not allowed`, {
-        allowed: [...ALLOWED_CONTENT_TYPES],
-      }),
+      { error: { code: "VALIDATION_ERROR", message: `Content type '${contentType}' is not allowed`, details: { allowed: [...ALLOWED_CONTENT_TYPES] } } },
       415,
     );
   }
@@ -58,26 +65,34 @@ uploadRoutes.post("/", async (c) => {
 
   if (body.byteLength > MAX_FILE_SIZE_BYTES) {
     return c.json(
-      error("PAYLOAD_TOO_LARGE", `File size exceeds the ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB limit`),
+      { error: { code: "PAYLOAD_TOO_LARGE", message: `File size exceeds the ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB limit` } },
       413,
     );
   }
 
   const extension = filename.includes(".") ? filename.split(".").pop() : "";
-  const r2Key = `uploads/${user.sub}/${crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
+  const key = `uploads/${user.sub}/${crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
 
-  await c.env.VIDEO_BUCKET.put(r2Key, body, {
-    httpMetadata: { contentType },
-    customMetadata: { userId: user.sub, originalFilename: filename },
-  });
+  const s3 = getS3Client();
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+      Body: Buffer.from(body),
+      ContentType: contentType,
+      Metadata: { userId: user.sub, originalFilename: filename },
+    }),
+  );
 
   return c.json(
-    success({
-      key: r2Key,
-      url: `https://cdn.myvideoresu.me/${r2Key}`,
-      contentType,
-      size: body.byteLength,
-    }),
+    {
+      data: {
+        key,
+        url: `https://cdn.myvideoresu.me/${key}`,
+        contentType,
+        size: body.byteLength,
+      },
+    },
     201,
   );
 });
@@ -87,17 +102,20 @@ uploadRoutes.delete("/:key{.+}", async (c) => {
   const user = c.var.user;
   const key = c.req.param("key");
 
-  // Ensure the user owns this file
   if (!key.startsWith(`uploads/${user.sub}/`)) {
-    return c.json(error("FORBIDDEN", "You do not have permission to delete this file"), 403);
+    return c.json({ error: { code: "FORBIDDEN", message: "You do not have permission to delete this file" } }, 403);
   }
 
-  const existing = await c.env.VIDEO_BUCKET.head(key);
-  if (!existing) {
-    return c.json(error("NOT_FOUND", "File not found"), 404);
+  const s3 = getS3Client();
+  const bucket = getBucket();
+
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+  } catch {
+    return c.json({ error: { code: "NOT_FOUND", message: "File not found" } }, 404);
   }
 
-  await c.env.VIDEO_BUCKET.delete(key);
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 
-  return c.json(success(null, "File deleted"));
+  return c.json({ data: null });
 });

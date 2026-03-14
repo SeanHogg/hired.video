@@ -1,17 +1,17 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import * as schema from "./schema/index.js";
 
-/**
- * Creates a Drizzle ORM client connected to Neon Postgres via the serverless
- * HTTP driver. Call once per request using the DATABASE_URL binding.
- */
-export function getDb(databaseUrl: string) {
-  const sql = neon(databaseUrl);
-  return drizzle(sql, { schema });
+let _db: ReturnType<typeof drizzle> | null = null;
+
+export function getDb() {
+  if (_db) return _db;
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL environment variable is required");
+  const sql = neon(url);
+  _db = drizzle(sql, { schema });
+  return _db;
 }
 
-export type DbClient = ReturnType<typeof getDb>;
-
-// Re-export schema for convenience
+export type Db = ReturnType<typeof getDb>;
 export { schema };

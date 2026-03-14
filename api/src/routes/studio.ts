@@ -1,22 +1,40 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+import type { Variables } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 const { studioProjects, videos } = schema;
 
-// ============================================================================
-// TYPES
-// ============================================================================
+function getS3Client(): S3Client {
+  return new S3Client({
+    endpoint: process.env.STORAGE_ENDPOINT,
+    region: process.env.STORAGE_REGION ?? "auto",
+    credentials: {
+      accessKeyId: process.env.STORAGE_ACCESS_KEY ?? "",
+      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
+    },
+    forcePathStyle: true,
+  });
+}
+
+function getBucket(): string {
+  return process.env.STORAGE_BUCKET ?? "myvideoresume";
+}
 
 interface StoryboardScene {
   id: number;
   title: string;
   narration: string;
   visuals: string;
-  duration: number; // seconds
+  duration: number;
 }
 
 interface Storyboard {
@@ -31,14 +49,8 @@ interface OpenRouterMessage {
 }
 
 interface OpenRouterResponse {
-  choices: Array<{
-    message: { content: string };
-  }>;
+  choices: Array<{ message: { content: string } }>;
 }
-
-// ============================================================================
-// SCHEMAS
-// ============================================================================
 
 const GenerateStoryboardSchema = z.object({
   resumeText: z.string().min(50, "Resume text must be at least 50 characters"),
@@ -58,40 +70,27 @@ const PublishVideoSchema = z.object({
   privacyStatus: z.enum(["public", "private", "unlisted"]).default("unlisted"),
 });
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
 async function generateStoryboardFromOpenRouter(
   resumeText: string,
   targetDuration: number,
   apiKey: string,
 ): Promise<Storyboard> {
-  const systemPrompt = `You are a professional video resume producer. Given a resume, you create engaging video storyboards. 
+  const systemPrompt = `You are a professional video resume producer. Given a resume, you create engaging video storyboards.
 Return ONLY valid JSON with this structure:
 {
   "title": "string",
   "totalDuration": number,
   "scenes": [
-    {
-      "id": number,
-      "title": "string",
-      "narration": "string",
-      "visuals": "string",
-      "duration": number
-    }
+    { "id": number, "title": "string", "narration": "string", "visuals": "string", "duration": number }
   ]
 }`;
 
-  const userPrompt = `Create a ${targetDuration}-second video resume storyboard for the following resume. 
-Make it compelling, professional, and highlight key achievements.
-
-RESUME:
-${resumeText}`;
-
   const messages: OpenRouterMessage[] = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
+    {
+      role: "user",
+      content: `Create a ${targetDuration}-second video resume storyboard for:\n\n${resumeText}`,
+    },
   ];
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -111,22 +110,15 @@ ${resumeText}`;
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`OpenRouter API error ${response.status}: ${errorBody}`);
+    throw new Error(`OpenRouter API error ${response.status}: ${await response.text()}`);
   }
 
   const data = (await response.json()) as OpenRouterResponse;
   const content = data.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("OpenRouter returned an empty response");
-  }
-
+  if (!content) throw new Error("OpenRouter returned an empty response");
   return JSON.parse(content) as Storyboard;
 }
 
-/**
- * Exchange a YouTube OAuth2 refresh token for a fresh access token.
- */
 async function getYouTubeAccessToken(
   clientId: string,
   clientSecret: string,
@@ -142,25 +134,16 @@ async function getYouTubeAccessToken(
       grant_type: "refresh_token",
     }),
   });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Failed to refresh YouTube token: ${body}`);
-  }
-
+  if (!response.ok) throw new Error(`Failed to refresh YouTube token: ${await response.text()}`);
   const data = (await response.json()) as { access_token: string };
   return data.access_token;
 }
 
-/**
- * Upload a video file from R2 to YouTube using the resumable upload API.
- */
 async function uploadVideoToYouTube(
-  r2Object: R2ObjectBody,
+  videoBuffer: Buffer,
   metadata: { title: string; description: string; privacyStatus: string },
   accessToken: string,
 ): Promise<{ videoId: string; youtubeUrl: string }> {
-  // Step 1: Initiate the resumable upload session
   const initResponse = await fetch(
     "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
     {
@@ -171,105 +154,64 @@ async function uploadVideoToYouTube(
         "X-Upload-Content-Type": "video/mp4",
       },
       body: JSON.stringify({
-        snippet: {
-          title: metadata.title,
-          description: metadata.description,
-          categoryId: "22", // People & Blogs
-        },
-        status: {
-          privacyStatus: metadata.privacyStatus,
-          selfDeclaredMadeForKids: false,
-        },
+        snippet: { title: metadata.title, description: metadata.description, categoryId: "22" },
+        status: { privacyStatus: metadata.privacyStatus, selfDeclaredMadeForKids: false },
       }),
     },
   );
 
-  if (!initResponse.ok) {
-    const body = await initResponse.text();
-    throw new Error(`Failed to initiate YouTube upload: ${body}`);
-  }
-
+  if (!initResponse.ok) throw new Error(`Failed to initiate YouTube upload: ${await initResponse.text()}`);
   const uploadUrl = initResponse.headers.get("Location");
-  if (!uploadUrl) {
-    throw new Error("YouTube did not return an upload URL");
-  }
-
-  // Step 2: Stream the video body from R2 to YouTube
-  const videoBody = await r2Object.arrayBuffer();
+  if (!uploadUrl) throw new Error("YouTube did not return an upload URL");
 
   const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",
-    headers: {
-      "Content-Type": "video/mp4",
-      "Content-Length": String(videoBody.byteLength),
-    },
-    body: videoBody,
+    headers: { "Content-Type": "video/mp4", "Content-Length": String(videoBuffer.byteLength) },
+    body: videoBuffer,
   });
 
-  if (!uploadResponse.ok) {
-    const body = await uploadResponse.text();
-    throw new Error(`YouTube upload failed: ${body}`);
-  }
-
+  if (!uploadResponse.ok) throw new Error(`YouTube upload failed: ${await uploadResponse.text()}`);
   const result = (await uploadResponse.json()) as { id: string };
-  const videoId = result.id;
-
-  return {
-    videoId,
-    youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
-  };
+  return { videoId: result.id, youtubeUrl: `https://www.youtube.com/watch?v=${result.id}` };
 }
 
-// ============================================================================
-// ROUTES
-// ============================================================================
+export const studioRoutes = new Hono<{ Variables: Variables }>();
 
-export const studioRoutes = new Hono<AppEnv>();
-
-/** POST /api/studio/storyboard — generate AI storyboard from resume text */
 studioRoutes.post("/storyboard", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = GenerateStoryboardSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+    return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid request body", details: parsed.error.flatten() } }, 400);
   }
 
-  if (!c.env.OPENROUTER_API_KEY) {
-    return c.json(error("CONFIGURATION_ERROR", "OpenRouter API key not configured"), 500);
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return c.json({ error: { code: "CONFIGURATION_ERROR", message: "OpenRouter API key not configured" } }, 500);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
-
+  const db = getDb();
   try {
     const storyboard = await generateStoryboardFromOpenRouter(
       parsed.data.resumeText,
       parsed.data.targetDuration,
-      c.env.OPENROUTER_API_KEY,
+      apiKey,
     );
 
     const [project] = await db
       .insert(studioProjects)
-      .values({
-        userId: user.sub,
-        resumeText: parsed.data.resumeText,
-        storyboard,
-        status: "storyboard_ready",
-      })
+      .values({ userId: user.sub, resumeText: parsed.data.resumeText, storyboard, status: "storyboard_ready" })
       .returning();
 
-    return c.json(success({ project, storyboard }), 201);
+    return c.json({ data: { project, storyboard } }, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to generate storyboard";
     console.error("[studio/storyboard]", err);
-    return c.json(error("AI_ERROR", message), 502);
+    return c.json({ error: { code: "AI_ERROR", message: err instanceof Error ? err.message : "Failed to generate storyboard" } }, 502);
   }
 });
 
-/** POST /api/studio/upload — upload a recorded video blob to R2 */
 studioRoutes.post("/upload", async (c) => {
   const user = c.var.user;
-
   const contentType = c.req.header("Content-Type") ?? "";
   const projectId = c.req.header("X-Project-Id");
   const filename = c.req.header("X-Filename") ?? `video-${Date.now()}.webm`;
@@ -281,15 +223,10 @@ studioRoutes.post("/upload", async (c) => {
   });
 
   if (!parsed.success) {
-    return c.json(
-      error("VALIDATION_ERROR", "Missing or invalid headers: X-Project-Id, X-Filename, Content-Type (video/*)", {
-        issues: parsed.error.flatten(),
-      }),
-      400,
-    );
+    return c.json({ error: { code: "VALIDATION_ERROR", message: "Missing or invalid headers", details: parsed.error.flatten() } }, 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
   const [project] = await db
     .select({ id: studioProjects.id, userId: studioProjects.userId })
     .from(studioProjects)
@@ -297,36 +234,40 @@ studioRoutes.post("/upload", async (c) => {
     .limit(1);
 
   if (!project || project.userId !== user.sub) {
-    return c.json(error("NOT_FOUND", "Studio project not found"), 404);
+    return c.json({ error: { code: "NOT_FOUND", message: "Studio project not found" } }, 404);
   }
 
   const r2Key = `studio/${user.sub}/${parsed.data.projectId}/${parsed.data.filename}`;
   const body = await c.req.arrayBuffer();
 
-  await c.env.VIDEO_BUCKET.put(r2Key, body, {
-    httpMetadata: { contentType: parsed.data.contentType },
-    customMetadata: { userId: user.sub, projectId: parsed.data.projectId },
-  });
+  const s3 = getS3Client();
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: r2Key,
+      Body: Buffer.from(body),
+      ContentType: parsed.data.contentType,
+      Metadata: { userId: user.sub, projectId: parsed.data.projectId },
+    }),
+  );
 
   await db
     .update(studioProjects)
     .set({ status: "video_uploaded", updatedAt: new Date() })
     .where(eq(studioProjects.id, parsed.data.projectId));
 
-  return c.json(success({ r2Key }, "Video uploaded to temporary storage"), 201);
+  return c.json({ data: { r2Key } }, 201);
 });
 
-/** POST /api/studio/publish — upload from R2 to YouTube */
 studioRoutes.post("/publish", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = PublishVideoSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+    return c.json({ error: { code: "VALIDATION_ERROR", message: "Invalid request body", details: parsed.error.flatten() } }, 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
-
+  const db = getDb();
   const [project] = await db
     .select()
     .from(studioProjects)
@@ -334,126 +275,93 @@ studioRoutes.post("/publish", async (c) => {
     .limit(1);
 
   if (!project || project.userId !== user.sub) {
-    return c.json(error("NOT_FOUND", "Studio project not found"), 404);
+    return c.json({ error: { code: "NOT_FOUND", message: "Studio project not found" } }, 404);
   }
 
   if (project.status !== "video_uploaded") {
-    return c.json(
-      error("CONFLICT", `Project must be in 'video_uploaded' state to publish (current: ${project.status})`),
-      409,
-    );
+    return c.json({ error: { code: "CONFLICT", message: `Project must be in 'video_uploaded' state (current: ${project.status})` } }, 409);
   }
 
-  // Locate the R2 key for this project
-  const listed = await c.env.VIDEO_BUCKET.list({ prefix: `studio/${user.sub}/${parsed.data.projectId}/` });
-  const r2Object = listed.objects[0];
+  const s3 = getS3Client();
+  const bucket = getBucket();
+  const prefix = `studio/${user.sub}/${parsed.data.projectId}/`;
 
-  if (!r2Object) {
-    return c.json(error("NOT_FOUND", "No uploaded video found for this project"), 404);
+  const listed = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }));
+  const firstObject = listed.Contents?.[0];
+  if (!firstObject?.Key) {
+    return c.json({ error: { code: "NOT_FOUND", message: "No uploaded video found for this project" } }, 404);
   }
 
-  const r2File = await c.env.VIDEO_BUCKET.get(r2Object.key);
-  if (!r2File) {
-    return c.json(error("NOT_FOUND", "R2 object could not be retrieved"), 404);
+  const s3Object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: firstObject.Key }));
+  if (!s3Object.Body) {
+    return c.json({ error: { code: "NOT_FOUND", message: "S3 object could not be retrieved" } }, 404);
   }
 
-  // Mark as publishing
   await db
     .update(studioProjects)
     .set({ status: "publishing", updatedAt: new Date() })
     .where(eq(studioProjects.id, parsed.data.projectId));
 
   try {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of s3Object.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    const videoBuffer = Buffer.concat(chunks);
+
     const accessToken = await getYouTubeAccessToken(
-      c.env.YOUTUBE_CLIENT_ID,
-      c.env.YOUTUBE_CLIENT_SECRET,
-      c.env.YOUTUBE_REFRESH_TOKEN,
+      process.env.YOUTUBE_CLIENT_ID ?? "",
+      process.env.YOUTUBE_CLIENT_SECRET ?? "",
+      process.env.YOUTUBE_REFRESH_TOKEN ?? "",
     );
 
     const { videoId, youtubeUrl } = await uploadVideoToYouTube(
-      r2File,
-      {
-        title: parsed.data.title,
-        description: parsed.data.description,
-        privacyStatus: parsed.data.privacyStatus,
-      },
+      videoBuffer,
+      { title: parsed.data.title, description: parsed.data.description, privacyStatus: parsed.data.privacyStatus },
       accessToken,
     );
 
-    // Create video record and link to project
     const [video] = await db
       .insert(videos)
-      .values({
-        userId: user.sub,
-        status: "Completed",
-        r2Key: r2Object.key,
-        youtubeVideoId: videoId,
-        youtubeUrl,
-        storyboard: project.storyboard,
-      })
+      .values({ userId: user.sub, status: "Completed", r2Key: firstObject.Key, youtubeVideoId: videoId, youtubeUrl, storyboard: project.storyboard })
       .returning();
 
-    if (!video) {
-      throw new Error("Failed to create video record");
-    }
+    if (!video) throw new Error("Failed to create video record");
 
     await db
       .update(studioProjects)
       .set({ status: "published", videoId: video.id, updatedAt: new Date() })
       .where(eq(studioProjects.id, parsed.data.projectId));
 
-    // Clean up the R2 object after successful upload
-    await c.env.VIDEO_BUCKET.delete(r2Object.key).catch((err) => {
-      console.warn("[studio/publish] failed to delete R2 object after upload", err);
-    });
+    await s3
+      .send(new DeleteObjectCommand({ Bucket: bucket, Key: firstObject.Key }))
+      .catch((err) => console.warn("[studio/publish] failed to delete S3 object", err));
 
-    return c.json(success({ videoId, youtubeUrl, video }));
+    return c.json({ data: { videoId, youtubeUrl, video } });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "YouTube upload failed";
     console.error("[studio/publish]", err);
-
     await db
       .update(studioProjects)
-      .set({
-        status: "publish_failed",
-        retryCount: (project.retryCount ?? 0) + 1,
-        updatedAt: new Date(),
-      })
+      .set({ status: "publish_failed", retryCount: (project.retryCount ?? 0) + 1, updatedAt: new Date() })
       .where(eq(studioProjects.id, parsed.data.projectId));
-
-    return c.json(error("YOUTUBE_UPLOAD_ERROR", message), 502);
+    return c.json({ error: { code: "YOUTUBE_UPLOAD_ERROR", message: err instanceof Error ? err.message : "YouTube upload failed" } }, 502);
   }
 });
 
-/** GET /api/studio/status/:projectId — check a project's publish status */
 studioRoutes.get("/status/:projectId", async (c) => {
   const user = c.var.user;
   const projectId = c.req.param("projectId");
-  const db = getDb(c.env.DATABASE_URL);
-
-  const [project] = await db
-    .select()
-    .from(studioProjects)
-    .where(eq(studioProjects.id, projectId))
-    .limit(1);
-
+  const db = getDb();
+  const [project] = await db.select().from(studioProjects).where(eq(studioProjects.id, projectId)).limit(1);
   if (!project || project.userId !== user.sub) {
-    return c.json(error("NOT_FOUND", "Studio project not found"), 404);
+    return c.json({ error: { code: "NOT_FOUND", message: "Studio project not found" } }, 404);
   }
-
-  return c.json(success(project));
+  return c.json({ data: project });
 });
 
-/** GET /api/studio/projects — list all studio projects for the current user */
 studioRoutes.get("/projects", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
-
-  const projects = await db
-    .select()
-    .from(studioProjects)
-    .where(eq(studioProjects.userId, user.sub))
-    .orderBy(studioProjects.createdAt);
-
-  return c.json(success(projects));
+  const db = getDb();
+  const projects = await db.select().from(studioProjects).where(eq(studioProjects.userId, user.sub)).orderBy(studioProjects.createdAt);
+  return c.json({ data: projects });
 });

@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
-const { jobs } = schema;
+const { jobItems: jobs } = schema;
 
 // ============================================================================
 // SCHEMAS
@@ -25,17 +25,17 @@ const UpdateJobSchema = CreateJobSchema.partial();
 // ROUTES
 // ============================================================================
 
-export const jobRoutes = new Hono<AppEnv>();
+export const jobRoutes = new Hono<{ Variables: Variables }>();
 
 /** GET /api/jobs — list authenticated user's jobs */
 jobRoutes.get("/", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const userJobs = await db
     .select()
     .from(jobs)
-    .where(eq(jobs.userId, user.sub))
+    .where(eq(jobs.postedByUserId, user.sub))
     .orderBy(jobs.updatedAt);
 
   return c.json(success(userJobs));
@@ -50,10 +50,10 @@ jobRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
   const [job] = await db
     .insert(jobs)
-    .values({ userId: user.sub, ...parsed.data })
+    .values({ postedByUserId: user.sub, ...parsed.data })
     .returning();
 
   return c.json(success(job), 201);
@@ -63,12 +63,12 @@ jobRoutes.post("/", async (c) => {
 jobRoutes.get("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [job] = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.id, id), eq(jobs.userId, user.sub)))
+    .where(and(eq(jobs.id, id), eq(jobs.postedByUserId, user.sub)))
     .limit(1);
 
   if (!job) {
@@ -88,12 +88,12 @@ jobRoutes.put("/:id", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: jobs.id })
     .from(jobs)
-    .where(and(eq(jobs.id, id), eq(jobs.userId, user.sub)))
+    .where(and(eq(jobs.id, id), eq(jobs.postedByUserId, user.sub)))
     .limit(1);
 
   if (!existing) {
@@ -113,12 +113,12 @@ jobRoutes.put("/:id", async (c) => {
 jobRoutes.delete("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: jobs.id })
     .from(jobs)
-    .where(and(eq(jobs.id, id), eq(jobs.userId, user.sub)))
+    .where(and(eq(jobs.id, id), eq(jobs.postedByUserId, user.sub)))
     .limit(1);
 
   if (!existing) {

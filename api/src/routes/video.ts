@@ -1,14 +1,28 @@
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import {
+  S3Client,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 const { videos } = schema;
 
-// ============================================================================
-// SCHEMAS
+function getS3Client(): S3Client {
+  return new S3Client({
+    endpoint: process.env.STORAGE_ENDPOINT,
+    region: process.env.STORAGE_REGION ?? "auto",
+    credentials: {
+      accessKeyId: process.env.STORAGE_ACCESS_KEY ?? "",
+      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
+    },
+    forcePathStyle: true,
+  });
+}
+
 // ============================================================================
 
 const CreateVideoSchema = z.object({
@@ -26,12 +40,12 @@ const EnhanceSummarySchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const videoRoutes = new Hono<AppEnv>();
+export const videoRoutes = new Hono<{ Variables: Variables }>();
 
 /** GET /api/video/user/all — list all videos for the current user */
 videoRoutes.get("/user/all", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const userVideos = await db
     .select()
@@ -51,7 +65,7 @@ videoRoutes.post("/generate", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [video] = await db
     .insert(videos)
@@ -87,7 +101,7 @@ videoRoutes.post("/enhance-summary", async (c) => {
 videoRoutes.get("/resume/:resumeId", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const resumeVideos = await db
     .select()
@@ -102,7 +116,7 @@ videoRoutes.get("/resume/:resumeId", async (c) => {
 videoRoutes.get("/resume/:resumeId/can-generate", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const activeVideo = await db
     .select({ id: videos.id, status: videos.status })
@@ -131,7 +145,7 @@ videoRoutes.get("/resume/:resumeId/can-generate", async (c) => {
 videoRoutes.get("/resume/:resumeId/active", async (c) => {
   const user = c.var.user;
   const resumeId = c.req.param("resumeId");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [active] = await db
     .select()
@@ -151,7 +165,7 @@ videoRoutes.get("/resume/:resumeId/active", async (c) => {
 videoRoutes.get("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [video] = await db
     .select()
@@ -170,7 +184,7 @@ videoRoutes.get("/:id", async (c) => {
 videoRoutes.get("/:id/status", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [video] = await db
     .select({
@@ -212,7 +226,7 @@ videoRoutes.get("/:id/status", async (c) => {
 videoRoutes.post("/:id/cancel", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: videos.id, status: videos.status })
@@ -241,7 +255,7 @@ videoRoutes.post("/:id/cancel", async (c) => {
 videoRoutes.delete("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: videos.id, r2Key: videos.r2Key })
@@ -253,11 +267,13 @@ videoRoutes.delete("/:id", async (c) => {
     return c.json(error("NOT_FOUND", "Video not found"), 404);
   }
 
-  // Remove from R2 if present
+  // Remove from S3-compatible storage if present
   if (existing.r2Key) {
-    await c.env.VIDEO_BUCKET.delete(existing.r2Key).catch((err) => {
-      console.warn("[video] failed to delete R2 object", existing.r2Key, err);
-    });
+    const s3 = getS3Client();
+    await s3.send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET ?? "myvideoresume", Key: existing.r2Key }))
+      .catch((err: unknown) => {
+        console.warn("[video] failed to delete S3 object", existing.r2Key, err);
+      });
   }
 
   await db.delete(videos).where(eq(videos.id, id));

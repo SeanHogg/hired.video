@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
-const { resumes } = schema;
+const { resumeInformation: resumes } = schema;
 
 // ============================================================================
 // SCHEMAS
@@ -23,12 +23,12 @@ const UpdateResumeSchema = CreateResumeSchema.partial();
 // ROUTES
 // ============================================================================
 
-export const resumeRoutes = new Hono<AppEnv>();
+export const resumeRoutes = new Hono<{ Variables: Variables }>();
 
 /** GET /api/resumes — list authenticated user's resumes */
 resumeRoutes.get("/", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const userResumes = await db
     .select()
@@ -48,7 +48,7 @@ resumeRoutes.post("/", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
   const [resume] = await db
     .insert(resumes)
     .values({
@@ -66,7 +66,7 @@ resumeRoutes.post("/", async (c) => {
 resumeRoutes.get("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [resume] = await db
     .select()
@@ -91,7 +91,7 @@ resumeRoutes.put("/:id", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: resumes.id })
@@ -116,7 +116,7 @@ resumeRoutes.put("/:id", async (c) => {
 resumeRoutes.delete("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: resumes.id })
@@ -137,7 +137,7 @@ resumeRoutes.delete("/:id", async (c) => {
 resumeRoutes.post("/:id/clone", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [original] = await db
     .select()
@@ -166,7 +166,7 @@ resumeRoutes.post("/:id/clone", async (c) => {
 resumeRoutes.post("/:id/publish", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: resumes.id })

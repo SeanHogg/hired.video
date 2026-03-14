@@ -1,16 +1,20 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noEmit": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

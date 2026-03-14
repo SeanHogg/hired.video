@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { AppEnv } from "../types";
-import { success, error } from "../types";
-import { getDb, schema } from "../db";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 const { users } = schema;
 
@@ -20,12 +20,12 @@ const UpdateProfileSchema = z.object({
 // ROUTES
 // ============================================================================
 
-export const userRoutes = new Hono<AppEnv>();
+export const userRoutes = new Hono<{ Variables: Variables }>();
 
 /** GET /api/users/profile — get the authenticated user's profile */
 userRoutes.get("/profile", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const [profile] = await db
     .select({
@@ -57,7 +57,7 @@ userRoutes.put("/profile", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   const updates: Partial<{ name: string; email: string; updatedAt: Date }> = {
     updatedAt: new Date(),
@@ -88,7 +88,7 @@ userRoutes.put("/profile", async (c) => {
 /** DELETE /api/users/account — permanently delete the authenticated user's account */
 userRoutes.delete("/account", async (c) => {
   const user = c.var.user;
-  const db = getDb(c.env.DATABASE_URL);
+  const db = getDb();
 
   await db.delete(users).where(eq(users.id, user.sub));
 
