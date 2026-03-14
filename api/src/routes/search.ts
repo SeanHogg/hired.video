@@ -11,13 +11,16 @@ searchRoutes.get("/public", (c) => {
 
   return c.json(
     {
-      items: [],
-      total: 0,
-      page,
-      limit,
-      totalPages: 0,
-      hasNextPage: false,
-      hasPreviousPage: false,
+      success: true,
+      data: {
+        items: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
     },
     200,
   );

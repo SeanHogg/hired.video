@@ -85,16 +85,10 @@ export default function PdfToJson() {
       formData.append("file", file);
 
       // Use the resume parse endpoint to convert to JSON
-      const response = await fetch("/api/resume/parse", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to convert document");
-      }
-
-      const result = await response.json();
+      const { data: result } = await apiClient.requestRaw<any>(
+        "/api/resume/parse",
+        { method: "POST", body: formData },
+      );
 
       // Format the JSON result nicely
       const formattedJson =

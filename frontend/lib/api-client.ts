@@ -184,7 +184,24 @@ export class ApiClient {
 
     // Collapse any accidental double-slashes in the path portion (excluding protocol)
     // e.g. http://localhost:8787/api//api/Users -> http://localhost:8787/api/api/Users
-    return rawUrl.replace(/([^:]\/\/)+/g, "$1");
+    const collapsedUrl = rawUrl.replace(/([^:]\/\/)+/g, "$1");
+
+    // Normalize casing for paths under /api/ to avoid frontend casing mistakes
+    // (e.g., /api/Auth/login should map to /api/auth/login)
+    try {
+      const parsed = new URL(collapsedUrl, "http://dummy");
+      if (parsed.pathname.toLowerCase().startsWith("/api/")) {
+        const segments = parsed.pathname.split("/");
+        parsed.pathname = ["", "api", ...segments.slice(2).map((s) => s.toLowerCase())].join("/");
+      }
+      // If the caller provided a relative endpoint, preserve relative output
+      if (!/^https?:\/\//i.test(collapsedUrl)) {
+        return `${parsed.pathname}${parsed.search}`;
+      }
+      return parsed.toString();
+    } catch {
+      return collapsedUrl;
+    }
   }
 
   private async executeRequest(

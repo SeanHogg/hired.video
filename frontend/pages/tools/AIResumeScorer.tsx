@@ -182,16 +182,10 @@ export default function AIResumeScorer() {
       formData.append("file", file);
 
       // First parse the file to text
-      const parseResponse = await fetch("/api/resume/parse", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!parseResponse.ok) {
-        throw new Error("Failed to parse resume file");
-      }
-
-      const parseResult = await parseResponse.json();
+      const { data: parseResult } = await apiClient.requestRaw<any>(
+        "/api/resume/parse",
+        { method: "POST", body: formData },
+      );
       const resumeContent = parseResult.result || parseResult;
 
       // Now score the parsed content

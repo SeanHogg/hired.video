@@ -496,12 +496,8 @@ export default function People() {
 
     // Load available jobs
     try {
-      const jobs = await fetch('/api/Job/user-jobs', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      }).then(r => r.json());
-      setAvailableJobs(jobs.data || []);
-    } catch (error) {
-      console.error("Failed to load jobs:", error);
+        const response = await apiClient.get<any>("/api/job/user-jobs");
+        setAvailableJobs(response.data || []);
     }
 
     setSubmitDialogOpen(true);
