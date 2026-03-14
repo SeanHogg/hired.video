@@ -43,6 +43,11 @@ export function createApp() {
     .map((o) => o.trim())
     .filter(Boolean);
 
+  // Allow local dev origin(s) when running locally
+  if (process.env.NODE_ENV !== "production") {
+    allowedOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+  }
+
   app.use(
     "*",
     cors({

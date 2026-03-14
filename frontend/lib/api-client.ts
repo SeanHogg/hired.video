@@ -161,18 +161,26 @@ export class ApiClient {
     if (/^https?:\/\//i.test(endpoint)) {
       return endpoint;
     }
-    const cleanEndpoint = endpoint.startsWith("/")
-      ? endpoint.slice(1)
-      : endpoint;
+
+    // Normalize API path casing and slashes to match the backend (which uses lowercase routes).
+    // This prevents 404s when the frontend accidentally requests e.g. /api/Users/public
+    // and avoids doubling up on /api when baseUrl already includes /api.
+    const [pathPart, queryPart] = endpoint.split("?");
+    const cleanPath = pathPart.replace(/^\/+/, ""); // remove leading slash(es)
+    const normalizedPath = cleanPath.replace(/^api\//i, (match) => match.toLowerCase());
+    const cleanEndpoint = `${normalizedPath}${queryPart ? `?${queryPart}` : ""}`;
+
     const cleanBaseUrl = this.baseUrl.endsWith("/")
       ? this.baseUrl.slice(0, -1)
       : this.baseUrl;
 
-    // Guard against double /api when baseUrl already ends with /api and endpoint starts with api/
     const baseEndsWithApi = /\/api$/i.test(cleanBaseUrl);
     const endpointStartsWithApi = /^api\//i.test(cleanEndpoint);
+
     if (baseEndsWithApi && endpointStartsWithApi) {
-      return `${cleanBaseUrl}/${cleanEndpoint.replace(/^api\//i, "")}`;
+      // Avoid double /api (e.g. base: .../api + endpoint: api/Users)
+      const withoutApi = cleanEndpoint.replace(/^api\//i, "");
+      return `${cleanBaseUrl}/${withoutApi}`;
     }
 
     return `${cleanBaseUrl}/${cleanEndpoint}`;
