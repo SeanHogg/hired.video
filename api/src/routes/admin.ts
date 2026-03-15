@@ -94,6 +94,27 @@ adminRoutes.get("/productdashboard/affiliate-stats", (c) =>
 	),
 );
 
+// Alias for when this router is mounted at /api/productdashboard
+adminRoutes.get("/affiliate-stats", (c) =>
+	c.json(
+		ok({
+			totalAffiliates: 0,
+			activeAffiliates: 0,
+			newAffiliatesThisMonth: 0,
+			totalCommissionsPaidCents: 0,
+			pendingPayoutsCents: 0,
+			totalReferrals: 0,
+			totalConversions: 0,
+			conversionRate: 0,
+			pendingPayouts: 0,
+			completedPayouts: 0,
+			topPerformers: [],
+			recentPayouts: [],
+		}),
+		200,
+	),
+);
+
 adminRoutes.get("/", (c) => c.json(ok(productDashboardStub), 200));
 
 adminRoutes.get("/export/:format", (c) => {

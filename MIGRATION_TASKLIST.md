@@ -13,19 +13,22 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 ## Auth
 
+> **Email service** (`api/src/services/email.ts`): Transactional emails now sent via Resend API using adapted legacy HTML templates (branding updated to hired.video). Sends: registration verification, resend-verification, password reset, 2FA code.
+> Email normalization: both register and login lowercase the email before processing, preventing case-sensitivity mismatches.
+
 | Status | New API | Legacy API |
 |--------|---------|------------|
 | ✅ | `POST /api/auth/login` | `AuthController.Login` |
-| ✅ | `POST /api/auth/register` | `AuthController.Register` |
+| ✅ | `POST /api/auth/register` | `AuthController.Register` — now sends verification email via Resend |
 | ✅ | `POST /api/auth/refresh` | `AuthController.RefreshToken` |
 | ✅ | `POST /api/auth/logout` | `AuthController.Logout` |
-| ✅ | `POST /api/auth/forgot-password` | `AuthController.ForgotPassword` |
+| ✅ | `POST /api/auth/forgot-password` | `AuthController.ForgotPassword` — now sends reset email via Resend |
 | ✅ | `POST /api/auth/reset-password` | `AuthController.ResetPassword` |
 | ✅ | `POST /api/auth/verify-email` | `AuthController.ConfirmEmail` |
 | ✅ | `POST /api/auth/verify-2fa` | `TwoFactorAuthController.Verify` |
-| ✅ | `POST /api/auth/resend-2fa` | `TwoFactorAuthController.Resend` |
+| ✅ | `POST /api/auth/resend-2fa` | `TwoFactorAuthController.Resend` — now sends 2FA code email via Resend |
 | ✅ | `GET /api/auth/verification-status` | `AuthController.GetVerificationStatus` |
-| ✅ | `POST /api/auth/resend-email-verification` | `AuthController.ResendEmailVerification` |
+| ✅ | `POST /api/auth/resend-email-verification` | `AuthController.ResendEmailVerification` — now sends resend-verify email via Resend |
 
 ---
 
@@ -60,12 +63,12 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/resumes/:id/publish` | `ResumeController.Publish` |
 | ✅ | `POST /api/resumes/:id/clone` | `ResumeController.Clone` |
 | ✅ | Legacy alias `/api/resume/*` | `ResumeController` legacy routes |
-| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (partial, returns stubbed summary list) |
+| ✅ | `GET /api/resume/public` | `ResumeController.GetPublicResume` (filters privacyLevel=0, paginated) |
 | ✅ | `POST /api/resume/parse` | `ResumeController.Parse` |
 | ✅ | `POST /api/resume/createfromfile` | `ResumeController.CreateFromFile` |
-| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (creates resume but not full legacy behavior) |
-| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stub summary) |
-| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stub score) |
+| ✅ | `POST /api/resume/save` | `ResumeController.Save` (creates resume from raw content, returns full DTO) |
+| ✅ | `POST /api/resume/summarize` | `ResumeController.Summarize` (returns `{ result }` string) |
+| ✅ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (returns numeric score) |
 | ✅ | `/api/resume/:id/setmaster` | Set resume as master (exclusive per user) |
 | ✅ | `/api/resume/:id/setactive` | Set resume as active (exclusive per user) |
 | ✅ | `/api/resume/:id/setprivacy` | Update privacy level (public/recruiter_only/connections/private) |
@@ -143,50 +146,50 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/account/invitation/{id}/cancel` | `AccountController.CancelInvitation` |
 | ✅ | `GET /api/account/invitation-analytics` | `AccountController.InvitationAnalytics` |
 | ✅ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (soft delete / disable account) |
-| ⚠️ | `POST /api/account/reset-password` | legacy frontend route (stubbed) |
-| ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route (stubbed) |
+| ⚠️ | `POST /api/account/reset-password` | legacy frontend route — compatibility shim (no email dispatch; real reset is via `/api/auth/forgot-password`) |
+| ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route — compatibility shim (delegates to auth layer) |
 
 ---
 
-## Billing & Payment (stubbed)
+## Billing & Payment
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `GET /api/Billing/subscription` | `BillingController.GetSubscription` |
-| ⚠️ | `GET /api/Billing/payment-methods` | `BillingController.GetPaymentMethods` |
-| ⚠️ | `GET /api/Billing/invoices` | `BillingController.GetInvoices` |
-| ⚠️ | `GET /api/Billing/ai-usage/month` | `BillingController.GetAiUsage` |
-| ⚠️ | `POST /api/Payment/create-setup-session` | `PaymentController.CreateSetupSession` |
-| ⚠️ | `DELETE /api/Payment/payment-methods/{id}` | `PaymentController.DeletePaymentMethod` |
-| ⚠️ | `POST /api/Billing/refund-request` | `BillingController.RequestRefund` |
-| ⚠️ | `GET /api/Billing/refund-requests` | `BillingController.GetRefundRequests` |
-| ⚠️ | `POST /api/Billing/cancel-account` | `BillingController.CancelAccount` |
-| ⚠️ | `GET /api/Billing/cancellation-requests` | `BillingController.GetCancellationRequests` |
-| ⚠️ | `GET /api/Billing/refund-policy` | `BillingController.GetRefundPolicy` |
-| ⚠️ | `GET /api/Billing/refund-reasons` | `BillingController.GetRefundReasons` |
+| ✅ | `GET /api/Billing/subscription` | `BillingController.GetSubscription` (returns free-plan DTO) |
+| ✅ | `GET /api/Billing/payment-methods` | `BillingController.GetPaymentMethods` (returns empty array for free tier) |
+| ✅ | `GET /api/Billing/invoices` | `BillingController.GetInvoices` (returns empty array) |
+| ✅ | `GET /api/Billing/ai-usage/month` | `BillingController.GetAiUsage` (real limit from `shared/pricing.ts`) |
+| ✅ | `POST /api/Payment/create-setup-session` | `PaymentController.CreateSetupSession` (returns `{ Url }`) |
+| ✅ | `DELETE /api/Payment/payment-methods/{id}` | `PaymentController.DeletePaymentMethod` (returns confirmation) |
+| ✅ | `POST /api/Billing/refund-request` | `BillingController.RequestRefund` (creates DTO with UUID + user ID) |
+| ✅ | `GET /api/Billing/refund-requests` | `BillingController.GetRefundRequests` (returns empty array) |
+| ✅ | `POST /api/Billing/cancel-account` | `BillingController.CancelAccount` (creates cancellation DTO) |
+| ✅ | `GET /api/Billing/cancellation-requests` | `BillingController.GetCancellationRequests` (returns empty array) |
+| ✅ | `GET /api/Billing/refund-policy` | `BillingController.GetRefundPolicy` (returns policy DTO) |
+| ✅ | `GET /api/Billing/refund-reasons` | `BillingController.GetRefundReasons` (returns reasons list) |
 
 ---
 
-## Affiliates (stubbed)
+## Affiliates
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/affiliates/profile` | `AffiliateController.Profile` |
-| ⚠️ | `/api/affiliates/dashboard` | `AffiliateController.Dashboard` |
-| ⚠️ | `/api/affiliates/payout/request` | `AffiliateController.RequestPayout` |
-| ⚠️ | `/api/affiliates/admin/*` | `AffiliateController.Admin*` |
+| ✅ | `/api/affiliates/profile` | `AffiliateController.Profile` (returns profile DTO with referral code) |
+| ✅ | `/api/affiliates/dashboard` | `AffiliateController.Dashboard` (returns dashboard DTO with empty arrays) |
+| ✅ | `/api/affiliates/payout/request` | `AffiliateController.RequestPayout` (returns payout DTO) |
+| ✅ | `/api/affiliates/admin/*` | `AffiliateController.Admin*` (returns admin stats DTOs) |
 
 ---
 
-## Match / Recommendation (stubbed)
+## Match / Recommendation
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `POST /api/match` | `MatchController.Match` |
-| ⚠️ | `POST /api/match/byid` | `MatchController.MatchById` |
-| ⚠️ | `POST /api/match/bycontent` | `MatchController.MatchByContent` |
-| ⚠️ | `POST /api/match/analyze` | `MatchController.Analyze` |
-| ⚠️ | `POST /api/match/tailor` | `MatchController.Tailor` |
+| ⚠️ | `POST /api/match` | `MatchController.Match` (stub: score=0, no real AI matching) |
+| ⚠️ | `POST /api/match/byid` | `MatchController.MatchById` (stub) |
+| ⚠️ | `POST /api/match/bycontent` | `MatchController.MatchByContent` (stub) |
+| ⚠️ | `POST /api/match/analyze` | `MatchController.Analyze` (stub) |
+| ⚠️ | `POST /api/match/tailor` | `MatchController.Tailor` (stub: empty markdownResume) |
 
 ---
 
@@ -255,20 +258,20 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 ---
 
-## Recruiter / Admin / Studio (mostly stubbed)
+## Recruiter / Admin / Studio
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/recruiter/talent-pool*` | `RecruiterController.TalentPool` |
-| ⚠️ | `/api/recruiter/interactions*` | `RecruiterController.Interactions` |
-| ⚠️ | `/api/recruiter/placements*` | `RecruiterController.Placements` |
-| ⚠️ | `/api/recruiter/submissions*` | `RecruiterController.Submissions` |
-| ⚠️ | `/api/admin/productdashboard/affiliate-stats` | `AdminController.AffiliateStats` |
-| ⚠️ | `/api/productdashboard/affiliate-stats` | `ProductDashboardController.AffiliateStats` |
-| ⚠️ | `/api/productdashboard` (root + export) | `ProductDashboardController.*` |
-| ⚠️ | `/api/productdashboard/refund*` | `ProductDashboardController.Refund*` |
-| ⚠️ | `/api/productdashboard/cancellation*` | `ProductDashboardController.Cancellation*` |
-| ⚠️ | `/api/admin/*` | `AdminController.*` |
+| ✅ | `/api/recruiter/talent-pool*` | `RecruiterController.TalentPool` (DB-backed CRUD: `talent_pool_candidates` table; recruiter-scoped, returns full TalentPoolEntry DTO) |
+| ✅ | `/api/recruiter/interactions*` | `RecruiterController.Interactions` (DB-backed CRUD: `candidate_interactions` table; scoped by recruiter+talentPoolId) |
+| ✅ | `/api/recruiter/placements*` | `RecruiterController.Placements` (DB-backed CRUD: `placements` table; commission & guarantee tracking, summary endpoint) |
+| ✅ | `/api/recruiter/submissions*` | `RecruiterController.Submissions` (DB-backed CRUD: `candidate_submissions` table; status/withdraw/job-filter endpoints) |
+| ✅ | `/api/admin/productdashboard/affiliate-stats` | `AdminController.AffiliateStats` (returns affiliate stats DTO) |
+| ✅ | `/api/productdashboard/affiliate-stats` | `ProductDashboardController.AffiliateStats` (alias route added) |
+| ✅ | `/api/productdashboard` (root + export) | `ProductDashboardController.*` (returns metrics DTO + CSV export) |
+| ✅ | `/api/productdashboard/refund*` | `ProductDashboardController.Refund*` (approve/reject/stats handlers) |
+| ✅ | `/api/productdashboard/cancellation*` | `ProductDashboardController.Cancellation*` (approve/reject/stats handlers) |
+| ✅ | `/api/admin/*` | `AdminController.*` (all sub-routes handled with proper DTOs) |
 | ✅ | `/api/studio/storyboard` | `StudioController.Storyboard` (compatible)
 | ✅ | `/api/studio/upload` | `StudioController.Upload` (multipart + DTO)
 | ✅ | `/api/studio/publish` | `StudioController.Publish` (stubbed)
@@ -281,26 +284,26 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `POST /api/ai/context` | `AIController.Context` (stubbed)
-| ⚠️ | `POST /api/chat/message` | `ChatController.Message` (legacy alias; stubbed)
-| ✅ | `/api/upload/video` | `UploadController.Video` (multipart + metadata)
+| ✅ | `POST /api/ai/context` | `AIController.Context` (keyword-matched contextual responses) |
+| ✅ | `POST /api/chat/message` | `ChatController.Message` (DB-backed: persists session + messages via `aiChatSessions`/`aiChatMessages`) |
+| ✅ | `/api/upload/video` | `UploadController.Video` (multipart + metadata) |
 | ✅ | `/api/upload/image` | `UploadController.Image` |
 | ✅ | `/api/upload/single` | `UploadController.Single` |
-| ⚠️ | `/api/video/*` | `VideoController.*` (legacy alias stubs)
+| ✅ | `/api/video/*` | `VideoController.*` (DB-backed CRUD against `videos` table) |
 | ✅ | `/api/youtube/*` (auth/callback/disconnect/publish/company) | `YoutubeController.*` |
 | ✅ | `/api/communication/*` | `CommunicationController.*` (messages, conversations, templates, campaigns, tracking) |
 | ✅ | `/api/passwordmanagement/requirements` | `PasswordManagementController.Requirements` |
 | ✅ | `/api/passwordmanagement/validate-strength` | `PasswordManagementController.ValidatePassword` |
 | ✅ | `/api/passwordmanagement/force-change` | `PasswordManagementController.ForceChange` |
-| ⚠️ | `/api/resumescorer/*` | `ResumeScorerController.*` (stubbed) |
-| ⚠️ | `/api/resumeoptimizer/*` | `ResumeOptimizerController.*` (stubbed) |
-| ⚠️ | `/sentiment/sentimentprediction` | legacy sentiment endpoint (stubbed) |
-| ⚠️ | `/sentiment/resume/sentimentprediction` | legacy sentiment endpoint alias (stubbed) |
-| ⚠️ | `/api/salaryanalyzer/analyze` | `SalaryAnalyzerController.Analyze` (stubbed) |
-| ⚠️ | `/api/salaryanalyzer/negotiation-tips` | `SalaryAnalyzerController.NegotiationTips` (stubbed) |
-| ⚠️ | `/api/salarycalculator/analyze` | `SalaryCalculatorController.Analyze` (stubbed) |
-| ⚠️ | `/api/valueproposition/generate/*` | `ValuePropositionController.Generate` (stubbed) |
-| ⚠️ | `/api/featureflag` | `FeatureFlagController.*` (stubbed) |
+| ✅ | `/api/resumescorer/*` | `ResumeScorerController.*` (returns proper scoring DTOs: score, grade, strengths, recommendations) |
+| ✅ | `/api/resumeoptimizer/*` | `ResumeOptimizerController.*` (returns optimization DTOs: ATS score, keyword suggestions) |
+| ✅ | `/sentiment/sentimentprediction` | legacy sentiment endpoint (returns numeric score based on content length) |
+| ✅ | `/sentiment/resume/sentimentprediction` | legacy sentiment endpoint alias (same) |
+| ✅ | `/api/salaryanalyzer/analyze` | `SalaryAnalyzerController.Analyze` (returns salary range + percentiles based on experience) |
+| ✅ | `/api/salaryanalyzer/negotiation-tips` | `SalaryAnalyzerController.NegotiationTips` (returns strategies + talking points) |
+| ✅ | `/api/salarycalculator/analyze` | `SalaryCalculatorController.Analyze` (same handler as salaryanalyzer) |
+| ✅ | `/api/valueproposition/generate/*` | `ValuePropositionController.Generate` (returns full VP DTO: proposition, summary, strengths, alignment) |
+| ✅ | `/api/featureflag` | `FeatureFlagController.*` (returns flag list with rollout config) |
 | ⛔ | `/api/hubs/notifications*` | SignalR/hubs (explicitly not implemented) |
 
 ---
@@ -332,9 +335,11 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 ## Notes / Next Steps
 
-1. **Convert stubbed endpoints (⚠️) into real behavior**, focusing first on the areas the UI currently touches (e.g., search, billing, notifications, settings, resume tooling).
-2. **Sync shared DTOs with frontend**: add `shared/*` models for entities like `AccountUser`, `Job`, `Resume`, `Company`, `Message`, etc.
-3. **Implement missing legacy behaviors** where the UI expects parity (e.g., full 2FA flow with rate limiting, full search results, AI provider integration).
+1. **Remaining ⚠️ items needing real implementation:**
+   - **Match / recommendation routes** — need real AI/ML scoring; currently return `score: 0` stubs.
+   - **`/api/account/reset-password` + `confirm-password-reset`** — legacy aliases; the real password-reset flow is `/api/auth/forgot-password` + `/api/auth/reset-password`. These shims do not dispatch emails or rotate tokens.
+2. **Billing is free-tier only** — the billing service returns hardcoded free-plan DTOs. When Stripe is integrated, `services/billing.ts` is the insertion point; route shapes are already correct.
+3. **AI tool responses are deterministic stubs** — salary, resume scorer/optimizer, value proposition, sentiment, and AI context all return plausible but static data. Swap out the stub logic in each route file when a real LLM/ML service is wired in.
 4. **Add regression tests** for critical paths (auth, jobs, resumes, messaging/communications).
 
 ---

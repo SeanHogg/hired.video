@@ -5,6 +5,12 @@ import { z } from "zod";
 import type { Variables, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import {
+  sendVerificationEmail,
+  sendResendVerificationEmail,
+  sendPasswordResetEmail,
+  sendTwoFactorEmail,
+} from "../services/email.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
 
@@ -117,18 +123,36 @@ async function consumeTwoFactorEntry(tempAuthToken: string) {
 // ============================================================================
 
 const LoginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform((e) => e.toLowerCase()),
   password: z.string().min(6),
 });
 
 const RegisterSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform((e) => e.toLowerCase()),
   password: z.string().min(8),
-  name: z.string().min(1),
+  // Accept either a single `name` field or `firstName`+`lastName` from the frontend
+  name: z.string().min(1).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   role: z
-    .enum(["job_seeker", "recruiter", "employer", "affiliate", "admin"])
+    .string()
+    .transform((r) => {
+      // Normalise PascalCase role names sent by the frontend (e.g. "JobSeeker" → "job_seeker")
+      const map: Record<string, string> = {
+        jobseeker: "job_seeker",
+        recruiter: "recruiter",
+        employer: "employer",
+        affiliate: "affiliate",
+        admin: "admin",
+      };
+      return map[r.toLowerCase().replace(/[^a-z]/g, "")] ?? r;
+    })
+    .pipe(z.enum(["job_seeker", "recruiter", "employer", "affiliate", "admin"]))
     .default("job_seeker"),
-});
+}).refine(
+  (d) => d.name || (d.firstName || d.lastName),
+  { message: "name or firstName/lastName is required", path: ["name"] },
+);
 
 const ForgotPasswordSchema = z.object({
   email: z.string().email(),
@@ -167,7 +191,8 @@ authRoutes.post("/register", async (c) => {
   }
 
   const db = getDb();
-  const { email, password, name, role } = parsed.data;
+  const { email, password, role } = parsed.data;
+  const name = parsed.data.name || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ") || email;
 
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing.length > 0) {
@@ -194,7 +219,11 @@ authRoutes.post("/register", async (c) => {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
   });
 
-  // In production, send verification email. For now, include token in dev response.
+  // Send verification email (fire-and-forget — never block registration on email failure)
+  void sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
+    console.error("[register] Failed to send verification email:", err),
+  );
+
   const isDev = process.env.NODE_ENV !== "production";
   return c.json(
     success({
@@ -244,6 +273,9 @@ authRoutes.post("/login", async (c) => {
   // If user has MFA enabled, step through the 2FA flow instead of issuing a JWT.
   if (user.mfaEnabled) {
     const entry = await createTwoFactorEntry(user.id);
+    void sendTwoFactorEmail(user.email, user.name, entry.code).catch((err) =>
+      console.error("[login] Failed to send 2FA email:", err),
+    );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(
       success({
@@ -320,7 +352,7 @@ authRoutes.post("/forgot-password", async (c) => {
 
   const db = getDb();
   const [user] = await db
-    .select({ id: users.id, email: users.email })
+    .select({ id: users.id, email: users.email, name: users.name })
     .from(users)
     .where(eq(users.email, parsed.data.email))
     .limit(1);
@@ -336,7 +368,9 @@ authRoutes.post("/forgot-password", async (c) => {
       .set({ used: true } as any)
       .where(eq(passwordResetTokens.userId, user.id));
     await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt });
-    // In production, send token via email. For now, include in dev response.
+    void sendPasswordResetEmail(user.email, user.name, token).catch((err) =>
+      console.error("[forgot-password] Failed to send reset email:", err),
+    );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(
       success(
@@ -480,6 +514,18 @@ authRoutes.post("/resend-2fa", async (c) => {
   await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, existing.id));
   const entry = await createTwoFactorEntry(existing.userId);
 
+  // Look up user email/name to send the new code
+  const [userForEmail] = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, existing.userId))
+    .limit(1);
+  if (userForEmail) {
+    void sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code).catch((err) =>
+      console.error("[resend-2fa] Failed to send 2FA email:", err),
+    );
+  }
+
   const isDev = process.env.NODE_ENV !== "production";
   return c.json(
     success({
@@ -543,7 +589,7 @@ authRoutes.post("/resend-email-verification", async (c) => {
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
     const db = getDb();
     const [user] = await db
-      .select({ id: users.id, emailVerified: users.emailVerified })
+      .select({ id: users.id, email: users.email, name: users.name, emailVerified: users.emailVerified })
       .from(users)
       .where(eq(users.id, payload.sub as string))
       .limit(1);
@@ -560,6 +606,9 @@ authRoutes.post("/resend-email-verification", async (c) => {
       token: newToken,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
+    void sendResendVerificationEmail(user.email, user.name, newToken).catch((err) =>
+      console.error("[resend-email-verification] Failed to send email:", err),
+    );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(success(isDev ? { verificationToken: newToken } : null, "Verification email sent"), 200);
   } catch {

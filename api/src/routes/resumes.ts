@@ -157,7 +157,14 @@ resumeRoutes.get("/public", async (c) => {
   const page = Number(c.req.query("page") ?? 1) || 1;
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const db = getDb();
-  const rows = await db.select().from(resumes).limit(limit).offset((page - 1) * limit);
+  // Only return resumes with privacyLevel = 0 (public)
+  const rows = await db
+    .select()
+    .from(resumes)
+    .where(eq(resumes.privacyLevel, 0))
+    .orderBy(resumes.updatedAt)
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   return c.json(
     ok({
@@ -165,7 +172,7 @@ resumeRoutes.get("/public", async (c) => {
       total: rows.length,
       page,
       limit,
-      hasNext: false,
+      hasNext: rows.length === limit,
       hasPrev: page > 1,
     }),
     200,

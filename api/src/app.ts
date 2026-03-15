@@ -112,6 +112,7 @@ export function createApp() {
     "/api/jobs/public",
     "/api/companies/public",
     "/api/resumes/public",
+    "/api/resume/public",
     "/health",
     "/api/health",
   ];
@@ -195,7 +196,6 @@ export function createApp() {
   app.route("/api/salaryanalyzer", salaryRoutes);
   app.route("/api/salarycalculator", salaryRoutes);
   app.route("/api/valueproposition", valuePropositionRoutes);
-  app.route("/api/featureflag", featureFlagRoutes);
   app.route("/api/hubs", hubsRoutes);
 
   // Legacy frontend service currently requests /FeatureFlag without /api prefix.
