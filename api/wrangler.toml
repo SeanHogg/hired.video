@@ -7,7 +7,6 @@ compatibility_flags = ["nodejs_compat"]
 # Routes (both new and legacy domains)
 routes = [
   "api.hired.video/*",
-  "api.hired.video/*",
 ]
 
 [[r2_buckets]]

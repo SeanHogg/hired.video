@@ -313,14 +313,7 @@ const App = () => (
                         path="/resumes/upload/video"
                         element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
                       />
-                      <Route
-                        path="/studio"
-                        element={
-                          <RequireAuth>
-                            <Studio />
-                          </RequireAuth>
-                        }
-                      />
+                      <Route path="/studio" element={<Studio />} />
                       <Route
                         path="/resumes/create/:id"
                         element={<ResumeCreatePage />}

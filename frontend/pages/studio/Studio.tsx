@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -7,12 +7,15 @@ import {
   Sparkles,
   Play,
   CheckCircle,
+  CheckCircle2,
   Youtube,
   Share2,
   Download,
   ArrowRight,
   ArrowLeft,
   Loader2,
+  Zap,
+  Globe,
 } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
@@ -22,7 +25,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useSEO } from "@/lib/seo";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -994,8 +997,142 @@ export default function Studio() {
   const [youtubeVideoId, setYoutubeVideoId] = useState<string>("");
 
   if (!isAuthenticated || !user) {
-    navigate("/login", { replace: true });
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          collapsed={sidebarCollapsed}
+        />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+
+          <div className="pt-16">
+            <div className="max-w-6xl mx-auto px-4 py-16">
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center space-x-2 mb-6">
+                  <div className="relative">
+                    <Video className="h-12 w-12 text-primary" />
+                    <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                  </div>
+                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                    Studio
+                  </span>
+                </div>
+                <h1 className="text-5xl font-bold mb-6">
+                  Create a Video Resume That Stands Out
+                </h1>
+                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                  Plan, record, and publish a polished video resume — powered by AI storyboarding and one-click YouTube publishing.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link to="/signup">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
+                      Get Started
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button size="lg" variant="outline" className="text-lg px-8">
+                      Log In
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-8 mb-16">
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <Zap className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>AI Storyboards</CardTitle>
+                    <CardDescription>
+                      Generate a complete video plan from your resume text in seconds.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Auto-generated scene scripts
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Professionally styled templates
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Customize your story & pacing
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                  <CardHeader>
+                    <Video className="h-10 w-10 text-brand-blue mb-4" />
+                    <CardTitle>Record & Upload</CardTitle>
+                    <CardDescription>
+                      Record directly in your browser or upload a studio-quality file.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Easy webcam recording flow
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Upload MP4/WebM video files
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Preview and re-record instantly
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                  <CardHeader>
+                    <Globe className="h-10 w-10 text-primary mb-4" />
+                    <CardTitle>Publish & Share</CardTitle>
+                    <CardDescription>
+                      Publish directly to YouTube and share with recruiters in seconds.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        One-click YouTube publishing
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Track views & engagement
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        Share a branded resume link
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Footer />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const goTo = (next: StepId) => {

@@ -3,7 +3,7 @@
  * Catches JavaScript errors anywhere in the child component tree and displays fallback UI
  */
 
-import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home, Copy } from "lucide-react";
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { normalizeError, handleError, type AppError } from "@/lib/errors";
@@ -25,6 +25,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: AppError | null;
   errorId: string | null;
+  copyStatus: "idle" | "copied" | "failed";
 }
 
 // ============================================================================
@@ -41,6 +42,7 @@ export class ErrorBoundary extends Component<
       hasError: false,
       error: null,
       errorId: null,
+      copyStatus: "idle",
     };
   }
 
@@ -120,6 +122,38 @@ export class ErrorBoundary extends Component<
     window.location.href = "/";
   };
 
+  private handleCopyErrorDetails = async (): Promise<void> => {
+    const { error, errorId } = this.state;
+    if (!error) {
+      return;
+    }
+
+    const details = {
+      errorId,
+      level: this.props.level || "component",
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      statusCode: error.statusCode,
+      stack: error.stack,
+      context: error.context,
+      url: typeof window !== "undefined" ? window.location.href : undefined,
+      userAgent:
+        typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(details, null, 2));
+      this.setState({ copyStatus: "copied" });
+      window.setTimeout(() => this.setState({ copyStatus: "idle" }), 2000);
+    } catch (copyError) {
+      console.error("Failed to copy error details", copyError);
+      this.setState({ copyStatus: "failed" });
+      window.setTimeout(() => this.setState({ copyStatus: "idle" }), 2000);
+    }
+  };
+
   render(): ReactNode {
     if (this.state.hasError && this.state.error) {
       // Use custom fallback if provided
@@ -176,7 +210,25 @@ export class ErrorBoundary extends Component<
 
             {/* Show detailed error information in development or always for debugging */}
             <div className="bg-white rounded-lg shadow-lg p-6 text-left">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Error Details</h3>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-3">
+                <h3 className="text-lg font-semibold text-gray-900">Error Details</h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={this.handleCopyErrorDetails}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy details
+                  </Button>
+                  {this.state.copyStatus === "copied" && (
+                    <span className="text-sm text-green-600">Copied!</span>
+                  )}
+                  {this.state.copyStatus === "failed" && (
+                    <span className="text-sm text-red-600">Copy failed</span>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-4">
                 <div>
