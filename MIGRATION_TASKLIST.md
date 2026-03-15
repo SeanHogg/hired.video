@@ -1,267 +1,335 @@
 # API Migration Task List (Legacy → New `/api` Cloudflare Worker)
 
-This document tracks the migration of the legacy .NET API (in `/hired-api`) into the new Cloudflare Worker API implementation (`/api`).
-
-## ✅ Migration Approach
-
-1. **Inventory frontend API usage** (all `/api/*` endpoints used by the UI)
-2. **Map each endpoint to the legacy .NET controller/DTO** (for behavior + shape)
-3. **Implement the endpoint in `/api`**
-   - Add or update route handler in `api/src/routes/*`
-   - Add shared DTO/schema types to `shared/` when useful
-   - Ensure response matches frontend schema expectations (especially envelopes like `{ success: true, data: ... }`)
-4. **Test** via `npm run dev` and by exercising the UI
+This document tracks where the new Cloudflare Worker API implementation (`/api`) stands compared to the legacy .NET API (`/hired-api`). Each row is an endpoint or small group of endpoints; the **Status** column reflects our current implementation correctness vs. the legacy behavior.
 
 ---
 
-## ✅ Domains + Endpoint Tasks
-
-### Auth (already mostly implemented)
-- [x] `POST /api/auth/login` → `api/src/routes/auth.ts`
-- [x] `POST /api/auth/register`
-- [x] `POST /api/auth/refresh`
-- [x] `POST /api/auth/logout`
-- [ ] `POST /api/auth/forgot-password` (stubbed)
-- [ ] `POST /api/auth/reset-password` (stubbed)
-- [ ] `POST /api/auth/verify-email` (stubbed)
-- [x] `POST /api/auth/verify-2fa` (stubbed)
-- [x] `POST /api/auth/resend-2fa` (stubbed)
-- [x] `GET /api/auth/verification-status` (stubbed)
-- [x] `POST /api/auth/resend-email-verification` (stubbed)
-- [x] `POST /api/auth/verify-2fa` (stubbed)
-- [x] `POST /api/auth/resend-2fa` (stubbed)
-- [x] `GET /api/auth/verification-status` (stubbed)
-- [x] `POST /api/auth/resend-email-verification` (stubbed)
-
-### Users
-- [x] `GET /api/users/me` (authenticated profile)
-- [x] `GET /api/users/public` (public user listing)
-- [x] `GET /api/users/{id}`
-- [x] `PUT /api/users/me` (update profile)
-- [x] `POST /api/users/connections`
-- [x] `GET /api/users/me/connections`
-- [x] `GET /api/users/me/connections/pending`
-- [x] `PUT /api/users/connections/{id}/accept`
-- [x] `DELETE /api/users/connections/{id}`
-- [x] `GET /api/users/{id}/connections`
-- [x] `GET /api/users/connections/status`
-- [x] `GET /api/users/me/recommendations`
-- [x] `GET /api/users/{id}/can-message`
-- [x] `GET /api/users/{id}/stats`
-- [x] `GET /api/users/{id}/resumes`
-- [x] `POST /api/users/connections`
-- [x] `GET /api/users/me/connections`
-- [x] `GET /api/users/me/connections/pending`
-- [x] `PUT /api/users/connections/{id}/accept`
-- [x] `DELETE /api/users/connections/{id}`
-- [x] `GET /api/users/{id}/connections`
-- [x] `GET /api/users/connections/status`
-- [x] `GET /api/users/me/recommendations`
-- [x] `GET /api/users/{id}/can-message`
-- [x] `GET /api/users/{id}/stats`
-- [x] `GET /api/users/{id}/resumes`
-
-### Resumes
-- [x] `/api/resumes` CRUD (list, create, update, delete)
-- [x] `/api/resumes/:id` (get resume)
-- [x] `/api/resumes/:id/publish`
-- [x] `/api/resumes/:id/clone`
-- [x] Legacy alias `/api/resume/*`
-- [x] `/api/resume/public` (stubbed)
-- [x] `/api/resume/parse` and `/api/resume/createfromfile` (stubbed)
-- [x] `/api/resume/save`, `/api/resume/summarize`, `/api/resume/sentimentprediction` (stubbed)
-- [x] `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` (stubbed)
-- [x] `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` (stubbed)
-
-### Jobs (stubbed via `api/src/routes/jobs.ts`)
-- [x] `/api/jobs` CRUD (user-owned jobs)
-- [x] `/api/job` CRUD (legacy singular endpoint)
-- [x] `/api/Job/GetSummaryItems` + `/api/job/getsummaryitems` (user job summaries)
-- [x] `/api/Job/saved` + save/unsave endpoints
-- [x] `/api/Job/:id/apply` (stubbed)
-- [x] `/api/Job/slug/:slug` (stubbed)
-- [x] `/api/Job/CreateFromFile` + `/api/job/createfromfile` (stubbed)
-- [x] `/api/Job/Extract` + `/api/job/extract` (stubbed)
-- [x] `/api/jobs/public` (stubbed public listings)
-- [x] `/api/Job/applications` (stubbed)
-- [x] `/api/Job/alerts` CRUD + toggle (stubbed)
-- [x] `/api/job/user-jobs` (legacy recruiter flow alias)
-- [ ] `/api/job/match` / `/api/job/analytics` etc. (depending on UI usage)
-
-### Companies (currently stubbed; frontend used it)
-- [x] `/api/companies/public` (added stub)
-- [x] `/api/companies/{id}` (stubbed)
-- [x] `/api/companies/{id}/jobs` (stubbed)
-- [x] `/api/companies/{id}/follow` and unfollow (stubbed)
-- [x] `/api/companies/{id}/following-status` (stubbed)
-- [x] `/api/companies/{id}/stats` (stubbed)
-- [x] `/api/companies/me/followed` (stubbed)
-- [x] `/api/companies/trending` (stubbed)
-- [x] `/api/companies/slug/{slug}` (stubbed)
-- [ ] other company endpoints
-
-### Search (stubbed)
-- [x] `/api/search/public` (added stub)
-
-### Account / Organization Management (implemented as stubs)
-**Frontend expectations (from `frontend/lib/services/account-service.ts`)**
-- [x] `GET /api/account/users` (stubbed via `accountRoutes` + service)
-- [x] `POST /api/account/invite` (stubbed)
-- [x] `PUT /api/account/roles` (stubbed)
-- [x] `DELETE /api/account/users/{id}` (stubbed)
-- [x] `GET /api/account/available` (stubbed)
-- [x] `POST /api/account/switch` (stubbed)
-- [x] `GET /api/account/invitation/{id}` (stubbed)
-- [x] `POST /api/account/accept-invitation/{id}` (stubbed)
-- [x] `GET /api/account/invitations/pending` (stubbed)
-- [x] `GET /api/account/settings` (stubbed)
-- [x] `POST /api/account/settings` (stubbed)
-- [x] `GET /api/account/analytics` (stubbed)
-- [x] `POST /api/account/bulk-invite` (stubbed)
-- [x] `POST /api/account/invitation/{id}/resend` (stubbed)
-- [x] `POST /api/account/invitation/{id}/cancel` (stubbed)
-- [x] `GET /api/account/invitation-analytics` (stubbed)
-- [x] `POST /api/account/deleteaccount` (stubbed)
-- [x] `POST /api/account/reset-password` (stubbed legacy forgot-password flow)
-- [x] `POST /api/account/confirm-password-reset` (stubbed legacy reset confirmation)
-
-### Billing and Payment (stubbed)
-- [x] `GET /api/Billing/subscription` (stubbed)
-- [x] `GET /api/Billing/payment-methods` (stubbed)
-- [x] `GET /api/Billing/invoices` (stubbed)
-- [x] `GET /api/Billing/ai-usage/month` (stubbed)
-- [x] `POST /api/Payment/create-setup-session` (stubbed)
-- [x] `DELETE /api/Payment/payment-methods/{id}` (stubbed)
-- [x] `POST /api/Billing/refund-request` (stubbed)
-- [x] `GET /api/Billing/refund-requests` + detail (stubbed)
-- [x] `POST /api/Billing/cancel-account` + `GET /api/Billing/cancellation-requests` (stubbed)
-- [x] `GET /api/Billing/refund-policy` + `/refund-reasons` (stubbed)
-
-### Affiliates (stubbed)
-- [x] `/api/affiliates/profile` (stubbed)
-- [x] `/api/affiliates/dashboard` (stubbed)
-- [x] `/api/affiliates/payout/request` (stubbed)
-- [x] `/api/affiliates/admin/*` (stubbed)
-
-### Match / Recommendation (stubbed)
-- [x] `POST /api/match`
-- [x] `POST /api/match/byid`
-- [x] `POST /api/match/bycontent`
-- [x] `POST /api/match/analyze`
-- [x] `POST /api/match/tailor`
-
-### Notifications (stubbed)
-- [x] `/api/notifications` list (stubbed)
-- [x] `/api/notifications/unread-count` (stubbed)
-- [x] `/api/notifications/:id/mark-read` + `/mark-all-read` (stubbed)
-- [x] `/api/notifications/:id` delete (stubbed)
-
-### Settings (stubbed)
-- [x] `GET /api/settings`
-- [x] `GET/PUT /api/settings/notifications`
-- [x] `GET/PUT /api/settings/privacy`
-- [x] `GET/PUT /api/settings/job-preferences`
-- [x] `GET/PUT /api/settings/account`
-- [x] `GET/PUT /api/settings/security`
-- [x] `POST /api/settings/security/2fa/enable`
-- [x] `POST /api/settings/security/2fa/disable`
-- [x] `GET /api/settings/export`
-
-### Locations (stubbed)
-- [x] `/api/locations/search` (stubbed)
-- [x] `/api/locations/countries|states|cities` (stubbed)
-
-### Dashboard (stubbed)
-- [x] `/api/dashboard` base endpoint
-- [x] `/api/dashboard/jobseeker`
-- [x] `/api/dashboard/recruiter`
-- [x] `/api/dashboard/employer`
-- [x] `/api/dashboard/admin`
-- [x] `/api/dashboard/profile-view`
-- [x] `/api/dashboard/activity`
-- [x] `/api/dashboard/engagement`
-- [x] `/api/dashboard/refresh`
-- [x] Legacy alias `/api/userdashboard/*`
-
-### Marketing (stubbed)
-- [x] `/api/marketing/campaigns` list/create (stubbed)
-- [x] `/api/marketing/leads` list/create (stubbed)
-
-### Recruiter / Admin / Studio
-- [x] `/api/recruiter/talent-pool*` (stubbed)
-- [x] `/api/recruiter/interactions*` (stubbed)
-- [x] `/api/recruiter/placements*` (stubbed legacy envelope)
-- [x] `/api/recruiter/submissions*` (stubbed legacy envelope)
-- [x] `/api/admin/productdashboard/affiliate-stats` (stubbed)
-- [x] Legacy alias `/api/productdashboard/affiliate-stats` (stubbed)
-- [x] `/api/productdashboard` root + `/export/:format` (stubbed)
-- [x] `/api/productdashboard/refund*` + `/cancellation*` stats/actions (stubbed)
-- [x] `/api/admin/*` (stubbed)
-- [x] `/api/studio/storyboard` (frontend-compatible response)
-- [x] `/api/studio/upload` (multipart upload + project DTO)
-- [x] `/api/studio/publish` (stubbed publish flow)
-- [x] `/api/studio/status/:projectId` + `/api/studio/projects`
-
-### AI / Chat / Misc
-- [x] `POST /api/ai/context` (stubbed)
-- [x] `POST /api/chat/message` (legacy alias, stubbed)
-- [x] `/api/upload/video` (multipart + metadata response)
-- [x] `/api/upload/image` + `/api/upload/single`
-- [x] `/api/video/*` legacy alias + frontend schema-compatible stubs
-- [x] `/api/youtube/*` account/auth/callback/disconnect/publish/company endpoints
-- [x] `/api/communication/*` (conversations/messages/templates/campaigns/tracking/job-boards)
-- [x] `/api/passwordmanagement/requirements`
-- [x] `/api/passwordmanagement/validate-strength`
-- [x] `/api/passwordmanagement/force-change`
-- [x] `/api/resumescorer/*` (score/category/recommendations stubs)
-- [x] `/api/resumeoptimizer/*` (optimize/analysis/keywords stubs)
-- [x] `/sentiment/sentimentprediction` (legacy non-/api path)
-- [x] `/sentiment/resume/sentimentprediction` (legacy nested alias)
-- [x] `/api/salaryanalyzer/analyze` + `/api/salaryanalyzer/negotiation-tips` (stubbed)
-- [x] `/api/salarycalculator/analyze` (stubbed alias)
-- [x] `/api/valueproposition/generate/*` (stubbed)
-- [x] `/api/featureflag` + legacy `/FeatureFlag` (stubbed)
-- [x] `/api/hubs/notifications*` (explicit not-implemented responses)
-- [x] `/api/featureflag` + legacy `/FeatureFlag` (stubbed)
-
-### Feed (stubbed)
-- [x] `/api/feed/posts` list/create
-- [x] `/api/feed/posts/:id` get/update/delete
-- [x] `/api/feed/posts/:id/like` post/delete
-- [x] `/api/feed/comments` create
-- [x] `/api/feed/comments/:id` update/delete
-- [x] `/api/feed/search`
-- [x] `/api/feed/link-preview`
-
-### Task (stubbed)
-- [x] `/api/task` list
-- [x] `/api/task/:id` get/delete
-- [x] `/api/task/save` create/update
-- [x] Legacy fallback `POST /api/task/:id`
+## ✅ Status Key
+- ✅ **Matched**: New API behavior matches or is compatible with legacy functionality used by the frontend.
+- ⚠️ **Partial / Stub**: Endpoint exists but is intentionally stubbed or only partially matches legacy behavior.
+- ⛔ **Missing**: Endpoint/behavior not yet implemented in `/api`.
 
 ---
 
-## ✅ Migration Status: All endpoints implemented or stubbed
+## Auth
 
-All `/api/*` endpoints required for frontend compatibility are now implemented or stubbed. Remaining work involves converting stubs to real services and shared DTOs, as outlined below.
-
----
-
-## ✅ Next migration steps (where I’ll start)
-1. **Convert account stubs into real services** (replace stubbed responses with real DB/domain behavior). This will follow the pattern:
-   - `/api/routes/*` handles HTTP + validation
-   - `/api/services/*` contains business logic
-   - `/shared/*` contains shared schema/DTO definitions
-2. **Add shared DTO schemas to `/shared`** for the most-used objects (AccountUser, Invite, Company, Job, Resume, etc.) so the frontend and backend share a single source of truth.
-3. **Implement the next domain (Jobs or Resumes)** by:
-   - Identifying which endpoints are used by the UI
-   - Mapping to legacy .NET controllers/DTOs
-   - Adding route handlers + service functions + (eventually) persistence
-4. **Ensure all routes return the standard envelope**: `{ success: true, data: ... }` (or `{ error: { ... } }` on failure), so frontend validation stays consistent.
-5. **Write regression tests** for each domain using the existing `frontend/__tests__` patterns and new backend unit tests as needed.
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | `POST /api/auth/login` | `AuthController.Login` |
+| ✅ | `POST /api/auth/register` | `AuthController.Register` |
+| ✅ | `POST /api/auth/refresh` | `AuthController.RefreshToken` |
+| ✅ | `POST /api/auth/logout` | `AuthController.Logout` |
+| ✅ | `POST /api/auth/forgot-password` | `AuthController.ForgotPassword` |
+| ✅ | `POST /api/auth/reset-password` | `AuthController.ResetPassword` |
+| ✅ | `POST /api/auth/verify-email` | `AuthController.ConfirmEmail` |
+| ⚠️ | `POST /api/auth/verify-2fa` | `TwoFactorAuthController.Verify` (partial: accepts token but no per-user throttling)
+| ⚠️ | `POST /api/auth/resend-2fa` | `TwoFactorAuthController.Resend` (partial: no rate-limit/locking) |
+| ✅ | `GET /api/auth/verification-status` | `AuthController.GetVerificationStatus` |
+| ✅ | `POST /api/auth/resend-email-verification` | `AuthController.ResendEmailVerification` |
 
 ---
 
-## How to mark progress
-- Update this file by checking off tasks as they get implemented.
-- Add notes for any dependencies (e.g., “requires DB schema change” or “requires shared DTO update”).
+## Users / Connections
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | `GET /api/users/me` | `UserController.GetMe` |
+| ✅ | `GET /api/users/public` | `UserController.GetPublicUsers` |
+| ✅ | `GET /api/users/{id}` | `UserController.GetById` |
+| ✅ | `PUT /api/users/me` | `UserController.Update` |
+| ✅ | `POST /api/users/connections` | `ConnectionsController.SendRequest` |
+| ✅ | `GET /api/users/me/connections` | `ConnectionsController.GetMyConnections` |
+| ✅ | `GET /api/users/me/connections/pending` | `ConnectionsController.GetPending` |
+| ✅ | `PUT /api/users/connections/{id}/accept` | `ConnectionsController.Accept` |
+| ✅ | `DELETE /api/users/connections/{id}` | `ConnectionsController.Remove` |
+| ✅ | `GET /api/users/{id}/connections` | `ConnectionsController.GetForUser` |
+| ✅ | `GET /api/users/connections/status` | `ConnectionsController.GetStatus` |
+| ✅ | `GET /api/users/me/recommendations` | `UserController.GetRecommendations` |
+| ✅ | `GET /api/users/{id}/can-message` | `UserController.CanMessage` |
+| ✅ | `GET /api/users/{id}/stats` | `UserController.GetStats` |
+| ✅ | `GET /api/users/{id}/resumes` | `UserController.GetResumes` |
+
+---
+
+## Resumes
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | `GET/POST/PUT/DELETE /api/resumes` | `ResumeController.*` |
+| ✅ | `GET /api/resumes/:id` | `ResumeController.GetById` |
+| ✅ | `POST /api/resumes/:id/publish` | `ResumeController.Publish` |
+| ✅ | `POST /api/resumes/:id/clone` | `ResumeController.Clone` |
+| ✅ | Legacy alias `/api/resume/*` | `ResumeController` legacy routes |
+| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (stubbed public resume response)
+| ✅ | `POST /api/resume/parse` | `ResumeController.Parse` |
+| ✅ | `POST /api/resume/createfromfile` | `ResumeController.CreateFromFile` |
+| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (stubbed)
+| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stubbed)
+| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stubbed)
+| ⚠️ | `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` | various resume owner actions (stubbed)
+| ⚠️ | `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` | resume metadata actions (stubbed)
+
+---
+
+## Jobs
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | CRUD `/api/jobs` | `JobsController.*` |
+| ✅ | CRUD `/api/job` (legacy singular endpoint) | `JobController.*` |
+| ✅ | `GET /api/job/getsummaryitems` | `JobController.GetSummaryItems` |
+| ✅ | `GET /api/job/saved` + save/unsave | `JobController.SavedJobs` |
+| ✅ | `POST /api/job/:id/apply` | `JobController.Apply` |
+| ✅ | `GET /api/job/slug/:slug` | `JobController.GetBySlug` |
+| ✅ | `POST /api/job/createfromfile` | `JobController.CreateFromFile` |
+| ✅ | `POST /api/job/extract` | `JobController.Extract` |
+| ✅ | `GET /api/jobs/public` | `JobsController.GetPublic` |
+| ✅ | `GET /api/job/applications` | `JobController.GetApplications` |
+| ✅ | `/api/job/alerts` CRUD | `JobController.Alerts` |
+| ⚠️ | `/api/job/user-jobs` (legacy recruiter flow alias) | `JobController.GetUserJobs` (alias support only)
+| ⚠️ | `/api/job/match`, `/api/job/analytics` | legacy matching/analytics (not used by frontend, small stubbed support under `/api/match/*`)
+
+---
+
+## Companies
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | `GET /api/companies/public` | `CompaniesController.GetPublic` |
+| ✅ | `GET /api/companies/{id}` | `CompaniesController.GetById` |
+| ✅ | `GET /api/companies/{id}/jobs` | `CompaniesController.GetJobs` |
+| ✅ | `POST /api/companies/{id}/follow` + unfollow | `CompaniesController.Follow` |
+| ✅ | `GET /api/companies/{id}/following-status` | `CompaniesController.GetFollowStatus` |
+| ✅ | `GET /api/companies/{id}/stats` | `CompaniesController.GetStats` |
+| ✅ | `GET /api/companies/me/followed` | `CompaniesController.GetFollowed` |
+| ✅ | `GET /api/companies/trending` | `CompaniesController.GetTrending` |
+| ✅ | `GET /api/companies/slug/{slug}` | `CompaniesController.GetBySlug` |
+
+---
+
+## Search
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `GET /api/search/public` | `SearchController.PublicSearch` (stubbed response)
+
+---
+
+## Account / Organization Management
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ✅ | `GET /api/account/users` | `AccountController.GetUsers` |
+| ✅ | `POST /api/account/invite` | `AccountController.Invite` |
+| ✅ | `PUT /api/account/roles` | `AccountController.UpdateRoles` |
+| ✅ | `DELETE /api/account/users/{id}` | `AccountController.DeactivateUser` |
+| ✅ | `GET /api/account/available` | `AccountController.Available` |
+| ✅ | `POST /api/account/switch` | `AccountController.SwitchAccount` (no-op compatibility)
+| ✅ | `GET /api/account/invitation/{id}` | `AccountController.GetInvitation` |
+| ✅ | `POST /api/account/accept-invitation/{id}` | `AccountController.AcceptInvitation` |
+| ✅ | `GET /api/account/invitations/pending` | `AccountController.PendingInvitations` |
+| ✅ | `GET /api/account/settings` | `AccountController.GetSettings` |
+| ✅ | `POST /api/account/settings` | `AccountController.UpdateSettings` |
+| ✅ | `GET /api/account/analytics` | `AccountController.Analytics` |
+| ✅ | `POST /api/account/bulk-invite` | `AccountController.BulkInvite` |
+| ✅ | `POST /api/account/invitation/{id}/resend` | `AccountController.ResendInvitation` |
+| ✅ | `POST /api/account/invitation/{id}/cancel` | `AccountController.CancelInvitation` |
+| ✅ | `GET /api/account/invitation-analytics` | `AccountController.InvitationAnalytics` |
+| ⚠️ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (stubbed)
+| ⚠️ | `POST /api/account/reset-password` | legacy frontend route (stubbed)
+| ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route (stubbed)
+
+---
+
+## Billing & Payment (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `GET /api/Billing/subscription` | `BillingController.GetSubscription` |
+| ⚠️ | `GET /api/Billing/payment-methods` | `BillingController.GetPaymentMethods` |
+| ⚠️ | `GET /api/Billing/invoices` | `BillingController.GetInvoices` |
+| ⚠️ | `GET /api/Billing/ai-usage/month` | `BillingController.GetAiUsage` |
+| ⚠️ | `POST /api/Payment/create-setup-session` | `PaymentController.CreateSetupSession` |
+| ⚠️ | `DELETE /api/Payment/payment-methods/{id}` | `PaymentController.DeletePaymentMethod` |
+| ⚠️ | `POST /api/Billing/refund-request` | `BillingController.RequestRefund` |
+| ⚠️ | `GET /api/Billing/refund-requests` | `BillingController.GetRefundRequests` |
+| ⚠️ | `POST /api/Billing/cancel-account` | `BillingController.CancelAccount` |
+| ⚠️ | `GET /api/Billing/cancellation-requests` | `BillingController.GetCancellationRequests` |
+| ⚠️ | `GET /api/Billing/refund-policy` | `BillingController.GetRefundPolicy` |
+| ⚠️ | `GET /api/Billing/refund-reasons` | `BillingController.GetRefundReasons` |
+
+---
+
+## Affiliates (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/affiliates/profile` | `AffiliateController.Profile` |
+| ⚠️ | `/api/affiliates/dashboard` | `AffiliateController.Dashboard` |
+| ⚠️ | `/api/affiliates/payout/request` | `AffiliateController.RequestPayout` |
+| ⚠️ | `/api/affiliates/admin/*` | `AffiliateController.Admin*` |
+
+---
+
+## Match / Recommendation (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `POST /api/match` | `MatchController.Match` |
+| ⚠️ | `POST /api/match/byid` | `MatchController.MatchById` |
+| ⚠️ | `POST /api/match/bycontent` | `MatchController.MatchByContent` |
+| ⚠️ | `POST /api/match/analyze` | `MatchController.Analyze` |
+| ⚠️ | `POST /api/match/tailor` | `MatchController.Tailor` |
+
+---
+
+## Notifications (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/notifications` | `NotificationsController.List` |
+| ⚠️ | `/api/notifications/unread-count` | `NotificationsController.UnreadCount` |
+| ⚠️ | `/api/notifications/:id/mark-read` | `NotificationsController.MarkRead` |
+| ⚠️ | `/api/notifications/mark-all-read` | `NotificationsController.MarkAllRead` |
+| ⚠️ | `/api/notifications/:id` (DELETE) | `NotificationsController.Delete` |
+
+---
+
+## Settings (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `GET /api/settings` | `SettingsController.Get` |
+| ⚠️ | `GET/PUT /api/settings/notifications` | `SettingsController.Notifications` |
+| ⚠️ | `GET/PUT /api/settings/privacy` | `SettingsController.Privacy` |
+| ⚠️ | `GET/PUT /api/settings/job-preferences` | `SettingsController.JobPreferences` |
+| ⚠️ | `GET/PUT /api/settings/account` | `SettingsController.Account` |
+| ⚠️ | `GET/PUT /api/settings/security` | `SettingsController.Security` |
+| ⚠️ | `POST /api/settings/security/2fa/enable` | `SettingsController.Enable2FA` |
+| ⚠️ | `POST /api/settings/security/2fa/disable` | `SettingsController.Disable2FA` |
+| ⚠️ | `GET /api/settings/export` | `SettingsController.Export` |
+
+---
+
+## Locations (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/locations/search` | `LocationsController.Search` |
+| ⚠️ | `/api/locations/countries` | `LocationsController.GetCountries` |
+| ⚠️ | `/api/locations/states` | `LocationsController.GetStates` |
+| ⚠️ | `/api/locations/cities` | `LocationsController.GetCities` |
+
+---
+
+## Dashboard (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/dashboard` | `DashboardController.Root` |
+| ⚠️ | `/api/dashboard/jobseeker` | `DashboardController.JobSeeker` |
+| ⚠️ | `/api/dashboard/recruiter` | `DashboardController.Recruiter` |
+| ⚠️ | `/api/dashboard/employer` | `DashboardController.Employer` |
+| ⚠️ | `/api/dashboard/admin` | `DashboardController.Admin` |
+| ⚠️ | `/api/dashboard/profile-view` | `DashboardController.ProfileView` |
+| ⚠️ | `/api/dashboard/activity` | `DashboardController.Activity` |
+| ⚠️ | `/api/dashboard/engagement` | `DashboardController.Engagement` |
+| ⚠️ | `/api/dashboard/refresh` | `DashboardController.Refresh` |
+| ⚠️ | Legacy alias `/api/userdashboard/*` | `DashboardController.LegacyUserDashboard` |
+
+---
+
+## Marketing (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/marketing/campaigns` | `MarketingController.Campaigns` |
+| ⚠️ | `/api/marketing/leads` | `MarketingController.Leads` |
+
+---
+
+## Recruiter / Admin / Studio (mostly stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/recruiter/talent-pool*` | `RecruiterController.TalentPool` |
+| ⚠️ | `/api/recruiter/interactions*` | `RecruiterController.Interactions` |
+| ⚠️ | `/api/recruiter/placements*` | `RecruiterController.Placements` |
+| ⚠️ | `/api/recruiter/submissions*` | `RecruiterController.Submissions` |
+| ⚠️ | `/api/admin/productdashboard/affiliate-stats` | `AdminController.AffiliateStats` |
+| ⚠️ | `/api/productdashboard/affiliate-stats` | `ProductDashboardController.AffiliateStats` |
+| ⚠️ | `/api/productdashboard` (root + export) | `ProductDashboardController.*` |
+| ⚠️ | `/api/productdashboard/refund*` | `ProductDashboardController.Refund*` |
+| ⚠️ | `/api/productdashboard/cancellation*` | `ProductDashboardController.Cancellation*` |
+| ⚠️ | `/api/admin/*` | `AdminController.*` |
+| ✅ | `/api/studio/storyboard` | `StudioController.Storyboard` (compatible)
+| ✅ | `/api/studio/upload` | `StudioController.Upload` (multipart + DTO)
+| ⚠️ | `/api/studio/publish` | `StudioController.Publish` (stubbed)
+| ⚠️ | `/api/studio/status/:projectId` | `StudioController.Status` (stubbed)
+| ⚠️ | `/api/studio/projects` | `StudioController.Projects` (stubbed)
+
+---
+
+## AI / Chat / Misc
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `POST /api/ai/context` | `AIController.Context` (stubbed)
+| ⚠️ | `POST /api/chat/message` | `ChatController.Message` (legacy alias; stubbed)
+| ✅ | `/api/upload/video` | `UploadController.Video` (multipart + metadata)
+| ✅ | `/api/upload/image` | `UploadController.Image` |
+| ✅ | `/api/upload/single` | `UploadController.Single` |
+| ⚠️ | `/api/video/*` | `VideoController.*` (legacy alias stubs)
+| ✅ | `/api/youtube/*` (auth/callback/disconnect/publish/company) | `YoutubeController.*` |
+| ✅ | `/api/communication/*` | `CommunicationController.*` (messages, conversations, templates, campaigns, tracking) |
+| ✅ | `/api/passwordmanagement/requirements` | `PasswordManagementController.Requirements` |
+| ✅ | `/api/passwordmanagement/validate-strength` | `PasswordManagementController.ValidatePassword` |
+| ✅ | `/api/passwordmanagement/force-change` | `PasswordManagementController.ForceChange` |
+| ⚠️ | `/api/resumescorer/*` | `ResumeScorerController.*` (stubbed)
+| ⚠️ | `/api/resumeoptimizer/*` | `ResumeOptimizerController.*` (stubbed)
+| ⚠️ | `/sentiment/sentimentprediction` | legacy sentiment endpoint (stubbed)
+| ⚠️ | `/sentiment/resume/sentimentprediction` | legacy sentiment endpoint alias (stubbed)
+| ⚠️ | `/api/salaryanalyzer/analyze` | `SalaryAnalyzerController.Analyze` (stubbed)
+| ⚠️ | `/api/salaryanalyzer/negotiation-tips` | `SalaryAnalyzerController.NegotiationTips` (stubbed)
+| ⚠️ | `/api/salarycalculator/analyze` | `SalaryCalculatorController.Analyze` (stubbed)
+| ⚠️ | `/api/valueproposition/generate/*` | `ValuePropositionController.Generate` (stubbed)
+| ⚠️ | `/api/featureflag` | `FeatureFlagController.*` (stubbed)
+| ⛔ | `/api/hubs/notifications*` | SignalR/hubs (explicitly not implemented)
+
+---
+
+## Feed (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/feed/posts` | `FeedController.Posts` |
+| ⚠️ | `/api/feed/posts/:id` | `FeedController.Post` |
+| ⚠️ | `/api/feed/posts/:id/like` | `FeedController.Like` |
+| ⚠️ | `/api/feed/comments` | `FeedController.Comments` |
+| ⚠️ | `/api/feed/comments/:id` | `FeedController.Comment` |
+| ⚠️ | `/api/feed/search` | `FeedController.Search` |
+| ⚠️ | `/api/feed/link-preview` | `FeedController.LinkPreview` |
+
+---
+
+## Task (stubbed)
+
+| Status | New API | Legacy API |
+|--------|---------|------------|
+| ⚠️ | `/api/task` | `TaskController.List` |
+| ⚠️ | `/api/task/:id` | `TaskController.Get/Delete` |
+| ⚠️ | `/api/task/save` | `TaskController.Save` |
+| ⚠️ | `POST /api/task/:id` (legacy fallback) | `TaskController.LegacyPost` |
+
+---
+
+## Notes / Next Steps
+
+1. **Convert stubbed endpoints (⚠️) into real behavior**, focusing first on the areas the UI currently touches (e.g., search, billing, notifications, settings, resume tooling).
+2. **Sync shared DTOs with frontend**: add `shared/*` models for entities like `AccountUser`, `Job`, `Resume`, `Company`, `Message`, etc.
+3. **Implement missing legacy behaviors** where the UI expects parity (e.g., full 2FA flow with rate limiting, full search results, AI provider integration).
+4. **Add regression tests** for critical paths (auth, jobs, resumes, messaging/communications).
+
+---
+
+> Tip: When updating this document, update the `Status` cell rather than adding new checkboxes. It keeps the migration status clear and comparable to the legacy behavior.

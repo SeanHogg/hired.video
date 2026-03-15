@@ -141,6 +141,21 @@ export const accountPreferences = pgTable("account_preferences", {
 export type AccountPreferences = typeof accountPreferences.$inferSelect;
 export type NewAccountPreferences = typeof accountPreferences.$inferInsert;
 
+export const accountInvitations = pgTable("account_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+});
+
+export type AccountInvitation = typeof accountInvitations.$inferSelect;
+export type NewAccountInvitation = typeof accountInvitations.$inferInsert;
+
 export const systemSettings = pgTable("system_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   key: varchar("key", { length: 255 }).notNull().unique(),

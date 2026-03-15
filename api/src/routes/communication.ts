@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { and, desc, eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 export const communicationRoutes = new Hono<{ Variables: Variables }>();
 
@@ -7,235 +9,234 @@ function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
 }
 
-const now = () => new Date().toISOString();
-
-function conversationStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    title: "Conversation",
-    type: 0,
-    createdByUserId: "",
-    companyId: undefined,
-    isArchived: false,
-    isMuted: false,
-    lastActivityAt: now(),
-    participants: [],
-    messages: [],
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
+function userId(c: any): string | null {
+  return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-function messageStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    conversationId: "",
-    content: "",
-    messageType: 0,
-    attachmentUrl: undefined,
-    attachmentName: undefined,
-    replyToMessageId: undefined,
-    isEdited: false,
-    editedAt: undefined,
-    isDeleted: false,
-    deletedAt: undefined,
-    senderId: "",
-    recipientId: "",
-    readReceipts: [],
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
-}
+const { conversations, conversationParticipants, messages, emailTemplates, emailCampaigns, communicationTracking } = schema;
 
-function emailTemplateStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    name: "Default Template",
-    description: "",
-    subject: "",
-    body: "",
-    category: 8,
-    targetRole: 0,
-    isSystemTemplate: false,
-    isActive: true,
-    createdByUserId: "",
-    companyId: undefined,
-    variables: undefined,
-    usageCount: 0,
-    lastUsedAt: undefined,
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
-}
+communicationRoutes.get("/conversations", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
-function emailCampaignStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    name: "Campaign",
-    description: "",
-    emailTemplateId: "",
-    createdByUserId: "",
-    companyId: undefined,
-    status: 0,
-    sentAt: undefined,
-    totalRecipients: 0,
-    emailsSent: 0,
-    emailsDelivered: 0,
-    emailsOpened: 0,
-    emailsClicked: 0,
-    repliesReceived: 0,
-    recipients: [],
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
-}
+  const db = getDb();
+  const rows = await db
+    .select({ convo: conversations })
+    .from(conversationParticipants)
+    .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+    .where(eq(conversationParticipants.userId, uid))
+    .orderBy(desc(conversations.updatedAt));
 
-function trackingStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    initiatorUserId: "",
-    targetUserId: undefined,
-    externalEmail: undefined,
-    externalName: undefined,
-    companyId: undefined,
-    type: 0,
-    channel: 0,
-    subject: "",
-    content: "",
-    status: 0,
-    priority: 1,
-    tags: "",
-    followUpDate: undefined,
-    requiresFollowUp: false,
-    followUpNotes: "",
-    responseReceivedAt: undefined,
-    responseContent: "",
-    responseSentiment: "",
-    relatedJobId: undefined,
-    relatedResumeId: undefined,
-    relatedConversationId: undefined,
-    relatedEmailCampaignId: undefined,
-    metadata: "",
-    followUps: [],
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
-}
-
-function externalContactStub(id = crypto.randomUUID()) {
-  return {
-    id,
-    userId: "",
-    companyId: undefined,
-    email: "contact@example.com",
-    firstName: "",
-    lastName: "",
-    jobTitle: "",
-    companyName: "",
-    phone: "",
-    linkedInUrl: "",
-    location: "",
-    notes: "",
-    tags: "",
-    lastCommunicationAt: undefined,
-    preferredFrequency: 3,
-    isActive: true,
-    creationDateTime: now(),
-    updateDateTime: now(),
-  };
-}
-
-const jobBoardStub = {
-  id: "board-stub",
-  name: "General Jobs",
-  slug: "general-jobs",
-  description: "",
-  logoUrl: null,
-  websiteUrl: null,
-  category: "general",
-  tier: "free",
-  costPerPosting: null,
-  isActive: true,
-  requiresApiKey: false,
-  supportsAutoPosting: true,
-  maxPostingDuration: null,
-};
-
-const jobBoardPostingStub = {
-  id: "posting-stub",
-  jobId: "",
-  jobTitle: "",
-  companyName: "",
-  jobBoardId: jobBoardStub.id,
-  jobBoardName: jobBoardStub.name,
-  status: "pending",
-  externalPostingId: null,
-  externalUrl: null,
-  postedAt: now(),
-  expiresAt: null,
-  views: 0,
-  clicks: 0,
-  applications: 0,
-  cost: null,
-};
-
-communicationRoutes.get("/conversations", (c) => c.json(ok([]), 200));
-communicationRoutes.post("/conversations", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const conv = { ...conversationStub(), title: body?.title || "Conversation", type: body?.type ?? 0 };
-  return c.json(ok(conv), 201);
+  return c.json(ok(rows.map((r) => r.convo)), 200);
 });
-communicationRoutes.get("/conversations/:conversationId", (c) =>
-  c.json(ok({ ...conversationStub(c.req.param("conversationId")), messages: [] }), 200),
-);
 
-communicationRoutes.get("/messages", (c) => c.json(ok([]), 200));
-communicationRoutes.post("/messages", async (c) => {
+communicationRoutes.post("/conversations", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
   const body = await c.req.json().catch(() => ({}));
-  const msg = {
-    ...messageStub(),
-    conversationId: body?.conversationId ?? "",
-    content: body?.content ?? "",
-    messageType: body?.messageType ?? 0,
-  };
+  const title = typeof body.title === "string" ? body.title : "Conversation";
+  const type = typeof body.type === "string" ? body.type : "direct";
+
+  const db = getDb();
+  const [conversation] = await db
+    .insert(conversations)
+    .values({ subject: title, type })
+    .returning();
+
+  await db.insert(conversationParticipants).values({ conversationId: conversation.id, userId: uid, role: "member" } as any);
+
+  return c.json(ok(conversation), 201);
+});
+
+communicationRoutes.get("/conversations/:conversationId", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const convoId = c.req.param("conversationId");
+  const db = getDb();
+  const [conversation] = await db.select().from(conversations).where(eq(conversations.id, convoId)).limit(1);
+  if (!conversation) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Conversation not found" } }, 404);
+
+  const participants = await db
+    .select({ participant: conversationParticipants })
+    .from(conversationParticipants)
+    .where(eq(conversationParticipants.conversationId, convoId));
+
+  const msgs = await db
+    .select({ message: messages })
+    .from(messages)
+    .where(eq(messages.conversationId, convoId))
+    .orderBy(desc(messages.createdAt));
+
+  return c.json(ok({ ...conversation, participants: participants.map((r) => r.participant), messages: msgs.map((r) => r.message) }), 200);
+});
+
+communicationRoutes.get("/messages", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const db = getDb();
+  const rows = await db
+    .select({ message: messages })
+    .from(messages)
+    .innerJoin(conversationParticipants, eq(messages.conversationId, conversationParticipants.conversationId))
+    .where(eq(conversationParticipants.userId, uid))
+    .orderBy(desc(messages.createdAt));
+
+  return c.json(ok(rows.map((r) => r.message)), 200);
+});
+
+communicationRoutes.post("/messages", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const body = await c.req.json().catch(() => ({}));
+  const convoId = typeof body.conversationId === "string" ? body.conversationId : "";
+  const content = typeof body.content === "string" ? body.content : "";
+
+  const db = getDb();
+  const [conversation] = await db.select().from(conversations).where(eq(conversations.id, convoId)).limit(1);
+  if (!conversation) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Conversation not found" } }, 404);
+
+  const [msg] = await db
+    .insert(messages)
+    .values({ conversationId: convoId, senderId: uid, content, contentType: "text" } as any)
+    .returning();
+
   return c.json(ok(msg), 201);
 });
-communicationRoutes.post("/messages/mark-read", (c) => c.json(ok({ success: true }), 200));
 
-communicationRoutes.get("/email-templates", (c) => c.json(ok([]), 200));
-communicationRoutes.get("/email-templates/:templateId", (c) => c.json(ok(emailTemplateStub(c.req.param("templateId"))), 200));
+communicationRoutes.post("/messages/mark-read", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  return c.json(ok({ success: true }), 200);
+});
+
+communicationRoutes.get("/email-templates", async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
+  return c.json(ok(rows), 200);
+});
+
+communicationRoutes.get("/email-templates/:templateId", async (c) => {
+  const db = getDb();
+  const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, c.req.param("templateId"))).limit(1);
+  if (!template) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Template not found" } }, 404);
+  return c.json(ok(template), 200);
+});
+
 communicationRoutes.post("/email-templates", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...emailTemplateStub(), ...body, id: crypto.randomUUID(), usageCount: 0 }), 201);
+  const db = getDb();
+  const [created] = await db
+    .insert(emailTemplates)
+    .values({
+      name: String(body.name ?? "Untitled"),
+      subject: String(body.subject ?? ""),
+      htmlBody: String(body.body ?? ""),
+      textBody: String(body.textBody ?? ""),
+      variables: body.variables ?? [],
+      isActive: body.isActive ?? true,
+    } as any)
+    .returning();
+  return c.json(ok(created), 201);
 });
+
 communicationRoutes.put("/email-templates/:templateId", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...emailTemplateStub(c.req.param("templateId")), ...body }), 200);
+  const db = getDb();
+  const [updated] = await db
+    .update(emailTemplates)
+    .set({
+      name: body.name,
+      subject: body.subject,
+      htmlBody: body.body,
+      textBody: body.textBody,
+      variables: body.variables,
+      isActive: body.isActive,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(emailTemplates.id, c.req.param("templateId")))
+    .returning();
+  if (!updated) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Template not found" } }, 404);
+  return c.json(ok(updated), 200);
 });
-communicationRoutes.delete("/email-templates/:templateId", (c) => c.json(ok(undefined), 200));
 
-communicationRoutes.get("/email-campaigns", (c) => c.json(ok([]), 200));
+communicationRoutes.delete("/email-templates/:templateId", async (c) => {
+  const db = getDb();
+  await db.delete(emailTemplates).where(eq(emailTemplates.id, c.req.param("templateId")));
+  return c.json(ok({ success: true }), 200);
+});
+
+communicationRoutes.get("/email-campaigns", async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(emailCampaigns).orderBy(desc(emailCampaigns.createdAt));
+  return c.json(ok(rows), 200);
+});
+
 communicationRoutes.post("/email-campaigns", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...emailCampaignStub(), ...body, id: crypto.randomUUID() }), 201);
+  const db = getDb();
+  const [created] = await db
+    .insert(emailCampaigns)
+    .values({
+      name: String(body.name ?? "Campaign"),
+      templateId: body.templateId,
+      subject: String(body.subject ?? ""),
+      status: String(body.status ?? "draft"),
+      scheduledAt: body.scheduledAt ? new Date(String(body.scheduledAt)) : null,
+      sentAt: body.sentAt ? new Date(String(body.sentAt)) : null,
+    } as any)
+    .returning();
+  return c.json(ok(created), 201);
 });
-communicationRoutes.post("/email-campaigns/:campaignId/send", (c) => c.json(ok({ success: true }), 200));
 
-communicationRoutes.get("/tracking", (c) => c.json(ok([]), 200));
+communicationRoutes.post("/email-campaigns/:campaignId/send", async (c) => {
+  const db = getDb();
+  const [updated] = await db
+    .update(emailCampaigns)
+    .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() } as any)
+    .where(eq(emailCampaigns.id, c.req.param("campaignId")))
+    .returning();
+  if (!updated) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Campaign not found" } }, 404);
+  return c.json(ok(updated), 200);
+});
+
+communicationRoutes.get("/tracking", async (c) => {
+  const db = getDb();
+  const rows = await db.select().from(communicationTracking).orderBy(desc(communicationTracking.createdAt));
+  return c.json(ok(rows), 200);
+});
+
 communicationRoutes.post("/tracking", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...trackingStub(), ...body, id: crypto.randomUUID() }), 201);
+  const db = getDb();
+  const [created] = await db
+    .insert(communicationTracking)
+    .values({
+      userId: body.userId,
+      type: String(body.type ?? ""),
+      channel: String(body.channel ?? ""),
+      referenceId: body.referenceId,
+      referenceType: String(body.referenceType ?? ""),
+      status: String(body.status ?? "sent"),
+      metadata: body.metadata ?? {},
+    } as any)
+    .returning();
+  return c.json(ok(created), 201);
 });
+
 communicationRoutes.post("/follow-ups", (c) => c.json(ok({ success: true }), 201));
 
 communicationRoutes.get("/external-contacts", (c) => c.json(ok([]), 200));
 communicationRoutes.post("/external-contacts", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...externalContactStub(), ...body, id: crypto.randomUUID() }), 201);
+  return c.json(ok({ id: crypto.randomUUID(), ...body }), 201);
 });
 communicationRoutes.put("/external-contacts/:contactId", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  return c.json(ok({ ...externalContactStub(c.req.param("contactId")), ...body }), 200);
+  return c.json(ok({ id: c.req.param("contactId"), ...body }), 200);
 });
 communicationRoutes.delete("/external-contacts/:contactId", (c) => c.json(ok(undefined), 200));
 
@@ -259,22 +260,42 @@ communicationRoutes.get("/stats", (c) =>
   ),
 );
 
-communicationRoutes.get("/job-boards", (c) => c.json(ok([jobBoardStub]), 200));
+communicationRoutes.get("/job-boards", (c) =>
+  c.json(
+    ok([
+      {
+        id: "board-stub",
+        name: "General Jobs",
+        slug: "general-jobs",
+        description: "",
+        logoUrl: null,
+        websiteUrl: null,
+        category: "general",
+        tier: "free",
+        costPerPosting: null,
+        isActive: true,
+        requiresApiKey: false,
+        supportsAutoPosting: true,
+        maxPostingDuration: null,
+      },
+    ]),
+    200,
+  ),
+);
 communicationRoutes.post("/job-boards/post", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const boardIds = Array.isArray(body?.boardIds) ? body.boardIds : [];
   const postings = boardIds.length
     ? boardIds.map((boardId: string, idx: number) => ({
-        ...jobBoardPostingStub,
         id: `posting-${idx + 1}`,
         jobId: body?.jobId ?? "",
         jobBoardId: boardId,
       }))
-    : [{ ...jobBoardPostingStub, jobId: body?.jobId ?? "" }];
+    : [{ id: "posting-1", jobId: body?.jobId ?? "", jobBoardId: "board-stub" }];
   return c.json(ok(postings), 201);
 });
 communicationRoutes.get("/job-boards/jobs/:jobId/postings", (c) =>
-  c.json(ok([{ ...jobBoardPostingStub, jobId: c.req.param("jobId") }]), 200),
+  c.json(ok([{ id: "posting-1", jobId: c.req.param("jobId"), jobBoardId: "board-stub" }]), 200),
 );
 communicationRoutes.get("/job-boards/postings", (c) => c.json(ok([]), 200));
 communicationRoutes.get("/job-boards/stats", (c) =>

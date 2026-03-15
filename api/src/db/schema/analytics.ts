@@ -82,3 +82,17 @@ export const userEngagementMetrics = pgTable("user_engagement_metrics", {
 
 export type UserEngagementMetric = typeof userEngagementMetrics.$inferSelect;
 export type NewUserEngagementMetric = typeof userEngagementMetrics.$inferInsert;
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 100 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;

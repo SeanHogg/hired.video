@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { SignJWT } from "jose";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { users } = schema;
+const { users, passwordResetTokens, emailVerificationTokens } = schema;
 
 // ============================================================================
 // HELPERS
@@ -140,12 +140,24 @@ authRoutes.post("/register", async (c) => {
     return c.json(error("INTERNAL_SERVER_ERROR", "Failed to create user"), 500);
   }
 
-  // Frontend register flow expects an email verification challenge response.
+  // Issue an email verification token and store it
+  const verificationToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  await db.insert(emailVerificationTokens).values({
+    userId: user.id,
+    token: verificationToken,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  });
+
+  // In production, send verification email. For now, include token in dev response.
+  const isDev = process.env.NODE_ENV !== "production";
   return c.json(
     success({
       requiresEmailVerification: true,
       email: user.email,
       sentAt: new Date().toISOString(),
+      ...(isDev ? { verificationToken } : {}),
     }),
     201,
   );
@@ -238,10 +250,35 @@ authRoutes.post("/forgot-password", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
   }
 
-  // Always return success to avoid email enumeration attacks
-  return c.json(
-    success(null, "If an account exists for that email, a reset link has been sent"),
-  );
+  const db = getDb();
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.email, parsed.data.email))
+    .limit(1);
+
+  // Always return success to avoid email enumeration
+  if (user) {
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await db
+      .update(passwordResetTokens)
+      .set({ used: true } as any)
+      .where(eq(passwordResetTokens.userId, user.id));
+    await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt });
+    // In production, send token via email. For now, include in dev response.
+    const isDev = process.env.NODE_ENV !== "production";
+    return c.json(
+      success(
+        isDev ? { resetToken: token } : null,
+        "If an account exists for that email, a reset link has been sent",
+      ),
+    );
+  }
+
+  return c.json(success(null, "If an account exists for that email, a reset link has been sent"));
 });
 
 /** POST /api/auth/reset-password */
@@ -252,8 +289,29 @@ authRoutes.post("/reset-password", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  // TODO: validate reset token from a tokens table and update password hash
-  return c.json(error("NOT_IMPLEMENTED", "Password reset tokens not yet implemented"), 501);
+  const db = getDb();
+  const now = new Date();
+  const [tokenRow] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.token, parsed.data.token),
+        eq(passwordResetTokens.used, false),
+        gt(passwordResetTokens.expiresAt, now),
+      ),
+    )
+    .limit(1);
+
+  if (!tokenRow) {
+    return c.json(error("INVALID_TOKEN", "Reset token is invalid or has expired"), 400);
+  }
+
+  const passwordHash = await hashPassword(parsed.data.password);
+  await db.update(users).set({ passwordHash, passwordChangedAt: now } as any).where(eq(users.id, tokenRow.userId));
+  await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.id, tokenRow.id));
+
+  return c.json(success(null, "Password has been reset successfully"));
 });
 
 /** POST /api/auth/verify-email */
@@ -264,8 +322,28 @@ authRoutes.post("/verify-email", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
   }
 
-  // TODO: validate email verification token and mark user as verified
-  return c.json(error("NOT_IMPLEMENTED", "Email verification tokens not yet implemented"), 501);
+  const db = getDb();
+  const now = new Date();
+  const [tokenRow] = await db
+    .select()
+    .from(emailVerificationTokens)
+    .where(
+      and(
+        eq(emailVerificationTokens.token, parsed.data.token),
+        eq(emailVerificationTokens.used, false),
+        gt(emailVerificationTokens.expiresAt, now),
+      ),
+    )
+    .limit(1);
+
+  if (!tokenRow) {
+    return c.json(error("INVALID_TOKEN", "Verification token is invalid or has expired"), 400);
+  }
+
+  await db.update(users).set({ emailVerified: true } as any).where(eq(users.id, tokenRow.userId));
+  await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.id, tokenRow.id));
+
+  return c.json(success(null, "Email verified successfully"));
 });
 
 /** POST /api/auth/verify-2fa */
@@ -349,7 +427,40 @@ authRoutes.get("/verification-status", async (c) => {
 
 /** POST /api/auth/resend-email-verification */
 authRoutes.post("/resend-email-verification", async (c) => {
-  return c.json(success({ resent: true }), 200);
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
+  }
+
+  const { jwtVerify } = await import("jose");
+  try {
+    const token = authHeader.slice(7);
+    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
+    const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
+    const db = getDb();
+    const [user] = await db
+      .select({ id: users.id, emailVerified: users.emailVerified })
+      .from(users)
+      .where(eq(users.id, payload.sub as string))
+      .limit(1);
+    if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+    if (user.emailVerified) return c.json(success({ resent: false }, "Email already verified"), 200);
+
+    // Invalidate old tokens and issue a new one
+    await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, user.id));
+    const newToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    await db.insert(emailVerificationTokens).values({
+      userId: user.id,
+      token: newToken,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+    const isDev = process.env.NODE_ENV !== "production";
+    return c.json(success(isDev ? { verificationToken: newToken } : null, "Verification email sent"), 200);
+  } catch {
+    return c.json(error("UNAUTHORIZED", "Invalid or expired token"), 401);
+  }
 });
 
 /** GET /api/auth/me — requires valid JWT passed as Authorization header */
