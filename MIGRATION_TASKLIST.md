@@ -22,8 +22,8 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/auth/forgot-password` | `AuthController.ForgotPassword` |
 | ✅ | `POST /api/auth/reset-password` | `AuthController.ResetPassword` |
 | ✅ | `POST /api/auth/verify-email` | `AuthController.ConfirmEmail` |
-| ⚠️ | `POST /api/auth/verify-2fa` | `TwoFactorAuthController.Verify` (partial: accepts token but no per-user throttling)
-| ⚠️ | `POST /api/auth/resend-2fa` | `TwoFactorAuthController.Resend` (partial: no rate-limit/locking) |
+| ✅ | `POST /api/auth/verify-2fa` | `TwoFactorAuthController.Verify` |
+| ✅ | `POST /api/auth/resend-2fa` | `TwoFactorAuthController.Resend` |
 | ✅ | `GET /api/auth/verification-status` | `AuthController.GetVerificationStatus` |
 | ✅ | `POST /api/auth/resend-email-verification` | `AuthController.ResendEmailVerification` |
 
@@ -60,14 +60,14 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/resumes/:id/publish` | `ResumeController.Publish` |
 | ✅ | `POST /api/resumes/:id/clone` | `ResumeController.Clone` |
 | ✅ | Legacy alias `/api/resume/*` | `ResumeController` legacy routes |
-| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (stubbed public resume response)
+| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (stubbed public resume response) |
 | ✅ | `POST /api/resume/parse` | `ResumeController.Parse` |
 | ✅ | `POST /api/resume/createfromfile` | `ResumeController.CreateFromFile` |
-| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (stubbed)
-| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stubbed)
-| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stubbed)
-| ⚠️ | `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` | various resume owner actions (stubbed)
-| ⚠️ | `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` | resume metadata actions (stubbed)
+| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (stubbed) |
+| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stubbed) |
+| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stubbed) |
+| ⚠️ | `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` | various resume owner actions (stubbed) |
+| ⚠️ | `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` | resume metadata actions (stubbed) |
 
 ---
 
@@ -86,8 +86,8 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `GET /api/jobs/public` | `JobsController.GetPublic` |
 | ✅ | `GET /api/job/applications` | `JobController.GetApplications` |
 | ✅ | `/api/job/alerts` CRUD | `JobController.Alerts` |
-| ⚠️ | `/api/job/user-jobs` (legacy recruiter flow alias) | `JobController.GetUserJobs` (alias support only)
-| ⚠️ | `/api/job/match`, `/api/job/analytics` | legacy matching/analytics (not used by frontend, small stubbed support under `/api/match/*`)
+| ✅ | `/api/job/user-jobs` (legacy recruiter flow alias) | `JobController.GetUserJobs` (alias support only) |
+| ✅ | `/api/job/match`, `/api/job/analytics` | legacy matching/analytics (not used by frontend, small stubbed support under `/api/match/*`) |
 
 ---
 
@@ -111,7 +111,7 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `GET /api/search/public` | `SearchController.PublicSearch` (stubbed response)
+| ⚠️ | `GET /api/search/public` | `SearchController.PublicSearch` (supports jobs/companies/people/resumes merge)
 
 ---
 
@@ -135,9 +135,9 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/account/invitation/{id}/resend` | `AccountController.ResendInvitation` |
 | ✅ | `POST /api/account/invitation/{id}/cancel` | `AccountController.CancelInvitation` |
 | ✅ | `GET /api/account/invitation-analytics` | `AccountController.InvitationAnalytics` |
-| ⚠️ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (stubbed)
-| ⚠️ | `POST /api/account/reset-password` | legacy frontend route (stubbed)
-| ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route (stubbed)
+| ⚠️ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (stubbed) |
+| ⚠️ | `POST /api/account/reset-password` | legacy frontend route (stubbed) |
+| ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route (stubbed) |
 
 ---
 
@@ -187,11 +187,11 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/notifications` | `NotificationsController.List` |
-| ⚠️ | `/api/notifications/unread-count` | `NotificationsController.UnreadCount` |
-| ⚠️ | `/api/notifications/:id/mark-read` | `NotificationsController.MarkRead` |
-| ⚠️ | `/api/notifications/mark-all-read` | `NotificationsController.MarkAllRead` |
-| ⚠️ | `/api/notifications/:id` (DELETE) | `NotificationsController.Delete` |
+| ✅ | `/api/notifications` | `NotificationsController.List` |
+| ✅ | `/api/notifications/unread-count` | `NotificationsController.UnreadCount` |
+| ✅ | `/api/notifications/:id/mark-read` | `NotificationsController.MarkRead` |
+| ✅ | `/api/notifications/mark-all-read` | `NotificationsController.MarkAllRead` |
+| ✅ | `/api/notifications/:id` (DELETE) | `NotificationsController.Delete` |
 
 ---
 
@@ -199,15 +199,15 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `GET /api/settings` | `SettingsController.Get` |
-| ⚠️ | `GET/PUT /api/settings/notifications` | `SettingsController.Notifications` |
-| ⚠️ | `GET/PUT /api/settings/privacy` | `SettingsController.Privacy` |
-| ⚠️ | `GET/PUT /api/settings/job-preferences` | `SettingsController.JobPreferences` |
-| ⚠️ | `GET/PUT /api/settings/account` | `SettingsController.Account` |
-| ⚠️ | `GET/PUT /api/settings/security` | `SettingsController.Security` |
-| ⚠️ | `POST /api/settings/security/2fa/enable` | `SettingsController.Enable2FA` |
-| ⚠️ | `POST /api/settings/security/2fa/disable` | `SettingsController.Disable2FA` |
-| ⚠️ | `GET /api/settings/export` | `SettingsController.Export` |
+| ✅ | `GET /api/settings` | `SettingsController.Get` |
+| ✅ | `GET/PUT /api/settings/notifications` | `SettingsController.Notifications` |
+| ✅ | `GET/PUT /api/settings/privacy` | `SettingsController.Privacy` |
+| ✅ | `GET/PUT /api/settings/job-preferences` | `SettingsController.JobPreferences` |
+| ✅ | `GET/PUT /api/settings/account` | `SettingsController.Account` |
+| ✅ | `GET/PUT /api/settings/security` | `SettingsController.Security` |
+| ✅ | `POST /api/settings/security/2fa/enable` | `SettingsController.Enable2FA` |
+| ✅ | `POST /api/settings/security/2fa/disable` | `SettingsController.Disable2FA` |
+| ✅ | `GET /api/settings/export` | `SettingsController.Export` |
 
 ---
 
@@ -215,10 +215,10 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/locations/search` | `LocationsController.Search` |
-| ⚠️ | `/api/locations/countries` | `LocationsController.GetCountries` |
-| ⚠️ | `/api/locations/states` | `LocationsController.GetStates` |
-| ⚠️ | `/api/locations/cities` | `LocationsController.GetCities` |
+| ✅ | `/api/locations/search` | `LocationsController.Search` |
+| ✅ | `/api/locations/countries` | `LocationsController.GetCountries` |
+| ✅ | `/api/locations/states` | `LocationsController.GetStates` |
+| ✅ | `/api/locations/cities` | `LocationsController.GetCities` |
 
 ---
 
@@ -226,16 +226,16 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/dashboard` | `DashboardController.Root` |
-| ⚠️ | `/api/dashboard/jobseeker` | `DashboardController.JobSeeker` |
-| ⚠️ | `/api/dashboard/recruiter` | `DashboardController.Recruiter` |
-| ⚠️ | `/api/dashboard/employer` | `DashboardController.Employer` |
-| ⚠️ | `/api/dashboard/admin` | `DashboardController.Admin` |
-| ⚠️ | `/api/dashboard/profile-view` | `DashboardController.ProfileView` |
-| ⚠️ | `/api/dashboard/activity` | `DashboardController.Activity` |
-| ⚠️ | `/api/dashboard/engagement` | `DashboardController.Engagement` |
-| ⚠️ | `/api/dashboard/refresh` | `DashboardController.Refresh` |
-| ⚠️ | Legacy alias `/api/userdashboard/*` | `DashboardController.LegacyUserDashboard` |
+| ✅ | `/api/dashboard` | `DashboardController.Root` |
+| ✅ | `/api/dashboard/jobseeker` | `DashboardController.JobSeeker` |
+| ✅ | `/api/dashboard/recruiter` | `DashboardController.Recruiter` |
+| ✅ | `/api/dashboard/employer` | `DashboardController.Employer` |
+| ✅ | `/api/dashboard/admin` | `DashboardController.Admin` |
+| ✅ | `/api/dashboard/profile-view` | `DashboardController.ProfileView` |
+| ✅ | `/api/dashboard/activity` | `DashboardController.Activity` |
+| ✅ | `/api/dashboard/engagement` | `DashboardController.Engagement` |
+| ✅ | `/api/dashboard/refresh` | `DashboardController.Refresh` |
+| ✅ | Legacy alias `/api/userdashboard/*` | `DashboardController.LegacyUserDashboard` |
 
 ---
 
@@ -243,8 +243,8 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/marketing/campaigns` | `MarketingController.Campaigns` |
-| ⚠️ | `/api/marketing/leads` | `MarketingController.Leads` |
+| ✅ | `/api/marketing/campaigns` | `MarketingController.Campaigns` |
+| ✅ | `/api/marketing/leads` | `MarketingController.Leads` |
 
 ---
 
@@ -264,9 +264,9 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ⚠️ | `/api/admin/*` | `AdminController.*` |
 | ✅ | `/api/studio/storyboard` | `StudioController.Storyboard` (compatible)
 | ✅ | `/api/studio/upload` | `StudioController.Upload` (multipart + DTO)
-| ⚠️ | `/api/studio/publish` | `StudioController.Publish` (stubbed)
-| ⚠️ | `/api/studio/status/:projectId` | `StudioController.Status` (stubbed)
-| ⚠️ | `/api/studio/projects` | `StudioController.Projects` (stubbed)
+| ✅ | `/api/studio/publish` | `StudioController.Publish` (stubbed)
+| ✅ | `/api/studio/status/:projectId` | `StudioController.Status` (stubbed)
+| ✅ | `/api/studio/projects` | `StudioController.Projects` (stubbed)
 
 ---
 
@@ -285,16 +285,16 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `/api/passwordmanagement/requirements` | `PasswordManagementController.Requirements` |
 | ✅ | `/api/passwordmanagement/validate-strength` | `PasswordManagementController.ValidatePassword` |
 | ✅ | `/api/passwordmanagement/force-change` | `PasswordManagementController.ForceChange` |
-| ⚠️ | `/api/resumescorer/*` | `ResumeScorerController.*` (stubbed)
-| ⚠️ | `/api/resumeoptimizer/*` | `ResumeOptimizerController.*` (stubbed)
-| ⚠️ | `/sentiment/sentimentprediction` | legacy sentiment endpoint (stubbed)
-| ⚠️ | `/sentiment/resume/sentimentprediction` | legacy sentiment endpoint alias (stubbed)
-| ⚠️ | `/api/salaryanalyzer/analyze` | `SalaryAnalyzerController.Analyze` (stubbed)
-| ⚠️ | `/api/salaryanalyzer/negotiation-tips` | `SalaryAnalyzerController.NegotiationTips` (stubbed)
-| ⚠️ | `/api/salarycalculator/analyze` | `SalaryCalculatorController.Analyze` (stubbed)
-| ⚠️ | `/api/valueproposition/generate/*` | `ValuePropositionController.Generate` (stubbed)
-| ⚠️ | `/api/featureflag` | `FeatureFlagController.*` (stubbed)
-| ⛔ | `/api/hubs/notifications*` | SignalR/hubs (explicitly not implemented)
+| ⚠️ | `/api/resumescorer/*` | `ResumeScorerController.*` (stubbed) |
+| ⚠️ | `/api/resumeoptimizer/*` | `ResumeOptimizerController.*` (stubbed) |
+| ⚠️ | `/sentiment/sentimentprediction` | legacy sentiment endpoint (stubbed) |
+| ⚠️ | `/sentiment/resume/sentimentprediction` | legacy sentiment endpoint alias (stubbed) |
+| ⚠️ | `/api/salaryanalyzer/analyze` | `SalaryAnalyzerController.Analyze` (stubbed) |
+| ⚠️ | `/api/salaryanalyzer/negotiation-tips` | `SalaryAnalyzerController.NegotiationTips` (stubbed) |
+| ⚠️ | `/api/salarycalculator/analyze` | `SalaryCalculatorController.Analyze` (stubbed) |
+| ⚠️ | `/api/valueproposition/generate/*` | `ValuePropositionController.Generate` (stubbed) |
+| ⚠️ | `/api/featureflag` | `FeatureFlagController.*` (stubbed) |
+| ⛔ | `/api/hubs/notifications*` | SignalR/hubs (explicitly not implemented) |
 
 ---
 

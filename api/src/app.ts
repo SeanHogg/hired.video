@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
+import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
 
 import { authRoutes } from "./routes/auth.js";
@@ -95,8 +96,24 @@ export function createApp() {
     return rateLimiterMiddleware(c, next);
   });
 
-  // Simple health check
-  app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+  // Simple health check (includes DB connectivity)
+  app.get("/health", async (c) => {
+    try {
+      const db = getDb();
+      // Touch the DB to ensure connectivity. Using a lightweight query on the users table.
+      await db.select().from(schema.users).limit(1);
+      return c.json({ status: "ok", timestamp: new Date().toISOString() });
+    } catch (error: any) {
+      return c.json(
+        {
+          status: "error",
+          timestamp: new Date().toISOString(),
+          error: String(error?.message ?? error),
+        },
+        503,
+      );
+    }
+  });
 
   // Temporary route to quiet accidental /api/collab requests from dev tools/extensions
   // (no business logic currently needed)

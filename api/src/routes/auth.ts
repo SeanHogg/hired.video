@@ -6,7 +6,7 @@ import type { Variables, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { users, passwordResetTokens, emailVerificationTokens } = schema;
+const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
 
 // ============================================================================
 // HELPERS
@@ -66,6 +66,46 @@ async function createJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: strin
     .setIssuedAt()
     .setExpirationTime("7d")
     .sign(secretKey);
+}
+
+function generateVerificationCode(): string {
+  const digits = Array.from(crypto.getRandomValues(new Uint8Array(6))).map((b) => (b % 10).toString());
+  return digits.join("");
+}
+
+async function createTwoFactorEntry(userId: string) {
+  const db = getDb();
+  // Invalidate existing pending codes for this user
+  await db.update(twoFactorCodes).set({ used: true } as any).where(and(eq(twoFactorCodes.userId, userId), eq(twoFactorCodes.used, false)));
+
+  const code = generateVerificationCode();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const [entry] = await db
+    .insert(twoFactorCodes)
+    .values({ userId, code, expiresAt, used: false } as any)
+    .returning();
+
+  return entry;
+}
+
+async function consumeTwoFactorEntry(tempAuthToken: string) {
+  const db = getDb();
+  const now = new Date();
+  const [entry] = await db
+    .select()
+    .from(twoFactorCodes)
+    .where(
+      and(
+        eq(twoFactorCodes.id, tempAuthToken),
+        eq(twoFactorCodes.used, false),
+        gt(twoFactorCodes.expiresAt, now),
+      ),
+    )
+    .limit(1);
+  if (!entry) return null;
+
+  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, entry.id));
+  return entry;
 }
 
 // ============================================================================
@@ -187,6 +227,22 @@ authRoutes.post("/login", async (c) => {
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     return c.json(error("UNAUTHORIZED", "Invalid email or password"), 401);
+  }
+
+  // If user has MFA enabled, step through the 2FA flow instead of issuing a JWT.
+  if (user.mfaEnabled) {
+    const entry = await createTwoFactorEntry(user.id);
+    const isDev = process.env.NODE_ENV !== "production";
+    return c.json(
+      success({
+        requiresTwoFactor: true,
+        tempAuthToken: entry.id,
+        expiresAt: entry.expiresAt.toISOString(),
+        email: user.email,
+        ...(isDev ? { verificationCode: entry.code } : {}),
+      }),
+      200,
+    );
   }
 
   const token = await createJwt(
@@ -354,9 +410,22 @@ authRoutes.post("/verify-2fa", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  // Stub behavior: accept any verification code for migration compatibility.
+  const entry = await consumeTwoFactorEntry(parsed.data.tempAuthToken);
+  if (!entry) {
+    return c.json(error("INVALID_TOKEN", "Invalid or expired two-factor token"), 400);
+  }
+
+  if (entry.code !== parsed.data.verificationCode) {
+    return c.json(error("INVALID_CODE", "Invalid verification code"), 400);
+  }
+
   const db = getDb();
-  const [user] = await db.select().from(users).limit(1);
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, entry.userId))
+    .limit(1);
+
   if (!user) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
@@ -384,7 +453,30 @@ authRoutes.post("/resend-2fa", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  return c.json(success({ resent: true }), 200);
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(twoFactorCodes)
+    .where(eq(twoFactorCodes.id, parsed.data.tempAuthToken))
+    .limit(1);
+
+  if (!existing || existing.used || new Date(existing.expiresAt) <= new Date()) {
+    return c.json(error("INVALID_TOKEN", "Invalid or expired two-factor token"), 400);
+  }
+
+  // Create a new code and invalidate the old one.
+  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, existing.id));
+  const entry = await createTwoFactorEntry(existing.userId);
+
+  const isDev = process.env.NODE_ENV !== "production";
+  return c.json(
+    success({
+      resent: true,
+      tempAuthToken: entry.id,
+      ...(isDev ? { verificationCode: entry.code } : {}),
+    }),
+    200,
+  );
 });
 
 /** GET /api/auth/verification-status */
