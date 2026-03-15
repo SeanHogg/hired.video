@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   integer,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -113,8 +114,22 @@ export const userProfiles = pgTable("user_profiles", {
   headline: text("headline"),
   summary: text("summary"),
   location: varchar("location", { length: 255 }),
+  website: varchar("website", { length: 500 }),
+  phone: varchar("phone", { length: 50 }),
+  linkedIn: varchar("linked_in", { length: 500 }),
+  github: varchar("github", { length: 500 }),
+  twitter: varchar("twitter", { length: 500 }),
+  currentRole: varchar("current_role", { length: 255 }),
+  currentCompany: varchar("current_company", { length: 255 }),
+  avatarUrl: text("avatar_url"),
   yearsOfExperience: integer("years_of_experience"),
   openToWork: boolean("open_to_work").default(false).notNull(),
+  openToRemote: boolean("open_to_remote").default(false).notNull(),
+  salaryCurrency: varchar("salary_currency", { length: 10 }).default("USD"),
+  salaryExpectation: integer("salary_expectation"),
+  skills: jsonb("skills").$type<string[]>().default([]),
+  industries: jsonb("industries").$type<string[]>().default([]),
+  preferredRoles: jsonb("preferred_roles").$type<string[]>().default([]),
   profileVisibility: varchar("profile_visibility", { length: 50 }).default("public").notNull(),
   customUrlSlug: varchar("custom_url_slug", { length: 100 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -167,3 +182,17 @@ export const systemSettings = pgTable("system_settings", {
 
 export type SystemSetting = typeof systemSettings.$inferSelect;
 export type NewSystemSetting = typeof systemSettings.$inferInsert;
+
+export const userConnections = pgTable("user_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fromUserId: uuid("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId: uuid("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 50 }).default("Pending").notNull(), // Pending | Accepted | Rejected
+  requestMessage: text("request_message"),
+  responseMessage: text("response_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type UserConnection = typeof userConnections.$inferSelect;
+export type NewUserConnection = typeof userConnections.$inferInsert;

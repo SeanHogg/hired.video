@@ -28,6 +28,7 @@ import {
   AIUsageLimitError,
 } from "./errors";
 import { logApiCall } from "./logger";
+import { runtimeConfig } from "./runtime-config";
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -82,9 +83,11 @@ export class ApiClient {
   private errorInterceptors: ErrorInterceptor[] = [];
 
   constructor(config: ApiClientConfig = {}) {
-    // Use environment variable or default to production backend
+    // Use runtime config if available, otherwise fall back to build env vars.
+    // Runtime config is expected to come from /config.js (or be injected at runtime).
     this.baseUrl =
       config.baseUrl ||
+      runtimeConfig.apiUrl ||
       import.meta.env.VITE_API_URL ||
       import.meta.env.VITE_API_BASE_URL ||
       "https://api.hired.video"; // Do not include trailing /api; endpoints include /api

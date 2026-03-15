@@ -60,14 +60,21 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/resumes/:id/publish` | `ResumeController.Publish` |
 | ✅ | `POST /api/resumes/:id/clone` | `ResumeController.Clone` |
 | ✅ | Legacy alias `/api/resume/*` | `ResumeController` legacy routes |
-| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (stubbed public resume response) |
+| ⚠️ | `POST /api/resume/public` | `ResumeController.GetPublicResume` (partial, returns stubbed summary list) |
 | ✅ | `POST /api/resume/parse` | `ResumeController.Parse` |
 | ✅ | `POST /api/resume/createfromfile` | `ResumeController.CreateFromFile` |
-| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (stubbed) |
-| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stubbed) |
-| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stubbed) |
-| ⚠️ | `/api/resume/:id/setmaster|setactive|setprivacy|promote|createvariation` | various resume owner actions (stubbed) |
-| ⚠️ | `/api/resume/mastergroups|withownership|validateslug|watch|unwatch` | resume metadata actions (stubbed) |
+| ⚠️ | `POST /api/resume/save` | `ResumeController.Save` (creates resume but not full legacy behavior) |
+| ⚠️ | `POST /api/resume/summarize` | `ResumeController.Summarize` (stub summary) |
+| ⚠️ | `POST /api/resume/sentimentprediction` | `ResumeController.SentimentPrediction` (stub score) |
+| ✅ | `/api/resume/:id/setmaster` | Set resume as master (exclusive per user) |
+| ✅ | `/api/resume/:id/setactive` | Set resume as active (exclusive per user) |
+| ✅ | `/api/resume/:id/setprivacy` | Update privacy level (public/recruiter_only/connections/private) |
+| ✅ | `/api/resume/:id/promote` | Promote variation to master (clears parentId) |
+| ✅ | `/api/resume/:id/createvariation` | Clone resume as variation (sets parentId) |
+| ✅ | `/api/resume/mastergroups` | Return resumes grouped by master/variation hierarchy |
+| ✅ | `/api/resume/withownership` | Return user resumes with ownership metadata |
+| ✅ | `/api/resume/validateslug` | Check if slug is available for current user |
+| ✅ | `/api/resume/watch/:id` + `/api/resume/unwatch/:id` | Watch/unwatch resume (DB-backed via watched_resumes) |
 
 ---
 
@@ -111,7 +118,7 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `GET /api/search/public` | `SearchController.PublicSearch` (supports jobs/companies/people/resumes merge)
+| ✅ | `GET /api/search/public` | `SearchController.PublicSearch` (supports jobs/companies/people/resumes merge)
 
 ---
 
@@ -135,7 +142,7 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 | ✅ | `POST /api/account/invitation/{id}/resend` | `AccountController.ResendInvitation` |
 | ✅ | `POST /api/account/invitation/{id}/cancel` | `AccountController.CancelInvitation` |
 | ✅ | `GET /api/account/invitation-analytics` | `AccountController.InvitationAnalytics` |
-| ⚠️ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (stubbed) |
+| ✅ | `POST /api/account/deleteaccount` | `AccountController.DeleteAccount` (soft delete / disable account) |
 | ⚠️ | `POST /api/account/reset-password` | legacy frontend route (stubbed) |
 | ⚠️ | `POST /api/account/confirm-password-reset` | legacy frontend route (stubbed) |
 
@@ -302,13 +309,13 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/feed/posts` | `FeedController.Posts` |
-| ⚠️ | `/api/feed/posts/:id` | `FeedController.Post` |
-| ⚠️ | `/api/feed/posts/:id/like` | `FeedController.Like` |
-| ⚠️ | `/api/feed/comments` | `FeedController.Comments` |
-| ⚠️ | `/api/feed/comments/:id` | `FeedController.Comment` |
-| ⚠️ | `/api/feed/search` | `FeedController.Search` |
-| ⚠️ | `/api/feed/link-preview` | `FeedController.LinkPreview` |
+| ✅ | `/api/feed/posts` | `FeedController.Posts` |
+| ✅ | `/api/feed/posts/:id` | `FeedController.Post` |
+| ✅ | `/api/feed/posts/:id/like` | `FeedController.Like` |
+| ✅ | `/api/feed/comments` | `FeedController.Comments` |
+| ✅ | `/api/feed/comments/:id` | `FeedController.Comment` |
+| ✅ | `/api/feed/search` | `FeedController.Search` |
+| ✅ | `/api/feed/link-preview` | `FeedController.LinkPreview` (link metadata stubbed) |
 
 ---
 
@@ -316,10 +323,10 @@ This document tracks where the new Cloudflare Worker API implementation (`/api`)
 
 | Status | New API | Legacy API |
 |--------|---------|------------|
-| ⚠️ | `/api/task` | `TaskController.List` |
-| ⚠️ | `/api/task/:id` | `TaskController.Get/Delete` |
-| ⚠️ | `/api/task/save` | `TaskController.Save` |
-| ⚠️ | `POST /api/task/:id` (legacy fallback) | `TaskController.LegacyPost` |
+| ✅ | `/api/task` | `TaskController.List` |
+| ✅ | `/api/task/:id` | `TaskController.Get/Delete` |
+| ✅ | `/api/task/save` | `TaskController.Save` |
+| ✅ | `POST /api/task/:id` (legacy fallback) | `TaskController.LegacyPost` |
 
 ---
 

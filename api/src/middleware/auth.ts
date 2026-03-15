@@ -8,7 +8,7 @@ export const authMiddleware: MiddlewareHandler<{ Variables: Variables }> = async
     return c.json({ error: { code: "UNAUTHORIZED", message: "Missing or malformed Authorization header" } }, 401);
   }
   const token = authHeader.slice(7);
-  const secret = process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET;
   if (!secret) {
     console.error("[auth] JWT_SECRET is not configured");
     return c.json({ error: { code: "INTERNAL_SERVER_ERROR", message: "Auth configuration error" } }, 500);

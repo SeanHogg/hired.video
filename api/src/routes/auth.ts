@@ -8,6 +8,10 @@ import { getDb, schema } from "../db/index.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
 
+function getJwtSecret(): string {
+  return process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET || "";
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -224,6 +228,14 @@ authRoutes.post("/login", async (c) => {
     return c.json(error("UNAUTHORIZED", "Invalid email or password"), 401);
   }
 
+  if (!user.isActive) {
+    return c.json(error("UNAUTHORIZED", "Account is disabled"), 401);
+  }
+
+  if (user.isSuspended) {
+    return c.json(error("FORBIDDEN", "Account is suspended"), 403);
+  }
+
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     return c.json(error("UNAUTHORIZED", "Invalid email or password"), 401);
@@ -247,7 +259,7 @@ authRoutes.post("/login", async (c) => {
 
   const token = await createJwt(
     { sub: user.id, email: user.email, roles: [user.role], emailVerified: false, mustChangePassword: false },
-    process.env.JWT_SECRET ?? "",
+    getJwtSecret(),
   );
 
   return c.json(
@@ -269,7 +281,7 @@ authRoutes.post("/refresh", async (c) => {
   const { jwtVerify } = await import("jose");
   const token = authHeader.slice(7);
   try {
-    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
     const newToken = await createJwt(
@@ -279,7 +291,7 @@ authRoutes.post("/refresh", async (c) => {
         
         roles: (payload["roles"] as string[]) ?? [], emailVerified: (payload["emailVerified"] as boolean) ?? false, mustChangePassword: (payload["mustChangePassword"] as boolean) ?? false,
       },
-      process.env.JWT_SECRET ?? "",
+      getJwtSecret(),
     );
 
     return c.json(
@@ -432,7 +444,7 @@ authRoutes.post("/verify-2fa", async (c) => {
 
   const token = await createJwt(
     { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false },
-    process.env.JWT_SECRET ?? "",
+    getJwtSecret(),
   );
 
   return c.json(
@@ -489,7 +501,7 @@ authRoutes.get("/verification-status", async (c) => {
   const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
-    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
     const db = getDb();
@@ -527,7 +539,7 @@ authRoutes.post("/resend-email-verification", async (c) => {
   const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
-    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
     const db = getDb();
     const [user] = await db
@@ -565,7 +577,7 @@ authRoutes.get("/me", async (c) => {
   const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
-    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
+    const secretKey = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
 
     const db = getDb();

@@ -253,6 +253,83 @@ dotnet run
 
 The API will be available at `https://localhost:5001` and `http://localhost:5000`
 
+### ⚙️ Cloudflare Worker API (hired-api)
+
+This project includes a Cloudflare Worker-based API (`api/`) that is deployed via Wrangler.
+
+#### Secrets & environment
+
+The worker expects a Neon/Postgres connection string via one of these binding names:
+
+- `DATABASE_URL`
+- `NEON_DATABASE_URL`
+- `NEON_DB_URL`
+
+> **Important:** These values should be set as Wrangler secrets, not committed to source control.
+
+Example (run from `api/`):
+
+```bash
+# Set secrets for the worker (production environment)
+wrangler secret put NEON_DATABASE_URL --env production
+wrangler secret put NEON_DB_URL --env production
+```
+
+#### Deploying the worker (with migrations)
+
+The worker deploy script has been configured to run database migrations before deploying.
+
+From `api/`:
+
+```bash
+npm install
+npm run deploy
+```
+
+This runs:
+
+1. `npm run db:push` — runs `drizzle-kit up` to apply any schema changes
+2. `wrangler deploy --env production` — deploys the worker to Cloudflare
+
+#### Health check
+
+A health endpoint is available at:
+
+- `https://api.hired.video/api/health`
+
+It verifies both the worker is running and the database connection is valid.
+
+#### CORS configuration
+
+Allowed frontend origins are controlled by the `FRONTEND_URL` environment variable in `api/wrangler.toml`. Set it as a **comma-separated list** of all domains that should be permitted to call the API from a browser.
+
+```toml
+# api/wrangler.toml
+[vars]
+FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+
+[env.production.vars]
+FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+```
+
+> ⚠️ **Critical implementation detail:** The CORS origin check in `api/src/app.ts` reads `FRONTEND_URL` inside the per-request `origin` callback (via `getAllowedOrigins()`). This is intentional — Cloudflare Worker bindings are not available at module-load time (when `createApp()` runs), only during request handling when `globalThis.__ENV` has been populated by `worker.ts`. If you move that lookup outside the callback it will always fall back to the hardcoded default and any domain not in the fallback will get `Access-Control-Allow-Origin: null`.
+
+After editing `wrangler.toml`, redeploy the worker from `api/`:
+
+```bash
+npx wrangler deploy --env production
+```
+
+#### If you need to run migrations manually
+
+From `api/`:
+
+```bash
+npm run db:push
+```
+
+---
+
 #### 4. Frontend Setup
 
 ```bash

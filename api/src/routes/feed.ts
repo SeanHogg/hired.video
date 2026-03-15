@@ -1,334 +1,389 @@
 import { Hono } from "hono";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
+
+const { feedPosts, feedPostLikes, feedPostComments, users, userProfiles } = schema;
 
 export const feedRoutes = new Hono<{ Variables: Variables }>();
 
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-
-const nowIso = () => new Date().toISOString();
-
-type FeedPostLike = {
-  id: string;
-  feedPostId: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  createdAt: string;
-};
-
-type FeedPostComment = {
-  id: string;
-  feedPostId: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type FeedPost = {
-  id: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
-  content: string;
-  linkUrl?: string;
-  linkTitle?: string;
-  linkDescription?: string;
-  linkImageUrl?: string;
-  privacy: "Public" | "Private" | "Connections";
-  createdAt: string;
-  updatedAt: string;
-  media: Array<{
-    id: string;
-    feedPostId: string;
-    mediaType: "Image" | "Video";
-    mediaUrl: string;
-    thumbnailUrl?: string;
-    altText?: string;
-    displayOrder: number;
-    createdAt: string;
-  }>;
-  tags: Array<{
-    id: string;
-    feedPostId: string;
-    tagType: "Hashtag" | "Mention";
-    tagValue: string;
-    mentionedUserId?: string;
-    position: number;
-    createdAt: string;
-  }>;
-  likes: FeedPostLike[];
-  comments: FeedPostComment[];
-  likeCount: number;
-  commentCount: number;
-  isLikedByCurrentUser: boolean;
-};
-
-function createPost(body: Record<string, unknown>, existing?: FeedPost): FeedPost {
-  const now = nowIso();
-  const postId = existing?.id ?? crypto.randomUUID();
-  const likes = existing?.likes ?? [];
-  const comments = existing?.comments ?? [];
-
+// ─────────────────────────────────────────────────────────────────────────────
+// DTO builder
+// ─────────────────────────────────────────────────────────────────────────────
+function toPostDto(
+  post: typeof feedPosts.$inferSelect,
+  authorName: string,
+  authorAvatar: string | null,
+  likes: Array<{ id: string; userId: string }>,
+  commentCount: number,
+  currentUserId: string,
+) {
   return {
-    id: postId,
-    userId: existing?.userId ?? "",
-    userName: existing?.userName ?? "",
-    userAvatar: existing?.userAvatar,
-    content: typeof body.content === "string" ? body.content : existing?.content ?? "",
-    linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : existing?.linkUrl,
-    linkTitle: existing?.linkTitle,
-    linkDescription: existing?.linkDescription,
-    linkImageUrl: existing?.linkImageUrl,
-    privacy:
-      body.privacy === "Private" || body.privacy === "Connections" || body.privacy === "Public"
-        ? body.privacy
-        : existing?.privacy ?? "Public",
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-    media: Array.isArray(body.media)
-      ? body.media.map((m, idx) => {
-          const media = (m ?? {}) as Record<string, unknown>;
-          return {
-            id: crypto.randomUUID(),
-            feedPostId: postId,
-            mediaType: media.mediaType === "Video" ? "Video" : "Image",
-            mediaUrl: typeof media.mediaUrl === "string" ? media.mediaUrl : "",
-            thumbnailUrl: typeof media.thumbnailUrl === "string" ? media.thumbnailUrl : undefined,
-            altText: typeof media.altText === "string" ? media.altText : undefined,
-            displayOrder: typeof media.displayOrder === "number" ? media.displayOrder : idx,
-            createdAt: now,
-          };
-        })
-      : existing?.media ?? [],
-    tags: existing?.tags ?? [],
-    likes,
-    comments,
+    id: post.id,
+    userId: post.userId,
+    userName: authorName,
+    userAvatar: authorAvatar ?? undefined,
+    content: post.content,
+    linkUrl: post.linkUrl ?? undefined,
+    linkTitle: post.linkTitle ?? undefined,
+    linkDescription: post.linkDescription ?? undefined,
+    linkImageUrl: post.linkImageUrl ?? undefined,
+    privacy: post.privacy as "Public" | "Connections" | "Private",
+    createdAt: new Date(post.createdAt).toISOString(),
+    updatedAt: new Date(post.updatedAt).toISOString(),
+    media: post.media ?? [],
+    tags: post.tags ?? [],
+    likes: likes.map((l) => ({ id: l.id, feedPostId: post.id, userId: l.userId, userName: "" })),
+    comments: [],
     likeCount: likes.length,
-    commentCount: comments.length,
-    isLikedByCurrentUser: false,
+    commentCount,
+    isLikedByCurrentUser: likes.some((l) => l.userId === currentUserId),
   };
 }
 
-const posts = new Map<string, FeedPost>();
+async function fetchPostDtos(
+  postRows: Array<typeof feedPosts.$inferSelect>,
+  currentUserId: string,
+  db: ReturnType<typeof getDb>,
+) {
+  if (postRows.length === 0) return [];
+  const postIds = postRows.map((p) => p.id);
+  const authorIds = [...new Set(postRows.map((p) => p.userId))];
 
-feedRoutes.get("/posts", (c) => {
-  const pageNumber = Number(c.req.query("pageNumber") ?? "1") || 1;
-  const pageSize = Number(c.req.query("pageSize") ?? "20") || 20;
+  const [authorRows, profileRows, likeRows, commentCounts] = await Promise.all([
+    db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds)),
+    db
+      .select({ userId: userProfiles.userId, avatarUrl: userProfiles.avatarUrl })
+      .from(userProfiles)
+      .where(inArray(userProfiles.userId, authorIds)),
+    db
+      .select({ id: feedPostLikes.id, feedPostId: feedPostLikes.feedPostId, userId: feedPostLikes.userId })
+      .from(feedPostLikes)
+      .where(inArray(feedPostLikes.feedPostId, postIds)),
+    db
+      .select({ feedPostId: feedPostComments.feedPostId, count: sql<number>`count(*)::int` })
+      .from(feedPostComments)
+      .where(inArray(feedPostComments.feedPostId, postIds))
+      .groupBy(feedPostComments.feedPostId),
+  ]);
 
-  const all = Array.from(posts.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  const start = (pageNumber - 1) * pageSize;
-  const slice = all.slice(start, start + pageSize);
+  const authorMap = new Map(authorRows.map((a) => [a.id, a.name]));
+  const avatarMap = new Map(profileRows.map((p) => [p.userId, p.avatarUrl ?? null]));
+
+  const likesByPost = new Map<string, Array<{ id: string; userId: string }>>();
+  for (const like of likeRows) {
+    if (!likesByPost.has(like.feedPostId)) likesByPost.set(like.feedPostId, []);
+    likesByPost.get(like.feedPostId)!.push({ id: like.id, userId: like.userId });
+  }
+
+  const commentCountMap = new Map(commentCounts.map((c) => [c.feedPostId, c.count]));
+
+  return postRows.map((post) =>
+    toPostDto(
+      post,
+      authorMap.get(post.userId) ?? "Unknown",
+      avatarMap.get(post.userId) ?? null,
+      likesByPost.get(post.id) ?? [],
+      commentCountMap.get(post.id) ?? 0,
+      currentUserId,
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** GET /api/feed/posts */
+feedRoutes.get("/posts", async (c) => {
+  const currentUserId = c.var.user?.sub ?? "";
+  const pageNumber = Math.max(1, Number(c.req.query("pageNumber") ?? "1") || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(c.req.query("pageSize") ?? "20") || 20));
+  const offset = (pageNumber - 1) * pageSize;
+  const db = getDb();
+
+  const [totalRow, postRows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(feedPosts),
+    db.select().from(feedPosts).orderBy(desc(feedPosts.createdAt)).limit(pageSize).offset(offset),
+  ]);
+
+  const total = totalRow[0]?.count ?? 0;
+  const dtos = await fetchPostDtos(postRows, currentUserId, db);
 
   return c.json(
-    ok({
-      posts: slice,
-      totalCount: all.length,
+    success({
+      posts: dtos,
+      totalCount: total,
       pageNumber,
       pageSize,
-      hasNextPage: start + pageSize < all.length,
+      hasNextPage: offset + pageSize < total,
       hasPreviousPage: pageNumber > 1,
     }),
     200,
   );
 });
 
-feedRoutes.get("/posts/:postId", (c) => {
+/** GET /api/feed/posts/:postId */
+feedRoutes.get("/posts/:postId", async (c) => {
   const postId = c.req.param("postId");
-  const post = posts.get(postId);
-  if (!post) {
-    return c.json(ok(createPost({ content: "", privacy: "Public", media: [] }, { ...createPost({}, undefined), id: postId })), 200);
-  }
-  return c.json(ok(post), 200);
+  const currentUserId = c.var.user?.sub ?? "";
+  const db = getDb();
+
+  const [post] = await db.select().from(feedPosts).where(eq(feedPosts.id, postId)).limit(1);
+  if (!post) return c.json(error("NOT_FOUND", "Post not found"), 404);
+
+  const [dto] = await fetchPostDtos([post], currentUserId, db);
+  return c.json(success(dto), 200);
 });
 
+/** POST /api/feed/posts */
 feedRoutes.post("/posts", async (c) => {
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const post = createPost(body);
-  posts.set(post.id, post);
-  return c.json(ok(post), 201);
+  const db = getDb();
+
+  const [post] = await db
+    .insert(feedPosts)
+    .values({
+      userId,
+      content: typeof body.content === "string" ? body.content : "",
+      linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : null,
+      privacy:
+        body.privacy === "Private" || body.privacy === "Connections" ? String(body.privacy) : "Public",
+      media: Array.isArray(body.media)
+        ? (body.media as any[]).map((m: any, idx: number) => ({
+            id: crypto.randomUUID(),
+            mediaType: m.mediaType === "Video" ? "Video" : "Image",
+            mediaUrl: m.mediaUrl ?? "",
+            thumbnailUrl: m.thumbnailUrl ?? undefined,
+            altText: m.altText ?? undefined,
+            displayOrder: typeof m.displayOrder === "number" ? m.displayOrder : idx,
+          }))
+        : [],
+      tags: [],
+    } as any)
+    .returning();
+
+  const [dto] = await fetchPostDtos([post], userId, db);
+  return c.json(success(dto), 201);
 });
 
+/** PUT /api/feed/posts/:postId */
 feedRoutes.put("/posts/:postId", async (c) => {
   const postId = c.req.param("postId");
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const existing = posts.get(postId);
-  const updated = createPost(body, existing ?? { ...createPost({}, undefined), id: postId });
-  posts.set(postId, updated);
-  return c.json(ok(updated), 200);
+  const db = getDb();
+
+  const [existing] = await db.select().from(feedPosts).where(eq(feedPosts.id, postId)).limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Post not found"), 404);
+  if (existing.userId !== userId) return c.json(error("FORBIDDEN", "Not your post"), 403);
+
+  const [updated] = await db
+    .update(feedPosts)
+    .set({
+      content: typeof body.content === "string" ? body.content : existing.content,
+      privacy:
+        body.privacy === "Private" || body.privacy === "Connections" || body.privacy === "Public"
+          ? String(body.privacy)
+          : existing.privacy,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(feedPosts.id, postId))
+    .returning();
+
+  const [dto] = await fetchPostDtos([updated], userId, db);
+  return c.json(success(dto), 200);
 });
 
-feedRoutes.delete("/posts/:postId", (c) => {
-  posts.delete(c.req.param("postId"));
-  return c.json(ok(true), 200);
-});
-
-feedRoutes.post("/posts/:postId/like", (c) => {
+/** DELETE /api/feed/posts/:postId */
+feedRoutes.delete("/posts/:postId", async (c) => {
   const postId = c.req.param("postId");
-  const existing = posts.get(postId);
-  const basePost = existing ?? { ...createPost({}, undefined), id: postId };
+  const userId = c.var.user.sub;
+  const db = getDb();
 
-  const like: FeedPostLike = {
-    id: crypto.randomUUID(),
-    feedPostId: postId,
-    userId: "",
-    userName: "",
-    createdAt: nowIso(),
-  };
+  const [existing] = await db
+    .select({ id: feedPosts.id, userId: feedPosts.userId })
+    .from(feedPosts)
+    .where(eq(feedPosts.id, postId))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Post not found"), 404);
+  if (existing.userId !== userId) return c.json(error("FORBIDDEN", "Not your post"), 403);
 
-  const likes = [...basePost.likes, like];
-  const updated: FeedPost = {
-    ...basePost,
-    likes,
-    likeCount: likes.length,
-    isLikedByCurrentUser: true,
-    updatedAt: nowIso(),
-  };
-
-  posts.set(postId, updated);
-  return c.json(ok(like), 200);
+  await db.delete(feedPosts).where(eq(feedPosts.id, postId));
+  return c.json(success(true), 200);
 });
 
-feedRoutes.delete("/posts/:postId/like", (c) => {
+/** POST /api/feed/posts/:postId/like */
+feedRoutes.post("/posts/:postId/like", async (c) => {
   const postId = c.req.param("postId");
-  const existing = posts.get(postId);
-  if (existing) {
-    const likes = existing.likes.slice(0, Math.max(0, existing.likes.length - 1));
-    posts.set(postId, {
-      ...existing,
-      likes,
-      likeCount: likes.length,
-      isLikedByCurrentUser: false,
-      updatedAt: nowIso(),
-    });
-  }
-  return c.json(ok(true), 200);
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ id: feedPostLikes.id })
+    .from(feedPostLikes)
+    .where(and(eq(feedPostLikes.feedPostId, postId), eq(feedPostLikes.userId, userId)))
+    .limit(1);
+
+  if (existing) return c.json(success({ id: existing.id, feedPostId: postId, userId }), 200);
+
+  const [like] = await db.insert(feedPostLikes).values({ feedPostId: postId, userId }).returning();
+  return c.json(success({ id: like.id, feedPostId: postId, userId }), 200);
 });
 
+/** DELETE /api/feed/posts/:postId/like */
+feedRoutes.delete("/posts/:postId/like", async (c) => {
+  const postId = c.req.param("postId");
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  await db
+    .delete(feedPostLikes)
+    .where(and(eq(feedPostLikes.feedPostId, postId), eq(feedPostLikes.userId, userId)));
+
+  return c.json(success(true), 200);
+});
+
+/** GET /api/feed/posts/:postId/comments */
+feedRoutes.get("/posts/:postId/comments", async (c) => {
+  const postId = c.req.param("postId");
+  const db = getDb();
+
+  const rows = await db
+    .select()
+    .from(feedPostComments)
+    .where(eq(feedPostComments.feedPostId, postId))
+    .orderBy(desc(feedPostComments.createdAt));
+
+  return c.json(
+    success(
+      rows.map((r) => ({
+        id: r.id,
+        feedPostId: r.feedPostId,
+        userId: r.userId,
+        userName: "",
+        content: r.content,
+        createdAt: new Date(r.createdAt).toISOString(),
+        updatedAt: new Date(r.updatedAt).toISOString(),
+      })),
+    ),
+    200,
+  );
+});
+
+/** POST /api/feed/comments */
 feedRoutes.post("/comments", async (c) => {
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const postId = typeof body.feedPostId === "string" ? body.feedPostId : "";
-  const existing = posts.get(postId) ?? { ...createPost({}, undefined), id: postId };
+  const content = typeof body.content === "string" ? body.content : "";
+  const db = getDb();
 
-  const comment: FeedPostComment = {
-    id: crypto.randomUUID(),
-    feedPostId: postId,
-    userId: "",
-    userName: "",
-    content: typeof body.content === "string" ? body.content : "",
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
+  const [comment] = await db
+    .insert(feedPostComments)
+    .values({ feedPostId: postId, userId, content })
+    .returning();
 
-  const comments = [...existing.comments, comment];
-  posts.set(postId, {
-    ...existing,
-    comments,
-    commentCount: comments.length,
-    updatedAt: nowIso(),
-  });
-
-  return c.json(ok(comment), 201);
+  return c.json(
+    success({
+      id: comment.id,
+      feedPostId: comment.feedPostId,
+      userId: comment.userId,
+      userName: "",
+      content: comment.content,
+      createdAt: new Date(comment.createdAt).toISOString(),
+      updatedAt: new Date(comment.updatedAt).toISOString(),
+    }),
+    201,
+  );
 });
 
+/** PUT /api/feed/comments/:commentId */
 feedRoutes.put("/comments/:commentId", async (c) => {
   const commentId = c.req.param("commentId");
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const db = getDb();
 
-  for (const [postId, post] of posts.entries()) {
-    const idx = post.comments.findIndex((it) => it.id === commentId);
-    if (idx >= 0) {
-      const updatedComment: FeedPostComment = {
-        ...post.comments[idx],
-        content: typeof body.content === "string" ? body.content : post.comments[idx].content,
-        updatedAt: nowIso(),
-      };
-      const comments = [...post.comments];
-      comments[idx] = updatedComment;
-      posts.set(postId, { ...post, comments, updatedAt: nowIso() });
-      return c.json(ok(updatedComment), 200);
-    }
-  }
+  const [existing] = await db
+    .select()
+    .from(feedPostComments)
+    .where(eq(feedPostComments.id, commentId))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Comment not found"), 404);
+  if (existing.userId !== userId) return c.json(error("FORBIDDEN", "Not your comment"), 403);
+
+  const [updated] = await db
+    .update(feedPostComments)
+    .set({
+      content: typeof body.content === "string" ? body.content : existing.content,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(feedPostComments.id, commentId))
+    .returning();
 
   return c.json(
-    ok({
-      id: commentId,
-      feedPostId: "",
-      userId: "",
+    success({
+      id: updated.id,
+      feedPostId: updated.feedPostId,
+      userId: updated.userId,
       userName: "",
-      content: typeof body.content === "string" ? body.content : "",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+      content: updated.content,
+      createdAt: new Date(updated.createdAt).toISOString(),
+      updatedAt: new Date(updated.updatedAt).toISOString(),
     }),
     200,
   );
 });
 
-feedRoutes.delete("/comments/:commentId", (c) => {
+/** DELETE /api/feed/comments/:commentId */
+feedRoutes.delete("/comments/:commentId", async (c) => {
   const commentId = c.req.param("commentId");
-  for (const [postId, post] of posts.entries()) {
-    const filtered = post.comments.filter((it) => it.id !== commentId);
-    if (filtered.length !== post.comments.length) {
-      posts.set(postId, {
-        ...post,
-        comments: filtered,
-        commentCount: filtered.length,
-        updatedAt: nowIso(),
-      });
-      break;
-    }
-  }
-  return c.json(ok(true), 200);
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ id: feedPostComments.id, userId: feedPostComments.userId })
+    .from(feedPostComments)
+    .where(eq(feedPostComments.id, commentId))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Comment not found"), 404);
+  if (existing.userId !== userId) return c.json(error("FORBIDDEN", "Not your comment"), 403);
+
+  await db.delete(feedPostComments).where(eq(feedPostComments.id, commentId));
+  return c.json(success(true), 200);
 });
 
-feedRoutes.get("/search", (c) => {
-  const searchTerm = (c.req.query("searchTerm") ?? "").toLowerCase();
-  const pageNumber = Number(c.req.query("pageNumber") ?? "1") || 1;
-  const pageSize = Number(c.req.query("pageSize") ?? "20") || 20;
+/** GET /api/feed/search */
+feedRoutes.get("/search", async (c) => {
+  const currentUserId = c.var.user?.sub ?? "";
+  const searchTerm = c.req.query("searchTerm") ?? "";
+  const pageNumber = Math.max(1, Number(c.req.query("pageNumber") ?? "1") || 1);
+  const pageSize = Math.min(50, Number(c.req.query("pageSize") ?? "20") || 20);
+  const offset = (pageNumber - 1) * pageSize;
 
-  const matches = Array.from(posts.values()).filter((p) => p.content.toLowerCase().includes(searchTerm));
-  const start = (pageNumber - 1) * pageSize;
-  const slice = matches.slice(start, start + pageSize);
+  const db = getDb();
+  const { ilike } = await import("drizzle-orm");
+  const postRows = await db
+    .select()
+    .from(feedPosts)
+    .where(ilike(feedPosts.content, `%${searchTerm}%`))
+    .orderBy(desc(feedPosts.createdAt))
+    .limit(pageSize)
+    .offset(offset);
 
-  return c.json(
-    ok({
-      posts: slice,
-      totalCount: matches.length,
-      pageNumber,
-      pageSize,
-      hasNextPage: start + pageSize < matches.length,
-      hasPreviousPage: pageNumber > 1,
-    }),
-    200,
-  );
+  const dtos = await fetchPostDtos(postRows, currentUserId, db);
+  return c.json(success({ posts: dtos, totalCount: dtos.length, pageNumber, pageSize }), 200);
 });
 
+/** POST /api/feed/link-preview */
 feedRoutes.post("/link-preview", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const url = typeof body.url === "string" ? body.url : "";
   return c.json(
-    ok({
-      url,
-      title: "Link Preview",
-      description: "Preview data is currently stubbed.",
-      imageUrl: undefined,
-      siteName: undefined,
-    }),
+    success({ url, title: null, description: null, imageUrl: null, siteName: null }),
     200,
   );
 });
-
-feedRoutes.all("*", (c) =>
-  c.json(
-    {
-      success: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Feed routes coming soon" },
-      timestamp: new Date().toISOString(),
-    },
-    501,
-  ),
-);

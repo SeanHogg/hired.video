@@ -1,19 +1,41 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, or, and } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { users } = schema;
+const { users, userProfiles, userConnections } = schema;
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
 
 const UpdateProfileSchema = z.object({
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().optional(),
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
+  headline: z.string().optional(),
+  summary: z.string().optional(),
+  location: z.string().optional(),
+  website: z.string().optional(),
+  phone: z.string().optional(),
+  linkedIn: z.string().optional(),
+  gitHub: z.string().optional(),  // frontend sends camelCase gitHub
+  github: z.string().optional(),
+  twitter: z.string().optional(),
+  currentRole: z.string().optional(),
+  currentCompany: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  openToWork: z.boolean().optional(),
+  openToRemote: z.boolean().optional(),
+  salaryCurrency: z.string().optional(),
+  salaryExpectation: z.number().int().optional(),
+  yearsOfExperience: z.number().int().optional(),
+  skills: z.array(z.string()).optional(),
+  industries: z.array(z.string()).optional(),
+  preferredRoles: z.array(z.string()).optional(),
 });
 
 const SendConnectionRequestSchema = z.object({
@@ -31,29 +53,77 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function toUserProfileDto(row: {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  emailVerified: boolean;
-  createdAt: Date | string;
-  updatedAt?: Date | string;
+function makeConnectionDto(row: {
+  id: string; fromUserId: string; toUserId: string; status: string;
+  requestMessage: string | null; responseMessage: string | null;
+  createdAt: Date | string; updatedAt: Date | string;
 }) {
   return {
     id: row.id,
-    email: row.email,
-    name: row.name,
-    role: row.role,
-    headline: "",
-    summary: "",
-    location: "",
-    avatarUrl: "",
-    profilePictureUrl: "",
-    isPublic: true,
-    isVerified: row.emailVerified,
+    fromUserId: row.fromUserId,
+    toUserId: row.toUserId,
+    status: row.status,
+    requestMessage: row.requestMessage ?? "",
+    responseMessage: row.responseMessage ?? "",
     createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt ?? row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+function toUserProfileDto(
+  row: {
+    id: string; email: string; name: string; role: string;
+    emailVerified: boolean; createdAt: Date | string; updatedAt?: Date | string;
+  },
+  profile?: {
+    headline?: string | null; summary?: string | null; location?: string | null;
+    website?: string | null; phone?: string | null;
+    linkedIn?: string | null; github?: string | null; twitter?: string | null;
+    currentRole?: string | null; currentCompany?: string | null;
+    avatarUrl?: string | null; openToWork?: boolean | null; openToRemote?: boolean | null;
+    salaryCurrency?: string | null; salaryExpectation?: number | null;
+    yearsOfExperience?: number | null;
+    skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
+    updatedAt?: Date | string | null;
+  } | null,
+) {
+  const nameParts = (row.name ?? "").split(" ");
+  const firstName = nameParts[0] ?? "";
+  const lastName = nameParts.slice(1).join(" ");
+  const profileUpdatedAt = profile?.updatedAt ?? row.updatedAt ?? row.createdAt;
+  return {
+    id: row.id,
+    slug: "",
+    email: row.email,
+    userName: row.email,
+    data: {
+      firstName,
+      lastName,
+      avatar: profile?.avatarUrl ?? "",
+      headline: profile?.headline ?? "",
+      summary: profile?.summary ?? "",
+      location: profile?.location ?? "",
+      website: profile?.website ?? "",
+      linkedIn: profile?.linkedIn ?? "",
+      github: profile?.github ?? "",
+      phone: profile?.phone ?? "",
+      currentRole: profile?.currentRole ?? "",
+      currentCompany: profile?.currentCompany ?? "",
+    },
+    role: row.role,
+    isPremium: false,
+    isDemo: false,
+    isVerified: row.emailVerified,
+    openToWork: profile?.openToWork ?? false,
+    openToRemote: profile?.openToRemote ?? false,
+    salaryCurrency: profile?.salaryCurrency ?? "USD",
+    salaryExpectation: profile?.salaryExpectation ?? null,
+    yearsOfExperience: profile?.yearsOfExperience ?? null,
+    skills: profile?.skills ?? [],
+    industries: profile?.industries ?? [],
+    preferredRoles: profile?.preferredRoles ?? [],
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(profileUpdatedAt).toISOString(),
   };
 }
 
@@ -122,7 +192,13 @@ userRoutes.get("/me", async (c) => {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
-  return c.json(success(toUserProfileDto(me)), 200);
+  const [profile] = await db
+    .select()
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, user.sub))
+    .limit(1);
+
+  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
 });
 
 /** GET /api/users/profile — get the authenticated user's profile */
@@ -130,7 +206,7 @@ userRoutes.get("/profile", async (c) => {
   const user = c.var.user;
   const db = getDb();
 
-  const [profile] = await db
+  const [me] = await db
     .select({
       id: users.id,
       email: users.email,
@@ -144,11 +220,17 @@ userRoutes.get("/profile", async (c) => {
     .where(eq(users.id, user.sub))
     .limit(1);
 
-  if (!profile) {
+  if (!me) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
-  return c.json(success(profile));
+  const [profile] = await db
+    .select()
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, user.sub))
+    .limit(1);
+
+  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
 });
 
 /** PUT /api/users/profile — update the authenticated user's profile */
@@ -161,50 +243,19 @@ userRoutes.put("/profile", async (c) => {
   }
 
   const db = getDb();
+  const d = parsed.data;
 
-  const updates: Partial<{ name: string; email: string; updatedAt: Date }> = {
-    updatedAt: new Date(),
-  };
-  if (parsed.data.name) updates.name = parsed.data.name;
-  if (parsed.data.email) updates.email = parsed.data.email;
+  const firstName = d.firstName ?? "";
+  const lastName = d.lastName ?? "";
+  const fullName = d.name ?? (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined);
 
-  const [updated] = await db
-    .update(users)
-    .set(updates)
-    .where(eq(users.id, user.sub))
-    .returning({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      updatedAt: users.updatedAt,
-    });
-
-  if (!updated) {
-    return c.json(error("NOT_FOUND", "User not found"), 404);
-  }
-
-  return c.json(success(updated));
-});
-
-/** PUT /api/users/me — frontend compatibility endpoint */
-userRoutes.put("/me", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateProfileSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-
-  const db = getDb();
-  const updates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
-  if (parsed.data.name) updates.name = parsed.data.name;
-  if (parsed.data.email) updates.email = parsed.data.email;
+  const userUpdates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
+  if (fullName) userUpdates.name = fullName;
+  if (d.email) userUpdates.email = d.email;
 
   const [updated] = await db
     .update(users)
-    .set(updates)
+    .set(userUpdates)
     .where(eq(users.id, user.sub))
     .returning({
       id: users.id,
@@ -220,7 +271,117 @@ userRoutes.put("/me", async (c) => {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
-  return c.json(success(toUserProfileDto(updated)), 200);
+  const profileData = {
+    userId: user.sub,
+    headline: d.headline ?? null,
+    summary: d.summary ?? null,
+    location: d.location ?? null,
+    website: d.website ?? null,
+    phone: d.phone ?? null,
+    linkedIn: d.linkedIn ?? null,
+    github: d.github ?? d.gitHub ?? null,
+    twitter: d.twitter ?? null,
+    currentRole: d.currentRole ?? null,
+    currentCompany: d.currentCompany ?? null,
+    avatarUrl: d.avatarUrl ?? null,
+    openToWork: d.openToWork ?? false,
+    openToRemote: d.openToRemote ?? false,
+    salaryCurrency: d.salaryCurrency ?? null,
+    salaryExpectation: d.salaryExpectation ?? null,
+    yearsOfExperience: d.yearsOfExperience ?? null,
+    skills: d.skills ?? [],
+    industries: d.industries ?? [],
+    preferredRoles: d.preferredRoles ?? [],
+    updatedAt: new Date(),
+  } as any;
+
+  const [profile] = await db
+    .insert(userProfiles)
+    .values({ ...profileData, createdAt: new Date() })
+    .onConflictDoUpdate({
+      target: userProfiles.userId,
+      set: profileData,
+    })
+    .returning();
+
+  return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
+});
+
+/** PUT /api/users/me — frontend compatibility endpoint */
+userRoutes.put("/me", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = UpdateProfileSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+  }
+
+  const db = getDb();
+  const d = parsed.data;
+
+  // Derive name from firstName/lastName if provided
+  const firstName = d.firstName ?? "";
+  const lastName = d.lastName ?? "";
+  const fullName = d.name ?? (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined);
+
+  // Update users table (name/email)
+  const userUpdates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
+  if (fullName) userUpdates.name = fullName;
+  if (d.email) userUpdates.email = d.email;
+
+  const [updated] = await db
+    .update(users)
+    .set(userUpdates)
+    .where(eq(users.id, user.sub))
+    .returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      emailVerified: users.emailVerified,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    });
+
+  if (!updated) {
+    return c.json(error("NOT_FOUND", "User not found"), 404);
+  }
+
+  // Upsert user_profiles
+  const profileData = {
+    userId: user.sub,
+    headline: d.headline ?? null,
+    summary: d.summary ?? null,
+    location: d.location ?? null,
+    website: d.website ?? null,
+    phone: d.phone ?? null,
+    linkedIn: d.linkedIn ?? null,
+    github: d.github ?? d.gitHub ?? null,
+    twitter: d.twitter ?? null,
+    currentRole: d.currentRole ?? null,
+    currentCompany: d.currentCompany ?? null,
+    avatarUrl: d.avatarUrl ?? null,
+    openToWork: d.openToWork ?? false,
+    openToRemote: d.openToRemote ?? false,
+    salaryCurrency: d.salaryCurrency ?? null,
+    salaryExpectation: d.salaryExpectation ?? null,
+    yearsOfExperience: d.yearsOfExperience ?? null,
+    skills: d.skills ?? [],
+    industries: d.industries ?? [],
+    preferredRoles: d.preferredRoles ?? [],
+    updatedAt: new Date(),
+  } as any;
+
+  const [profile] = await db
+    .insert(userProfiles)
+    .values({ ...profileData, createdAt: new Date() })
+    .onConflictDoUpdate({
+      target: userProfiles.userId,
+      set: profileData,
+    })
+    .returning();
+
+  return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
 });
 
 /** POST /api/users/connections — send connection request */
@@ -232,45 +393,83 @@ userRoutes.post("/connections", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const connection = makeConnection(crypto.randomUUID(), from, parsed.data.toUserId, "Pending");
-  inMemoryConnections.set(connection.id, connection);
-  return c.json(success(connection), 201);
+  if (from === parsed.data.toUserId) {
+    return c.json(error("BAD_REQUEST", "Cannot send connection request to yourself"), 400);
+  }
+
+  const db = getDb();
+  const [conn] = await db
+    .insert(userConnections)
+    .values({
+      fromUserId: from,
+      toUserId: parsed.data.toUserId,
+      status: "Pending",
+      requestMessage: parsed.data.message ?? null,
+    } as any)
+    .returning();
+
+  return c.json(success(makeConnectionDto(conn)), 201);
 });
 
 /** GET /api/users/me/connections */
 userRoutes.get("/me/connections", async (c) => {
   const me = c.var.user.sub;
-  const list = Array.from(inMemoryConnections.values()).filter(
-    (conn) => conn.status === "Accepted" && (conn.fromUserId === me || conn.toUserId === me),
-  );
-  return c.json(success(list), 200);
+  const db = getDb();
+  const list = await db
+    .select()
+    .from(userConnections)
+    .where(
+      and(
+        eq(userConnections.status, "Accepted"),
+        or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
+      ),
+    );
+  return c.json(success(list.map(makeConnectionDto)), 200);
 });
 
 /** GET /api/users/me/connections/pending */
 userRoutes.get("/me/connections/pending", async (c) => {
   const me = c.var.user.sub;
-  const list = Array.from(inMemoryConnections.values()).filter(
-    (conn) => conn.status === "Pending" && conn.toUserId === me,
-  );
-  return c.json(success(list), 200);
+  const db = getDb();
+  const list = await db
+    .select()
+    .from(userConnections)
+    .where(and(eq(userConnections.status, "Pending"), eq(userConnections.toUserId, me)));
+  return c.json(success(list.map(makeConnectionDto)), 200);
 });
 
 /** PUT /api/users/connections/:id/accept */
 userRoutes.put("/connections/:id/accept", async (c) => {
   const id = c.req.param("id");
-  const existing = inMemoryConnections.get(id);
-  if (!existing) {
+  const me = c.var.user.sub;
+  const db = getDb();
+
+  const [updated] = await db
+    .update(userConnections)
+    .set({ status: "Accepted", updatedAt: new Date() } as any)
+    .where(and(eq(userConnections.id, id), eq(userConnections.toUserId, me)))
+    .returning();
+
+  if (!updated) {
     return c.json(error("NOT_FOUND", "Connection request not found"), 404);
   }
-
-  const updated = { ...existing, status: "Accepted" as const, updatedAt: nowIso() };
-  inMemoryConnections.set(id, updated);
-  return c.json(success(updated), 200);
+  return c.json(success(makeConnectionDto(updated)), 200);
 });
 
 /** DELETE /api/users/connections/:id */
 userRoutes.delete("/connections/:id", async (c) => {
-  inMemoryConnections.delete(c.req.param("id"));
+  const id = c.req.param("id");
+  const me = c.var.user.sub;
+  const db = getDb();
+
+  await db
+    .delete(userConnections)
+    .where(
+      and(
+        eq(userConnections.id, id),
+        or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
+      ),
+    );
   return c.json(success(null), 200);
 });
 
@@ -278,16 +477,23 @@ userRoutes.delete("/connections/:id", async (c) => {
 userRoutes.get("/connections/status", async (c) => {
   const fromUserId = c.req.query("fromUserId") ?? "";
   const toUserId = c.req.query("toUserId") ?? "";
-  const found = Array.from(inMemoryConnections.values()).find(
-    (conn) =>
-      (conn.fromUserId === fromUserId && conn.toUserId === toUserId) ||
-      (conn.fromUserId === toUserId && conn.toUserId === fromUserId),
-  );
+  const db = getDb();
+
+  const [found] = await db
+    .select()
+    .from(userConnections)
+    .where(
+      or(
+        and(eq(userConnections.fromUserId, fromUserId), eq(userConnections.toUserId, toUserId)),
+        and(eq(userConnections.fromUserId, toUserId), eq(userConnections.toUserId, fromUserId)),
+      ),
+    )
+    .limit(1);
 
   if (!found) {
     return c.json(error("NOT_FOUND", "Connection not found"), 404);
   }
-  return c.json(success(found), 200);
+  return c.json(success(makeConnectionDto(found)), 200);
 });
 
 /** GET /api/users/me/recommendations */
@@ -298,10 +504,17 @@ userRoutes.get("/me/recommendations", async (c) => {
 /** GET /api/users/:id/connections */
 userRoutes.get("/:id/connections", async (c) => {
   const userId = c.req.param("id");
-  const list = Array.from(inMemoryConnections.values()).filter(
-    (conn) => conn.status === "Accepted" && (conn.fromUserId === userId || conn.toUserId === userId),
-  );
-  return c.json(success(list), 200);
+  const db = getDb();
+  const list = await db
+    .select()
+    .from(userConnections)
+    .where(
+      and(
+        eq(userConnections.status, "Accepted"),
+        or(eq(userConnections.fromUserId, userId), eq(userConnections.toUserId, userId)),
+      ),
+    );
+  return c.json(success(list.map(makeConnectionDto)), 200);
 });
 
 /** GET /api/users/:id/can-message */
@@ -330,7 +543,7 @@ userRoutes.get("/:id/resumes", async (c) => {
 userRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
   const db = getDb();
-  const [profile] = await db
+  const [me] = await db
     .select({
       id: users.id,
       email: users.email,
@@ -344,11 +557,17 @@ userRoutes.get("/:id", async (c) => {
     .where(eq(users.id, id))
     .limit(1);
 
-  if (!profile) {
+  if (!me) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
-  return c.json(success(toUserProfileDto(profile)), 200);
+  const [profile] = await db
+    .select()
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, id))
+    .limit(1);
+
+  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
 });
 
 /** DELETE /api/users/account — permanently delete the authenticated user's account */

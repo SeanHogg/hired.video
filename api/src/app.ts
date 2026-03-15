@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { authMiddleware } from "./middleware/auth.js";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
@@ -40,7 +41,6 @@ import { salaryRoutes } from "./routes/salary.js";
 import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
-
 export function createApp() {
   const app = new Hono();
 
@@ -55,30 +55,38 @@ export function createApp() {
 
   app.use("*", requestLoggerMiddleware);
 
-  const allowedOrigins = (process.env.FRONTEND_URL ?? "https://hired.video,https://hired.video")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-
-  // Allow local dev origin(s) when running locally
-  if (process.env.NODE_ENV !== "production") {
-    allowedOrigins.push(
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:4003",
-      "http://127.0.0.1:4003",
-    );
-  }
-
   // Also allow any localhost port for convenience (covers docker/VM networking)
   const isLocalhostOrigin = (origin: string) =>
     origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+
+  // Compute allowed origins per-request so Cloudflare Worker env bindings
+  // (which aren't available at module-load time) are picked up correctly.
+  const getAllowedOrigins = (): string[] => {
+    const frontendUrl =
+      (globalThis as any).__ENV?.FRONTEND_URL ||
+      process.env.FRONTEND_URL ||
+      "https://hired.video";
+    const origins = frontendUrl
+      .split(",")
+      .map((o: string) => o.trim())
+      .filter(Boolean);
+    if (process.env.NODE_ENV !== "production") {
+      origins.push(
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4003",
+        "http://127.0.0.1:4003",
+      );
+    }
+    return origins;
+  };
 
   app.use(
     "*",
     cors({
       origin: (origin) => {
         if (!origin) return "*"; // allow non-browser requests (e.g., server-side)
+        const allowedOrigins = getAllowedOrigins();
         if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) {
           return origin;
         }
@@ -96,12 +104,36 @@ export function createApp() {
     return rateLimiterMiddleware(c, next);
   });
 
+  // Apply JWT auth middleware to all /api/* routes except public ones
+  const PUBLIC_PREFIXES = [
+    "/api/auth",
+    "/api/search/public",
+    "/api/users/public",
+    "/api/jobs/public",
+    "/api/companies/public",
+    "/api/resumes/public",
+    "/health",
+    "/api/health",
+  ];
+  app.use("/api/*", async (c, next) => {
+    const path = c.req.path;
+    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
+    return authMiddleware(c as any, next);
+  });
+
   // Simple health check (includes DB connectivity)
-  app.get("/health", async (c) => {
+  const healthHandler = async (c: any) => {
     try {
       const db = getDb();
-      // Touch the DB to ensure connectivity. Using a lightweight query on the users table.
-      await db.select().from(schema.users).limit(1);
+      // Check connectivity with a minimal query that doesn't depend on app tables.
+      // This avoids failing health checks when the schema is not yet set up.
+      const raw = (db as any).execute || (db as any).query || (db as any).run;
+      if (typeof raw === "function") {
+        await raw.call(db, "SELECT 1");
+      } else {
+        // Fallback to a simple table query (existing behavior).
+        await db.select().from(schema.users).limit(1);
+      }
       return c.json({ status: "ok", timestamp: new Date().toISOString() });
     } catch (error: any) {
       return c.json(
@@ -113,7 +145,10 @@ export function createApp() {
         503,
       );
     }
-  });
+  };
+
+  app.get("/health", healthHandler);
+  app.get("/api/health", healthHandler);
 
   // Temporary route to quiet accidental /api/collab requests from dev tools/extensions
   // (no business logic currently needed)
@@ -170,7 +205,18 @@ export function createApp() {
   // Some legacy frontend services still call /sentiment/* without /api prefix
   app.route("/sentiment", sentimentRoutes);
 
-  app.onError(globalErrorHandler);
+  // Wrap globalErrorHandler to ensure CORS headers are present on error responses.
+  // Hono's onError creates a fresh response that bypasses middleware-set headers.
+  app.onError((err, c) => {
+    const origin = c.req.header("origin") ?? "";
+    if (origin && (getAllowedOrigins().includes(origin) || isLocalhostOrigin(origin))) {
+      c.header("Access-Control-Allow-Origin", origin);
+      c.header("Access-Control-Allow-Credentials", "true");
+      c.header("Vary", "Origin");
+    }
+    return globalErrorHandler(err, c);
+  });
 
   return app;
 }
+

@@ -14,15 +14,28 @@ binding = "VIDEO_BUCKET"
 bucket_name = "hired-videos-temp"
 
 [vars]
-FRONTEND_URL = "https://hired.video"
+FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+VITE_API_URL = "https://api.hired.video"
 # Local development DB connection (used by `neon()` in serverless DB client)
-# Replace this with your local Neon/DB connection string when running `wrangler dev`.
-# If you want to keep it secret, remove it from this file and set the env var directly.
-DATABASE_URL = "postgresql://neondb_owner:npg_lsjDXv6B5gdG@ep-quiet-block-aj62u9e9-pooler.c-3.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
+# For security, we use Wrangler secrets instead of committing connection strings.
+# To set this up, run:
+#   wrangler secret put DATABASE_URL
+#   wrangler secret put NEON_DATABASE_URL
+# (or set the env vars in your shell for local development)
 
 [env.production]
 name = "hired-api"
-vars = { FRONTEND_URL = "https://hired.video" }
+# The DB connection string is stored as a Wrangler secret, not in source control.
+# Set it via:
+#   wrangler secret put NEON_DATABASE_URL --env production
+#   wrangler secret put NEON_DB_URL --env production
+#
+# NOTE: In some Cloudflare accounts, DATABASE_URL may conflict with an existing
+# binding name; in that case use NEON_DB_URL (the name checked by the app).
+
+[env.production.vars]
+FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+VITE_API_URL = "https://api.hired.video"
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"

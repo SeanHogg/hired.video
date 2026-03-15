@@ -45,21 +45,21 @@ export interface PaginationMeta {
 }
 
 // ── API response helpers ─────────────────────────────────────────────────────
-export function success<T>(data: T): { data: T };
-export function success<T>(data: T, message: string): { data: T; message: string };
-export function success<T>(data: T, meta: PaginationMeta): { data: T; meta: PaginationMeta };
+export function success<T>(data: T): { success: true; data: T };
+export function success<T>(data: T, message: string): { success: true; data: T; message: string };
+export function success<T>(data: T, meta: PaginationMeta): { success: true; data: T; meta: PaginationMeta };
 export function success<T>(data: T, messageOrMeta?: string | PaginationMeta) {
   if (typeof messageOrMeta === "string") {
-    return { data, message: messageOrMeta };
+    return { success: true as const, data, message: messageOrMeta };
   }
   if (messageOrMeta) {
-    return { data, meta: messageOrMeta };
+    return { success: true as const, data, meta: messageOrMeta };
   }
-  return { data };
+  return { success: true as const, data };
 }
 
 export function apiError(code: string, message: string, details?: unknown) {
-  return { error: { code, message, ...(details !== undefined ? { details } : {}) } };
+  return { success: false as const, error: { code, message, ...(details !== undefined ? { details } : {}) } };
 }
 
 // Legacy export for common error response shape

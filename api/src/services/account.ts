@@ -12,7 +12,7 @@ import {
   InviteUserResponse,
 } from "../../../shared/account.js";
 
-const { users, accountPreferences, accountInvitations } = schema;
+const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
 
 function normalizeUser(row: typeof users.$inferSelect): AccountUser {
   return {
@@ -278,5 +278,23 @@ export async function getInvitationAnalytics(userId: string): Promise<Record<str
 
 export async function deleteAccount(userId: string): Promise<void> {
   const db = getDb();
-  await db.delete(users).where(eq(users.id, userId));
+
+  // Soft delete: disable the account and revoke existing authentication artifacts.
+  // This matches legacy behavior where the account is no longer usable but records remain.
+  await db
+    .update(users)
+    .set({
+      isActive: false,
+      emailVerified: false,
+      passwordHash: Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("") as any,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(users.id, userId));
+
+  await db.update(refreshTokens).set({ revoked: true } as any).where(eq(refreshTokens.userId, userId));
+  await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.userId, userId));
+  await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, userId));
+  await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.userId, userId));
 }

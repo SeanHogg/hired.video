@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { resumeInformation: resumes } = schema;
+const { resumeInformation: resumes, watchedResumes } = schema;
 
 export const resumeRoutes = new Hono<{ Variables: Variables }>();
 
@@ -28,21 +28,30 @@ function fail(code: string, message: string, details?: unknown) {
   };
 }
 
+// Map privacy string → stored integer
+const PRIVACY_TO_LEVEL: Record<string, number> = {
+  public: 0,
+  recruiter_only: 1,
+  connections: 2,
+  private: 10,
+  draft: 10,
+};
+
 function rowToLegacyResume(row: typeof resumes.$inferSelect) {
   return {
     id: row.id,
     userId: row.userId,
     name: row.title,
-    slug: row.id,
+    slug: row.slug ?? row.id,
     description: "",
     isPrimaryDefault: false,
     isWatched: false,
     sentimentScore: 0,
-    privacy_ShowResume: 10,
+    privacy_ShowResume: row.privacyLevel,
     resumeSerialized: JSON.stringify(row.content ?? {}),
-    isMaster: false,
-    isActive: true,
-    parentId: null,
+    isMaster: row.isMaster,
+    isActive: row.isActive,
+    parentId: row.parentId ?? null,
     creationDateTime: new Date(row.createdAt).toISOString(),
     updateDateTime: new Date(row.updatedAt).toISOString(),
     createdAt: new Date(row.createdAt).toISOString(),
@@ -170,9 +179,44 @@ resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
   return c.json(ok(rows.map(rowToSummary)), 200);
 });
 
-resumeRoutes.get("/withownership", (c) => c.json(ok([]), 200));
-resumeRoutes.get("/mastergroups", (c) => c.json(ok([]), 200));
-resumeRoutes.get("/validateslug", (c) => c.json(ok({ slug: c.req.query("slug") ?? "", available: true }), 200));
+resumeRoutes.get("/withownership", async (c) => {
+  const user = c.var.user;
+  const db = getDb();
+  const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
+  const result = rows.map((r) => ({ ...rowToLegacyResume(r), ownership: "owned" }));
+  return c.json(ok(result), 200);
+});
+
+resumeRoutes.get("/mastergroups", async (c) => {
+  const user = c.var.user;
+  const db = getDb();
+  const all = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
+  const masters = all.filter((r) => r.isMaster && !r.parentId);
+  const variations = all.filter((r) => !!r.parentId);
+  // Ungrouped non-master root resumes stand alone as single-item groups
+  const ungrouped = all.filter((r) => !r.isMaster && !r.parentId);
+  const masterGroups = [
+    ...masters.map((m) => ({
+      masterResume: rowToLegacyResume(m),
+      variations: variations.filter((v) => v.parentId === m.id).map(rowToLegacyResume),
+    })),
+    ...ungrouped.map((r) => ({ masterResume: rowToLegacyResume(r), variations: [] })),
+  ];
+  return c.json(ok(masterGroups), 200);
+});
+
+resumeRoutes.get("/validateslug", async (c) => {
+  const user = c.var.user;
+  const slug = c.req.query("slug") ?? "";
+  const resumeId = c.req.query("resumeId");
+  if (!slug) return c.json(ok({ slug, available: false }), 200);
+  const db = getDb();
+  const conditions = resumeId
+    ? and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, resumeId))
+    : and(eq(resumes.userId, user.sub), eq(resumes.slug, slug));
+  const [existing] = await db.select({ id: resumes.id }).from(resumes).where(conditions).limit(1);
+  return c.json(ok({ slug, available: !existing }), 200);
+});
 
 resumeRoutes.get("/embedded/:identifier", async (c) => {
   const id = c.req.param("identifier");
@@ -247,8 +291,28 @@ resumeRoutes.post("/sentimentprediction", async (c) => {
   return c.json(ok(score), 200);
 });
 
-resumeRoutes.post("/watch/:id", (c) => c.json(ok({ success: true }), 200));
-resumeRoutes.post("/unwatch/:id", (c) => c.json(ok({ success: true }), 200));
+resumeRoutes.post("/watch/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: watchedResumes.id })
+    .from(watchedResumes)
+    .where(and(eq(watchedResumes.viewerId, user.sub), eq(watchedResumes.resumeId, id)))
+    .limit(1);
+  if (!existing) {
+    await db.insert(watchedResumes).values({ viewerId: user.sub, resumeId: id } as any);
+  }
+  return c.json(ok({ success: true }), 200);
+});
+
+resumeRoutes.post("/unwatch/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  await db.delete(watchedResumes).where(and(eq(watchedResumes.viewerId, user.sub), eq(watchedResumes.resumeId, id)));
+  return c.json(ok({ success: true }), 200);
+});
 
 // Dynamic routes below static routes
 resumeRoutes.get("/:id", async (c) => {
@@ -349,20 +413,76 @@ resumeRoutes.put("/:id/metadata", async (c) => {
   return c.json(ok(rowToLegacyResume(row)), 200);
 });
 
-resumeRoutes.post("/:id/setmaster", (c) => c.json(ok(true), 200));
-resumeRoutes.post("/:id/setactive", (c) => c.json(ok(true), 200));
-resumeRoutes.post("/:id/setprivacy", (c) => c.json(ok(true), 200));
-resumeRoutes.post("/:id/promote", (c) => c.json(ok(true), 200));
+resumeRoutes.post("/:id/setmaster", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  await db.update(resumes).set({ isMaster: false } as any).where(eq(resumes.userId, user.sub));
+  await db.update(resumes).set({ isMaster: true } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
+  return c.json(ok(true), 200);
+});
+
+resumeRoutes.post("/:id/setactive", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  await db.update(resumes).set({ isActive: false } as any).where(eq(resumes.userId, user.sub));
+  await db.update(resumes).set({ isActive: true } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
+  return c.json(ok(true), 200);
+});
+
+resumeRoutes.post("/:id/setprivacy", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const privacy = typeof body?.privacy === "string" ? body.privacy : "private";
+  const privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
+  const db = getDb();
+  const [updated] = await db
+    .update(resumes)
+    .set({ privacyLevel, updatedAt: new Date() } as any)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .returning({ id: resumes.id });
+  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  return c.json(ok(true), 200);
+});
+
+resumeRoutes.post("/:id/promote", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  await db.update(resumes).set({ isMaster: false } as any).where(eq(resumes.userId, user.sub));
+  await db.update(resumes).set({ isMaster: true, parentId: null } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
+  return c.json(ok(true), 200);
+});
+
 resumeRoutes.post("/:id/createvariation", async (c) => {
   const id = c.req.param("id");
   const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : undefined;
   const db = getDb();
   const [parent] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
 
   const [created] = await db
     .insert(resumes)
-    .values({ userId: user.sub, title: `${parent.title} Variation`, content: parent.content ?? {}, status: "draft" } as any)
+    .values({
+      userId: user.sub,
+      title: name ?? `${parent.title} Variation`,
+      content: parent.content ?? {},
+      status: "draft",
+      parentId: parent.id,
+      isMaster: false,
+      isActive: false,
+      privacyLevel: parent.privacyLevel,
+    } as any)
     .returning();
   return c.json(ok(rowToLegacyResume(created)), 201);
 });

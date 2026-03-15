@@ -36,11 +36,20 @@ try {
     // Read the config file
     let configContent = fs.readFileSync(configPath, 'utf8');
 
-    // Update app version only
+    // Update app version and optionally override API URL from build env.
     configContent = configContent.replace(
       /VERSION: "[\d.]+"/,
       `VERSION: "${version}"`
     );
+
+    const apiUrlFromEnv = process.env.VITE_API_URL;
+    if (apiUrlFromEnv) {
+      configContent = configContent.replace(
+        /API_URL: "[^"]*"/,
+        `API_URL: "${apiUrlFromEnv}"`
+      );
+      console.log(`✅ Overwrote API_URL in config.js with ${apiUrlFromEnv}`);
+    }
 
     // Write the updated config
     fs.writeFileSync(configPath, configContent);

@@ -1,5 +1,10 @@
 import { Hono } from "hono";
+import { eq, and, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
+
+const { boards, tasks } = schema;
 
 export const taskRoutes = new Hono<{ Variables: Variables }>();
 
@@ -23,82 +28,187 @@ type TaskDto = {
   updateDateTime: string;
 };
 
-const nowIso = () => new Date().toISOString();
-
-function toTaskDto(input: Record<string, unknown>, existing?: TaskDto): TaskDto {
-  const now = nowIso();
+/** Map DB task row → legacy TaskDTO */
+function toTaskDto(row: typeof tasks.$inferSelect): TaskDto {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
   return {
-    id: existing?.id ?? (typeof input.id === "string" && input.id.length > 0 ? input.id : crypto.randomUUID()),
-    text: typeof input.text === "string" && input.text.length > 0 ? input.text : existing?.text ?? "Task",
-    description: typeof input.description === "string" ? input.description : existing?.description,
-    start: typeof input.start === "string" && input.start.length > 0 ? input.start : existing?.start ?? now,
-    end: typeof input.end === "string" ? input.end : existing?.end,
-    taskType: typeof input.taskType === "number" ? input.taskType : existing?.taskType ?? 0,
-    subTaskType: typeof input.subTaskType === "number" ? input.subTaskType : existing?.subTaskType,
-    actionToTake: typeof input.actionToTake === "number" ? input.actionToTake : existing?.actionToTake,
-    status: typeof input.status === "number" ? input.status : existing?.status ?? 1,
-    assignedToUserId:
-      typeof input.assignedToUserId === "string" ? input.assignedToUserId : existing?.assignedToUserId,
-    createdByUserId:
-      typeof input.createdByUserId === "string" ? input.createdByUserId : existing?.createdByUserId,
-    creationDateTime: existing?.creationDateTime ?? now,
-    updateDateTime: now,
+    id: row.id,
+    text: row.title,
+    description: row.description ?? undefined,
+    start: meta.start as string ?? new Date(row.createdAt).toISOString(),
+    end: meta.end as string ?? undefined,
+    taskType: typeof meta.taskType === "number" ? meta.taskType : 0,
+    subTaskType: typeof meta.subTaskType === "number" ? meta.subTaskType : undefined,
+    actionToTake: typeof meta.actionToTake === "number" ? meta.actionToTake : undefined,
+    status: typeof meta.legacyStatus === "number" ? meta.legacyStatus : 1,
+    assignedToUserId: row.userId,
+    createdByUserId: row.userId,
+    creationDateTime: new Date(row.createdAt).toISOString(),
+    updateDateTime: new Date(row.updatedAt).toISOString(),
   };
 }
 
-const tasks = new Map<string, TaskDto>();
+/** Ensure a default "tasks" board exists for the user; returns its id */
+async function getOrCreateDefaultBoard(userId: string, db: ReturnType<typeof getDb>): Promise<string> {
+  const [existing] = await db
+    .select({ id: boards.id })
+    .from(boards)
+    .where(and(eq(boards.userId, userId), eq(boards.name, "__default__")))
+    .limit(1);
 
-taskRoutes.get("/", (c) => {
-  const result = Array.from(tasks.values());
-  return c.json(ok(result), 200);
+  if (existing) return existing.id;
+
+  const [created] = await db
+    .insert(boards)
+    .values({ userId, name: "__default__", description: "Default task board" } as any)
+    .returning({ id: boards.id });
+
+  return created.id;
+}
+
+taskRoutes.get("/", async (c) => {
+  const userId = c.var.user.sub;
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.userId, userId))
+    .orderBy(desc(tasks.createdAt));
+  return c.json(ok(rows.map(toTaskDto)), 200);
 });
 
-taskRoutes.get("/:id", (c) => {
+taskRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
-  const task = tasks.get(id);
-  if (!task) {
-    return c.json(ok({ id, text: "Task", start: nowIso(), taskType: 0, status: 1 }), 200);
-  }
-  return c.json(ok(task), 200);
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  const [row] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .limit(1);
+
+  if (!row) return c.json(error("NOT_FOUND", "Task not found"), 404);
+  return c.json(ok(toTaskDto(row)), 200);
 });
 
 taskRoutes.post("/save", async (c) => {
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const existing = typeof body.id === "string" ? tasks.get(body.id) : undefined;
-  const task = toTaskDto(body, existing);
-  tasks.set(task.id, task);
-  return c.json(ok(task), 200);
+  const db = getDb();
+
+  const existingId = typeof body.id === "string" && body.id.length > 0 ? body.id : null;
+
+  // Store legacy-specific fields in metadata
+  const metadata = {
+    start: body.start,
+    end: body.end,
+    taskType: body.taskType,
+    subTaskType: body.subTaskType,
+    actionToTake: body.actionToTake,
+    legacyStatus: body.status,
+  };
+
+  if (existingId) {
+    const [existing] = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, existingId), eq(tasks.userId, userId)))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(tasks)
+        .set({
+          title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
+          description: typeof body.description === "string" ? body.description : existing.description,
+          metadata: { ...(existing.metadata as object ?? {}), ...metadata },
+          updatedAt: new Date(),
+        } as any)
+        .where(eq(tasks.id, existingId))
+        .returning();
+      return c.json(ok(toTaskDto(updated)), 200);
+    }
+  }
+
+  const boardId = await getOrCreateDefaultBoard(userId, db);
+  const [created] = await db
+    .insert(tasks)
+    .values({
+      id: existingId ?? undefined,
+      boardId,
+      userId,
+      title: typeof body.text === "string" && body.text.length > 0 ? body.text : "Task",
+      description: typeof body.description === "string" ? body.description : null,
+      metadata,
+    } as any)
+    .returning();
+
+  return c.json(ok(toTaskDto(created)), 200);
 });
 
-taskRoutes.delete("/:id", (c) => {
-  tasks.delete(c.req.param("id"));
+taskRoutes.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+  const userId = c.var.user.sub;
+  const db = getDb();
+
+  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
   return c.json(ok(true), 200);
 });
 
-// Legacy contract fallback: some clients call POST /api/task/{id} to delete
-// or mutate a task by id. Keep this to avoid 404s while migrating.
+// Legacy contract: POST /api/task/:id used for update-or-delete
 taskRoutes.post("/:id", async (c) => {
   const id = c.req.param("id");
+  const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const db = getDb();
 
   if (!body) {
-    tasks.delete(id);
+    await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
     return c.json(ok(true), 200);
   }
 
-  const existing = tasks.get(id);
-  const task = toTaskDto({ ...body, id }, existing);
-  tasks.set(id, task);
-  return c.json(ok(task), 200);
-});
+  const [existing] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .limit(1);
 
-taskRoutes.all("*", (c) =>
-  c.json(
-    {
-      success: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Task routes coming soon" },
-      timestamp: new Date().toISOString(),
-    },
-    501,
-  ),
-);
+  const metadata = {
+    start: body.start,
+    end: body.end,
+    taskType: body.taskType,
+    subTaskType: body.subTaskType,
+    actionToTake: body.actionToTake,
+    legacyStatus: body.status,
+  };
+
+  if (existing) {
+    const [updated] = await db
+      .update(tasks)
+      .set({
+        title: typeof body.text === "string" && body.text.length > 0 ? body.text : existing.title,
+        description: typeof body.description === "string" ? body.description : existing.description,
+        metadata: { ...(existing.metadata as object ?? {}), ...metadata },
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(tasks.id, id))
+      .returning();
+    return c.json(ok(toTaskDto(updated)), 200);
+  }
+
+  const boardId = await getOrCreateDefaultBoard(userId, db);
+  const [created] = await db
+    .insert(tasks)
+    .values({
+      id,
+      boardId,
+      userId,
+      title: typeof body.text === "string" && body.text.length > 0 ? body.text : "Task",
+      description: typeof body.description === "string" ? body.description : null,
+      metadata,
+    } as any)
+    .returning();
+
+  return c.json(ok(toTaskDto(created)), 200);
+});

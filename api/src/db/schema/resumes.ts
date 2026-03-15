@@ -7,6 +7,8 @@ import {
   timestamp,
   jsonb,
   integer,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
@@ -30,9 +32,18 @@ export const resumeInformation = pgTable("resume_information", {
   content: jsonb("content").notNull().default({}),
   status: varchar("status", { length: 50 }).default("draft").notNull(),
   templateId: uuid("template_id"),
+  // Resume hierarchy & display fields
+  isMaster: boolean("is_master").default(false).notNull(),
+  isActive: boolean("is_active").default(false).notNull(),
+  parentId: uuid("parent_id"),  // self-referential: null = root / variation of parentId
+  slug: varchar("slug", { length: 255 }),  // per-user vanity URL segment
+  privacyLevel: integer("privacy_level").default(10).notNull(),  // 0=public,1=recruiter,2=connections,10=private
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index("resume_information_user_id_idx").on(table.userId),
+  index("resume_information_parent_id_idx").on(table.parentId),
+]);
 
 export type ResumeInformation = typeof resumeInformation.$inferSelect;
 export type NewResumeInformation = typeof resumeInformation.$inferInsert;

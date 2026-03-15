@@ -46,15 +46,33 @@ class RuntimeConfig {
 
   private loadConfig(): AppConfig {
     // Runtime config from /config.js (preferred for static deployments)
+    // Ignore config.js if it has a localhost URL and we're running on a real domain
     if (typeof window !== "undefined" && window.APP_CONFIG) {
-      console.log("Using runtime configuration from /config.js");
-      return window.APP_CONFIG;
+      const isOnLiveDomain = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+      const configHasLocalhost = window.APP_CONFIG.API_URL?.includes("localhost") || window.APP_CONFIG.API_URL?.includes("127.0.0.1");
+      if (!isOnLiveDomain || !configHasLocalhost) {
+        console.log("Using runtime configuration from /config.js");
+        return window.APP_CONFIG;
+      }
+      console.log("Ignoring /config.js (has localhost URL but running on live domain)");
     }
 
     // Fallback to build-time environment variables (for development)
     console.log("Using build-time environment variables");
+
+    // If the app is running on the live domain, avoid accidentally using a dev API URL.
+    const defaultApiUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "http://localhost:8787/api"
+        : "https://api.hired.video";
+    const buildApiUrl = import.meta.env.VITE_API_URL;
+    const apiUrl =
+      buildApiUrl && buildApiUrl.includes("localhost")
+        ? defaultApiUrl
+        : buildApiUrl || defaultApiUrl;
+
     return {
-      API_URL: import.meta.env.VITE_API_URL || "https://api.hired.video/api",
+      API_URL: apiUrl,
       ERROR_REPORTING: {
         ENABLED: import.meta.env.VITE_ERROR_REPORTING_ENABLED === "true",
         DSN: import.meta.env.VITE_ERROR_REPORTING_DSN || "",
