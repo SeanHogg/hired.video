@@ -37,7 +37,7 @@ import { taskRoutes } from "./routes/task";
 import { feedRoutes } from "./routes/feed";
 import { salaryRoutes } from "./routes/salary";
 import { valuePropositionRoutes } from "./routes/value-proposition";
-import { featureFlagRoutes } from "./routes/feature-flag";
+import { featureFlagRoutes } from "./routes/featureflag";
 import { hubsRoutes } from "./routes/hubs";
 
 export function createApp() {
@@ -129,6 +129,7 @@ export function createApp() {
   app.route("/api/affiliates", affiliateRoutes);
   app.route("/api/marketing", marketingRoutes);
   app.route("/api/settings", settingsRoutes);
+  app.route("/api/featureflag", featureFlagRoutes);
   app.route("/api/task", taskRoutes);
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);

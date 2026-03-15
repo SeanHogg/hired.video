@@ -1,10 +1,42 @@
-import type {
-  AccountUser,
-  AccountOption,
-  AcceptInvitationResponse,
-  InviteUserRequest,
-  InviteUserResponse,
-} from "../../frontend/types/account";
+// Note: avoid depending on frontend type definitions in backend.
+// These are simple stubbed types used for migration compatibility.
+
+export type AccountUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+};
+
+export type AccountOption = {
+  id: string;
+  name: string;
+  role: string;
+  logoUrl: string;
+  isOwner: boolean;
+  isAdmin: boolean;
+};
+
+export type AcceptInvitationResponse = {
+  success: boolean;
+  message: string;
+  companyName: string;
+  assignedRoles: string[];
+  requiredRegistration: boolean;
+  redirectUrl: string;
+};
+
+export type InviteUserRequest = {
+  email: string;
+  role: string;
+};
+
+export type InviteUserResponse = {
+  success: boolean;
+  message: string;
+  inviteId: string;
+};
 
 // NOTE: These are stub implementations to keep the API running while the real
 // domain layer is being migrated from the legacy .NET backend.

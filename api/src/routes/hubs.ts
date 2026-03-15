@@ -3,7 +3,7 @@ import type { Variables } from "../types/index.js";
 
 export const hubsRoutes = new Hono<{ Variables: Variables }>();
 
-function notSupported(c: Parameters<typeof hubsRoutes.get>[1] extends (arg: infer T) => any ? T : any) {
+function notSupported(c: any) {
   return c.json(
     {
       success: false,
