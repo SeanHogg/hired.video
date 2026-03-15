@@ -146,7 +146,7 @@ export default function Login() {
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Welcome back</CardTitle>
                 <CardDescription>
-                  Sign in to your MyVideoResume account
+                  Sign in to your hired.video account
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">

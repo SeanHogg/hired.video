@@ -713,7 +713,7 @@ function StepPublish({
   const [phase, setPhase] = useState<"idle" | "uploading" | "publishing" | "polling" | "done" | "error">("idle");
   const [progress, setProgress] = useState(0);
   const [title, setTitle] = useState("My Video Resume");
-  const [description, setDescription] = useState("AI-generated video resume created with MyVideoResu.ME");
+  const [description, setDescription] = useState("AI-generated video resume created with hired.video");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();

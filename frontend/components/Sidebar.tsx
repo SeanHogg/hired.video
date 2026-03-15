@@ -125,7 +125,7 @@ export default function Sidebar({
               <Video className="h-6 w-6 text-primary" />
               {!collapsed && (
                 <span className="font-bold text-lg bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  MyVideoResu.ME
+                  hired.video
                 </span>
               )}
             </Link>

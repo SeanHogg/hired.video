@@ -1073,7 +1073,7 @@ function SettingsContent() {
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium">How it works:</h4>
                       <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                        <li>Record videos in the MyVideoResume mobile app</li>
+                        <li>Record videos in the hired.video mobile app</li>
                         <li>Videos are automatically uploaded and processed</li>
                         <li>Your videos appear in your profile and the public feed</li>
                         <li>No setup required - it just works!</li>

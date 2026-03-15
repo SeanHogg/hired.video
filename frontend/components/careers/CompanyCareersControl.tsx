@@ -112,7 +112,7 @@ export function CompanyCareersControl({
 
   // Fetch company (by id or slug) using React Query with caching
   const companyQuery = useQuery({
-    queryKey: ["company", companyId ?? companySlug ?? "myvideoresume-company"],
+    queryKey: ["company", companyId ?? companySlug ?? "hired-video-company"],
     queryFn: async (): Promise<CompanyInfo> => {
       try {
         if (companyId) {
@@ -145,16 +145,16 @@ export function CompanyCareersControl({
       } catch (e) {
         // swallow to use fallback
       }
-      // Fallback to MyVideoResu.me if no company data loaded
+      // Fallback to hired.video if no company data loaded
       return {
-        id: companyId || companySlug || "myvideoresume-company",
-        name: "MyVideoResu.me",
+        id: companyId || companySlug || "hired-video-company",
+        name: "hired.video",
         logo: "/logo.png",
         tagline:
           "Revolutionizing the way people find and showcase their talents",
         description:
-          "MyVideoResu.me is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.",
-        website: "https://myvideoresu.me",
+          "hired.video is a cutting-edge platform that combines traditional resumes with video presentations, helping job seekers stand out and employers find the perfect candidates.",
+        website: "https://hired.video",
         industry: "Technology",
         size: "11-50",
         location: "San Francisco, CA",
@@ -168,11 +168,11 @@ export function CompanyCareersControl({
     enabled: !!companyQuery.data?.id,
     queryKey: [
       "company-jobs",
-      (companyQuery.data?.id) ?? (companyId || companySlug || "myvideoresume-company"),
+      (companyQuery.data?.id) ?? (companyId || companySlug || "hired-video-company"),
       maxJobs ?? null,
     ],
     queryFn: async (): Promise<CompanyJob[]> => {
-      const cId = companyQuery.data?.id || companyId || companySlug || "myvideoresume-company";
+      const cId = companyQuery.data?.id || companyId || companySlug || "hired-video-company";
       const jobsResponse = await jobService.getPublicJobs({
         companyId: cId,
         limit: maxJobs || 50,

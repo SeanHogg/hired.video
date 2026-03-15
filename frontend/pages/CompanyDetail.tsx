@@ -92,10 +92,10 @@ export default function CompanyDetail() {
   // SEO: compute SEO data when company loads
   const seoData = useMemo(() => {
     if (!company) return null;
-    const title = `${company.data.name} Company Profile | MyVideoResu.me`;
+    const title = `${company.data.name} Company Profile | hired.video`;
     const description =
       company.data.tagline ||
-      (company.data.description ? company.data.description.slice(0, 160) : "Company profile on MyVideoResu.me");
+      (company.data.description ? company.data.description.slice(0, 160) : "Company profile on hired.video");
     return {
       title,
       description,

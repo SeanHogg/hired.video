@@ -80,7 +80,7 @@ export const UserProfileDTOSchema = z.object({
 // ============================================================================
 
 // Map backend role (string or number) to client role keys used by the UI
-// - Server returns enum numbers from MyVideoResumeRoles: JobSeeker=30, Recruiter=40, Employer=20
+// - Server returns enum numbers from hiredvideoRoles: JobSeeker=30, Recruiter=40, Employer=20
 // - Or PascalCase strings (JobSeeker/Recruiter/Employer)
 // - Our UI expects USER_ROLES constants: "JobSeeker" | "Recruiter" | "Employer"
 // Note: Backend supports roles: JobSeeker=30, Recruiter=40, Employer=20, Admin=0, SuperAdmin=-1

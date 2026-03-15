@@ -159,7 +159,7 @@ function getS3Client(): S3Client {
 }
 
 function getBucket(): string {
-  return process.env.STORAGE_BUCKET ?? "myvideoresume";
+  return process.env.STORAGE_BUCKET ?? "hired.video";
 }
 
 function canUseObjectStorage(): boolean {
@@ -177,7 +177,7 @@ function toProjectDto(
     title: project.resumeText?.slice(0, 80) || "My Video Resume",
     status: mapStudioStatus(project.status),
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
-    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.myvideoresu.me/${linkedVideo.r2Key}` : null),
+    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
     thumbnailUrl: linkedVideo?.thumbnailUrl ?? null,
     storyboard,
     creationDateTime: asIso(project.createdAt),
@@ -390,7 +390,7 @@ studioRoutes.get("/status/:projectId", async (c) => {
     status,
     progressPercentage,
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
-    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.myvideoresu.me/${linkedVideo.r2Key}` : null),
+    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
     errorMessage: status === "Failed" ? linkedVideo?.errorMessage ?? "Publishing failed" : null,
   }));
 });

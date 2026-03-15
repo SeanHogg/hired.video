@@ -14,7 +14,7 @@ import {
   UserCompanyRoleAssociation,
   TaskType,
   ProductivityItemStatus,
-  MyVideoResumeRoles,
+  hiredvideoRoles,
 } from "@/types/task";
 
 export class TaskService {
@@ -227,7 +227,7 @@ export class TaskService {
   /**
    * Create role-specific onboarding tasks
    */
-  async createOnboardingTasks(roles: MyVideoResumeRoles[]): Promise<TaskDTO[]> {
+  async createOnboardingTasks(roles: hiredvideoRoles[]): Promise<TaskDTO[]> {
     try {
       const tasks: CreateTaskRequest[] = [];
       const now = new Date();
@@ -244,7 +244,7 @@ export class TaskService {
       });
 
       // Role-specific tasks
-      if (roles.includes(MyVideoResumeRoles.JobSeeker)) {
+      if (roles.includes(hiredvideoRoles.JobSeeker)) {
         tasks.push(
           {
             text: "Polish your resume",
@@ -265,7 +265,7 @@ export class TaskService {
         );
       }
 
-      if (roles.includes(MyVideoResumeRoles.Recruiter)) {
+      if (roles.includes(hiredvideoRoles.Recruiter)) {
         tasks.push(
           {
             text: "Set your recruiter preferences",
@@ -288,8 +288,8 @@ export class TaskService {
       }
 
       if (
-        roles.includes(MyVideoResumeRoles.Employer) ||
-        roles.includes(MyVideoResumeRoles.EmployerManager)
+        roles.includes(hiredvideoRoles.Employer) ||
+        roles.includes(hiredvideoRoles.EmployerManager)
       ) {
         tasks.push(
           {

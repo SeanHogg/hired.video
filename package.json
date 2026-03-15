@@ -1,0 +1,15 @@
+{
+  "name": "hired.video",
+  "version": "1.0.0",
+  "description": "A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools.",
+  "main": "eslint.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

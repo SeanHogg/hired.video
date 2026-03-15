@@ -7,11 +7,11 @@ const NotFound = () => {
 
   // SEO: mark as noindex and set canonical to homepage to avoid indexation of 404 paths
   useSEO(location.pathname, {
-    title: "404 Not Found - MyVideoResu.me",
+    title: "404 Not Found - hired.video",
     description: "This page could not be found.",
     robots: "noindex, nofollow",
-    canonical: "https://myvideoresu.me/",
-    ogTitle: "404 Not Found - MyVideoResu.me",
+    canonical: "https://hired.video/",
+    ogTitle: "404 Not Found - hired.video",
     ogDescription: "This page could not be found.",
   });
 

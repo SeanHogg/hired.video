@@ -14,11 +14,15 @@ export interface Env {
 }
 
 // ── Hono context variables ───────────────────────────────────────────────────
+import type { Context } from "hono";
+
 export interface Variables {
   user: JwtPayload;
 }
 
 export type AppEnv = { Bindings: Env; Variables: Variables };
+
+export type AppContext = Context<AppEnv>;
 
 // ── JWT payload ──────────────────────────────────────────────────────────────
 export interface JwtPayload {
@@ -41,8 +45,17 @@ export interface PaginationMeta {
 }
 
 // ── API response helpers ─────────────────────────────────────────────────────
-export function success<T>(data: T, meta?: PaginationMeta) {
-  return { data, ...(meta ? { meta } : {}) };
+export function success<T>(data: T): { data: T };
+export function success<T>(data: T, message: string): { data: T; message: string };
+export function success<T>(data: T, meta: PaginationMeta): { data: T; meta: PaginationMeta };
+export function success<T>(data: T, messageOrMeta?: string | PaginationMeta) {
+  if (typeof messageOrMeta === "string") {
+    return { data, message: messageOrMeta };
+  }
+  if (messageOrMeta) {
+    return { data, meta: messageOrMeta };
+  }
+  return { data };
 }
 
 export function apiError(code: string, message: string, details?: unknown) {

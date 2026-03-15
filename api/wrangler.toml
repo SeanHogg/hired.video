@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 # Routes (both new and legacy domains)
 routes = [
   "api.hired.video/*",
-  "api.myvideoresu.me/*",
+  "api.hired.video/*",
 ]
 
 [[r2_buckets]]
@@ -38,5 +38,5 @@ bucket_name = "hired-videos-temp"
 # zone_id = "<YOUR_ZONE_ID>"
 # routes = [
 #   "api.hired.video/*",
-#   "api.myvideoresu.me/*",
+#   "api.hired.video/*",
 # ]

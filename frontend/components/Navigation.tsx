@@ -144,7 +144,7 @@ export default function Navigation({
                 <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                MyVideoResu.ME
+                hired.video
               </span>
             </Link>
           </div>

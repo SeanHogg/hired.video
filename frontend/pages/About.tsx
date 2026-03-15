@@ -361,7 +361,7 @@ export default function About() {
               </h2>
               <p className="text-xl text-muted-foreground mb-8">
                 Join thousands of professionals who are already using
-                MyVideoResume to showcase their talents and find amazing
+                hired.video to showcase their talents and find amazing
                 opportunities.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

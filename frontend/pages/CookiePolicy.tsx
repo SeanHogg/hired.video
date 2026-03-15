@@ -278,7 +278,7 @@ export default function CookiePolicy() {
                       First-Party Cookies
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      Set directly by MyVideoResume to provide essential
+                      Set directly by hired.video to provide essential
                       functionality and improve your experience.
                     </p>
                   </div>
@@ -514,10 +514,10 @@ export default function CookiePolicy() {
                   <p className="text-sm">
                     Email:{" "}
                     <a
-                      href="mailto:privacy@myvideoresume.me"
+                      href="mailto:privacy@hired.video"
                       className="text-primary hover:underline"
                     >
-                      privacy@myvideoresume.me
+                      privacy@hired.video
                     </a>
                   </p>
                   <p className="text-sm">Subject: Cookie Policy Inquiry</p>

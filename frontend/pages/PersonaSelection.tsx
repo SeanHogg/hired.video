@@ -103,7 +103,7 @@ export default function PersonaSelection() {
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold mb-4">
-                Welcome to MyVideoResume{user?.name ? `, ${user.name}` : ""}!
+                Welcome to hired.video{user?.name ? `, ${user.name}` : ""}!
               </h1>
               <p className="text-xl text-muted-foreground mb-6">
                 Tell us about yourself so we can personalize your experience

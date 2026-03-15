@@ -53,7 +53,7 @@ function toVideoDto(video: typeof videos.$inferSelect) {
     resumeId: video.resumeId ?? "",
     userId: video.userId,
     status,
-    filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.myvideoresu.me/${video.r2Key}` : null),
+    filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.hired.video/${video.r2Key}` : null),
     includeAvatar: false,
     scenePrompt: null,
     errorMessage: video.errorMessage ?? null,
@@ -210,7 +210,7 @@ videoRoutes.get("/:id/status", async (c) => {
       progressPercentage,
       estimatedTimeRemaining: video.status === "Processing" ? 60 : null,
       errorMessage: video.errorMessage ?? null,
-      filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.myvideoresu.me/${video.r2Key}` : null),
+      filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.hired.video/${video.r2Key}` : null),
     }),
   );
 });
@@ -279,7 +279,7 @@ videoRoutes.delete("/:id", async (c) => {
   if (existing.r2Key) {
     const s3 = getS3Client();
     await s3
-      .send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET ?? "myvideoresume", Key: existing.r2Key }))
+      .send(new DeleteObjectCommand({ Bucket: process.env.STORAGE_BUCKET ?? "hired.video", Key: existing.r2Key }))
       .catch((err: unknown) => {
         console.warn("[video] failed to delete S3 object", existing.r2Key, err);
       });

@@ -1,4 +1,4 @@
-// Meta types mirror backend enum MyVideoResume.Abstractions.Core.MetaType
+// Meta types mirror backend enum hired.video.Abstractions.Core.MetaType
 export enum MetaType {
   Hyperlink = 0,
   VideoMP4 = 1,

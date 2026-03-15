@@ -4,7 +4,7 @@ import type { ApiSuccessResponse } from "@shared/api";
 // Shared pricing constants
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 
-// TYPES - mirror backend DTOs; keep in sync with MyVideoResume.Abstractions/Billing/BillingDTOs.cs
+// TYPES - mirror backend DTOs; keep in sync with hired.video.Abstractions/Billing/BillingDTOs.cs
 export interface SubscriptionSummary {
   planId: string; // free | pro | enterprise
   planName: string;

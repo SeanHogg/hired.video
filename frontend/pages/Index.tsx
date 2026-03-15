@@ -359,7 +359,7 @@ export default function Index() {
               type: "media" as const,
               contentType: metaType?.toLowerCase?.().includes("video") ? "video" : "image" as const,
               profession: "Content Creator", // Generic profession for media
-              company: "MyVideoResume", // Platform name
+              company: "hired.video", // Platform name
               createdAt: item.createdAt || new Date().toISOString(),
               // Media-specific properties
               mediaType: metaType,
@@ -631,7 +631,7 @@ export default function Index() {
         />
 
         {/* Page H1 for semantic SEO */}
-        <h1 className="sr-only">MyVideoResume — Discover Jobs, Companies, People, and Resumes</h1>
+        <h1 className="sr-only">hired.video — Discover Jobs, Companies, People, and Resumes</h1>
 
         {/* Hero Carousel */}
         <HeroCarousel

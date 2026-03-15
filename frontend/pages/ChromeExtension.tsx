@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 const CHROME_STORE_URL =
-  "https://chromewebstore.google.com/detail/myvideoresume-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol";
+  "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol";
 
 export default function ChromeExtension() {
   useSEO("/chrome-extension");
@@ -139,7 +139,7 @@ export default function ChromeExtension() {
                   { icon: BarChart3, title: "Higher Match Scores", desc: "AI-optimized resumes score 30%+ higher on ATS systems" },
                   { icon: Zap, title: "Save Hours", desc: "Create tailored resumes in seconds instead of hours" },
                   { icon: Target, title: "Beat the Competition", desc: "Stand out with perfectly matched keywords and skills" },
-                  { icon: Shield, title: "Secure & Private", desc: "Your data stays in your MyVideoResume account" },
+                  { icon: Shield, title: "Secure & Private", desc: "Your data stays in your hired.video account" },
                 ].map(({ icon: Icon, title, desc }) => (
                   <div key={title} className="flex items-start gap-4 p-4 rounded-lg border hover:bg-gray-50">
                     <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center shrink-0">

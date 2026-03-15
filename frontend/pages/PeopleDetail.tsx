@@ -256,7 +256,7 @@ export default function PeopleDetail() {
   // SEO: update title/description and structured data at top-level (hooks must not be called inside callbacks)
   const fullName = userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : '';
   const seoTitle = userProfile
-    ? `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | MyVideoResu.me`
+    ? `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | hired.video`
     : undefined;
   const seoDescription = userProfile
     ? userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`

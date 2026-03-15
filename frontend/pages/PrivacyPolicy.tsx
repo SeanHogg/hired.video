@@ -69,8 +69,8 @@ export default function PrivacyPolicy() {
               <h1 className="text-4xl font-bold mb-4">Your Privacy Matters</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 This policy applies to all processing of personal data carried
-                out by MyVideoResu.ME and has the objective of informing the
-                user regarding the way in which MyVideoResu.ME carries out the
+                out by hired.video and has the objective of informing the
+                user regarding the way in which hired.video carries out the
                 processing of personal data (including details of the type of
                 personal data collected and the purpose of processing) and
                 regarding the rights of the user in relation to their personal
@@ -90,7 +90,7 @@ export default function PrivacyPolicy() {
                 </CardTitle>
                 <CardDescription>
                   Here's what you need to know about your privacy on
-                  MyVideoResume
+                  hired.video
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -150,14 +150,14 @@ export default function PrivacyPolicy() {
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">
                   In case of having any questions about the Privacy Policy, you
-                  can contact MyVideoResu.ME through the following means:
+                  can contact hired.video through the following means:
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <h4 className="font-medium">Company Information</h4>
                     <ul className="text-sm text-muted-foreground space-y-1">
                       <li>
-                        <strong>Trade name:</strong> MyVideoResu.ME
+                        <strong>Trade name:</strong> hired.video
                       </li>
                       <li>
                         <strong>Identity of the controller:</strong> Fix Faster
@@ -170,7 +170,7 @@ export default function PrivacyPolicy() {
                         <strong>Phone:</strong> 2488250176
                       </li>
                       <li>
-                        <strong>Email:</strong> info@myvideoresu.me
+                        <strong>Email:</strong> info@hired.video
                       </li>
                     </ul>
                   </div>
@@ -178,9 +178,9 @@ export default function PrivacyPolicy() {
                     <h4 className="font-medium">Data Protection Officer</h4>
                     <p className="text-sm text-muted-foreground">
                       You may establish direct and effective communication with
-                      MyVideoResu.ME by written communication sent to any of the
+                      hired.video by written communication sent to any of the
                       indicated addresses or by sending an email to the address:
-                      info@myvideoresu.me
+                      info@hired.video
                     </p>
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export default function PrivacyPolicy() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-muted-foreground mb-4">
-                    MyVideoResu.ME collects information when visiting their web
+                    hired.video collects information when visiting their web
                     page, and mainly by completing its registration forms. The
                     following data is collected: full name, email, phone number,
                     address and specific geolocation data.
@@ -256,10 +256,10 @@ export default function PrivacyPolicy() {
                       How We Collect Personal Data
                     </h4>
                     <p className="text-muted-foreground mb-2">
-                      MyVideoResu.ME collects personal data when the user:
+                      hired.video collects personal data when the user:
                     </p>
                     <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                      <li>Completes the forms of myvideoresu.me ('Site')</li>
+                      <li>Completes the forms of hired.video ('Site')</li>
                       <li>Subscribes to the newsletter</li>
                       <li>Answers a poll or completes a web form</li>
                       <li>Completes a printed form</li>
@@ -503,7 +503,7 @@ export default function PrivacyPolicy() {
                       </h4>
                       <p className="text-green-700 dark:text-green-300 text-sm">
                         Your personal information is never sold to third parties
-                        for marketing or any other purposes. MyVideoResu.ME will
+                        for marketing or any other purposes. hired.video will
                         keep collected personal data private and confidential.
                       </p>
                     </div>
@@ -537,7 +537,7 @@ export default function PrivacyPolicy() {
                         </li>
                         <li>
                           <strong>Internal Departments:</strong> Within
-                          MyVideoResu.ME departments (administration, marketing,
+                          hired.video departments (administration, marketing,
                           IT)
                         </li>
                       </ul>
@@ -552,7 +552,7 @@ export default function PrivacyPolicy() {
                           <h5 className="font-medium text-sm">YouTube</h5>
                           <p className="text-xs text-muted-foreground">
                             The Site has links to YouTube for videos related to
-                            MyVideoResu.ME services.
+                            hired.video services.
                             <a
                               href="https://policies.google.com/privacy"
                               className="text-primary hover:underline ml-1"
@@ -602,7 +602,7 @@ export default function PrivacyPolicy() {
                           <p className="text-xs text-muted-foreground">
                             We use social networks like Facebook and Instagram
                             with integrated functions. These networks have their
-                            own privacy policies over which MyVideoResu.ME has
+                            own privacy policies over which hired.video has
                             no control.
                           </p>
                         </div>
@@ -652,10 +652,10 @@ export default function PrivacyPolicy() {
                         Your Consent
                       </h4>
                       <p className="text-blue-700 dark:text-blue-300 text-sm">
-                        By providing personal data to MyVideoResu.ME, you
+                        By providing personal data to hired.video, you
                         declare to accept its processing fully and without
                         reservation. You give your free, express and informed
-                        consent to MyVideoResu.ME's use of the data collected
+                        consent to hired.video's use of the data collected
                         for the purposes indicated in this policy.
                       </p>
                     </div>
@@ -667,7 +667,7 @@ export default function PrivacyPolicy() {
                       <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                         <li>
                           <strong>Contract Performance:</strong> Processing
-                          necessary for the contracting of MyVideoResu.ME
+                          necessary for the contracting of hired.video
                           services
                         </li>
                         <li>
@@ -692,10 +692,10 @@ export default function PrivacyPolicy() {
                       <p className="text-muted-foreground mb-2">
                         You can oppose the sending of commercial communications
                         (unsubscribe) and stop receiving emails from
-                        MyVideoResu.ME by:
+                        hired.video by:
                       </p>
                       <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
-                        <li>Sending an email to info@myvideoresu.me</li>
+                        <li>Sending an email to info@hired.video</li>
                         <li>
                           Following the unsubscribe instructions in each email
                         </li>
@@ -716,7 +716,7 @@ export default function PrivacyPolicy() {
                 <CardContent>
                   <div className="space-y-4">
                     <p className="text-muted-foreground">
-                      MyVideoResu.ME declares its intention to adopt the
+                      hired.video declares its intention to adopt the
                       necessary technical and organisational measures to ensure
                       the security, integrity and confidentiality of the data in
                       accordance with applicable privacy regulations.
@@ -747,7 +747,7 @@ export default function PrivacyPolicy() {
                           </h4>
                           <div className="text-amber-700 dark:text-amber-300 text-sm space-y-2">
                             <p>
-                              MyVideoResu.ME does not guarantee absolute privacy
+                              hired.video does not guarantee absolute privacy
                               when using the Site, since the possibility that
                               unauthorized third parties may have knowledge of
                               it cannot be excluded. The user acknowledges that
@@ -770,7 +770,7 @@ export default function PrivacyPolicy() {
                               together with corrective and remedial measures.
                             </p>
                             <p>
-                              <strong>Limitations:</strong> MyVideoResu.ME is
+                              <strong>Limitations:</strong> hired.video is
                               not responsible for loss or deletion of data by
                               users, or damage caused by computer viruses.
                             </p>
@@ -850,8 +850,8 @@ export default function PrivacyPolicy() {
                       </h4>
                       <p className="text-muted-foreground text-sm mb-2">
                         The exercise of these rights may be carried out by email
-                        to info@myvideoresu.me, or by any of the methods
-                        provided for in applicable regulations. MyVideoResu.ME
+                        to info@hired.video, or by any of the methods
+                        provided for in applicable regulations. hired.video
                         may request data necessary to validate your
                         identification.
                       </p>
@@ -1013,7 +1013,7 @@ export default function PrivacyPolicy() {
                         provide your name and email. We will ask verification
                         questions based on your previous interactions with us.
                         We will only send verification questions from
-                        info@myvideoresu.me.
+                        info@hired.video.
                       </p>
                     </div>
 
@@ -1076,7 +1076,7 @@ export default function PrivacyPolicy() {
                         Protection of Minors
                       </h4>
                       <p className="text-orange-700 dark:text-orange-300 text-sm">
-                        At MyVideoResu.ME, we recognize the importance of
+                        At hired.video, we recognize the importance of
                         protecting the privacy of children. Our commitment to
                         safeguarding the personal information of minors is
                         unwavering.
@@ -1148,7 +1148,7 @@ export default function PrivacyPolicy() {
                 <CardContent>
                   <div className="space-y-4">
                     <p className="text-muted-foreground">
-                      The staff of MyVideoResu.ME whose functions are related to
+                      The staff of hired.video whose functions are related to
                       the processing of personal data are trained in order to
                       ensure better protection of personal data and the rights
                       of data subjects.
@@ -1183,8 +1183,8 @@ export default function PrivacyPolicy() {
                           <p className="text-amber-700 dark:text-amber-300 text-sm">
                             The Site may contain links to third party websites
                             whose privacy policies are foreign to
-                            MyVideoResu.ME. These linked sites are not related
-                            to MyVideoResu.ME, and their existence does not
+                            hired.video. These linked sites are not related
+                            to hired.video, and their existence does not
                             presuppose any suggestion, invitation or
                             recommendation to visit them.
                           </p>
@@ -1196,7 +1196,7 @@ export default function PrivacyPolicy() {
                       <h4 className="font-medium mb-2">Our Responsibilities</h4>
                       <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                         <li>
-                          MyVideoResu.ME is not responsible for the content, use
+                          hired.video is not responsible for the content, use
                           and activities of linked sites
                         </li>
                         <li>
@@ -1235,7 +1235,7 @@ export default function PrivacyPolicy() {
                 <CardContent>
                   <div className="space-y-4">
                     <p className="text-muted-foreground">
-                      MyVideoResu.ME may at any time and without prior notice,
+                      hired.video may at any time and without prior notice,
                       modify this Privacy Policy. Such modifications will be
                       operative from their publication on the Site or when they
                       are notified to users by any means, whichever occurs
@@ -1271,11 +1271,11 @@ export default function PrivacyPolicy() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <Mail className="h-5 w-5 text-muted-foreground" />
-                          <span>info@myvideoresu.me</span>
+                          <span>info@hired.video</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <FileText className="h-5 w-5 text-muted-foreground" />
-                          <span>MyVideoResu.ME Privacy Team</span>
+                          <span>hired.video Privacy Team</span>
                         </div>
                       </div>
                     </div>
@@ -1284,7 +1284,7 @@ export default function PrivacyPolicy() {
                       <h4 className="font-medium">Company Details</h4>
                       <div className="text-sm text-muted-foreground space-y-1">
                         <p>
-                          <strong>Trade name:</strong> MyVideoResu.ME
+                          <strong>Trade name:</strong> hired.video
                         </p>
                         <p>
                           <strong>Controller:</strong> Fix Faster LLC
@@ -1303,7 +1303,7 @@ export default function PrivacyPolicy() {
                     <p className="text-sm text-muted-foreground">
                       <strong>Response Time:</strong> We aim to respond to all
                       privacy inquiries within 72 hours. You may establish
-                      direct and effective communication with MyVideoResu.ME by
+                      direct and effective communication with hired.video by
                       written communication sent to any of the indicated
                       addresses.
                     </p>

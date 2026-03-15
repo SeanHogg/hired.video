@@ -133,7 +133,7 @@ authRoutes.post("/register", async (c) => {
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(users)
-    .values({ email, name, passwordHash, role })
+    .values({ email, name, passwordHash, role } as any)
     .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
 
   if (!user) {

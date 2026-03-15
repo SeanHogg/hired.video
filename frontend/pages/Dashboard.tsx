@@ -141,7 +141,7 @@ export default function Dashboard() {
     // Fallback for unknown roles
     return (
       <div className="text-center">
-        <h1 className="text-3xl font-bold mb-4">Welcome to MyVideoResume</h1>
+        <h1 className="text-3xl font-bold mb-4">Welcome to hired.video</h1>
         <p className="text-muted-foreground">
           Your role ({user?.role}) doesn&apos;t have a specific dashboard yet.
         </p>

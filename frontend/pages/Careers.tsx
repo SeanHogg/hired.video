@@ -60,7 +60,7 @@ function DeferredJobs() {
   return (
     <Suspense fallback={<JobsSkeleton />}>
       <CompanyCareersControl
-        companyId="myvideoresume-company"
+        companyId="hired-video-company"
         showCompanyHeader={false}
         showFilters={true}
         showSearch={true}
@@ -85,14 +85,14 @@ export default function Careers() {
   useSEO(location.pathname);
 
   useEffect(() => {
-    document.title = "Careers - Join Our Team | MyVideoResu.me";
+    document.title = "Careers - Join Our Team | hired.video";
 
     // Set meta description
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
       metaDescription.setAttribute(
         "content",
-        "Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
+        "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
       );
     }
 
@@ -109,29 +109,29 @@ export default function Careers() {
     };
 
     // Open Graph tags
-    addMetaTag("og:title", "Careers - Join Our Team | MyVideoResu.me", true);
+    addMetaTag("og:title", "Careers - Join Our Team | hired.video", true);
     addMetaTag(
       "og:description",
-      "Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
+      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
       true,
     );
-    addMetaTag("og:url", "https://myvideoresu.me/careers", true);
+    addMetaTag("og:url", "https://hired.video/careers", true);
     addMetaTag("og:type", "website", true);
-    addMetaTag("og:image", "https://myvideoresu.me/og-careers.jpg", true);
+    addMetaTag("og:image", "https://hired.video/og-careers.jpg", true);
 
     // Twitter Card tags
     addMetaTag("twitter:card", "summary_large_image");
-    addMetaTag("twitter:title", "Careers - Join Our Team | MyVideoResu.me");
+    addMetaTag("twitter:title", "Careers - Join Our Team | hired.video");
     addMetaTag(
       "twitter:description",
-      "Join MyVideoResu.me and help revolutionize how people showcase their talents. Explore our open positions.",
+      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions.",
     );
-    addMetaTag("twitter:image", "https://myvideoresu.me/og-careers.jpg");
+    addMetaTag("twitter:image", "https://hired.video/og-careers.jpg");
 
     // Additional SEO tags
     addMetaTag(
       "keywords",
-      "careers, jobs, MyVideoResu.me, software engineer, product designer, devops, remote work, tech jobs",
+      "careers, jobs, hired.video, software engineer, product designer, devops, remote work, tech jobs",
     );
     addMetaTag("robots", "index, follow");
     // Canonical is handled by useSEO/prerender; do not add invalid meta name="canonical"
@@ -141,9 +141,9 @@ export default function Careers() {
       {
         "@context": "https://schema.org",
         "@type": "Organization",
-        name: "MyVideoResu.me",
-        url: "https://myvideoresu.me",
-        logo: "https://myvideoresu.me/favicon.svg",
+        name: "hired.video",
+        url: "https://hired.video",
+        logo: "https://hired.video/favicon.svg",
         description:
           "Revolutionary video resume platform helping job seekers showcase their talents",
         foundingDate: "2024",
@@ -154,14 +154,14 @@ export default function Careers() {
           addressCountry: "US",
         },
         sameAs: [
-          "https://linkedin.com/company/myvideoresume",
-          "https://twitter.com/myvideoresume",
+          "https://linkedin.com/company/hired.video",
+          "https://twitter.com/hired.video",
         ],
         jobPosting: {
           "@type": "JobPosting",
           hiringOrganization: {
             "@type": "Organization",
-            name: "MyVideoResu.me",
+            name: "hired.video",
           },
           jobLocation: {
             "@type": "Place",
@@ -181,7 +181,7 @@ export default function Careers() {
         mainEntity: [
           {
             "@type": "Question",
-            name: "Is MyVideoResu.me fully remote?",
+            name: "Is hired.video fully remote?",
             acceptedAnswer: {
               "@type": "Answer",
               text: "Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work.",
@@ -297,7 +297,7 @@ export default function Careers() {
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-                At MyVideoResu.me, we're building the future of how people
+                At hired.video, we're building the future of how people
                 showcase their talents and find their dream jobs. Join our
                 passionate team and help millions of job seekers stand out from
                 the crowd.
@@ -600,7 +600,7 @@ export default function Careers() {
                 </h2>
                 <p className="text-lg text-muted-foreground">
                   Get answers to common questions about working at
-                  MyVideoResu.me.
+                  hired.video.
                 </p>
               </div>
 
@@ -608,7 +608,7 @@ export default function Careers() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      Is MyVideoResu.me fully remote?
+                      Is hired.video fully remote?
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -681,7 +681,7 @@ export default function Careers() {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button size="lg" asChild>
-                      <a href="mailto:careers@myvideoresu.me">
+                      <a href="mailto:careers@hired.video">
                         Send Us Your Resume
                       </a>
                     </Button>

@@ -73,7 +73,7 @@ export enum InviteStatus {
   Owner = 5,
 }
 
-export enum MyVideoResumeRole {
+export enum hiredvideoRole {
   Admin = "Admin",
   JobSeeker = "JobSeeker",
   Recruiter = "Recruiter",

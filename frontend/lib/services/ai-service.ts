@@ -200,7 +200,7 @@ class AIService {
 
     return {
       role: "system",
-      content: `You are an AI HR Assistant for MyVideoResume, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
+      content: `You are an AI HR Assistant for hired.video, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
 
 Your role is to help users with:
 - Resume optimization and ATS compatibility

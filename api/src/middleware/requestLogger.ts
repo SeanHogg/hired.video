@@ -21,7 +21,7 @@ export const requestLoggerMiddleware: MiddlewareHandler<{ Variables: Variables }
         userId: userId ?? undefined,
         ipAddress: c.req.header("x-forwarded-for")?.split(",")[0]?.trim(),
         userAgent: c.req.header("user-agent"),
-      });
+      } as any);
     } catch {
       // Silently ignore logging failures
     }

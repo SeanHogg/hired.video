@@ -141,114 +141,114 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "professional outreach, networking, communication tools, relationship building",
   },
   "/account": {
-    title: "Account Management - MyVideoResu.me",
+    title: "Account Management - hired.video",
     description:
-      "Manage your account settings, team members, and organization preferences. Complete control over your MyVideoResu.me experience.",
+      "Manage your account settings, team members, and organization preferences. Complete control over your hired.video experience.",
     robots: "noindex, nofollow",
   },
   "/settings": {
-    title: "Settings - MyVideoResu.me",
+    title: "Settings - hired.video",
     description:
-      "Customize your MyVideoResu.me experience. Manage privacy, notifications, and account preferences.",
+      "Customize your hired.video experience. Manage privacy, notifications, and account preferences.",
     robots: "noindex, nofollow",
   },
   "/privacy-policy": {
-    title: "Privacy Policy - MyVideoResu.me",
+    title: "Privacy Policy - hired.video",
     description:
       "Learn how we protect your data and respect your privacy across our platform. Review our policies and your rights.",
     keywords:
       "privacy policy, data protection, GDPR compliance, user privacy, data security",
   },
   "/terms-of-service": {
-    title: "Terms of Service - MyVideoResu.me",
+    title: "Terms of Service - hired.video",
     description:
-      "Understand your rights and responsibilities when using MyVideoResu.me. Review our platform terms and conditions.",
+      "Understand your rights and responsibilities when using hired.video. Review our platform terms and conditions.",
     keywords: "terms of service, user agreement, legal terms, platform rules",
   },
   "/help": {
-    title: "Help & Support - MyVideoResu.me",
+    title: "Help & Support - hired.video",
     description:
-      "Find answers, browse guides, and contact support to get the most from MyVideoResu.me.",
+      "Find answers, browse guides, and contact support to get the most from hired.video.",
     keywords: "help, support, FAQ, user guide, customer service",
   },
   "/tools": {
-    title: "Career Tools - MyVideoResu.me",
+    title: "Career Tools - hired.video",
     description:
       "Access powerful AI-driven career tools including sentiment analysis, job-resume matching, and career insights.",
     keywords:
       "career tools, AI tools, job matching, sentiment analysis, career insights",
   },
   "/tools/sentiment-analysis": {
-    title: "Sentiment Analysis Tool - MyVideoResu.me",
+    title: "Sentiment Analysis Tool - hired.video",
     description:
       "Analyze the sentiment and tone of your resume content with our AI-powered sentiment analysis tool.",
     keywords:
       "sentiment analysis, resume analysis, AI tools, content optimization",
   },
   "/tools/job-resume-match": {
-    title: "Job Resume Matching Tool - MyVideoResu.me",
+    title: "Job Resume Matching Tool - hired.video",
     description:
       "Find the perfect match between jobs and resumes using our advanced AI matching algorithm.",
     keywords: "job matching, resume matching, AI matching, career fit analysis",
   },
   "/tools/ai-resume-scorer": {
-    title: "AI Resume Scorer - MyVideoResu.me",
+    title: "AI Resume Scorer - hired.video",
     description:
       "Score your resume with AI to identify strengths and areas to improve for better job matches.",
     keywords: "AI resume score, resume grading, resume quality, career tools",
   },
   "/tools/resume-optimizer": {
-    title: "Resume Optimizer - MyVideoResu.me",
+    title: "Resume Optimizer - hired.video",
     description:
       "Optimize your resume for ATS and recruiters with AI suggestions tailored to your target roles.",
     keywords: "resume optimizer, ATS optimization, resume improvement, AI tools",
   },
   "/tools/salary-calculator": {
-    title: "Salary Calculator - MyVideoResu.me",
+    title: "Salary Calculator - hired.video",
     description:
       "Estimate fair salary ranges by title, experience, and location to negotiate your next offer confidently.",
     keywords: "salary calculator, compensation, pay range, negotiate salary",
   },
   "/tools/summarize-resume": {
-    title: "Resume Summarizer - MyVideoResu.me",
+    title: "Resume Summarizer - hired.video",
     description:
       "Generate concise professional summaries from your resume to use on profiles and applications.",
     keywords: "resume summary, professional summary, AI resume tools",
   },
   "/tools/pdf-to-json": {
-    title: "PDF to JSON - MyVideoResu.me",
+    title: "PDF to JSON - hired.video",
     description:
       "Convert resume PDFs into structured JSON data for analysis and quick editing.",
     keywords: "pdf to json, resume parsing, data extraction, AI tools",
   },
   "/tools/value-proposition": {
-    title: "Value Proposition Builder - MyVideoResu.me",
+    title: "Value Proposition Builder - hired.video",
     description:
       "Craft a compelling value proposition tailored to your target role using your resume and job description.",
     keywords: "value proposition, career branding, elevator pitch, AI tools",
   },
   "/contact": {
-    title: "Contact Us - MyVideoResu.me",
+    title: "Contact Us - hired.video",
     description:
-      "Get in touch with MyVideoResu.me support. We're here to help you succeed in your career journey.",
+      "Get in touch with hired.video support. We're here to help you succeed in your career journey.",
     keywords:
-      "contact us, customer support, help, video resume support, career assistance, MyVideoResu.me contact",
+      "contact us, customer support, help, video resume support, career assistance, hired.video contact",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "ContactPage",
-      name: "Contact MyVideoResu.me",
+      name: "Contact hired.video",
       description:
-        "Contact page for MyVideoResu.me - AI-powered video resume platform",
-      url: "https://myvideoresu.me/contact",
+        "Contact page for hired.video - AI-powered video resume platform",
+      url: "https://hired.video/contact",
       mainEntity: {
         "@type": "Organization",
-        name: "MyVideoResu.me",
-        email: "info@myvideoresu.me",
-        url: "https://myvideoresu.me",
+        name: "hired.video",
+        email: "info@hired.video",
+        url: "https://hired.video",
         contactPoint: {
           "@type": "ContactPoint",
           contactType: "customer service",
-          email: "info@myvideoresu.me",
+          email: "info@hired.video",
           availableLanguage: "English",
         },
       },
@@ -258,7 +258,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
 };
 
 // Canonical origin (prefer apex domain over www)
-const CANONICAL_ORIGIN = "https://myvideoresu.me";
+const CANONICAL_ORIGIN = "https://hired.video";
 
 // Map legacy/duplicate routes to canonical equivalents
 export function canonicalizePath(pathname: string): string {
@@ -443,6 +443,6 @@ export const generateStructuredData = {
     jobTitle: person.title,
     description: person.bio,
     image: person.avatar,
-    url: `https://myvideoresu.me/people/${person.id}`,
+    url: `https://hired.video/people/${person.id}`,
   }),
 };

@@ -1,6 +1,6 @@
 /**
  * Task management types that match the backend API exactly
- * Based on MyVideoResume.Abstractions.Productivity namespace
+ * Based on hired.video.Abstractions.Productivity namespace
  */
 
 import { UserProfile } from "@/lib/services/user-service";
@@ -56,7 +56,7 @@ export enum Actions {
   Delete = 3,
 }
 
-export enum MyVideoResumeRoles {
+export enum hiredvideoRoles {
   Admin = 0,
   AccountOwner = 10,
   AccountAdmin = 11,
@@ -128,7 +128,7 @@ export interface UserCompanyRoleAssociation {
   inviteStatusStartDateTime?: string;
   inviteStatusEndDateTime?: string;
   userProfile: UserProfile;
-  rolesAssigned: MyVideoResumeRoles[];
+  rolesAssigned: hiredvideoRoles[];
   termsOfUseAgreementAcceptedDateTime?: string;
   termsOfUserAgreementVersion?: string;
   isPaidAccount: boolean;

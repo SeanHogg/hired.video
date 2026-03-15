@@ -36,7 +36,7 @@ function getS3Client(): S3Client {
 }
 
 function getBucket(): string {
-  return process.env.STORAGE_BUCKET ?? "myvideoresume";
+  return process.env.STORAGE_BUCKET ?? "hired.video";
 }
 
 export const uploadRoutes = new Hono<{ Variables: Variables }>();
@@ -55,7 +55,7 @@ function fileExt(name: string): string {
 }
 
 function cdnUrl(key: string): string {
-  return `https://cdn.myvideoresu.me/${key}`;
+  return `https://cdn.hired.video/${key}`;
 }
 
 /** POST /api/upload — upload a file to S3-compatible storage (avatars, documents, etc.) */

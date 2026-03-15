@@ -69,7 +69,7 @@ jobs:
           // Runtime configuration for production deployment
           window.APP_CONFIG = {
             // API Configuration
-            API_URL: "https://api.myvideoresu.me/api",
+            API_URL: "https://api.hired.video/api",
             
             // Error Tracking (GlitchTip/Sentry)
             ERROR_REPORTING: {

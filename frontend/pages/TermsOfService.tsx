@@ -69,7 +69,7 @@ export default function TermsOfService() {
               <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 These Legal Terms constitute a legally binding agreement made
-                between you and MyVideoResu.ME, concerning your access to and
+                between you and hired.video, concerning your access to and
                 use of the Services.
               </p>
               <p className="text-sm text-muted-foreground mt-4">
@@ -87,17 +87,17 @@ export default function TermsOfService() {
                       Agreement to Our Legal Terms
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      We are MyVideoResu.ME (dba Fix Faster LLC), care of
+                      We are hired.video (dba Fix Faster LLC), care of
                       HireFractionalTalent.com, a company registered in
                       Michigan, United States in Troy, MI. We operate the
-                      website https://myvideoresu.me and related services.
+                      website https://hired.video and related services.
                     </p>
                     <p className="text-muted-foreground mb-4">
                       <strong>You can contact us by:</strong>
                       <br />
                       Phone: (+1) 248 825 0176
                       <br />
-                      Email: info@myvideoresu.me
+                      Email: info@hired.video
                     </p>
                     <p className="text-muted-foreground">
                       <strong>
@@ -150,7 +150,7 @@ export default function TermsOfService() {
                   </p>
 
                   <p className="text-muted-foreground">
-                    MyVideoResu.ME is a career platform that provides:
+                    hired.video is a career platform that provides:
                   </p>
                   <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                     <li>
@@ -498,7 +498,7 @@ export default function TermsOfService() {
                     <p className="text-blue-700 dark:text-blue-300 text-sm">
                       <strong>Questions or Concerns:</strong> If you have any
                       questions or are unsatisfied with our Services, please
-                      email us at info@myvideoresu.me.
+                      email us at info@hired.video.
                     </p>
                   </div>
                 </CardContent>
@@ -1612,7 +1612,7 @@ export default function TermsOfService() {
                     <h4 className="font-medium mb-2">Affiliate Program Terms</h4>
                     <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4">
                       <li>
-                        <strong>Eligibility and Account:</strong> You must maintain an active MyVideoResu.ME account in good standing. We may review affiliate applications and refuse or revoke access at our discretion for any reason, including suspected abuse.
+                        <strong>Eligibility and Account:</strong> You must maintain an active hired.video account in good standing. We may review affiliate applications and refuse or revoke access at our discretion for any reason, including suspected abuse.
                       </li>
                       <li>
                         <strong>Commission:</strong> 25% commission on the first month's subscription fee only (one-time per qualified referral). No recurring commission is paid for subsequent renewals.
@@ -1673,7 +1673,7 @@ export default function TermsOfService() {
                     </h4>
                     <p className="text-blue-700 dark:text-blue-300 text-sm">
                       If you have any questions or need assistance regarding our
-                      SMS communications, please email us at info@myvideoresu.me
+                      SMS communications, please email us at info@hired.video
                       or call at (+1) 248 825 0176.
                     </p>
                   </div>
@@ -1778,11 +1778,11 @@ export default function TermsOfService() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <Mail className="h-5 w-5 text-muted-foreground" />
-                          <span>info@myvideoresu.me</span>
+                          <span>info@hired.video</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <FileText className="h-5 w-5 text-muted-foreground" />
-                          <span>MyVideoResu.ME c/o MyVideoResu.ME</span>
+                          <span>hired.video c/o hired.video</span>
                         </div>
                       </div>
                     </div>
@@ -1791,7 +1791,7 @@ export default function TermsOfService() {
                       <h4 className="font-medium">Company Details</h4>
                       <div className="text-sm text-muted-foreground space-y-1">
                         <p>
-                          <strong>Company:</strong> MyVideoResu.ME
+                          <strong>Company:</strong> hired.video
                         </p>
                         <p>
                           <strong>Address:</strong> Troy, MI, United States
@@ -1800,7 +1800,7 @@ export default function TermsOfService() {
                           <strong>Phone:</strong> (+1) 248 825 0176
                         </p>
                         <p>
-                          <strong>Email:</strong> info@myvideoresu.me
+                          <strong>Email:</strong> info@hired.video
                         </p>
                       </div>
                     </div>

@@ -1,10 +1,10 @@
-# MyVideoResume Platform - Complete Documentation
+# hired.video Platform - Complete Documentation
 
 A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools.
 
 ## 🚀 Platform Overview
 
-MyVideoResume is an enterprise-grade platform that combines video resume creation with comprehensive talent management, professional networking, and business collaboration tools. The platform supports multi-tenant organizations with role-based access control and advanced productivity features.
+hired.video is an enterprise-grade platform that combines video resume creation with comprehensive talent management, professional networking, and business collaboration tools. The platform supports multi-tenant organizations with role-based access control and advanced productivity features.
 
 ### Core Platform Features
 
@@ -158,13 +158,13 @@ The frontend integrates with a comprehensive .NET Core API providing:
 
 ### Project Structure Setup
 
-The MyVideoResume platform consists of three repositories that work together:
+The hired.video platform consists of three repositories that work together:
 
 ```
-MyVideoResume/                    # Parent folder
-├── myvideoresume-frontend/       # React frontend (this repo)
-├── myvideoresume-api/           # .NET Core API backend
-└── myvideoresume-chrome-extension/  # Chrome extension
+hired.video/                    # Parent folder
+├── hired.video-frontend/       # React frontend (this repo)
+├── hired-api/           # .NET Core API backend
+└── hired.video-chrome-extension/  # Chrome extension
 ```
 
 ### Complete Installation Guide
@@ -173,13 +173,13 @@ MyVideoResume/                    # Parent folder
 
 ```bash
 # Create parent directory
-mkdir MyVideoResume
-cd MyVideoResume
+mkdir hired.video
+cd hired.video
 
 # Clone all three repositories
-git clone https://github.com/your-org/myvideoresume-frontend.git
-git clone https://github.com/your-org/myvideoresume-api.git
-git clone https://github.com/your-org/myvideoresume-chrome-extension.git
+git clone https://github.com/your-org/hired.video-frontend.git
+git clone https://github.com/your-org/hired-api.git
+git clone https://github.com/your-org/hired.video-chrome-extension.git
 
 # Open the parent folder in VS Code
 code .
@@ -189,7 +189,7 @@ code .
 
 ```bash
 # Navigate to API folder
-cd myvideoresume-api
+cd hired-api
 
 # Restore NuGet packages
 dotnet restore
@@ -203,12 +203,12 @@ cp appsettings.json appsettings.Development.json
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=MyVideoResumeDB;Trusted_Connection=true;MultipleActiveResultSets=true"
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=hired.videoDB;Trusted_Connection=true;MultipleActiveResultSets=true"
   },
   "JwtSettings": {
     "SecretKey": "your-super-secret-jwt-key-here-minimum-32-characters",
-    "Issuer": "MyVideoResume",
-    "Audience": "MyVideoResume",
+    "Issuer": "hired.video",
+    "Audience": "hired.video",
     "ExpirationInMinutes": 60
   },
   "OpenAIKey": "your-openrouter-api-key-here",
@@ -219,7 +219,7 @@ cp appsettings.json appsettings.Development.json
     "SmtpUsername": "your-email@gmail.com",
     "SmtpPassword": "your-app-password",
     "FromEmail": "your-email@gmail.com",
-    "FromName": "MyVideoResume"
+    "FromName": "hired.video"
   },
   "Logging": {
     "LogLevel": {
@@ -234,8 +234,8 @@ cp appsettings.json appsettings.Development.json
 #### 3. Database Setup
 
 ```bash
-# From the myvideoresume-api folder
-cd myvideoresume-api
+# From the hired-api folder
+cd hired-api
 
 # Install Entity Framework tools (if not already installed)
 dotnet tool install --global dotnet-ef
@@ -257,7 +257,7 @@ The API will be available at `https://localhost:5001` and `http://localhost:5000
 
 ```bash
 # Navigate to frontend folder
-cd ../myvideoresume-frontend
+cd ../hired.video-frontend
 
 # Install dependencies
 npm install
@@ -276,7 +276,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_OPENROUTER_API_KEY=your_openrouter_key
 
 # App Configuration
-VITE_APP_NAME=MyVideoResume
+VITE_APP_NAME=hired.video
 VITE_APP_VERSION=1.0.0
 VITE_ENVIRONMENT=development
 
@@ -288,7 +288,7 @@ VITE_GTM_ID=GTM-T6CSJ22D
 
 ```bash
 # Navigate to extension folder
-cd ../myvideoresume-chrome-extension
+cd ../hired.video-chrome-extension
 
 # Install dependencies
 npm install
@@ -307,7 +307,7 @@ npm run build
 #### Backend API
 
 ```bash
-cd myvideoresume-api
+cd hired-api
 
 # Run in development mode
 dotnet run
@@ -325,7 +325,7 @@ dotnet test
 #### Frontend
 
 ```bash
-cd myvideoresume-frontend
+cd hired.video-frontend
 
 # Start development server
 npm run dev
@@ -346,7 +346,7 @@ npm run lint
 #### Chrome Extension
 
 ```bash
-cd myvideoresume-chrome-extension
+cd hired.video-chrome-extension
 
 # Development build with watch
 npm run dev
@@ -391,7 +391,7 @@ Install these VS Code extensions for the best development experience:
 
 #### Workspace Configuration
 
-Create `.vscode/settings.json` in the parent MyVideoResume folder:
+Create `.vscode/settings.json` in the parent hired.video folder:
 
 ```json
 {
@@ -404,7 +404,7 @@ Create `.vscode/settings.json` in the parent MyVideoResume folder:
   "files.associations": {
     "*.json": "jsonc"
   },
-  "dotnet.defaultSolution": "myvideoresume-api/MyVideoResume.sln"
+  "dotnet.defaultSolution": "hired-api/hired.video.sln"
 }
 ```
 
@@ -419,9 +419,9 @@ Create `.vscode/launch.json` for debugging:
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/myvideoresume-api/Server/bin/Debug/net9.0/MyVideoResume.Server.dll",
+      "program": "${workspaceFolder}/hired-api/Server/bin/Debug/net9.0/hired.video.Server.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/myvideoresume-api/Server",
+      "cwd": "${workspaceFolder}/hired-api/Server",
       "stopAtEntry": false,
       "serverReadyAction": {
         "action": "openExternally",
@@ -440,7 +440,7 @@ Create `.vscode/launch.json` for debugging:
 #### Common Entity Framework Commands
 
 ```bash
-# From myvideoresume-api folder
+# From hired-api folder
 
 # Check migration status
 dotnet ef migrations list
@@ -484,13 +484,13 @@ sqllocaldb create mssqllocaldb
 For SQL Server Express:
 
 ```json
-"DefaultConnection": "Server=.\\SQLEXPRESS;Database=MyVideoResumeDB;Trusted_Connection=true;MultipleActiveResultSets=true"
+"DefaultConnection": "Server=.\\SQLEXPRESS;Database=hired.videoDB;Trusted_Connection=true;MultipleActiveResultSets=true"
 ```
 
 For Docker SQL Server:
 
 ```json
-"DefaultConnection": "Server=localhost,1433;Database=MyVideoResumeDB;User Id=sa;Password=YourPassword123!;TrustServerCertificate=true"
+"DefaultConnection": "Server=localhost,1433;Database=hired.videoDB;User Id=sa;Password=YourPassword123!;TrustServerCertificate=true"
 ```
 
 ### Environment Configuration
@@ -500,9 +500,9 @@ For Docker SQL Server:
 **Frontend (.env.production):**
 
 ```env
-VITE_API_URL=https://api.myvideoresu.me/api
+VITE_API_URL=https://api.hired.video/api
 VITE_OPENROUTER_API_KEY=prod_openrouter_key
-VITE_APP_NAME=MyVideoResume
+VITE_APP_NAME=hired.video
 VITE_APP_VERSION=1.0.0
 VITE_ENVIRONMENT=production
 VITE_GTM_ID=GTM-T6CSJ22D
@@ -536,7 +536,7 @@ VITE_GTM_ID=GTM-T6CSJ22D
 1. **Start the Backend API:**
 
 ```bash
-cd myvideoresume-api
+cd hired-api
 dotnet run
 # API will be available at http://localhost:5000
 ```
@@ -544,7 +544,7 @@ dotnet run
 2. **Start the Frontend:**
 
 ```bash
-cd myvideoresume-frontend
+cd hired.video-frontend
 npm run dev
 # Frontend will be available at http://localhost:5173
 ```
@@ -660,7 +660,7 @@ Error: Migration already applied
 #### Frontend Testing
 
 ```bash
-cd myvideoresume-frontend
+cd hired.video-frontend
 
 # Run unit tests
 npm run test
@@ -675,7 +675,7 @@ npm run test:coverage
 #### Backend Testing
 
 ```bash
-cd myvideoresume-api
+cd hired-api
 
 # Run all tests
 dotnet test
@@ -684,7 +684,7 @@ dotnet test
 dotnet test --collect:"XPlat Code Coverage"
 
 # Run specific test project
-dotnet test MyVideoResume.Tests
+dotnet test hired.video.Tests
 ```
 
 #### Integration Testing
@@ -891,7 +891,7 @@ npm run preview
 
 ```bash
 # Production environment variables
-VITE_API_URL=https://api.myvideoresu.me/api
+VITE_API_URL=https://api.hired.video/api
 VITE_OPENROUTER_API_KEY=prod_openrouter_key
 VITE_ENVIRONMENT=production
 ```
@@ -1158,4 +1158,4 @@ The platform has a **strong technical foundation** but needs **immediate marketi
 
 ---
 
-This frontend provides a modern, professional interface for the MyVideoResume platform with enterprise-grade features for career development, business networking, and organizational management. The platform is designed to scale from individual job seekers to large enterprise recruiting teams with comprehensive multi-tenant support and advanced collaboration features.
+This frontend provides a modern, professional interface for the hired.video platform with enterprise-grade features for career development, business networking, and organizational management. The platform is designed to scale from individual job seekers to large enterprise recruiting teams with comprehensive multi-tenant support and advanced collaboration features.

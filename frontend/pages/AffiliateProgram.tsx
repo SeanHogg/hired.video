@@ -57,7 +57,7 @@ export default function AffiliateProgram() {
           <section className="max-w-6xl mx-auto px-6 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
               <div className="space-y-6">
-                <h1 className="text-4xl font-bold tracking-tight">Partner with MyVideoResume</h1>
+                <h1 className="text-4xl font-bold tracking-tight">Partner with hired.video</h1>
                 <p className="text-muted-foreground text-lg">
                   Help professionals stand out with AI-powered video and traditional resumes. Earn commissions by sharing a platform that accelerates job searches and improves hiring outcomes.
                 </p>
@@ -219,7 +219,7 @@ export default function AffiliateProgram() {
                 <CardDescription>Early partners have reported higher click-through with video resumes vs text-only.</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
-                <blockquote className="p-4 bg-muted rounded-md">“MyVideoResume is the first tool my audience asked me to keep recommending.” — Career Coach</blockquote>
+                <blockquote className="p-4 bg-muted rounded-md">“hired.video is the first tool my audience asked me to keep recommending.” — Career Coach</blockquote>
                 <blockquote className="p-4 bg-muted rounded-md">“Video intros increased recruiter responses. Easy sell.” — Content Creator</blockquote>
                 <blockquote className="p-4 bg-muted rounded-md">“The collections feature makes managing resume variants a breeze.” — Staffing Agency</blockquote>
               </CardContent>

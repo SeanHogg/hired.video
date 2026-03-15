@@ -94,7 +94,7 @@ export async function uploadCompanyLogo(file: File): Promise<string> {
     formData,
   );
 
-  // Backend returns full URL (e.g., https://api.myvideoresu.me/uploads/filename.png)
+  // Backend returns full URL (e.g., https://api.hired.video/uploads/filename.png)
   return response.data.url || "";
 }
 
@@ -166,7 +166,7 @@ export async function uploadVideo(
       // Get the base URL from apiClient configuration
       const baseUrl = import.meta.env.VITE_API_URL ||
                       import.meta.env.VITE_API_BASE_URL ||
-                      "https://api.myvideoresu.me";
+                      "https://api.hired.video";
 
       xhr.open("POST", `${baseUrl}/api/upload/video`);
 

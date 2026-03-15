@@ -1,5 +1,5 @@
 {
-  "name": "myvideoresume-frontend",
+  "name": "hired.video-frontend",
   "private": true,
   "type": "module",
   "pkg": {
@@ -13,6 +13,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node ./scripts/update-config.mjs && node ./scripts/prerender.mjs",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name hired --commit-dirty=true",
+    "deploy:frontend": "wrangler pages deploy dist --project-name hired --commit-dirty=true",
     "start": "vite preview",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 1000",
     "lint:strict": "eslint . --ext .ts,.tsx,.js,.jsx",

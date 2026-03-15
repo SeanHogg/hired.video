@@ -170,7 +170,7 @@ export default function Help() {
       title: "Email Support",
       description: "Send us an email",
       action: "Send Email",
-      available: "help@myvideoresume.me",
+      available: "help@hired.video",
     },
     {
       icon: Phone,
@@ -283,7 +283,7 @@ export default function Help() {
                   </h2>
                   <p className="text-muted-foreground">
                     Quick answers to the most common questions about
-                    MyVideoResume
+                    hired.video
                   </p>
                 </div>
 
@@ -340,7 +340,7 @@ export default function Help() {
                   <h2 className="text-2xl font-bold mb-2">Helpful Guides</h2>
                   <p className="text-muted-foreground">
                     Comprehensive guides to help you get the most out of
-                    MyVideoResume
+                    hired.video
                   </p>
                 </div>
 
@@ -380,7 +380,7 @@ export default function Help() {
                   <CardHeader>
                     <CardTitle>Video Tutorials</CardTitle>
                     <CardDescription>
-                      Watch step-by-step video tutorials to master MyVideoResume
+                      Watch step-by-step video tutorials to master hired.video
                       features
                     </CardDescription>
                   </CardHeader>

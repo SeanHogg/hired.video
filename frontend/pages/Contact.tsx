@@ -95,8 +95,8 @@ export default function Contact() {
       icon: Mail,
       title: "Email Us",
       description: "Get in touch via email",
-      value: "info@myvideoresu.me",
-      action: "mailto:info@myvideoresu.me",
+      value: "info@hired.video",
+      action: "mailto:info@hired.video",
     },
     {
       icon: MessageCircle,
@@ -121,7 +121,7 @@ export default function Contact() {
         "Simply sign up for an account, upload your existing resume, and use our AI-powered tools to create a compelling video resume that showcases your skills and personality.",
     },
     {
-      question: "Is MyVideoResu.me free to use?",
+      question: "Is hired.video free to use?",
       answer:
         "We offer both free and premium plans. Our free plan includes basic video resume creation, while premium plans offer advanced features like AI optimization and priority support.",
     },
@@ -160,7 +160,7 @@ export default function Contact() {
                   Get in Touch
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8">
-                  Have questions about MyVideoResu.me? We're here to help you
+                  Have questions about hired.video? We're here to help you
                   succeed in your career journey. Reach out to our team and
                   we'll get back to you as soon as possible.
                 </p>
@@ -262,7 +262,7 @@ export default function Contact() {
                   Frequently Asked Questions
                 </h2>
                 <p className="text-lg text-muted-foreground">
-                  Find answers to common questions about MyVideoResu.me
+                  Find answers to common questions about hired.video
                 </p>
               </div>
 

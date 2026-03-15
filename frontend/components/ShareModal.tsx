@@ -39,7 +39,7 @@ export default function ShareModal({
 
   const encodedUrl = encodeURIComponent(shareUrl);
   const defaultText = encodeURIComponent(
-    "Check out my profile on MyVideoResume!",
+    "Check out my profile on hired.video!",
   );
 
   const links = [
@@ -57,7 +57,7 @@ export default function ShareModal({
     },
     {
       label: "Share by Email",
-      href: `mailto:?subject=${encodeURIComponent("MyVideoResume Profile")}&body=${defaultText}%20${encodedUrl}`,
+      href: `mailto:?subject=${encodeURIComponent("hired.video Profile")}&body=${defaultText}%20${encodedUrl}`,
     },
     {
       label: "Share on WhatsApp",

@@ -1,6 +1,6 @@
 /**
  * Communication system types that match the backend API exactly
- * Based on MyVideoResume.Abstractions.Communications namespace
+ * Based on hired.video.Abstractions.Communications namespace
  */
 
 import { UserProfile } from "@/lib/services/user-service";

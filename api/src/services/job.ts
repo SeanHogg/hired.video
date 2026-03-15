@@ -3,7 +3,7 @@ import type {
   CreateJobDTO,
   JobSummaryDTO,
   PaginatedJobsDTO,
-} from "../../../shared/job";
+} from "../../../shared/job.js";
 
 // NOTE: These are placeholder implementations until the legacy .NET domain is migrated.
 // Proper implementations should query the database, apply permissions, and return real data.

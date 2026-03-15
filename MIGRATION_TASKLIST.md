@@ -1,6 +1,6 @@
 # API Migration Task List (Legacy → New `/api` Cloudflare Worker)
 
-This document tracks the migration of the legacy .NET API (in `/myvideoresume-api`) into the new Cloudflare Worker API implementation (`/api`).
+This document tracks the migration of the legacy .NET API (in `/hired-api`) into the new Cloudflare Worker API implementation (`/api`).
 
 ## ✅ Migration Approach
 
@@ -196,7 +196,7 @@ This document tracks the migration of the legacy .NET API (in `/myvideoresume-ap
 - [x] Legacy alias `/api/productdashboard/affiliate-stats` (stubbed)
 - [x] `/api/productdashboard` root + `/export/:format` (stubbed)
 - [x] `/api/productdashboard/refund*` + `/cancellation*` stats/actions (stubbed)
-- [ ] `/api/admin/*` (remaining endpoints)
+- [x] `/api/admin/*` (stubbed)
 - [x] `/api/studio/storyboard` (frontend-compatible response)
 - [x] `/api/studio/upload` (multipart upload + project DTO)
 - [x] `/api/studio/publish` (stubbed publish flow)
@@ -238,6 +238,12 @@ This document tracks the migration of the legacy .NET API (in `/myvideoresume-ap
 - [x] `/api/task/:id` get/delete
 - [x] `/api/task/save` create/update
 - [x] Legacy fallback `POST /api/task/:id`
+
+---
+
+## ✅ Migration Status: All endpoints implemented or stubbed
+
+All `/api/*` endpoints required for frontend compatibility are now implemented or stubbed. Remaining work involves converting stubs to real services and shared DTOs, as outlined below.
 
 ---
 

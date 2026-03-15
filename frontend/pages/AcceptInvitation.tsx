@@ -165,7 +165,7 @@ export default function AcceptInvitation() {
           <CardTitle className="text-2xl">You're Invited!</CardTitle>
           <CardDescription>
             {invitationDetails.inviterName} has invited you to join{" "}
-            <strong>{invitationDetails.companyName}</strong> on MyVideoResu.ME
+            <strong>{invitationDetails.companyName}</strong> on hired.video
           </CardDescription>
         </CardHeader>
 

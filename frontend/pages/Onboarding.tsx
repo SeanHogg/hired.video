@@ -212,7 +212,7 @@ export default function Onboarding() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Welcome to MyVideoResume!</h1>
+            <h1 className="text-3xl font-bold">Welcome to hired.video!</h1>
           </div>
           <p className="text-muted-foreground text-lg">
             Let's get your {user.persona.replace("_", " ")} profile set up in

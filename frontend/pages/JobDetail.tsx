@@ -237,7 +237,7 @@ export default function JobDetail() {
 
   // SEO: compute and apply at top-level to respect Rules of Hooks
   const jobSeoTitle = job
-    ? `${job.data.title} at ${job.data.company.name} | MyVideoResu.me`
+    ? `${job.data.title} at ${job.data.company.name} | hired.video`
     : undefined;
   const jobSeoDescription = job
     ? `${job.data.title} at ${job.data.company.name}${job.data.location?.remote ? " (Remote)" : job.data.location?.city ? ` in ${job.data.location.city}, ${job.data.location.state}` : ""}. ${job.data.description?.slice(0, 150)}`

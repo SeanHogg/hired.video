@@ -148,7 +148,7 @@ export default function Signup() {
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Create your account</CardTitle>
                 <CardDescription>
-                  Join MyVideoResume and start building your career
+                  Join hired.video and start building your career
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">

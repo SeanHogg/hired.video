@@ -3,8 +3,8 @@ import type {
   InvoiceDTO,
   PaymentMethodDTO,
   SubscriptionSummaryDTO,
-} from "../../../shared/billing";
-import { FREE_AI_MONTHLY_LIMIT } from "../../../shared/pricing";
+} from "../../../shared/billing.js";
+import { FREE_AI_MONTHLY_LIMIT } from "../../../shared/pricing.js";
 
 export async function getSubscription(): Promise<SubscriptionSummaryDTO> {
   return {

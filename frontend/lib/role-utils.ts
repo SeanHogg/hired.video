@@ -9,7 +9,7 @@
 
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
 
-// Backend enum values from MyVideoResumeRoles
+// Backend enum values from hiredvideoRoles
 export const BACKEND_ROLE_VALUES = {
   JOB_SEEKER: 30,
   RECRUITER: 40,
@@ -64,7 +64,7 @@ export function normalizeRole(
 ): UserRole {
   if (!role && role !== 0) return USER_ROLES.JOB_SEEKER;
 
-  // Handle numeric role values from MyVideoResumeRoles enum
+  // Handle numeric role values from hiredvideoRoles enum
   if (typeof role === "number" || !isNaN(Number(role))) {
     const numericRole = Number(role);
     switch (numericRole) {

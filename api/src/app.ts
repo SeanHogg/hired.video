@@ -3,14 +3,14 @@ import { cors } from "hono/cors";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
-import { studioRoutes } from "./routes/studio";
+import { studioRoutes } from "./routes/studio.js";
 
 import { authRoutes } from "./routes/auth.js";
 import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
-import { resumeRoutes } from "./routes/resumes";
+import { resumeRoutes } from "./routes/resumes.js";
 import { jobRoutes } from "./routes/jobs.js";
-import { videoRoutes } from "./routes/video";
+import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
 import { recruiterRoutes } from "./routes/recruiter.js";
 import { matchRoutes } from "./routes/match.js";
@@ -27,18 +27,18 @@ import { aiRoutes } from "./routes/ai.js";
 import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
 import { paymentRoutes } from "./routes/payment.js";
-import { youtubeRoutes } from "./routes/youtube";
+import { youtubeRoutes } from "./routes/youtube.js";
 import { communicationRoutes } from "./routes/communication.js";
 import { passwordManagementRoutes } from "./routes/password-management.js";
 import { resumeScorerRoutes } from "./routes/resume-scorer.js";
 import { resumeOptimizerRoutes } from "./routes/resume-optimizer.js";
 import { sentimentRoutes } from "./routes/sentiment.js";
-import { taskRoutes } from "./routes/task";
-import { feedRoutes } from "./routes/feed";
-import { salaryRoutes } from "./routes/salary";
-import { valuePropositionRoutes } from "./routes/value-proposition";
-import { featureFlagRoutes } from "./routes/featureflag";
-import { hubsRoutes } from "./routes/hubs";
+import { taskRoutes } from "./routes/task.js";
+import { feedRoutes } from "./routes/feed.js";
+import { salaryRoutes } from "./routes/salary.js";
+import { valuePropositionRoutes } from "./routes/value-proposition.js";
+import { featureFlagRoutes } from "./routes/featureflag.js";
+import { hubsRoutes } from "./routes/hubs.js";
 
 export function createApp() {
   const app = new Hono();
@@ -54,7 +54,7 @@ export function createApp() {
 
   app.use("*", requestLoggerMiddleware);
 
-  const allowedOrigins = (process.env.FRONTEND_URL ?? "https://hired.video,https://myvideoresu.me")
+  const allowedOrigins = (process.env.FRONTEND_URL ?? "https://hired.video,https://hired.video")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);

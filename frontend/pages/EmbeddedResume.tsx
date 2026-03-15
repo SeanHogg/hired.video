@@ -149,7 +149,7 @@ export default function EmbeddedResume() {
           </p>
           <Button asChild>
             <a
-              href="https://myvideoresu.me"
+              href="https://hired.video"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -182,12 +182,12 @@ export default function EmbeddedResume() {
           <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
             <span>Powered by</span>
             <a
-              href="https://myvideoresu.me"
+              href="https://hired.video"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold text-primary hover:underline flex items-center space-x-1"
             >
-              <span>MyVideoResu.ME</span>
+              <span>hired.video</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>

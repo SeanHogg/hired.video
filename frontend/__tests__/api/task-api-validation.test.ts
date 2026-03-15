@@ -154,7 +154,7 @@ describe('Task API Response Validation', () => {
       
       console.log('=== ROOT CAUSE ANALYSIS ===');
       console.log('Problem: Authentication middleware returns 401 with empty body');
-      console.log('Location: myvideoresume-api/Server/Program.cs lines 418-444');
+      console.log('Location: hired-api/Server/Program.cs lines 418-444');
       console.log('Fix: Add JSON response body to OnRedirectToLogin event');
       console.log('===========================');
     });
