@@ -1,11 +1,12 @@
 // PromptEditor.tsx — resume text + prompt + optional job description + Run
 
 import { useRef, useState, useEffect } from "react";
-import JSZip from "jszip";
-import { Upload, ChevronDown, ChevronUp, Briefcase, FileText, Bookmark, Loader2, X } from "lucide-react";
+import { Sparkles, Upload, ChevronDown, ChevronUp, Briefcase, FileText, Bookmark, Loader2, X } from "lucide-react";
+import { extractTextFromFile } from "@/lib/extract-text";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import FileUploadInput from "@/components/FileUploadInput";
 import type { StudioProjectState } from "@/types/studio";
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeSummary } from "@/lib/services/resume-service";
@@ -20,38 +21,8 @@ interface Props {
   onToggleJD: () => void;
 }
 
-async function extractTextFromPdf(file: File): Promise<string> {
-  const pdfjsLib = await import("pdfjs-dist");
-  // Point the worker at the bundled worker (Vite resolves ?url imports)
-  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    const workerMod = await import("pdfjs-dist/build/pdf.worker.mjs?url");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerMod.default as string;
-  }
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const parts: string[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ");
-    parts.push(pageText);
-  }
-  return parts.join("\n").replace(/\s+/g, " ").trim();
-}
-
 async function extractText(file: File): Promise<string> {
-  if (file.name.toLowerCase().endsWith(".pdf")) {
-    return extractTextFromPdf(file);
-  }
-  if (file.name.endsWith(".docx")) {
-    const zip = await JSZip.loadAsync(file);
-    const xml = await zip.file("word/document.xml")?.async("string");
-    if (!xml) return "";
-    return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  }
-  return file.text();
+  return extractTextFromFile(file);
 }
 
 /** Serialize a loaded FrontendResume into plain readable text for the AI. */
@@ -157,12 +128,15 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <Label>Resume</Label>
-          <div className="flex items-center gap-1">
-            {/* Upload file */}
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => fileRef.current?.click()}>
-              <Upload className="w-3.5 h-3.5 mr-1" /> Upload
-            </Button>
-            <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.docx" className="hidden" onChange={handleFileInput} />
+          <div className="flex items-center gap-2">
+            <FileUploadInput
+              buttonText="Upload PDF / DOCX"
+              accept=".pdf,.txt,.md,.docx"
+              onFileSelected={async (file) => {
+                const text = await extractTextFromFile(file);
+                onStateChange({ resumeText: text });
+              }}
+            />
 
             {/* From account */}
             {resumes.length > 0 && (

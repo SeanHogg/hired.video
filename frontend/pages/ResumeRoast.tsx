@@ -16,6 +16,8 @@ import RoastResultView from "@/components/RoastResult";
 import type { RoastResult } from "@/components/RoastResult";
 import { scoreCardToBlob } from "@/components/ScoreCard";
 import { useToast } from "@/hooks/use-toast";
+import { extractTextFromFile } from "@/lib/extract-text";
+import FileUploadInput from "@/components/FileUploadInput";
 
 // ─── API schema ───────────────────────────────────────────────────────────────
 
@@ -28,42 +30,6 @@ const RoastResponseSchema = z.object({
   improvedExamples: z.array(z.object({ original: z.string(), improved: z.string() })),
 });
 
-// ─── Text extraction helper (TXT / MD / PDF / DOCX) ───────────────────────────
-
-async function extractTextFromPdf(file: File): Promise<string> {
-  const pdfjs = await import("pdfjs-dist");
-  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    const worker = await import("pdfjs-dist/build/pdf.worker.mjs?url");
-    pdfjs.GlobalWorkerOptions.workerSrc = worker.default as string;
-  }
-  const buffer = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: buffer }).promise;
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    pages.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
-  }
-  return pages.join("\n").replace(/\s+/g, " ").trim();
-}
-
-async function extractTextFromFile(file: File): Promise<string> {
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".pdf")) return extractTextFromPdf(file);
-  if (file.type === "text/plain" || lower.endsWith(".txt") || lower.endsWith(".md")) {
-    return file.text();
-  }
-  if (lower.endsWith(".docx") || file.type.includes("wordprocessingml")) {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const xmlFile = zip.file("word/document.xml");
-    if (xmlFile) {
-      const xml = await xmlFile.async("text");
-      return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    }
-  }
-  return file.text();
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -83,9 +49,21 @@ export default function ResumeRoast() {
     if (!file) return;
     try {
       const text = await extractTextFromFile(file);
+      if (!text.trim()) {
+        toast({
+          title: "Could not extract text",
+          description: "This file type isn't supported or contains no selectable text. Please paste your resume instead.",
+          variant: "destructive",
+        });
+        return;
+      }
       setResumeText(text);
     } catch {
-      toast({ title: "Could not read file", description: "Please paste your resume text instead", variant: "destructive" });
+      toast({
+        title: "Could not read file",
+        description: "Please paste your resume text instead.",
+        variant: "destructive",
+      });
     }
   }, [toast]);
 
@@ -156,21 +134,12 @@ export default function ResumeRoast() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="resume-upload" className="sr-only">Upload file</Label>
-                  <label
-                    htmlFor="resume-upload"
-                    className="flex items-center gap-2 cursor-pointer w-fit text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Upload .txt / .md / .docx
-                    <input
-                      id="resume-upload"
-                      type="file"
-                      accept=".pdf,.txt,.md,.docx,text/plain"
-                      className="sr-only"
-                      onChange={handleFileChange}
-                    />
-                  </label>
+                  <FileUploadInput
+                    label={<Label className="sr-only">Upload file</Label>}
+                    buttonText="Upload PDF / DOCX"
+                    accept=".pdf,.txt,.md,.docx,text/plain"
+                    onFileSelected={handleFileChange}
+                  />
                 </div>
                 <Textarea
                   placeholder="Or paste your resume text here…"

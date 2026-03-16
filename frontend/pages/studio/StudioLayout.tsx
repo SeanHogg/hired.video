@@ -234,6 +234,7 @@ export default function StudioLayout() {
   function handleTemplateLoad(script: VideoScript) {
     const cv = recompile(script);
     patchState({ script, status: cv ? "ready" : "error" });
+    setCompiledVideo(cv);
     setTab("storyboard");
   }
 
