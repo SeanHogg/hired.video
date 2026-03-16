@@ -28,14 +28,32 @@ const RoastResponseSchema = z.object({
   improvedExamples: z.array(z.object({ original: z.string(), improved: z.string() })),
 });
 
-// ─── DOCX text extraction helper ─────────────────────────────────────────────
+// ─── Text extraction helper (TXT / MD / PDF / DOCX) ───────────────────────────
+
+async function extractTextFromPdf(file: File): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    const worker = await import("pdfjs-dist/build/pdf.worker.mjs?url");
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default as string;
+  }
+  const buffer = await file.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data: buffer }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+  }
+  return pages.join("\n").replace(/\s+/g, " ").trim();
+}
 
 async function extractTextFromFile(file: File): Promise<string> {
-  if (file.type === "text/plain" || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf")) return extractTextFromPdf(file);
+  if (file.type === "text/plain" || lower.endsWith(".txt") || lower.endsWith(".md")) {
     return file.text();
   }
-  if (file.name.endsWith(".docx") || file.type.includes("wordprocessingml")) {
-    // Dynamically import JSZip (only when needed)
+  if (lower.endsWith(".docx") || file.type.includes("wordprocessingml")) {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
     const xmlFile = zip.file("word/document.xml");
@@ -148,7 +166,7 @@ export default function ResumeRoast() {
                     <input
                       id="resume-upload"
                       type="file"
-                      accept=".txt,.md,.docx,text/plain"
+                      accept=".pdf,.txt,.md,.docx,text/plain"
                       className="sr-only"
                       onChange={handleFileChange}
                     />

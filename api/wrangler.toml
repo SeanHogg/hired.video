@@ -19,13 +19,14 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+# OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY`)
+OPENROUTER_API_KEY = ""
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
 # wrangler secret put STRIPE_PUBLISHABLE_KEY
 # wrangler secret put STRIPE_SECRET_KEY
 # wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY
-# wrangler secret put OPENROUTER_API_KEY
 # wrangler secret put OPENROUTER_MODELS
 # wrangler secret put GOOGLE_GEMINI_KEY
 # wrangler secret put YOUTUBE_CLIENT_ID
@@ -49,6 +50,8 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+# OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY --env production`)
+OPENROUTER_API_KEY = ""
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"

@@ -38,7 +38,14 @@ function buildMockRoast(resumeText: string): RoastResponse {
   const bulletLines = lines.filter((l) => /^[\-•\*\d\.]+\s+/.test(l));
   const hasBullets = bulletLines.length > 0;
 
-  const metrics = Array.from(resumeText.matchAll(/\b\d+(?:\.\d+)?(?:%|k|m|b)?\b/gi)).map((m) => m[0]);
+  // Extract metrics but avoid treating phone numbers as metrics
+  const rawMetrics = Array.from(resumeText.matchAll(/\b\d+(?:\.\d+)?(?:%|k|m|b|x)?\b/gi)).map((m) => m[0]);
+  const metrics = rawMetrics.filter((m) => {
+    const digits = m.replace(/\D/g, "");
+    // Ignore things that look like a phone number (10+ digits)
+    if (digits.length >= 10) return false;
+    return true;
+  });
   const hasNumbers = metrics.length > 0;
 
   const verbs = Array.from(resumeText.matchAll(/\b(lead|led|manage|managed|build|built|design|designed|deliver|delivered|drive|drove|improve|improved|reduce|reduced|optimi[sz]e|launched|created)\b/gi)).map((m) => m[0].toLowerCase());
@@ -48,7 +55,18 @@ function buildMockRoast(resumeText: string): RoastResponse {
   const score = Math.min(9.8, Math.max(2.0, scoreBase));
 
   const firstMetric = metrics[0] ?? "a measurable result";
-  const firstBullet = bulletLines[0] ?? lines[0] ?? "a key accomplishment";
+
+  // Pick short, bullet-like lines for improved examples (fallback to sentences)
+  const candidateLines = bulletLines.length > 0 ? bulletLines : [];
+  if (candidateLines.length === 0) {
+    const sentences = resumeText
+      .split(/[\.\?!]\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    candidateLines.push(...sentences.slice(0, 2));
+  }
+  const firstBullet = candidateLines[0] ?? "a key accomplishment";
+  const secondBullet = candidateLines[1] ?? candidateLines[0] ?? "a key accomplishment";
 
   const strengths: string[] = [];
   if (hasBullets) strengths.push(`Uses bullet points to highlight accomplishments`);
@@ -86,9 +104,16 @@ function buildMockRoast(resumeText: string): RoastResponse {
     return improved;
   }
 
-  const improvedExamples = [firstBullet].slice(0, 2).map((orig) => {
-    const improved = improvePhrase(orig);
-    return { original: orig, improved };
+  const sanitizeExample = (text: string): string => {
+    let out = text.trim();
+    if (out.length > 120) out = out.slice(0, 117).trim() + "...";
+    return out;
+  };
+
+  const improvedExamples = [firstBullet, secondBullet].map((orig) => {
+    const original = sanitizeExample(orig);
+    const improved = sanitizeExample(improvePhrase(orig));
+    return { original, improved };
   });
 
   const fixes = [
@@ -169,15 +194,14 @@ resumeRoastRoutes.post("/roast", async (c) => {
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return c.json(fail("MISSING_API_KEY", "OpenRouter API key is missing on the server."), 500);
+  try {
+    if (apiKey) {
+      const roast = await callOpenRouterRoast(parsed.data.resumeText, apiKey);
+      return c.json(ok(roast));
+    }
+  } catch (err) {
+    console.error("[resume/roast] OpenRouter error, falling back to mock:", err);
   }
 
-  try {
-    const roast = await callOpenRouterRoast(parsed.data.resumeText, apiKey);
-    return c.json(ok(roast));
-  } catch (err) {
-    console.error("[resume/roast] error:", err);
-    return c.json(fail("LLM_ERROR", "Failed to generate roast. Please try again later."), 500);
-  }
+  return c.json(ok(buildMockRoast(parsed.data.resumeText)));
 });
