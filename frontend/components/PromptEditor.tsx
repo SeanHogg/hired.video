@@ -1,23 +1,50 @@
 // PromptEditor.tsx — resume text + prompt + optional job description + Run
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import JSZip from "jszip";
-import { Sparkles, Upload, ChevronDown, ChevronUp, Briefcase } from "lucide-react";
+import { Upload, ChevronDown, ChevronUp, Briefcase, FileText, Bookmark, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type { StudioProjectState } from "@/types/studio";
+import { resumeService } from "@/lib/services/resume-service";
+import type { ResumeSummary } from "@/lib/services/resume-service";
+import { jobService } from "@/lib/services/job-service";
+import type { JobSummary } from "@/lib/services/job-service";
+import type { Resume as FrontendResume } from "@/types/resume";
 
 interface Props {
   state: StudioProjectState;
   onStateChange: (patch: Partial<StudioProjectState>) => void;
-  onGenerate: () => void;
-  loading: boolean;
   showJD: boolean;
   onToggleJD: () => void;
 }
 
+async function extractTextFromPdf(file: File): Promise<string> {
+  const pdfjsLib = await import("pdfjs-dist");
+  // Point the worker at the bundled worker (Vite resolves ?url imports)
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    const workerMod = await import("pdfjs-dist/build/pdf.worker.mjs?url");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerMod.default as string;
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const parts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ");
+    parts.push(pageText);
+  }
+  return parts.join("\n").replace(/\s+/g, " ").trim();
+}
+
 async function extractText(file: File): Promise<string> {
+  if (file.name.toLowerCase().endsWith(".pdf")) {
+    return extractTextFromPdf(file);
+  }
   if (file.name.endsWith(".docx")) {
     const zip = await JSZip.loadAsync(file);
     const xml = await zip.file("word/document.xml")?.async("string");
@@ -27,9 +54,88 @@ async function extractText(file: File): Promise<string> {
   return file.text();
 }
 
-export default function PromptEditor({ state, onStateChange, onGenerate, loading, showJD, onToggleJD }: Props) {
+/** Serialize a loaded FrontendResume into plain readable text for the AI. */
+function resumeToText(r: FrontendResume): string {
+  const lines: string[] = [];
+  const b = r?.data?.Basics;
+  if (b?.Name) lines.push(`${b.Name}${b.Label ? ` — ${b.Label}` : ""}`);
+  if (b?.Email) lines.push(`Email: ${b.Email}`);
+  if (b?.Summary) lines.push(`\nSummary:\n${b.Summary}`);
+
+  const work = r?.data?.Work;
+  if (work?.length) {
+    lines.push("\nWork Experience:");
+    for (const w of work) {
+      lines.push(`• ${w.Position} at ${w.Name} (${w.StartDate}–${w.EndDate || "Present"})`);
+      if (w.Summary) lines.push(`  ${w.Summary}`);
+      w.Highlights?.forEach((h) => lines.push(`  - ${h}`));
+    }
+  }
+
+  const edu = r?.data?.Education;
+  if (edu?.length) {
+    lines.push("\nEducation:");
+    for (const e of edu) {
+      lines.push(`• ${e.StudyType} in ${e.Area}, ${e.Institution} (${e.StartDate}–${e.EndDate})`);
+    }
+  }
+
+  const skills = r?.data?.Skills;
+  if (skills?.length) {
+    lines.push("\nSkills:");
+    lines.push(skills.map((s) => s.Name).filter(Boolean).join(", "));
+  }
+
+  return lines.join("\n");
+}
+
+export default function PromptEditor({ state, onStateChange, showJD, onToggleJD }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Account resume picker ───────────────────────────────────────────────
+  const [resumes, setResumes] = useState<ResumeSummary[]>([]);
+  const [resumePickerOpen, setResumePickerOpen] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+
+  useEffect(() => {
+    resumeService.getUserResumes()
+      .then(setResumes)
+      .catch(() => {});
+  }, []);
+
+  async function handleSelectResume(summary: ResumeSummary) {
+    const id = summary.Id || summary.id;
+    if (!id) return;
+    setResumeLoading(true);
+    setResumePickerOpen(false);
+    try {
+      const full = await resumeService.getResumeById(id);
+      onStateChange({ resumeText: resumeToText(full), resumeId: id });
+    } catch {
+      // fall back — at least set the ID
+      onStateChange({ resumeId: id });
+    } finally {
+      setResumeLoading(false);
+    }
+  }
+
+  // ── Saved job picker ────────────────────────────────────────────────────
+  const [savedJobs, setSavedJobs] = useState<JobSummary[]>([]);
+  const [jobPickerOpen, setJobPickerOpen] = useState(false);
+
+  useEffect(() => {
+    jobService.getSavedJobs()
+      .then(setSavedJobs)
+      .catch(() => {});
+  }, []);
+
+  function handleSelectJob(job: JobSummary) {
+    onStateChange({ jobDescription: job.description ?? `${job.title}${job.company ? ` at ${job.company}` : ""}` });
+    setJobPickerOpen(false);
+    if (!showJD) onToggleJD(); // open the JD section if it's closed
+  }
+
+  // ── File handlers ───────────────────────────────────────────────────────
   async function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
@@ -45,22 +151,71 @@ export default function PromptEditor({ state, onStateChange, onGenerate, loading
     onStateChange({ resumeText: text });
   }
 
-  const canRun = state.resumeText.trim().length > 50;
-
   return (
     <div className="flex flex-col gap-5 p-5">
       {/* Resume */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <Label>Resume</Label>
-          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => fileRef.current?.click()}>
-            <Upload className="w-3.5 h-3.5 mr-1" /> Upload .txt / .md / .docx
-          </Button>
-          <input ref={fileRef} type="file" accept=".txt,.md,.docx" className="hidden" onChange={handleFileInput} />
+          <div className="flex items-center gap-1">
+            {/* Upload file */}
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => fileRef.current?.click()}>
+              <Upload className="w-3.5 h-3.5 mr-1" /> Upload
+            </Button>
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.docx" className="hidden" onChange={handleFileInput} />
+
+            {/* From account */}
+            {resumes.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setResumePickerOpen((o) => !o)}
+                disabled={resumeLoading}
+              >
+                {resumeLoading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <><FileText className="w-3.5 h-3.5 mr-1" /> From account</>
+                }
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Account resume picker */}
+        {resumePickerOpen && (
+          <div className="mb-2 border rounded-lg overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your resumes</span>
+              <button type="button" onClick={() => setResumePickerOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <ul className="max-h-48 overflow-y-auto divide-y">
+              {resumes.map((r) => {
+                const id = r.Id || r.id;
+                const name = r.Name || r.name || "Untitled";
+                const desc = r.Description || r.description;
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
+                      onClick={() => handleSelectResume(r)}
+                    >
+                      <p className="text-xs font-medium leading-tight">{name}</p>
+                      {desc && <p className="text-[11px] text-muted-foreground truncate">{desc}</p>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         <Textarea
           className="h-48 font-mono text-xs resize-none"
-          placeholder="Paste your resume text here, or drag-and-drop a .txt / .docx file…"
+          placeholder="Paste your resume text here, or drag-and-drop a .pdf / .txt / .docx file…"
           value={state.resumeText}
           onChange={(e) => onStateChange({ resumeText: e.target.value })}
           onDragOver={(e) => e.preventDefault()}
@@ -81,15 +236,56 @@ export default function PromptEditor({ state, onStateChange, onGenerate, loading
 
       {/* Job Description toggle */}
       <div>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          onClick={onToggleJD}
-        >
-          <Briefcase className="w-4 h-4" />
-          Personalise for a job
-          {showJD ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            onClick={onToggleJD}
+          >
+            <Briefcase className="w-4 h-4" />
+            Personalise for a job
+            {showJD ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {/* Saved jobs picker trigger */}
+          {savedJobs.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => { setJobPickerOpen((o) => !o); if (!showJD) onToggleJD(); }}
+            >
+              <Bookmark className="w-3.5 h-3.5 mr-1" /> Saved jobs
+            </Button>
+          )}
+        </div>
+
+        {/* Saved job picker */}
+        {jobPickerOpen && (
+          <div className="mt-2 border rounded-lg overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saved jobs</span>
+              <button type="button" onClick={() => setJobPickerOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <ul className="max-h-48 overflow-y-auto divide-y">
+              {savedJobs.map((j) => (
+                <li key={j.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
+                    onClick={() => handleSelectJob(j)}
+                  >
+                    <p className="text-xs font-medium leading-tight">{j.title}</p>
+                    {j.company && <p className="text-[11px] text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ""}</p>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {showJD && (
           <Textarea
             className="mt-2 h-32 text-xs resize-none"
@@ -99,31 +295,6 @@ export default function PromptEditor({ state, onStateChange, onGenerate, loading
           />
         )}
       </div>
-
-      {/* Run */}
-      <Button
-        className="w-full"
-        size="lg"
-        onClick={onGenerate}
-        disabled={!canRun || loading}
-      >
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-            Generating…
-          </span>
-        ) : (
-          <span className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" /> Run
-          </span>
-        )}
-      </Button>
-
-      {!canRun && (
-        <p className="text-xs text-muted-foreground text-center">
-          Paste at least 50 characters of resume text to enable generation.
-        </p>
-      )}
     </div>
   );
 }

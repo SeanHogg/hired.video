@@ -45,8 +45,14 @@ async function exportWebCodecs(
     },
   });
 
+  // Pick AVC level based on resolution:
+  //   Baseline 3.0 (42E01E) → max ~848×480 (414 720 px)
+  //   Main 3.1    (4D001F) → max 1280×720 (921 600 px)
+  //   High 4.0    (640028) → max 1920×1080 (2 097 152 px)
+  const avcCodec = height >= 1080 ? "avc1.640028" : height >= 720 ? "avc1.4D001F" : "avc1.42E01E";
+
   encoder.configure({
-    codec: "avc1.42E01E",
+    codec: avcCodec,
     width,
     height,
     bitrate: opts.videoBitsPerSecond ?? (height >= 1080 ? 4_000_000 : 2_000_000),
@@ -66,9 +72,12 @@ async function exportWebCodecs(
     });
     bitmap.close();
 
-    const isKey = frame % (fps * 2) === 0; // keyframe every 2s
-    encoder.encode(videoFrame, { keyFrame: isKey });
-    videoFrame.close();
+    try {
+      const isKey = frame % (fps * 2) === 0; // keyframe every 2s
+      encoder.encode(videoFrame, { keyFrame: isKey });
+    } finally {
+      videoFrame.close();
+    }
 
     opts.onProgress?.(frame / totalFrames);
 

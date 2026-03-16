@@ -95,10 +95,14 @@ function buildIntroGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   }
 
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -40 }, { fontSize: 52, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -50 }, { fontSize: 52, fontWeight: "bold" }, theme, scene, "titleEnter"));
   }
   if (scene.subtitle) {
-    nodes.push(makeNode("text", scene.subtitle, { y: 30 }, { fontSize: 26, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
+    nodes.push(makeNode("text", scene.subtitle, { y: 20 }, { fontSize: 26, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
+  }
+  if (scene.text) {
+    const body = Array.isArray(scene.text) ? scene.text.join(" ") : scene.text;
+    nodes.push(makeNode("text", body, { y: 90 }, { fontSize: 18, fontWeight: "normal", color: palette[3] ?? "#c4b5fd", lineHeight: 1.5 }, theme, scene, "subtitleEnter"));
   }
   return nodes;
 }
@@ -146,10 +150,14 @@ function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   });
 
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -20 }, { fontSize: 42, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -70 }, { fontSize: 42, fontWeight: "bold" }, theme, scene, "titleEnter"));
+  }
+  if (scene.text) {
+    const body = Array.isArray(scene.text) ? scene.text.join(" ") : scene.text;
+    nodes.push(makeNode("text", body, { y: 0 }, { fontSize: 20, fontWeight: "normal", color: palette[2] ?? "#e2e8f0", lineHeight: 1.5 }, theme, scene, "titleEnter"));
   }
   if (scene.subtitle) {
-    nodes.push(makeNode("text", scene.subtitle, { y: 40 }, { fontSize: 24, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
+    nodes.push(makeNode("text", scene.subtitle, { y: 65 }, { fontSize: 20, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
   }
   return nodes;
 }

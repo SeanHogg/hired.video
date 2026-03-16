@@ -167,6 +167,7 @@ export function createApp() {
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);
   app.route("/api/resumes", resumeRoutes);
+  app.route("/api/resume", resumeRoastRoutes); // roast must be before catch-all in resumeRoutes
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints
   app.route("/api/resumescorer", resumeScorerRoutes);
   app.route("/api/resumeoptimizer", resumeOptimizerRoutes);
@@ -201,7 +202,6 @@ export function createApp() {
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);
   app.route("/api/studio", linkedInPostRoutes);
-  app.route("/api/resume", resumeRoastRoutes);
   app.route("/api/og", ogRoutes);
   app.route("/api/youtube", youtubeRoutes);
   app.route("/api/salaryanalyzer", salaryRoutes);

@@ -1,18 +1,16 @@
-// StudioEditor.tsx — tab switcher: Prompt | Storyboard | Timeline.
+// StudioEditor.tsx — tab switcher: Prompt | Storyboard.
 // Auto-switches to Storyboard after generation.
 
 import PromptEditor from "@/components/PromptEditor";
 import StoryboardEditor from "@/components/StoryboardEditor";
-import TimelineEditor from "@/components/TimelineEditor";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 
-export type EditorTab = "prompt" | "storyboard" | "timeline";
+export type EditorTab = "prompt" | "storyboard";
 
 const TABS: { id: EditorTab; label: string }[] = [
   { id: "prompt",     label: "Prompt"     },
   { id: "storyboard", label: "Storyboard" },
-  { id: "timeline",   label: "Timeline"   },
 ];
 
 interface Props {
@@ -20,21 +18,17 @@ interface Props {
   onTabChange: (t: EditorTab) => void;
   state: StudioProjectState;
   onStateChange: (patch: Partial<StudioProjectState>) => void;
-  onGenerate: () => void;
-  loading: boolean;
   showJD: boolean;
   onToggleJD: () => void;
   onScriptChange: (s: VideoScript) => void;
-  currentTime: number;
-  onSeek: (t: number) => void;
   focusedSceneId?: string;
   onSceneFocus?: (id: string) => void;
 }
 
 export default function StudioEditor({
   tab, onTabChange,
-  state, onStateChange, onGenerate, loading, showJD, onToggleJD,
-  onScriptChange, currentTime, onSeek, focusedSceneId, onSceneFocus,
+  state, onStateChange, showJD, onToggleJD,
+  onScriptChange, focusedSceneId, onSceneFocus,
 }: Props) {
   return (
     <div className="studio-editor">
@@ -63,8 +57,6 @@ export default function StudioEditor({
           <PromptEditor
             state={state}
             onStateChange={onStateChange}
-            onGenerate={onGenerate}
-            loading={loading}
             showJD={showJD}
             onToggleJD={onToggleJD}
           />
@@ -79,15 +71,6 @@ export default function StudioEditor({
           />
         )}
 
-        {tab === "timeline" && state.script && (
-          <TimelineEditor
-            script={state.script}
-            currentTime={currentTime}
-            onSeek={onSeek}
-            focusedSceneId={focusedSceneId}
-            onSceneFocus={(id) => { onSceneFocus?.(id); onTabChange("storyboard"); }}
-          />
-        )}
       </div>
     </div>
   );

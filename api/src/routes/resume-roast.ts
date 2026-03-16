@@ -32,45 +32,79 @@ const RoastResponseSchema = z.object({
 type RoastResponse = z.infer<typeof RoastResponseSchema>;
 
 function buildMockRoast(resumeText: string): RoastResponse {
-  const wordCount = resumeText.split(/\s+/).length;
-  const hasNumbers = /\d+%|\d+x|\$\d+|\d+ (?:million|billion|k\b)/i.test(resumeText);
-  const hasBullets = resumeText.includes("•") || resumeText.includes("-") || resumeText.includes("*");
-  let score = 5.0;
-  if (hasNumbers) score += 1.5;
-  if (hasBullets) score += 0.5;
-  if (wordCount < 150) score -= 1.5;
-  if (wordCount > 600) score -= 0.5;
-  score = Math.min(9.8, Math.max(2.0, score));
+  const lines = resumeText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
+
+  const bulletLines = lines.filter((l) => /^[\-•\*\d\.]+\s+/.test(l));
+  const hasBullets = bulletLines.length > 0;
+
+  const metrics = Array.from(resumeText.matchAll(/\b\d+(?:\.\d+)?(?:%|k|m|b)?\b/gi)).map((m) => m[0]);
+  const hasNumbers = metrics.length > 0;
+
+  const verbs = Array.from(resumeText.matchAll(/\b(lead|led|manage|managed|build|built|design|designed|deliver|delivered|drive|drove|improve|improved|reduce|reduced|optimi[sz]e|launched|created)\b/gi)).map((m) => m[0].toLowerCase());
+  const uniqueVerbs = Array.from(new Set(verbs));
+
+  const scoreBase = 5.5 + (hasNumbers ? 1.0 : 0) + (hasBullets ? 0.7 : 0) + (uniqueVerbs.length > 2 ? 0.8 : 0) - (wordCount < 180 ? 1 : 0) - (wordCount > 700 ? 0.5 : 0);
+  const score = Math.min(9.8, Math.max(2.0, scoreBase));
+
+  const firstMetric = metrics[0] ?? "a measurable result";
+  const firstBullet = bulletLines[0] ?? lines[0] ?? "a key accomplishment";
+
+  const strengths: string[] = [];
+  if (hasBullets) strengths.push(`Uses bullet points to highlight accomplishments`);
+  if (hasNumbers) strengths.push(`Includes measurable results (e.g. ${firstMetric})`);
+  if (uniqueVerbs.length > 0) strengths.push(`Uses action verbs like ${uniqueVerbs.slice(0, 3).join(", ")}`);
+  if (strengths.length < 3) strengths.push("Clear structure with recognisable sections");
+
+  const weaknesses: string[] = [];
+  if (!hasNumbers) weaknesses.push("No quantifiable impact — hiring managers scan for numbers");
+  if (!hasBullets) weaknesses.push("Lacks bullet points — it reads like a paragraph instead of achievements");
+  if (uniqueVerbs.length === 0) weaknesses.push("Weak verbs (responsible for, helped) make achievements bland");
+  if (wordCount < 180) weaknesses.push("Too short — add more detail about what you delivered");
+  if (weaknesses.length < 3) weaknesses.push("Some sections could be more concise and focused on outcomes");
+
+  const roastLines: string[] = [];
+  roastLines.push(
+    hasNumbers
+      ? `Great, you include some hard numbers (${firstMetric}) — now put them front and center.`
+      : `There's almost no measurable impact; '5 years of experience' means nothing without outcomes.`
+  );
+  if (!hasBullets) roastLines.push("This reads like a bio, not a resume. Bullet points make recruiters actually read it.");
+  if (uniqueVerbs.length === 0) roastLines.push("Swap 'responsible for' / 'worked on' for real action verbs like 'Led', 'Built', 'Delivered'.");
+  roastLines.push("Make the first bullet under your most recent job the one you want the hiring manager to remember.");
+
+  function improvePhrase(text: string): string {
+    let improved = text;
+    improved = improved.replace(/\bresponsible for\b/gi, "led");
+    improved = improved.replace(/\bworked on\b/gi, "delivered");
+    improved = improved.replace(/\bhelped (?:with|to?)\b/gi, "led");
+    if (!/\d/.test(improved)) {
+      // add a generic metric if missing
+      improved = improved.replace(/\.$/, " — drove a 20% improvement.");
+      if (improved === text) improved += " — delivered measurable impact.";
+    }
+    return improved;
+  }
+
+  const improvedExamples = [firstBullet].slice(0, 2).map((orig) => {
+    const improved = improvePhrase(orig);
+    return { original: orig, improved };
+  });
+
+  const fixes = [
+    hasBullets ? "Keep using bullets, but lead with the result (e.g., 'Increased revenue by 30%')" : "Turn responsibilities into bullet-point achievements with measurable outcomes",
+    hasNumbers ? "Move your strongest metric to the top of each role" : "Add at least one number per role (%, $ impact, team size, users)",
+    uniqueVerbs.length > 0 ? "Swap weak verbs for stronger, outcome-focused verbs (e.g., 'led', 'delivered', 'scaled')" : "Start bullets with strong action verbs (Led, Built, Optimized, Drove)",
+    "Write the resume as a story: what you delivered, how you did it, and why it mattered.",
+  ];
 
   return {
     score: Math.round(score * 10) / 10,
-    strengths: [
-      "Clear structure with recognisable sections",
-      hasNumbers ? "Quantified achievements present" : "Relevant experience listed",
-      "Professional tone maintained throughout",
-    ],
-    weaknesses: [
-      !hasNumbers ? "No quantified achievements — hiring managers scan for numbers" : "Some bullet points lack specifics",
-      wordCount < 200 ? "Too brief — add more detail to key roles" : "Some sections could be more concise",
-      "Action verbs could be stronger (replace 'responsible for' with 'Led', 'Drove', 'Delivered')",
-    ],
-    roast: `Your resume reads like a terms-of-service agreement — technically complete but nobody actually reads it. ${!hasNumbers ? "Where are the numbers? '5 years of experience' tells me nothing. '5 years building systems that process 10M events/day' tells me everything." : "You have some numbers, but they're hiding. Make them the first thing I see."} ${wordCount < 200 ? "It's shorter than a LinkedIn bio. Give me something to work with." : ""}`,
-    fixes: [
-      "Start every bullet with a strong past-tense action verb (Led, Drove, Architected, Reduced, Grew)",
-      "Add at least one measurable result per role (%, $, x, users)",
-      "Remove 'responsible for' and 'worked on' — replace with what you actually delivered",
-      "Put your most impressive achievement in the first bullet of your most recent role",
-    ],
-    improvedExamples: [
-      {
-        original: "Responsible for managing the team and overseeing the project",
-        improved: "Led a team of 6 engineers, delivering the project 2 weeks ahead of schedule and 10% under budget",
-      },
-      {
-        original: "Worked on improving the application performance",
-        improved: "Reduced p99 API latency by 40% (800ms → 480ms) through query optimisation and Redis caching",
-      },
-    ],
+    strengths: strengths.slice(0, 3),
+    weaknesses: weaknesses.slice(0, 3),
+    roast: roastLines.join(" "),
+    fixes,
+    improvedExamples,
   };
 }
 
@@ -134,16 +168,16 @@ resumeRoastRoutes.post("/roast", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–10 000 chars)", parsed.error.flatten()), 400);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  try {
-    const roast = apiKey
-      ? await callOpenRouterRoast(parsed.data.resumeText, apiKey)
-      : buildMockRoast(parsed.data.resumeText);
+  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return c.json(fail("MISSING_API_KEY", "OpenRouter API key is missing on the server."), 500);
+  }
 
+  try {
+    const roast = await callOpenRouterRoast(parsed.data.resumeText, apiKey);
     return c.json(ok(roast));
   } catch (err) {
     console.error("[resume/roast] error:", err);
-    // Always fall back to mock rather than returning an error to the user
-    return c.json(ok(buildMockRoast(parsed.data.resumeText)));
+    return c.json(fail("LLM_ERROR", "Failed to generate roast. Please try again later."), 500);
   }
 });

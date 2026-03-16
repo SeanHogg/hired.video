@@ -178,8 +178,36 @@ function storyboardToVideoScript(sb: z.infer<typeof StoryboardSchema>, targetDur
 }
 
 function buildMockVideoScript(resumeText: string, targetDuration: number, motion: "minimal" | "moderate" | "cinematic" = "moderate"): VideoScript {
-  const cleaned = resumeText.replace(/\s+/g, " ").trim();
-  const intro = cleaned.slice(0, 120) || "Experienced professional";
+  let name = "";
+  let label = "";
+  let summary = "";
+  let achievements: string[] = [];
+  let skills: string[] = [];
+  let contact = "";
+  try {
+    const parsed = JSON.parse(resumeText);
+    const basics = parsed?.Basics ?? parsed?.basics ?? {};
+    name    = basics.Name    ?? basics.name    ?? "";
+    label   = basics.Label   ?? basics.label   ?? "";
+    summary = basics.Summary ?? basics.summary ?? "";
+    contact = basics.Email   ?? basics.email   ?? basics.LinkedIn ?? basics.linkedin ?? "";
+    // Extract achievements from work highlights
+    const work: Array<{ Highlights?: string[]; highlights?: string[] }> = parsed?.Work ?? parsed?.work ?? [];
+    for (const w of work.slice(0, 3)) {
+      const hl = w.Highlights ?? w.highlights ?? [];
+      achievements.push(...hl.slice(0, 2));
+    }
+    // Extract skills
+    const skillsData: Array<{ Name?: string; name?: string }> = parsed?.Skills ?? parsed?.skills ?? [];
+    skills = skillsData.map((s) => s.Name ?? s.name ?? "").filter(Boolean);
+  } catch {
+    name = resumeText.replace(/\s+/g, " ").trim().slice(0, 80);
+  }
+  const introSubtitle = label || "Experienced Professional";
+  const introText     = summary.slice(0, 200) || "Passionate professional ready to make an impact.";
+  const resolvedItems = achievements.length >= 3 ? achievements.slice(0, 4) : ["Delivered measurable results with quantifiable impact", "Led initiatives that drove team efficiency and growth", "Consistently exceeded expectations across key projects"];
+  const resolvedSkills = skills.length >= 3 ? skills.slice(0, 8) : ["Communication", "Problem Solving", "Leadership", "Execution", "Strategy"];
+  const closingContact = contact || "Connect on LinkedIn";
   const perScene = Math.max(5, Math.round(targetDuration / 4));
   return {
     video: {
@@ -196,10 +224,10 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
       },
     },
     scenes: [
-      { id: "scene-0", start: 0, duration: perScene, type: "intro", title: "Professional Introduction", subtitle: intro },
-      { id: "scene-1", start: perScene, duration: perScene, type: "achievement", title: "Key Achievements", items: ["Delivered impactful results", "Led cross-functional teams", "Drove measurable outcomes"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "skills", title: "Core Skills", skills: ["Communication", "Problem Solving", "Leadership", "Execution", "Strategy"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "closing", title: "Let's Connect", text: "Open to new opportunities — reach out!" },
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",       title: name || "Professional Introduction", subtitle: introSubtitle, text: introText },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "achievement", title: "Key Achievements", items: resolvedItems },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "skills",      title: "Core Skills",     skills: resolvedSkills },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "closing",     title: "Let's Connect",   text: "Open to exciting new opportunities — let's talk.", subtitle: closingContact },
     ],
   };
 }
@@ -214,17 +242,37 @@ async function callOpenRouter(
     ? `\n\nPersonalise the intro scene for this role. Filter achievements and skills to only those relevant.\nJob Description:\n${jobDescription.slice(0, 3000)}`
     : "";
 
-  const systemPrompt = `You are a professional video director specialising in career content. Produce a JSON VideoScript for a ${targetDuration}-second video resume. Rules:
-- Exactly 4 scenes: intro → achievement → skills → closing
-- Scene start times are sequential; sum of durations equals video.duration (${targetDuration}s)
-- Extract the candidate's real name, role, and measurable achievements from the resume
-- Include 4–6 real skills from the resume
-- motion style: ${motion}
-- Return ONLY valid JSON matching this TypeScript interface:
+  const systemPrompt = `You are a professional video director and career storyteller. Produce a JSON VideoScript for a ${targetDuration}-second video resume that powerfully showcases this specific candidate.
 
+RULES:
+- Exactly 4 scenes in order: intro → achievement → skills → closing
+- Scene durations must sum to exactly ${targetDuration}s. Divide sensibly (e.g. 7/7/7/7 for 28s)
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences, no explanation.
+
+SCENE CONTENT — extract everything from the resume provided:
+1. "intro" scene:
+   - title: candidate's exact full name
+   - subtitle: most recent job title and company (format "Role · Company")
+   - text: a compelling 1–2 sentence elevator pitch derived from their summary and career arc. Make it specific to this person — never use generic phrases.
+
+2. "achievement" scene:
+   - title: "Key Achievements"
+   - items: 3–4 real, measurable bullet points from their work history with specific numbers, outcomes, or business impact where available. NEVER use placeholder text like "Delivered impactful results".
+
+3. "skills" scene:
+   - title: "Core Skills"
+   - skills: 5–8 specific skills taken directly from the resume (technologies, tools, domains). Use the exact names as listed.
+
+4. "closing" scene:
+   - title: a warm CTA reflecting the candidate's personality inferred from the resume (e.g. a maker → "Let's Build Something Great", a leader → "Ready to Drive Your Next Chapter")
+   - text: a memorable 1-sentence personal brand statement capturing what makes this candidate unique
+   - subtitle: their LinkedIn URL or email from the resume, or "Connect on LinkedIn" if not found
+
+TypeScript interface:
 interface VideoScript {
   video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
-  scenes: Array<{ id: string; start: number; duration: number; type: "intro"|"achievement"|"skills"|"closing"; title?: string; subtitle?: string; text?: string|string[]; items?: string[]; skills?: string[] }>
+  scenes: Array<{ id: string; start: number; duration: number; type: "intro"|"achievement"|"skills"|"closing"; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[] }>
 }${jobBlock}`;
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -271,7 +319,7 @@ studioRoutes.post("/storyboard", async (c) => {
   }
 
   let script: VideoScript;
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
   if (apiKey) {
     try {
       script = await callOpenRouter(parsed.data, apiKey);

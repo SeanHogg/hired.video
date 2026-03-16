@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Chrome,
   PenTool,
+  Flame,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -817,6 +818,74 @@ export default function Tools() {
                           </div>
                           <Button className="w-full mt-4" variant="outline">
                             Tailor My Resume
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  {/* Resume Roast */}
+                  <Link to="/resume-roast">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                              <Flame className="h-6 w-6 text-red-500 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Resume Roast
+                              </CardTitle>
+                              <CardDescription>
+                                Brutally honest AI feedback on your resume
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-red-100 text-red-800"
+                          >
+                            Hot
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-red-500">
+                                0–10
+                              </div>
+                              <div className="text-muted-foreground">
+                                Score
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-red-500">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Powered
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Instant roast + score
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Strengths &amp; weaknesses
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Rewritten bullet examples
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Roast My Resume
                           </Button>
                         </div>
                       </CardContent>
@@ -1807,6 +1876,70 @@ export default function Tools() {
                         </div>
                         <Button className="w-full mt-4" variant="outline">
                           Tailor My Resume
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Resume Roast */}
+                <Link to="/resume-roast">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                            <Flame className="h-6 w-6 text-red-500 group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl">
+                              Resume Roast
+                            </CardTitle>
+                            <CardDescription>
+                              Brutally honest AI feedback on your resume
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-red-100 text-red-800"
+                        >
+                          Hot
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-red-500">
+                              0–10
+                            </div>
+                            <div className="text-muted-foreground">Score</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-red-500">
+                              AI
+                            </div>
+                            <div className="text-muted-foreground">Powered</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Instant roast + score
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Strengths &amp; weaknesses
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Rewritten bullet examples
+                          </div>
+                        </div>
+                        <Button className="w-full mt-4" variant="outline">
+                          Roast My Resume
                         </Button>
                       </div>
                     </CardContent>
