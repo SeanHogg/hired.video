@@ -18,6 +18,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 
 export default function PdfToJson() {

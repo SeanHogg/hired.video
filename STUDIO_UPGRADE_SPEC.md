@@ -505,48 +505,48 @@ All videos published with `privacyStatus: 'public'` appear in a **Video Resumes*
 
 ### Phase 1 — Compiler
 
-- [ ] **T-05** Create `frontend/lib/compiler/animation-graph.ts` — `compileAnimation()`, all easings, `evaluate(elapsed)`
-- [ ] **T-06** Create `frontend/lib/compiler/scene-graph.ts` — `buildSceneGraph()`, one builder per scene type
-- [ ] **T-07** Create `frontend/lib/compiler/video-compiler.ts` — `compile(script): CompiledVideo`, `getSceneAt(time)`
-- [ ] **T-08** Create `frontend/lib/compiler/storyboard-adapter.ts` — `storyboardToVideoScript(sb): VideoScript`
+- [x] **T-05** Create `frontend/lib/compiler/animation-graph.ts` — `compileAnimation()`, all easings, `evaluate(elapsed)`
+- [x] **T-06** Create `frontend/lib/compiler/scene-graph.ts` — `buildSceneGraph()`, one builder per scene type
+- [x] **T-07** Create `frontend/lib/compiler/video-compiler.ts` — `compile(script): CompiledVideo`, `getSceneAt(time)`
+- [x] **T-08** Create `frontend/lib/compiler/storyboard-adapter.ts` — `storyboardToVideoScript(sb): VideoScript`
 
 ### Phase 2 — Renderer & Exporter
 
-- [ ] **T-09** Create `frontend/lib/renderer/canvas-nodes.ts` — `drawNode(ctx, node)` all types
-- [ ] **T-10** Create `frontend/lib/renderer/frame-renderer.ts` — `render(ctx, compiledVideo, time)`
-- [ ] **T-11** Create `frontend/lib/renderer/video-exporter.ts` — `exportVideo()` WebCodecs + mp4-muxer + MediaRecorder fallback
-- [ ] **T-12** Install `mp4-muxer` and `webm-muxer`
+- [x] **T-09** Create `frontend/lib/renderer/canvas-nodes.ts` — `drawNode(ctx, node)` all types
+- [x] **T-10** Create `frontend/lib/renderer/frame-renderer.ts` — `render(ctx, compiledVideo, time)`
+- [x] **T-11** Create `frontend/lib/renderer/video-exporter.ts` — `exportVideo()` WebCodecs + mp4-muxer + MediaRecorder fallback
+- [x] **T-12** Install `mp4-muxer` and `webm-muxer`
 
 ### Phase 3 — Studio UI
 
-- [ ] **T-13** Create `frontend/pages/studio/StudioLayout.tsx` — 3-panel layout, full state owner, marketing landing for anon
-- [ ] **T-14** Create `frontend/pages/studio/StudioSidebar.tsx` — Create New, recent projects, templates, Roast link
-- [ ] **T-15** Create `frontend/pages/studio/StudioEditor.tsx` — tab switcher with auto-switch logic
-- [ ] **T-16** Create `frontend/components/PromptEditor.tsx` — resume + prompt + JD toggle + Run
-- [ ] **T-17** Create `frontend/components/StoryboardEditor.tsx` — inline-editable cards, recompile on change
-- [ ] **T-18** Create `frontend/components/TimelineEditor.tsx` — proportional blocks, playhead sync
-- [ ] **T-19** Create `frontend/components/VideoPreview.tsx` — RAF loop, `frameRenderer.render()`, play/pause
-- [ ] **T-20** Create `frontend/pages/studio/StudioPreview.tsx` — Export MP4, Publish, LinkedIn Post, visibility toggle
-- [ ] **T-21** Create `frontend/pages/studio/StudioSettings.tsx` — AI + Video settings
-- [ ] **T-22** Update `frontend/pages/studio/Studio.tsx` → one-line re-export
-- [ ] **T-23** Add studio CSS to `frontend/global.css`
+- [x] **T-13** Create `frontend/pages/studio/StudioLayout.tsx` — 3-panel layout, full state owner, marketing landing for anon
+- [x] **T-14** Create `frontend/pages/studio/StudioSidebar.tsx` — Create New, recent projects, templates, Roast link
+- [x] **T-15** Create `frontend/pages/studio/StudioEditor.tsx` — tab switcher with auto-switch logic
+- [x] **T-16** Create `frontend/components/PromptEditor.tsx` — resume + prompt + JD toggle + Run
+- [x] **T-17** Create `frontend/components/StoryboardEditor.tsx` — inline-editable cards, recompile on change
+- [x] **T-18** Create `frontend/components/TimelineEditor.tsx` — proportional blocks, playhead sync
+- [x] **T-19** Create `frontend/components/VideoPreview.tsx` — RAF loop, `frameRenderer.render()`, play/pause
+- [x] **T-20** Create `frontend/pages/studio/StudioPreview.tsx` — Export MP4, Publish, LinkedIn Post, visibility toggle
+- [x] **T-21** Create `frontend/pages/studio/StudioSettings.tsx` — AI + Video settings
+- [x] **T-22** Update `frontend/pages/studio/Studio.tsx` → one-line re-export
+- [x] **T-23** Add studio CSS to `frontend/global.css`
 
 ### Phase 4 — Templates
 
-- [ ] **T-24** Create `frontend/data/templates/video-resume-professional.json`
-- [ ] **T-25** Create `frontend/data/templates/video-resume-minimal.json`
+- [x] **T-24** Create `frontend/data/templates/video-resume-professional.json`
+- [x] **T-25** Create `frontend/data/templates/video-resume-minimal.json`
 
 ### Phase 5 — Backend
 
 - [x] **T-26** Update `api/src/routes/studio.ts` — real OpenRouter LLM, `VideoScript` output, `jobDescription` support, fallback to mock
-- [ ] **T-27** Add `POST /api/studio/edit-script` — AI surgical editing endpoint
-- [ ] **T-28** Create `api/src/routes/linkedin-post.ts` — `POST /api/studio/linkedin-post`
-- [ ] **T-29** Wire new routes into `api/src/app.ts`
+- [x] **T-27** Add `POST /api/studio/edit-script` — AI surgical editing endpoint
+- [x] **T-28** Create `api/src/routes/linkedin-post.ts` — `POST /api/studio/linkedin-post`
+- [x] **T-29** Wire new routes into `api/src/app.ts`
 
 ### Phase 6 — Growth Features
 
-- [ ] **T-30** Create `frontend/components/LinkedInPostModal.tsx`
-- [ ] **T-31** Add LinkedIn Post button to `StudioPreview.tsx`
+- [x] **T-30** Create `frontend/components/LinkedInPostModal.tsx`
+- [x] **T-31** Add LinkedIn Post button to `StudioPreview.tsx`
 - [x] **T-32** Create `api/src/routes/resume-roast.ts` — `POST /api/resume/roast`
 - [x] **T-33** Wire `resumeRoastRoutes` into `api/src/app.ts`
 - [x] **T-34** Create `frontend/pages/ResumeRoast.tsx`
@@ -562,8 +562,8 @@ All videos published with `privacyStatus: 'public'` appear in a **Video Resumes*
 
 ### Phase 7 — QA
 
-- [ ] **T-44** Verify `App.tsx` route works end-to-end with new Studio re-export
-- [ ] **T-45** Smoke test: resume paste → Run → preview → Export MP4 → Publish → public page → LinkedIn post
+- [x] **T-44** Verify `App.tsx` route works end-to-end with new Studio re-export
+- [x] **T-45** Smoke test: resume paste → Run → preview → Export MP4 → Publish → public page → LinkedIn post
 
 ### Phase 8 — Resume-Video Association
 

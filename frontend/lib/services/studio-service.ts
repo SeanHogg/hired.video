@@ -1,8 +1,62 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import type { VideoScript } from "../../types/video-script";
 
-// ─── Storyboard types ────────────────────────────────────────────────────────
+export type { VideoScript };
+export type { SceneScript } from "../../types/video-script";
+
+// ─── VideoScript Zod schema (mirrors the TypeScript type) ────────────────────
+// Used only for API response validation — the authoritative types live in
+// frontend/types/video-script.ts.
+
+const AnimationSpecSchema = z.object({
+  type: z.enum(["fadeIn", "slideUp", "slideIn", "scaleIn", "typewriter", "none"]),
+  start: z.number(),
+  duration: z.number(),
+  easing: z.enum(["linear", "easeIn", "easeOut", "easeInOut", "spring"]).optional(),
+});
+
+const SceneEffectSchema = z.object({
+  type: z.enum(["particles", "blur", "glow", "vignette"]),
+  intensity: z.number(),
+});
+
+export const SceneScriptSchema = z.object({
+  id: z.string(),
+  start: z.number(),
+  duration: z.number(),
+  type: z.enum(["intro", "achievement", "skills", "closing"]),
+  title: z.string().optional(),
+  subtitle: z.string().optional(),
+  text: z.union([z.string(), z.array(z.string())]).optional(),
+  items: z.array(z.string()).optional(),
+  skills: z.array(z.string()).optional(),
+  highlight: z.boolean().optional(),
+  animation: z.object({
+    titleEnter: AnimationSpecSchema.optional(),
+    subtitleEnter: AnimationSpecSchema.optional(),
+    textEnter: AnimationSpecSchema.optional(),
+  }).optional(),
+  effects: z.array(SceneEffectSchema).optional(),
+});
+
+export const VideoScriptSchema = z.object({
+  video: z.object({
+    duration: z.number(),
+    fps: z.number().default(30),
+    resolution: z.enum(["720p", "1080p"]),
+    aspect: z.enum(["16:9", "9:16", "1:1"]),
+    theme: z.object({
+      colorPalette: z.array(z.string()),
+      fontFamily: z.string(),
+      motion: z.enum(["minimal", "moderate", "cinematic"]),
+      transition: z.enum(["cut", "fade", "slide", "cinematic-fade"]),
+      background: z.enum(["gradient", "dark-tech-grid", "particles", "solid"]),
+    }),
+  }),
+  scenes: z.array(SceneScriptSchema),
+});
 
 export const StoryboardSceneSchema = z.object({
   duration: z.number(),
@@ -75,20 +129,64 @@ export interface PublishVideoRequest {
   privacyStatus?: "public" | "private" | "unlisted";
 }
 
+// ─── Published video types ───────────────────────────────────────────────────
+
+export const ResumeVideoSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  videoUrl: z.string().nullable(),
+  youtubeUrl: z.string().nullable(),
+  youtubeVideoId: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  privacyStatus: z.string().nullable(),
+  status: z.string(),
+  createdAt: z.string(),
+});
+export type ResumeVideo = z.infer<typeof ResumeVideoSchema>;
+
+export const PublicVideoSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  videoUrl: z.string().nullable(),
+  youtubeUrl: z.string().nullable(),
+  youtubeVideoId: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  description: z.string().nullable(),
+  ownerName: z.string(),
+  resumeId: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type PublicVideo = z.infer<typeof PublicVideoSchema>;
+
+export interface GenerateStoryboardParams {
+  resumeText: string;
+  resumeId?: string;
+  prompt?: string;
+  jobDescription?: string;
+  model?: string;
+  temperature?: number;
+  targetDuration?: number;
+  resolution?: "720p" | "1080p";
+  motion?: "minimal" | "moderate" | "cinematic";
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const studioService = {
   /**
-   * Generate an AI storyboard from resume text.
+   * Generate an AI VideoScript from resume text.
+   * The API first attempts a real LLM call (OpenRouter); falls back to a mock
+   * storyboard if the key is missing or the call fails.
    */
   async generateStoryboard(
-    resumeText: string,
-  ): Promise<ApiSuccessResponse<Storyboard>> {
-    return apiClient.post(
-      "/api/studio/storyboard",
-      { resumeText },
-      StoryboardSchema,
-    );
+    paramsOrText: GenerateStoryboardParams | string,
+    resumeId?: string,
+  ): Promise<ApiSuccessResponse<VideoScript>> {
+    const body: GenerateStoryboardParams =
+      typeof paramsOrText === "string"
+        ? { resumeText: paramsOrText, ...(resumeId ? { resumeId } : {}) }
+        : paramsOrText;
+    return apiClient.post("/api/studio/storyboard", body, VideoScriptSchema) as Promise<ApiSuccessResponse<VideoScript>>;
   },
 
   /**
@@ -98,10 +196,14 @@ export const studioService = {
   async uploadVideo(
     blob: Blob,
     title: string,
+    projectId?: string,
+    resumeId?: string,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     const formData = new FormData();
     formData.append("video", blob, "studio-video.webm");
     formData.append("title", title);
+    if (projectId) formData.append("projectId", projectId);
+    if (resumeId) formData.append("resumeId", resumeId);
 
     return apiClient.post("/api/studio/upload", formData, StudioProjectSchema);
   },
@@ -112,10 +214,11 @@ export const studioService = {
   async publishVideo(
     projectId: string,
     request: PublishVideoRequest,
+    resumeId?: string,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post(
       "/api/studio/publish",
-      { projectId, ...request },
+      { projectId, ...request, ...(resumeId ? { resumeId } : {}) },
       StudioProjectSchema,
     );
   },
@@ -141,4 +244,25 @@ export const studioService = {
       z.array(StudioProjectSchema),
     );
   },
+
+  /**
+   * Get all videos associated with a specific resume (public + owner's own).
+   */
+  async getVideosForResume(resumeId: string): Promise<ApiSuccessResponse<ResumeVideo[]>> {
+    return apiClient.get(
+      `/api/studio/videos/resume/${resumeId}`,
+      z.array(ResumeVideoSchema),
+    );
+  },
+
+  /**
+   * Get the 20 most-recent public videos for the homepage feed.
+   */
+  async getPublicVideos(): Promise<ApiSuccessResponse<PublicVideo[]>> {
+    return apiClient.get(
+      "/api/studio/videos/public",
+      z.array(PublicVideoSchema),
+    );
+  },
+
 };

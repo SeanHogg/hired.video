@@ -79,6 +79,7 @@ export const studioProjects = pgTable("studio_projects", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   resumeText: text("resume_text").notNull(),
+  resumeId: uuid("resume_id").references(() => resumeInformation.id, { onDelete: "set null" }),
   storyboard: jsonb("storyboard"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),

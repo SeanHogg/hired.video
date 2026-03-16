@@ -11,6 +11,8 @@ import {
   Wrench,
   CheckSquare,
   Send,
+  Flame,
+  Clapperboard,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -66,6 +68,18 @@ export default function Navigation({
       href: "/tools",
       icon: Wrench,
       description: "Career enhancement tools",
+    },
+    {
+      name: "Resume Roast",
+      href: "/resume-roast",
+      icon: Flame,
+      description: "Get brutal AI feedback on your resume",
+    },
+    {
+      name: "Video Studio",
+      href: "/studio",
+      icon: Clapperboard,
+      description: "Create AI-powered video resumes",
     },
     {
       name: "Task Management",

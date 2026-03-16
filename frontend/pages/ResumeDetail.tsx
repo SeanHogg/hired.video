@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Trophy,
   MoreHorizontal,
+  Play,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { Resume , ResumeSectionMeta } from "@/types/resume";
@@ -171,6 +173,7 @@ export default function ResumeDetail() {
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [studioVideos, setStudioVideos] = useState<ResumeVideo[]>([]);
 
   // Metadata modal state
   const [metadataModal, setMetadataModal] = useState<{
@@ -181,11 +184,19 @@ export default function ResumeDetail() {
     initialMetadata: [],
   });
 
+  // Merge metadata videos + studio videos into a unified list
   const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
-    if (!resume?.metaData || resume.metaData.length === 0) return [];
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    return resume.metaData.filter((m) => videoTypes.has(m.metaType));
-  }, [resume]);
+    const fromMeta: ResumeSectionMeta[] = resume?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
+    const fromStudio: ResumeSectionMeta[] = studioVideos.map((v) => ({
+      id: v.id,
+      referenceId: id ?? "",
+      name: v.title || "Studio Video Resume",
+      url: v.youtubeUrl ?? v.videoUrl ?? "",
+      metaType: v.youtubeUrl ? MetaType.YouTube : MetaType.VideoMP4,
+    } as ResumeSectionMeta));
+    return [...fromMeta, ...fromStudio];
+  }, [resume, studioVideos, id]);
 
   const [videoIndex, setVideoIndex] = useState<number>(0);
   useEffect(() => {
@@ -236,7 +247,18 @@ export default function ResumeDetail() {
       }
     };
 
+    const loadStudioVideos = async () => {
+      if (!id) return;
+      try {
+        const res = await studioService.getVideosForResume(id);
+        setStudioVideos(res.data ?? []);
+      } catch {
+        // Non-critical — silently ignore
+      }
+    };
+
     loadResume();
+    loadStudioVideos();
   }, [id]);
 
   // Handle URL fragments to open specific media content
@@ -565,8 +587,8 @@ export default function ResumeDetail() {
 
                 </div>
 
-                {/* Featured Video (from metadata) */}
-                {currentVideoMeta && (
+                {/* Featured Video (from metadata or Studio) */}
+                {currentVideoMeta ? (
                   <div className="relative">
                     <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
                       <CardContent className="p-6">
@@ -641,7 +663,29 @@ export default function ResumeDetail() {
                       </CardContent>
                     </Card>
                   </div>
-                )}
+                ) : isOwner ? (
+                  <div className="relative">
+                    <Card className="bg-white/10 border-white/30 backdrop-blur-sm border-dashed">
+                      <CardContent className="p-6 flex flex-col items-center justify-center text-center gap-4 min-h-[200px]">
+                        <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+                          <Play className="w-7 h-7 text-primary-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-primary-foreground text-lg">No video resume yet</p>
+                          <p className="text-sm opacity-80 mt-1">Create an AI-generated video resume to stand out</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
+                          onClick={() => navigate("/studio")}
+                        >
+                          Create Video Resume →
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

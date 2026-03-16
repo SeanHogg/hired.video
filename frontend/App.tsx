@@ -84,6 +84,8 @@ const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
 const VideoResumeWizardPage = lazy(() => import("./pages/VideoResumeWizardPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
+const ResumeRoast = lazy(() => import("./pages/ResumeRoast"));
+const PublicVideoResume = lazy(() => import("./pages/PublicVideoResume"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
 // JobUploadPage removed - functionality consolidated into JobCreatePage
 const JobCreatePage = lazy(() => import("./pages/JobCreatePage"));
@@ -314,6 +316,7 @@ const App = () => (
                         element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
                       />
                       <Route path="/studio" element={<Studio />} />
+                      <Route path="/resume-roast" element={<ResumeRoast />} />
                       <Route
                         path="/resumes/create/:id"
                         element={<ResumeCreatePage />}
@@ -495,6 +498,9 @@ const App = () => (
                         path="/embedded/resumes/:identifier"
                         element={<EmbeddedResume />}
                       />
+
+                      {/* Public video resume page */}
+                      <Route path="/v/:videoId" element={<PublicVideoResume />} />
 
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />

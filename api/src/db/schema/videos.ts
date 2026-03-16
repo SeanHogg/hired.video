@@ -25,6 +25,7 @@ export const videos = pgTable("videos", {
   duration: integer("duration"),
   errorMessage: text("error_message"),
   privacyStatus: varchar("privacy_status", { length: 50 }).default("unlisted"),
+  isPublic: boolean("is_public").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -54,6 +54,7 @@ export class ErrorBoundary extends Component<
       hasError: true,
       error: normalizedError,
       errorId,
+      copyStatus: "idle",
     };
   }
 

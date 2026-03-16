@@ -98,6 +98,7 @@ import {
   type SubmissionDTO,
   type SubmissionFilters,
 } from "@/lib/services/submission-service";
+import { apiClient } from "@/lib/api-client";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";

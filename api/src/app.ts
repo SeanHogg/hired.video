@@ -26,6 +26,9 @@ import { marketingRoutes } from "./routes/marketing.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { uploadRoutes } from "./routes/upload.js";
 import { aiRoutes } from "./routes/ai.js";
+import { resumeRoastRoutes } from "./routes/resume-roast.js";
+import { ogRoutes } from "./routes/og.js";
+import { linkedInPostRoutes } from "./routes/linkedin-post.js";
 import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
 import { paymentRoutes } from "./routes/payment.js";
@@ -113,6 +116,11 @@ export function createApp() {
     "/api/companies/public",
     "/api/resumes/public",
     "/api/resume/public",
+    "/api/studio/videos/public",
+    "/api/studio/videos/resume",
+    "/api/studio/public",
+    "/api/resume/roast",
+    "/api/og",
     "/health",
     "/api/health",
   ];
@@ -192,6 +200,9 @@ export function createApp() {
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);
+  app.route("/api/studio", linkedInPostRoutes);
+  app.route("/api/resume", resumeRoastRoutes);
+  app.route("/api/og", ogRoutes);
   app.route("/api/youtube", youtubeRoutes);
   app.route("/api/salaryanalyzer", salaryRoutes);
   app.route("/api/salarycalculator", salaryRoutes);

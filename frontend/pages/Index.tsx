@@ -51,6 +51,7 @@ import {
 import { jobService } from "@/lib/services/job-service";
 import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import type { CompanyWithOwnership } from "@/types/company";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
 
@@ -97,6 +98,7 @@ export default function Index() {
 
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [contentError, setContentError] = useState<string | null>(null);
+  const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
   // Deduplicate rapid successive loads (e.g., double effects or quick state churn)
   const lastRequestRef = React.useRef<string>("");
@@ -136,6 +138,13 @@ export default function Index() {
 
   // Note: loadContent is called by the useEffect at line ~563 when dependencies change
   // No need for a separate mount effect - the dependency effect handles initial load
+
+  // Fetch public video resumes once on mount
+  React.useEffect(() => {
+    studioService.getPublicVideos()
+      .then((res) => setPublicVideos(res.data ?? []))
+      .catch(() => {});
+  }, []);
 
 
 
@@ -883,6 +892,36 @@ export default function Index() {
         </section>
 
 
+
+        {/* Public Video Resumes Section */}
+        {publicVideos.length > 0 && (
+          <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center gap-2 mb-6">
+                <Play className="w-5 h-5 text-primary" />
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Video Resumes</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {publicVideos.map((v) => (
+                  <VideoCard
+                    key={v.id}
+                    id={v.id}
+                    title={v.title}
+                    description={v.description ?? `${v.ownerName}'s video resume`}
+                    thumbnail={v.thumbnailUrl ?? ""}
+                    duration=""
+                    views={0}
+                    type="resume"
+                    profession={v.ownerName}
+                    company="hired.video"
+                    createdAt={v.createdAt}
+                    onView={() => navigate(`/v/${v.id}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <Footer />
       </div>

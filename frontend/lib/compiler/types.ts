@@ -1,0 +1,87 @@
+// Internal types for the Video Compiler Engine.
+// These are not the DSL types (see video-script.ts) — they are the compiled
+// output that the frame renderer evaluates at each timestamp.
+
+import type { SceneType, EasingType } from "../../types/video-script";
+
+// ─── Transform & Style ───────────────────────────────────────────────────────
+
+export interface Transform2D {
+  x: number;
+  y: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number; // degrees
+  alpha: number;    // 0–1
+}
+
+export interface NodeStyle {
+  color: string;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: "normal" | "bold";
+  textAlign: CanvasTextAlign;
+  lineHeight: number;
+  padding: number;
+  background?: string;
+  borderRadius?: number;
+  blur?: number;
+}
+
+// ─── Scene Nodes ─────────────────────────────────────────────────────────────
+
+export type SceneNodeType =
+  | "background"
+  | "text"
+  | "textGroup"
+  | "skillBubble"
+  | "overlay"
+  | "particles"
+  | "image";
+
+export interface SceneNode {
+  id: string;
+  type: SceneNodeType;
+  transform: Transform2D;
+  style: NodeStyle;
+  content?: string;
+  items?: string[];    // for textGroup / skillBubble lists
+  children?: SceneNode[];
+  // Resolved animations keyed by property name
+  animations: CompiledAnimation[];
+}
+
+// ─── Animations ──────────────────────────────────────────────────────────────
+
+export interface CompiledAnimation {
+  property: "alpha" | "x" | "y" | "scaleX" | "scaleY";
+  fromValue: number;
+  toValue: number;
+  startTime: number;   // absolute seconds within scene
+  endTime: number;
+  easing: EasingType;
+  /** Returns interpolated value at elapsed seconds within scene. */
+  evaluate(elapsed: number): number;
+}
+
+// ─── Compiled Scene & Video ───────────────────────────────────────────────────
+
+export interface CompiledScene {
+  id: string;
+  type: SceneType;
+  start: number;       // absolute video seconds
+  duration: number;
+  nodes: SceneNode[];
+  /** Background fill: CSS colour or "gradient:…" token. */
+  background: string;
+}
+
+export interface CompiledVideo {
+  totalDuration: number;
+  fps: number;
+  width: number;
+  height: number;
+  scenes: CompiledScene[];
+  /** Returns the scene active at `time` seconds (or the last scene). */
+  getSceneAt(time: number): CompiledScene;
+}

@@ -11,6 +11,22 @@
   }
 }
 
+/* ─── Studio layout ──────────────────────────────────────────────────────── */
+@layer components {
+  .studio-layout {
+    @apply flex h-screen overflow-hidden bg-background;
+  }
+  .studio-sidebar {
+    @apply w-[260px] flex-shrink-0 border-r bg-card overflow-y-auto flex flex-col;
+  }
+  .studio-editor {
+    @apply flex-1 min-w-0 overflow-hidden flex flex-col;
+  }
+  .studio-right-panel {
+    @apply w-[320px] flex-shrink-0 border-l flex flex-col overflow-y-auto;
+  }
+}
+
 @layer base {
   /**
    * Tailwind CSS theme
