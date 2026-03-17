@@ -154,8 +154,8 @@ export default function SignupSuccess() {
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-600 text-center">
                     <strong>Having trouble?</strong> Contact our support team
-                    for assistance. The confirmation link will expire in 24
-                    hours.
+                    for assistance. The confirmation link will expire in 1
+                    hour.
                   </p>
                 </div>
               </CardContent>
