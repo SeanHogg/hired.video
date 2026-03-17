@@ -8,8 +8,9 @@ import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail, LogOut } from "lucide-react";
+import { Loader2, Mail, LogOut, CheckCircle } from "lucide-react";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { apiClient } from "@/lib/api-client";
 
 function useQuery() {
   const { search } = useLocation();
@@ -22,6 +23,7 @@ export default function VerifyEmail(): JSX.Element {
   const query = useQuery();
   const redirect = query.get("redirect") || "/dashboard";
   const hintedEmail = query.get("email") || undefined;
+  const verifyToken = query.get("token") || undefined;
 
   // SEO for verify email page
   useSEO(location.pathname);
@@ -41,11 +43,32 @@ export default function VerifyEmail(): JSX.Element {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState<number>(0);
+  const [tokenVerified, setTokenVerified] = useState<boolean>(false);
+  const [tokenVerifying, setTokenVerifying] = useState<boolean>(false);
 
   // Sync email from authenticated user if present
   useEffect(() => {
     if (user?.email) setEmail(user.email);
   }, [user?.email]);
+
+  // Consume the ?token= param from the verification email link
+  useEffect(() => {
+    if (!verifyToken) return;
+    setTokenVerifying(true);
+    apiClient
+      .post("/api/auth/verify-email", { token: verifyToken })
+      .then(() => {
+        setTokenVerified(true);
+        setTokenVerifying(false);
+        // Give the user a moment to see the success message, then redirect
+        setTimeout(() => navigate(redirect, { replace: true }), 2500);
+      })
+      .catch(() => {
+        setTokenVerifying(false);
+        setError("This verification link is invalid or has expired. Please request a new one.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verifyToken]);
 
   // If the user becomes verified, send them forward
   const checkAndRedirectIfVerified = async () => {
@@ -120,10 +143,26 @@ export default function VerifyEmail(): JSX.Element {
                 <CardTitle>Verify your email to continue</CardTitle>
               </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            For your security and to prevent fake profiles, you must verify your email address before accessing your account.
-          </p>
-          {email && (
+          {tokenVerifying && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm text-muted-foreground">Verifying your email...</span>
+            </div>
+          )}
+          {tokenVerified && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                Your email has been verified! Redirecting you now...
+              </AlertDescription>
+            </Alert>
+          )}
+          {!tokenVerifying && !tokenVerified && (
+            <p className="text-sm text-muted-foreground">
+              For your security and to prevent fake profiles, you must verify your email address before accessing your account.
+            </p>
+          )}
+          {email && !tokenVerifying && !tokenVerified && (
             <Alert>
               <Mail className="h-4 w-4" />
               <AlertDescription>
@@ -132,16 +171,20 @@ export default function VerifyEmail(): JSX.Element {
             </Alert>
           )}
 
-          <p className="text-sm text-muted-foreground">
-            Need to update your email? You can change it in your account settings after signing in.
-          </p>
+          {!tokenVerifying && !tokenVerified && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Need to update your email? You can change it in your account settings after signing in.
+              </p>
 
-          {!isAuthenticated && (
-            <Alert>
-              <AlertDescription>
-                You are not currently signed in. Please sign in with your account to resend the verification email.
-              </AlertDescription>
-            </Alert>
+              {!isAuthenticated && (
+                <Alert>
+                  <AlertDescription>
+                    You are not currently signed in. Please sign in with your account to resend the verification email.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
           )}
 
           {message && (

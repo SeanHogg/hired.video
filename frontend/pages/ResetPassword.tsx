@@ -32,7 +32,6 @@ export default function ResetPassword() {
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  const userId = searchParams.get("userId");
   const token = searchParams.get("token");
 
   // SEO for reset password page
@@ -47,12 +46,12 @@ export default function ResetPassword() {
   } = useSidebar();
 
   useEffect(() => {
-    if (!userId || !token) {
+    if (!token) {
       setError(
         "Invalid or missing reset link. Please request a new password reset.",
       );
     }
-  }, [userId, token]);
+  }, [token]);
 
   const validatePassword = (password: string): string[] => {
     const errors: string[] = [];
@@ -79,7 +78,7 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!userId || !token) {
+    if (!token) {
       setError("Invalid reset link. Please request a new password reset.");
       return;
     }
@@ -107,13 +106,12 @@ export default function ResetPassword() {
 
     try {
       await apiClient.requestRaw<{ message?: string }>(
-        "/api/account/confirm-password-reset",
+        "/api/auth/reset-password",
         {
           method: "POST",
           body: {
-            userId,
             token,
-            newPassword: password,
+            password,
           },
         },
       );
@@ -141,7 +139,7 @@ export default function ResetPassword() {
     }
   };
 
-  if (!userId || !token) {
+  if (!token) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <Sidebar

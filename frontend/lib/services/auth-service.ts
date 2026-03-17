@@ -215,7 +215,7 @@ export class AuthService {
 
     try {
       // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge)
-      const response = await apiClient.post<any>("/api/Auth/login", credentials);
+      const response = await apiClient.post<any>("/api/auth/login", credentials);
 
       console.log("AuthService.login: API response received", response);
 
@@ -277,7 +277,7 @@ export class AuthService {
     const payload = { tempAuthToken: state.tempAuthToken, verificationCode: code } as const;
 
     const result = await apiClient.post<LoginResponse>(
-      "/api/Auth/verify-2fa",
+      "/api/auth/verify-2fa",
       payload,
       LoginResponseSchema,
     );
@@ -304,7 +304,7 @@ export class AuthService {
     }
 
     try {
-      await apiClient.post("/api/Auth/resend-2fa", {
+      await apiClient.post("/api/auth/resend-2fa", {
         tempAuthToken: state.tempAuthToken,
       });
       return true;
@@ -319,7 +319,7 @@ export class AuthService {
    */
   async getVerificationStatus(): Promise<VerificationStatus> {
     const res = await apiClient.get<VerificationStatus>(
-      "/api/Auth/verification-status",
+      "/api/auth/verification-status",
       VerificationStatusSchema,
     );
     return res.data;
@@ -330,7 +330,7 @@ export class AuthService {
    */
   async resendEmailVerification(): Promise<boolean> {
     try {
-      await apiClient.post("/api/Auth/resend-email-verification");
+      await apiClient.post("/api/auth/resend-email-verification");
       return true;
     } catch (e) {
       console.error("AuthService.resendEmailVerification: failed", e);
@@ -347,7 +347,7 @@ export class AuthService {
 
     // Return a strongly-typed and validated payload via ApiClient
     const response = await apiClient.post<EmailVerificationChallenge>(
-      "/api/Auth/register",
+      "/api/auth/register",
       payload,
       EmailVerificationChallengeSchema,
     );
@@ -361,7 +361,7 @@ export class AuthService {
   async logout(): Promise<void> {
     try {
       // Call backend logout endpoint if it exists
-      await apiClient.post("/api/Auth/logout");
+      await apiClient.post("/api/auth/logout");
     } catch (error) {
       // Continue with local logout even if backend call fails
       console.warn("Backend logout failed:", error);
@@ -513,7 +513,7 @@ export class AuthService {
     }
 
     const response = await apiClient.post<LoginResponse>(
-      "/api/Auth/refresh",
+      "/api/auth/refresh",
       { refreshToken },
       LoginResponseSchema,
     );

@@ -56,7 +56,7 @@ export default function ForgotPassword() {
     try {
       // Use the API endpoint for password reset
       await apiClient.requestRaw<{ message: string }>(
-        "/api/account/reset-password",
+        "/api/auth/forgot-password",
         {
           method: "POST",
           body: { email },
@@ -108,7 +108,7 @@ export default function ForgotPassword() {
                         </p>
                         <p className="text-sm text-green-700 mt-1">
                           Click the link in the email to reset your password.
-                          The link will expire in 24 hours.
+                          The link will expire in 1 hour.
                         </p>
                       </div>
                     </div>
