@@ -67,6 +67,7 @@ export const VideoScriptSchema = z.object({
     }).optional(),
   }),
   scenes: z.array(SceneScriptSchema),
+  _meta: z.object({ model: z.string().optional() }).optional(),
 });
 
 export const StoryboardSceneSchema = z.object({
@@ -321,6 +322,16 @@ export const studioService = {
    */
   async generateImage(prompt: string): Promise<ApiSuccessResponse<{ imageUrl: string }>> {
     return apiClient.post("/api/studio/generate-image", { prompt }, z.object({ imageUrl: z.string() }));
+  },
+
+  /**
+   * Upload a scene background image file to persistent storage (R2/S3).
+   * Returns a CDN URL that can be saved in the script and reloaded later.
+   */
+  async uploadSceneImage(file: File): Promise<ApiSuccessResponse<{ url: string }>> {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.post("/api/upload/image", form, z.object({ url: z.string() }));
   },
 
   /**

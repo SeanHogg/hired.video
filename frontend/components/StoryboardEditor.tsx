@@ -232,8 +232,22 @@ function SceneCard({
         ? `${imagePrompt.trim()} — Scene: ${sceneCtx}`
         : imagePrompt.trim();
       const res = await studioService.generateImage(fullPrompt);
-      onChange({ backgroundImage: res.data.imageUrl });
+      const dataUrl = res.data.imageUrl;
+      onChange({ backgroundImage: dataUrl });
       setShowImagePrompt(false);
+      // Upload the generated image to persistent storage in the background
+      if (dataUrl.startsWith("data:")) {
+        try {
+          const [header, base64] = dataUrl.split(",");
+          const mime = header.match(/:(.*?);/)?.[1] ?? "image/png";
+          const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+          const file = new File([bytes], "scene-bg.png", { type: mime });
+          const uploadRes = await studioService.uploadSceneImage(file);
+          onChange({ backgroundImage: uploadRes.data.url });
+        } catch {
+          // Upload failed — data URL stays (functional until page reload)
+        }
+      }
     } catch {
       // silently fail — image just won't update
     } finally {
@@ -241,12 +255,21 @@ function SceneCard({
     }
   }
 
-  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onChange({ backgroundImage: url });
+    // Show a preview immediately via blob URL while uploading to persistent storage
+    const blobUrl = URL.createObjectURL(file);
+    onChange({ backgroundImage: blobUrl });
     e.target.value = "";
+    try {
+      const res = await studioService.uploadSceneImage(file);
+      // Replace the ephemeral blob URL with the persistent CDN URL
+      onChange({ backgroundImage: res.data.url });
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Upload failed — blob URL stays (functional until page reload)
+    }
   }
 
   function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
