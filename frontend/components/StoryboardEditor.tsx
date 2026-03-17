@@ -272,12 +272,19 @@ function SceneCard({
     }
   }
 
-  function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    onChange({ sceneAudio: url, sceneAudioLabel: file.name });
+    const blobUrl = URL.createObjectURL(file);
+    onChange({ sceneAudio: blobUrl, sceneAudioLabel: file.name });
     e.target.value = "";
+    try {
+      const res = await studioService.uploadSceneAudio(file);
+      onChange({ sceneAudio: res.data.url });
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Upload failed — blob URL stays functional until page reload
+    }
   }
 
   return (

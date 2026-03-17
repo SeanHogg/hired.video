@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import type { StudioProject } from "@/lib/services/studio-service";
+import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
 
 // Template metadata with visual descriptions
@@ -135,6 +135,18 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     try { localStorage.setItem(SIDEBAR_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
   }, [collapsed]);
 
+  // Sync background selection when a project is loaded
+  useEffect(() => {
+    const bg = script?.video?.theme?.background;
+    const customBg = script?.video?.theme?.customBackground;
+    if (customBg) {
+      setActiveBg("custom");
+      setCustomBgUrl(customBg);
+    } else if (bg) {
+      setActiveBg(bg);
+    }
+  }, [script?.video?.theme?.background, script?.video?.theme?.customBackground]);
+
   function toggleSection(key: string) {
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
   }
@@ -178,14 +190,23 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     onBackgroundSelect?.(preset.value);
   }
 
-  function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setCustomBgUrl(url);
+    // Show immediately via blob URL while uploading to persistent storage
+    const blobUrl = URL.createObjectURL(file);
+    setCustomBgUrl(blobUrl);
     setActiveBg("custom");
-    onBackgroundSelect?.("custom", url);
+    onBackgroundSelect?.("custom", blobUrl);
     e.target.value = "";
+    try {
+      const res = await studioService.uploadSceneImage(file);
+      setCustomBgUrl(res.data.url);
+      onBackgroundSelect?.("custom", res.data.url);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Upload failed — blob URL stays functional until page reload
+    }
   }
 
   function patchTheme(patch: Partial<VideoTheme>) {

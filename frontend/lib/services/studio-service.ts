@@ -335,6 +335,16 @@ export const studioService = {
   },
 
   /**
+   * Upload a scene audio file to persistent storage (R2/S3).
+   * Returns a CDN URL that can be saved in the script and reloaded later.
+   */
+  async uploadSceneAudio(file: File): Promise<ApiSuccessResponse<{ url: string }>> {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.post("/api/upload/single", form, z.object({ url: z.string() }));
+  },
+
+  /**
    * Delete a studio project permanently.
    */
   async deleteProject(projectId: string): Promise<ApiSuccessResponse<{ id: string }>> {
