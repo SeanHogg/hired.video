@@ -44,9 +44,7 @@ export default function ResumeRoast() {
   const [result, setResult] = useState<RoastResult | null>(null);
   const [downloading, setDownloading] = useState(false);
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = useCallback(async (file: File) => {
     try {
       const text = await extractTextFromFile(file);
       if (!text.trim()) {
@@ -136,8 +134,8 @@ export default function ResumeRoast() {
                 <div>
                   <FileUploadInput
                     label={<Label className="sr-only">Upload file</Label>}
-                    buttonText="Upload PDF / DOCX"
-                    accept=".pdf,.txt,.md,.docx,text/plain"
+                    buttonText="Upload Resume"
+                    accept=".pdf,.doc,.docx,.txt,.md,.json,text/plain"
                     onFileSelected={handleFileChange}
                   />
                 </div>

@@ -74,6 +74,8 @@ export default function SentimentAnalysis() {
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
+      "application/json",
+      "application/ld+json",
     ],
     [],
   );
@@ -98,7 +100,7 @@ export default function SentimentAnalysis() {
       if (droppedFile && allowedTypes.includes(droppedFile.type)) {
         setFile(droppedFile);
       } else {
-        setError("Please upload a PDF, Word document, or text file.");
+        setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
       }
     },
     [allowedTypes],
@@ -111,7 +113,7 @@ export default function SentimentAnalysis() {
     if (selectedFile && allowedTypes.includes(selectedFile.type)) {
       setFile(selectedFile);
     } else {
-      setError("Please upload a PDF, Word document, or text file.");
+      setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
     }
   };
 
@@ -274,11 +276,11 @@ export default function SentimentAnalysis() {
                               Drop your resume here, or click to browse
                             </p>
                             <p className="text-sm text-muted-foreground mb-4">
-                              Supports PDF, Word (.doc, .docx), and text files
+                              Supports PDF, Word (.doc, .docx), Markdown, JSON, and text files
                             </p>
                             <Input
                               type="file"
-                              accept=".pdf,.doc,.docx,.txt"
+                              accept=".pdf,.doc,.docx,.txt,.md,.json"
                               onChange={handleFileSelect}
                               className="hidden"
                               id="file-upload"

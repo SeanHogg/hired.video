@@ -7,6 +7,7 @@ import {
   Loader2,
   User,
 } from "lucide-react";
+import { extractTextFromFile } from "@/lib/extract-text";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,8 @@ export default function ResumeSelectionStep({
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
+      "application/json",
+      "application/ld+json",
     ],
     [],
   );
@@ -100,17 +103,11 @@ export default function ResumeSelectionStep({
     if (!file) return;
 
     try {
-      // For now, we'll need to extract text content from the file
-      // This would typically involve a file processing service
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        onResumeSelected({
-          resumeContent: content,
-          source: "file",
-        });
-      };
-      reader.readAsText(file);
+      const text = await extractTextFromFile(file);
+      onResumeSelected({
+        resumeContent: text,
+        source: "file",
+      });
     } catch (err) {
       console.error("Failed to process resume file:", err);
     }
@@ -279,11 +276,11 @@ export default function ResumeSelectionStep({
                   Drop your resume here, or click to browse
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Supports PDF, Word (.doc, .docx), and text files
+                  Supports PDF, Word (.doc, .docx), Markdown, JSON, and text files
                 </p>
                 <Input
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt"
+                  accept=".pdf,.doc,.docx,.txt,.md,.json"
                   onChange={handleFileSelect}
                   className="hidden"
                   id="resume-file-upload"

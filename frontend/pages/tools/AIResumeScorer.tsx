@@ -93,10 +93,12 @@ export default function AIResumeScorer() {
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
+        "application/json",
+        "application/ld+json",
       ];
 
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError("Please upload a PDF, Word document, or text file.");
+        setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
         return;
       }
 
@@ -430,7 +432,7 @@ export default function AIResumeScorer() {
                             <input
                               type="file"
                               onChange={handleFileChange}
-                              accept=".pdf,.doc,.docx,.txt"
+                              accept=".pdf,.doc,.docx,.txt,.md,.json"
                               className="hidden"
                               id="resume-upload"
                             />
@@ -443,7 +445,7 @@ export default function AIResumeScorer() {
                                 Click to upload or drag and drop
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                PDF, Word, or Text files (max 10MB)
+                                PDF, Word, Markdown, JSON, or Text files (max 10MB)
                               </p>
                             </label>
                           </div>

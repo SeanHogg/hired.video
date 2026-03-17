@@ -71,6 +71,8 @@ export default function ResumeUpload({
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
+      "application/json",
+      "application/ld+json",
     ],
     [],
   );
@@ -98,7 +100,7 @@ export default function ResumeUpload({
           setName(droppedFile.name.replace(/\.[^/.]+$/, ""));
         }
       } else {
-        setError("Please upload a PDF, Word document, or text file.");
+        setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
       }
     },
     [name, allowedTypes],
@@ -114,7 +116,7 @@ export default function ResumeUpload({
         setName(selectedFile.name.replace(/\.[^/.]+$/, ""));
       }
     } else {
-      setError("Please upload a PDF, Word document, or text file.");
+      setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
     }
   };
 
@@ -269,11 +271,11 @@ export default function ResumeUpload({
                 Drop your resume here, or click to browse
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                Supports PDF, Word (.doc, .docx), and text files
+                Supports PDF, Word (.doc, .docx), markdown, JSON, and text files
               </p>
               <Input
                 type="file"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.doc,.docx,.txt,.md,.json"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="file-upload"

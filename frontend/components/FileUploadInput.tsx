@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function FileUploadInput({
-  accept = ".pdf,.txt,.md,.docx",
+  accept = ".pdf,.txt,.md,.docx,.json",
   label,
   buttonText = "Upload",
   onFileSelected,

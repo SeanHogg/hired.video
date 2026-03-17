@@ -21,8 +21,9 @@ export async function extractTextFromPdf(file: File): Promise<string> {
 
     return pages.join("\n").replace(/\s+/g, " ").trim();
   } catch (err) {
-    // Fallback to returning raw text (may be garbage) so the UI at least shows something
-    return file.text();
+    // Fallback: return raw bytes as text so the UI shows something instead of remaining blank.
+    const bytes = await file.arrayBuffer();
+    return new TextDecoder().decode(bytes).slice(0, 3000);
   }
 }
 
@@ -37,6 +38,17 @@ export async function extractTextFromFile(file: File): Promise<string> {
     if (xmlFile) {
       const xml = await xmlFile.async("text");
       return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    }
+  }
+
+  // Allow JSON resume uploads - just return pretty JSON as text
+  if (name.endsWith(".json")) {
+    const raw = await file.text();
+    try {
+      const parsed = JSON.parse(raw);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return raw;
     }
   }
 

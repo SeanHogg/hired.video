@@ -130,8 +130,8 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
           <Label>Resume</Label>
           <div className="flex items-center gap-2">
             <FileUploadInput
-              buttonText="Upload PDF / DOCX"
-              accept=".pdf,.txt,.md,.docx"
+              buttonText="Upload Resume"
+              accept=".pdf,.doc,.docx,.txt,.md,.json"
               onFileSelected={async (file) => {
                 const text = await extractTextFromFile(file);
                 onStateChange({ resumeText: text });
