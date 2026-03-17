@@ -19,6 +19,9 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+# SendPulse API credentials (recommended: set via `wrangler secret put EMAIL_CLIENTID` and `wrangler secret put EMAIL_SECRET`)
+EMAIL_CLIENTID = ""
+EMAIL_SECRET = ""
 # OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY`)
 OPENROUTER_API_KEY = ""
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
@@ -50,6 +53,9 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+# SendPulse API credentials (recommended: set via `wrangler secret put EMAIL_CLIENTID --env production` and `wrangler secret put EMAIL_SECRET --env production`)
+EMAIL_CLIENTID = ""
+EMAIL_SECRET = ""
 # OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY --env production`)
 OPENROUTER_API_KEY = ""
 

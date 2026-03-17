@@ -1,11 +1,12 @@
 /**
- * Email service — sends transactional emails via the Resend API.
+ * Email service — sends transactional emails via the SendPulse API.
  *
  * Templates are inlined (no filesystem reads) for Cloudflare Workers
  * compatibility. Branding is updated for hired.video.
  *
  * Environment variables (set as Wrangler secrets / vars):
- *   EMAIL_CLIENTID   — Resend API key
+ *   EMAIL_CLIENTID   — SendPulse Client ID
+ *   EMAIL_SECRET     — SendPulse Client Secret
  *   EMAIL_FROM       — From address (default: info@hired.video)
  *   FRONTEND_URL / BASE_URL — Base URL for link generation
  */
@@ -14,12 +15,17 @@
 // CONFIGURATION HELPERS
 // ============================================================================
 
-function getResendApiKey(): string {
-  return (
+function getSendPulseCredentials(): { clientId: string; clientSecret: string } {
+  const clientId =
     process.env.EMAIL_CLIENTID ||
     (globalThis as any).__ENV?.EMAIL_CLIENTID ||
-    ""
-  );
+    "";
+  const clientSecret =
+    process.env.EMAIL_SECRET ||
+    (globalThis as any).__ENV?.EMAIL_SECRET ||
+    "";
+
+  return { clientId, clientSecret };
 }
 
 function getFromAddress(): string {
@@ -360,30 +366,89 @@ function escapeHtml(str: string): string {
 }
 
 // ============================================================================
-// TRANSPORT
+// TRANSPORT (SendPulse)
 // ============================================================================
 
-async function send(to: string, subject: string, html: string): Promise<void> {
-  const apiKey = getResendApiKey();
-  if (!apiKey) {
-    console.warn("[email] EMAIL_CLIENTID not configured — skipping send to", to);
-    return;
+let sendPulseTokenCache: { token: string; expiresAt: number } | null = null;
+
+async function getSendPulseAccessToken(): Promise<string | null> {
+  const now = Date.now();
+  if (sendPulseTokenCache && sendPulseTokenCache.expiresAt > now + 30_000) {
+    return sendPulseTokenCache.token;
   }
+
+  const { clientId, clientSecret } = getSendPulseCredentials();
+  if (!clientId || !clientSecret) {
+    console.warn("[email] SendPulse credentials not configured — skipping send");
+    return null;
+  }
+
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: getFromAddress(), to, subject, html }),
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
     });
+
     if (!res.ok) {
       const text = await res.text();
-      console.error("[email] Resend API error:", res.status, text);
+      console.error("[email] SendPulse token fetch failed:", res.status, text);
+      return null;
+    }
+
+    const data = (await res.json()) as { access_token?: string; expires_in?: number };
+    const token = data.access_token;
+    const expiresIn = Number(data.expires_in) || 3600;
+    if (!token) {
+      console.error("[email] SendPulse token response missing access_token", data);
+      return null;
+    }
+
+    sendPulseTokenCache = {
+      token,
+      expiresAt: Date.now() + expiresIn * 1000,
+    };
+
+    return token;
+  } catch (err) {
+    console.error("[email] Failed to fetch SendPulse access token:", err);
+    return null;
+  }
+}
+
+async function send(to: string, subject: string, html: string): Promise<void> {
+  const token = await getSendPulseAccessToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch("https://api.sendpulse.com/smtp/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: {
+          subject,
+          html,
+          from: { email: getFromAddress(), name: "hired.video" },
+          to: [{ email: to }],
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("[email] SendPulse API error:", res.status, text);
     }
   } catch (err) {
-    console.error("[email] Failed to reach Resend API:", err);
+    console.error("[email] Failed to reach SendPulse API:", err);
   }
 }
 

@@ -44,6 +44,7 @@ import { salaryRoutes } from "./routes/salary.js";
 import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
+import { interviewRoutes } from "./routes/interview.js";
 export function createApp() {
   const app = new Hono();
 
@@ -208,6 +209,7 @@ export function createApp() {
   app.route("/api/salarycalculator", salaryRoutes);
   app.route("/api/valueproposition", valuePropositionRoutes);
   app.route("/api/hubs", hubsRoutes);
+  app.route("/api/interview", interviewRoutes);
 
   // Legacy frontend service currently requests /FeatureFlag without /api prefix.
   app.route("/featureflag", featureFlagRoutes);

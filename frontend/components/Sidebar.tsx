@@ -16,6 +16,7 @@ import {
   X,
   BarChart3,
   MessageSquare,
+  Mic,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -55,6 +56,7 @@ export default function Sidebar({
     },
     { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
     { name: "Studio", href: "/studio", icon: Video, exactMatch: false },
+    { name: "Interview Practice", href: "/interview", icon: Mic, exactMatch: false },
     { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
     {
       name: "Companies",

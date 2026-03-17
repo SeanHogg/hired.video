@@ -73,6 +73,7 @@ const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const AICoach = lazy(() => import("./pages/AICoach"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const Feed = lazy(() => import("./pages/Feed"));
+const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 
 
 // Other pages (lazy loaded)
@@ -316,6 +317,7 @@ const App = () => (
                         element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
                       />
                       <Route path="/studio" element={<Studio />} />
+                      <Route path="/interview" element={<InterviewPractice />} />
                       <Route path="/resume-roast" element={<ResumeRoast />} />
                       <Route
                         path="/resumes/create/:id"
