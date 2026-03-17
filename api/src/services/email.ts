@@ -32,87 +32,53 @@ export interface EmailProvider {
 }
 
 // ============================================================================
-// SENDPULSE IMPLEMENTATION
+// SENDPULSE IMPLEMENTATION (uses sendpulse-api npm package)
 // ============================================================================
 
-class SendPulseEmailProvider implements EmailProvider {
-  private tokenCache: { token: string; expiresAt: number } | null = null;
+import * as sendpulse from "sendpulse-api";
 
+/** Promisify sendpulse.init — authenticates and caches the OAuth token */
+function initSendPulse(clientId: string, clientSecret: string): Promise<void> {
+  return new Promise((resolve) => {
+    sendpulse.init(clientId, clientSecret, "/tmp/", () => resolve());
+  });
+}
+
+/** Promisify sendpulse.smtpSendMail */
+function smtpSend(email: object): Promise<any> {
+  return new Promise((resolve) => {
+    sendpulse.smtpSendMail((result: any) => {
+      resolve(result);
+    }, email);
+  });
+}
+
+class SendPulseEmailProvider implements EmailProvider {
   constructor(
     private readonly clientId: string,
     private readonly clientSecret: string,
     private readonly defaultFrom: string,
   ) {}
 
-  private async getAccessToken(): Promise<string | null> {
-    const now = Date.now();
-    if (this.tokenCache && this.tokenCache.expiresAt > now + 30_000) {
-      return this.tokenCache.token;
-    }
-
-    try {
-      const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          grant_type: "client_credentials",
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-        }),
-      });
-
-      if (!res.ok) {
-        console.error("[email:sendpulse] Token fetch failed:", res.status, await res.text());
-        return null;
-      }
-
-      const data = (await res.json()) as { access_token?: string; expires_in?: number };
-      if (!data.access_token) {
-        console.error("[email:sendpulse] Missing access_token in response", data);
-        return null;
-      }
-
-      this.tokenCache = {
-        token: data.access_token,
-        expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000,
-      };
-
-      return this.tokenCache.token;
-    } catch (err) {
-      console.error("[email:sendpulse] Failed to fetch access token:", err);
-      return null;
-    }
-  }
-
   async send(message: EmailMessage): Promise<void> {
-    const token = await this.getAccessToken();
-    if (!token) return;
-
-    const fromEmail = message.fromEmail ?? this.defaultFrom;
-    const fromName = message.fromName ?? "hired.video";
-
     try {
-      const res = await fetch("https://api.sendpulse.com/smtp/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: {
-            subject: message.subject,
-            html: message.html,
-            from: { email: fromEmail, name: fromName },
-            to: [{ email: message.to }],
-          },
-        }),
+      await initSendPulse(this.clientId, this.clientSecret);
+
+      const fromEmail = message.fromEmail ?? this.defaultFrom;
+      const fromName = message.fromName ?? "hired.video";
+
+      const result = await smtpSend({
+        html: message.html,
+        subject: message.subject,
+        from: { name: fromName, email: fromEmail },
+        to: [{ email: message.to }],
       });
 
-      if (!res.ok) {
-        console.error("[email:sendpulse] Send failed:", res.status, await res.text());
+      if (result && result.result === false) {
+        console.error("[email:sendpulse] Send failed:", JSON.stringify(result));
       }
     } catch (err) {
-      console.error("[email:sendpulse] Network error:", err);
+      console.error("[email:sendpulse] Error:", err);
     }
   }
 }
@@ -134,7 +100,7 @@ function getEmailProvider(): EmailProvider | null {
   const clientSecret = getEnv("EMAIL_SECRET");
 
   if (!clientId || !clientSecret) {
-    console.warn("[email] Provider credentials not configured — emails will be skipped");
+    console.warn("[email] SendPulse credentials not configured — emails will be skipped");
     return null;
   }
 
