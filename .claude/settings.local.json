@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls *.sh)",
+      "Bash(wrangler secret:*)",
+      "Bash(\"C:/code/hired.video/STUDIO_UPGRADE_SPEC.md\":*)"
     ]
   }
 }

@@ -8,6 +8,7 @@ export interface Env {
   YOUTUBE_CLIENT_SECRET?: string;
   YOUTUBE_REFRESH_TOKEN?: string;
   VIDEO_BUCKET: R2Bucket;
+  AI?: { run: (model: string, inputs: Record<string, unknown>) => Promise<unknown> };
   // YouTube company OAuth
   YOUTUBE_COMPANY_CLIENT_ID?: string;
   YOUTUBE_COMPANY_CLIENT_SECRET?: string;

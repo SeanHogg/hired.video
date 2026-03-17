@@ -3,6 +3,8 @@
 
 import type { VideoScript } from "../../types/video-script";
 import type { CompiledVideo, CompiledScene } from "./types";
+// satisfies import used for transition type assertion
+
 import { buildSceneGraph } from "./scene-graph";
 
 const RESOLUTION_MAP: Record<string, { w: number; h: number }> = {
@@ -64,6 +66,7 @@ export function compile(script: VideoScript): CompiledVideo {
     width,
     height,
     scenes: compiledScenes,
+    transition: (theme.transition ?? "fade") as CompiledVideo["transition"],
     getSceneAt(time: number): CompiledScene {
       // Find the scene whose time-window contains `time`
       for (let i = compiledScenes.length - 1; i >= 0; i--) {

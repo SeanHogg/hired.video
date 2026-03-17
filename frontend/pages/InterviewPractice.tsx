@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
+import { useSidebar } from "@/hooks/use-sidebar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
 import {
   Mic,
   MicOff,
@@ -20,6 +28,7 @@ import {
   RotateCcw,
   ChevronRight,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Star,
   TrendingUp,
@@ -29,6 +38,10 @@ import {
   BarChart3,
   RefreshCw,
   Loader2,
+  Sparkles,
+  Zap,
+  Target,
+  Users,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -724,38 +737,206 @@ function ResultsStep({
 
 function Landing() {
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center flex-col gap-8 text-center px-4 py-16">
-      <div className="space-y-4 max-w-xl">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
-          <Mic className="w-8 h-8 text-primary" />
-        </div>
-        <h1 className="text-4xl font-bold">AI Interview Practice</h1>
-        <p className="text-muted-foreground text-lg leading-relaxed">
-          Simulate real job interviews, record your answers, and get instant AI feedback on
-          clarity, confidence, structure, and impact.
-        </p>
-      </div>
+    <div className="pt-16">
+      <div className="max-w-6xl mx-auto px-4 py-16">
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full text-left">
-        {[
-          { icon: "🎯", title: "Tailored Questions", desc: "AI generates questions from any job description" },
-          { icon: "🎥", title: "Video Recording", desc: "Practice with your webcam just like a real interview" },
-          { icon: "📊", title: "Instant Scoring", desc: "Get scored on clarity, structure, confidence, and impact" },
-        ].map((f) => (
-          <div key={f.title} className="p-4 rounded-xl border bg-card">
-            <div className="text-2xl mb-2">{f.icon}</div>
-            <div className="font-semibold text-sm">{f.title}</div>
-            <div className="text-xs text-muted-foreground mt-1">{f.desc}</div>
+        {/* Hero */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center space-x-2 mb-6">
+            <div className="relative">
+              <Mic className="h-12 w-12 text-primary" />
+              <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+            </div>
+            <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+              Interview Practice
+            </span>
           </div>
-        ))}
-      </div>
+          <h1 className="text-5xl font-bold mb-6">
+            Practice Interviews. Get Hired Faster.
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+            Paste any job description and get AI-generated interview questions tailored to the role.
+            Record your video answers and receive instant feedback on clarity, confidence, structure, and impact.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/signup">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+              >
+                Start Practicing Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button size="lg" variant="outline" className="text-lg px-8">
+                Sign In
+              </Button>
+            </Link>
+          </div>
+        </div>
 
-      <Link to="/login?redirect=/interview">
-        <Button size="lg" className="px-8">
-          Sign in to Start Practicing
-          <ChevronRight className="ml-2 h-4 w-4" />
-        </Button>
-      </Link>
+        {/* Stats */}
+        <div className="grid md:grid-cols-4 gap-6 mb-16">
+          {[
+            { stat: "5–10 min", label: "Per practice session" },
+            { stat: "5 types", label: "Behavioral, Technical, System Design, Product & more" },
+            { stat: "5 scores", label: "Clarity, Confidence, Structure, Relevance & Impact" },
+            { stat: "Instant", label: "AI feedback with model answers" },
+          ].map((s) => (
+            <div key={s.stat} className="text-center">
+              <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>
+              <p className="text-sm text-muted-foreground">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-center mb-12">
+            Everything You Need to Nail Your Interview
+          </h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+              <CardHeader>
+                <Zap className="h-10 w-10 text-brand-purple mb-4" />
+                <CardTitle>AI-Generated Questions</CardTitle>
+                <CardDescription>
+                  Paste any job description and our AI instantly crafts questions tailored to the exact
+                  role, company, and interview type you're preparing for.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Job-specific question tailoring</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Behavioral, technical & system design</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Adjustable difficulty and count</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+              <CardHeader>
+                <Video className="h-10 w-10 text-brand-blue mb-4" />
+                <CardTitle>Video Recording & Transcription</CardTitle>
+                <CardDescription>
+                  Record your answers with your webcam just like a real interview.
+                  Your speech is transcribed live so the AI can evaluate every word you say.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Live webcam recording</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Real-time speech transcription</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Re-record any answer</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+              <CardHeader>
+                <BarChart3 className="h-10 w-10 text-primary mb-4" />
+                <CardTitle>Scored AI Feedback</CardTitle>
+                <CardDescription>
+                  Get a detailed score breakdown on five dimensions — clarity, confidence, structure,
+                  relevance, and impact — plus a model answer to compare against.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />0–10 score per answer</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Specific strengths & improvements</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />AI model answer for every question</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* How it works */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+          <div className="grid md:grid-cols-4 gap-8">
+            {[
+              { icon: Target, step: "1. Paste Job Description", desc: "Drop in any job posting and pick your interview type" },
+              { icon: Sparkles, step: "2. AI Generates Questions", desc: "Get 5 tailored questions in seconds" },
+              { icon: Mic, step: "3. Record Your Answers", desc: "Answer on camera with a live countdown timer" },
+              { icon: TrendingUp, step: "4. Get Your Score", desc: "Instant feedback with a model answer to learn from" },
+            ].map(({ icon: Icon, step, desc }) => (
+              <div key={step} className="text-center">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Icon className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="font-semibold mb-2">{step}</h3>
+                <p className="text-sm text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Testimonials */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-center mb-12">What Candidates Are Saying</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                quote: "I used to freeze up on behavioral questions. After 3 practice sessions I finally landed a FAANG offer. The AI feedback was brutally honest and incredibly helpful.",
+                name: "James Park",
+                title: "Software Engineer → Google",
+              },
+              {
+                quote: "The tailored questions for a specific job description blew me away. It asked me almost exactly what came up in my real interview at Stripe.",
+                name: "Priya Mehta",
+                title: "Product Manager → Stripe",
+              },
+              {
+                quote: "I score myself a 6 before practicing and an 8.5 after. The model answers showed me exactly how to restructure my responses with STAR format.",
+                name: "Marcus Williams",
+                title: "Engineering Manager → Meta",
+              },
+            ].map((t) => (
+              <Card key={t.name}>
+                <CardContent className="p-6">
+                  <div className="flex items-center mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-sm mb-4">"{t.quote}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
+                    <div>
+                      <p className="font-medium text-sm">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.title}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Final CTA */}
+        <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
+          <h3 className="text-2xl font-bold mb-4">
+            Ready to Ace Your Next Interview?
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            Join thousands of job seekers who practice smarter and interview with confidence.
+          </p>
+          <Link to="/signup">
+            <Button
+              size="lg"
+              className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+            >
+              Start Practicing Free
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+        </div>
+
+      </div>
+      <Footer />
     </div>
   );
 }
@@ -765,12 +946,12 @@ function Landing() {
 type Step = "setup" | "preview" | "recording" | "analyzing" | "results";
 
 export default function InterviewPractice() {
-  const { user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const location = useLocation();
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
-  useSEO("/interview", {
+  useSEO(location.pathname, {
     title: "AI Interview Practice — hired.video",
     description: "Simulate real job interviews and get AI feedback on your answers.",
   });
@@ -957,24 +1138,32 @@ export default function InterviewPractice() {
     setStep("recording");
   }
 
-  if (!user) {
+  if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <Landing />
+      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <Landing />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:pl-16" : "lg:pl-80"}>
-        <Navigation onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+        <div className="pt-16">
         <div className="max-w-4xl mx-auto px-4 py-8">
           {step === "setup" && (
             <SetupStep onStart={generateQuestions} loading={loading} />
@@ -1012,6 +1201,7 @@ export default function InterviewPractice() {
             onRetry={handleRetry}
           />
           )}
+        </div>
         </div>
       </div>
     </div>

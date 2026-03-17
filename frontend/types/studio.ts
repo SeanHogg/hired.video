@@ -19,6 +19,8 @@ export interface StudioProjectState {
   resumeId?: string;            // references resumeInformation.id
   jobDescription?: string;      // Feature G3: video for this job
   script: VideoScript | null;   // replaces legacy storyboard
+  /** Full template VideoScript — theme is re-applied after each regeneration */
+  activeTemplate: VideoScript | null;
   compiledVideo: CompiledVideo | null;
   videoBlob: Blob | null;
   projectId: string | null;
@@ -34,7 +36,7 @@ export interface StudioProjectState {
   motion: "minimal" | "moderate" | "cinematic";
 }
 
-export const defaultStudioState: Omit<StudioProjectState, "script" | "compiledVideo" | "videoBlob" | "projectId" | "youtubeVideoId"> = {
+export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "projectId" | "youtubeVideoId"> = {
   name: "New Video Resume",
   prompt: "Create a professional 28-second video resume",
   resumeText: "",

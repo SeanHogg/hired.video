@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import {
-  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check,
+  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
@@ -23,6 +24,8 @@ interface Props {
   onTimeUpdate: (t: number) => void;
   onExport: () => void;
   onPublish: () => void;
+  onPublishToProfile: () => void;
+  isPublishedToProfile?: boolean;
   onLinkedInPost: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
@@ -43,8 +46,10 @@ function formatTime(s: number): string {
 
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime, exportProgress,
-  onPlayPause, onTimeUpdate, onExport, onPublish, onLinkedInPost, onMakePublic, isPublic,
-  onGenerate, showVideo = true, showActions = true, className,
+  onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile,
+  onLinkedInPost, onMakePublic, isPublic,
+  onGenerate,
+  showVideo = true, showActions = true, className,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
@@ -78,6 +83,7 @@ export default function StudioPreview({
               playing={playing}
               currentTime={currentTime}
               onTimeUpdate={onTimeUpdate}
+              audio={state.script?.video?.audio}
               className="w-full h-full"
             />
           ) : (
@@ -147,6 +153,7 @@ export default function StudioPreview({
               playing={playing}
               currentTime={currentTime}
               onTimeUpdate={onTimeUpdate}
+              audio={state.script?.video?.audio}
               className="w-full h-full rounded-lg overflow-hidden"
             />
             {/* Controls in fullscreen */}
@@ -183,13 +190,13 @@ export default function StudioPreview({
         </div>
       )}
 
+
       {/* Action stepper */}
       {showActions && <div className="flex flex-col overflow-y-auto">
         {([
-          { n: 1, title: "Generate Script",   done: !!state.script,         active: !state.script || state.status === "generating" },
-          { n: 2, title: "Export MP4",        done: !!state.videoBlob,       active: !!state.script && !state.videoBlob && state.status !== "generating" },
-          { n: 3, title: "Publish to YouTube", done: !!state.youtubeVideoId, active: !!state.videoBlob && !state.youtubeVideoId },
-          { n: 4, title: "Share on LinkedIn",  done: false,                  active: !!state.youtubeVideoId },
+          { n: 1, title: "Generate Script", done: !!state.script,   active: !state.script || state.status === "generating" },
+          { n: 2, title: "Export MP4",      done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
+          { n: 3, title: "Share",           done: !!state.youtubeVideoId, active: !!state.videoBlob },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
             {/* Step badge */}
@@ -242,30 +249,56 @@ export default function StudioPreview({
                   {(state.status === "uploading" || state.status === "publishing") && (
                     <p className="text-[10px] text-muted-foreground">{statusLabel[state.status]}</p>
                   )}
+                  {/* Publish to YouTube */}
                   <Button size="sm" className="w-full h-7 text-xs" onClick={onPublish} disabled={!hasVideo || busy}>
                     <Upload className="w-3 h-3 mr-1.5" />
-                    {hasYoutube ? "Re-publish" : "Publish"}
+                    {hasYoutube ? "Re-publish to YouTube" : "Publish to YouTube"}
                   </Button>
+                  {/* LinkedIn always available once video is ready */}
+                  {hasVideo && (
+                    <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onLinkedInPost} disabled={busy}>
+                      <Share2 className="w-3 h-3 mr-1.5" /> Post to LinkedIn
+                    </Button>
+                  )}
+                  {/* Publish to Profile */}
+                  {hasVideo && (
+                    <Button
+                      size="sm"
+                      variant={isPublishedToProfile ? "secondary" : "default"}
+                      className={`w-full h-7 text-xs ${isPublishedToProfile ? "opacity-80" : ""}`}
+                      onClick={onPublishToProfile}
+                      disabled={busy}
+                    >
+                      {isPublishedToProfile
+                        ? <><Check className="w-3 h-3 mr-1.5" /> Published to Profile</>
+                        : <><UserCheck className="w-3 h-3 mr-1.5" /> Publish to Profile</>}
+                    </Button>
+                  )}
                   {hasYoutube && (
-                    <div className="flex items-center justify-between pt-0.5">
-                      <div className="flex items-center gap-1.5">
-                        {isPublic
-                          ? <Globe className="w-3 h-3 text-emerald-400" />
-                          : <Lock className="w-3 h-3 text-muted-foreground" />}
-                        <Label htmlFor="studio-public-toggle" className="text-[11px] cursor-pointer">
-                          {isPublic ? "Public page on" : "Make public"}
-                        </Label>
+                    <>
+                      <div className="flex items-center justify-between pt-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {isPublic
+                            ? <Globe className="w-3 h-3 text-emerald-400" />
+                            : <Lock className="w-3 h-3 text-muted-foreground" />}
+                          <Label htmlFor="studio-public-toggle" className="text-[11px] cursor-pointer">
+                            {isPublic ? "Public page on" : "Make public"}
+                          </Label>
+                        </div>
+                        <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
                       </div>
-                      <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
-                    </div>
+                      {/* X sharing post-YouTube */}
+                      <Button size="sm" variant="secondary" className="w-full h-7 text-xs" asChild>
+                        <a
+                          href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=https%3A%2F%2Fhired.video%2Fv%2F${state.youtubeVideoId}`}
+                          target="_blank" rel="noopener noreferrer"
+                        >
+                          <Share2 className="w-3 h-3 mr-1" /> Share on X
+                        </a>
+                      </Button>
+                    </>
                   )}
                 </>
-              )}
-
-              {n === 4 && (
-                <Button size="sm" variant="secondary" className="w-full h-7 text-xs" onClick={onLinkedInPost} disabled={!hasYoutube || busy}>
-                  <Share2 className="w-3 h-3 mr-1.5" /> Generate LinkedIn Post
-                </Button>
               )}
             </div>
           </div>

@@ -71,11 +71,21 @@ export default function ResumeUpload({
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "text/plain",
+      "text/markdown",
+      "text/x-markdown",
       "application/json",
       "application/ld+json",
     ],
     [],
   );
+
+  const allowedExtensions = [".pdf", ".doc", ".docx", ".txt", ".md", ".markdown", ".json"];
+
+  function isFileAllowed(file: File): boolean {
+    if (allowedTypes.includes(file.type)) return true;
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    return allowedExtensions.includes(ext);
+  }
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -94,7 +104,7 @@ export default function ResumeUpload({
       setError(null);
 
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile && allowedTypes.includes(droppedFile.type)) {
+      if (droppedFile && isFileAllowed(droppedFile)) {
         setFile(droppedFile);
         if (!name) {
           setName(droppedFile.name.replace(/\.[^/.]+$/, ""));
@@ -103,14 +113,15 @@ export default function ResumeUpload({
         setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
       }
     },
-    [name, allowedTypes],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [name],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     setError(null);
 
-    if (selectedFile && allowedTypes.includes(selectedFile.type)) {
+    if (selectedFile && isFileAllowed(selectedFile)) {
       setFile(selectedFile);
       if (!name) {
         setName(selectedFile.name.replace(/\.[^/.]+$/, ""));

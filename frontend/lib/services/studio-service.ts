@@ -39,6 +39,11 @@ export const SceneScriptSchema = z.object({
     textEnter: AnimationSpecSchema.optional(),
   }).optional(),
   effects: z.array(SceneEffectSchema).optional(),
+  accentColor: z.string().optional(),
+  backgroundImage: z.string().optional(),
+  backgroundImagePosition: z.enum(["full","half-left","half-right","small-left","small-right","corner-tl","corner-tr","corner-bl","corner-br"]).optional(),
+  sceneAudio: z.string().optional(),
+  sceneAudioLabel: z.string().optional(),
 });
 
 export const VideoScriptSchema = z.object({
@@ -53,7 +58,13 @@ export const VideoScriptSchema = z.object({
       motion: z.enum(["minimal", "moderate", "cinematic"]),
       transition: z.enum(["cut", "fade", "slide", "cinematic-fade"]),
       background: z.enum(["gradient", "dark-tech-grid", "particles", "solid"]),
+      customBackground: z.string().optional(),
     }),
+    audio: z.object({
+      track: z.string(),
+      label: z.string(),
+      volume: z.number(),
+    }).optional(),
   }),
   scenes: z.array(SceneScriptSchema),
 });
@@ -87,8 +98,10 @@ export type Storyboard = z.infer<typeof StoryboardSchema>;
 export enum StudioProjectStatus {
   Draft = "Draft",
   Processing = "Processing",
+  Exported = "Exported",
   Publishing = "Publishing",
   Completed = "Completed",
+  Published = "Published",
   Failed = "Failed",
 }
 
@@ -97,10 +110,14 @@ export const StudioProjectSchema = z.object({
   userId: z.string(),
   title: z.string(),
   status: z.nativeEnum(StudioProjectStatus),
-  youtubeVideoId: z.string().nullable(),
-  videoUrl: z.string().nullable(),
-  thumbnailUrl: z.string().nullable(),
-  storyboard: StoryboardSchema.nullable(),
+  youtubeVideoId: z.string().nullish(),
+  videoUrl: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
+  storyboard: StoryboardSchema.nullish(),
+  script: VideoScriptSchema.nullable().optional(),
+  prompt: z.string().nullish(),
+  jobDescription: z.string().nullish(),
+  resumeText: z.string().nullish(),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
 });
@@ -246,6 +263,27 @@ export const studioService = {
   },
 
   /**
+   * Save (create or update) a draft project with a user-defined name.
+   */
+  async saveDraft(
+    name: string,
+    resumeText: string,
+    script: import("../../types/video-script").VideoScript | null,
+    projectId?: string,
+    prompt?: string,
+    jobDescription?: string,
+  ): Promise<ApiSuccessResponse<StudioProject>> {
+    return apiClient.post("/api/studio/save-draft", {
+      name,
+      resumeText,
+      script,
+      ...(projectId ? { projectId } : {}),
+      ...(prompt ? { prompt } : {}),
+      ...(jobDescription ? { jobDescription } : {}),
+    }, StudioProjectSchema);
+  },
+
+  /**
    * Get all videos associated with a specific resume (public + owner's own).
    */
   async getVideosForResume(resumeId: string): Promise<ApiSuccessResponse<ResumeVideo[]>> {
@@ -263,6 +301,30 @@ export const studioService = {
       "/api/studio/videos/public",
       z.array(PublicVideoSchema),
     );
+  },
+
+  /**
+   * Generate an AI background image for a scene using Cloudflare Workers AI.
+   */
+  async generateImage(prompt: string): Promise<ApiSuccessResponse<{ imageUrl: string }>> {
+    return apiClient.post("/api/studio/generate-image", { prompt }, z.object({ imageUrl: z.string() }));
+  },
+
+  /**
+   * Delete a studio project permanently.
+   */
+  async deleteProject(projectId: string): Promise<ApiSuccessResponse<{ id: string }>> {
+    return apiClient.delete(`/api/studio/projects/${projectId}`, z.object({ id: z.string() }));
+  },
+
+  /**
+   * Update the status of a studio project.
+   */
+  async updateProjectStatus(
+    projectId: string,
+    status: "draft" | "exported" | "published" | "processing" | "failed",
+  ): Promise<ApiSuccessResponse<StudioProject>> {
+    return apiClient.patch(`/api/studio/projects/${projectId}/status`, { status }, StudioProjectSchema);
   },
 
 };

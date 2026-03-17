@@ -1,9 +1,27 @@
 // scene-graph.ts — builds a SceneNode tree from a SceneScript + VideoTheme.
 // One builder function per scene type.
 
-import type { SceneScript, VideoTheme } from "../../types/video-script";
+import type { SceneScript, VideoTheme, AnimationSpec, ImagePosition } from "../../types/video-script";
 import type { SceneNode, Transform2D, NodeStyle } from "./types";
 import { compileAnimation } from "./animation-graph";
+
+// ─── Default animations ───────────────────────────────────────────────────────
+// When the script doesn't specify animation specs, generate sensible defaults
+// based on the motion style. `order` controls stagger delay (0 = first node).
+
+function defaultAnim(motion: VideoTheme["motion"], order: number): AnimationSpec {
+  const delay = order * 0.22;
+  switch (motion) {
+    case "minimal":
+      return { type: "fadeIn", start: delay, duration: 0.4, easing: "easeOut" };
+    case "cinematic":
+      return order === 0
+        ? { type: "scaleIn",  start: 0,     duration: 0.7, easing: "spring" }
+        : { type: "slideUp",  start: delay, duration: 0.65, easing: "easeOut" };
+    default: // moderate
+      return { type: "slideUp", start: delay, duration: 0.5, easing: "easeOut" };
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,12 +54,13 @@ function makeNode(
   style: Partial<NodeStyle>,
   theme: VideoTheme,
   scene: SceneScript,
+  animOrder: number,
   animKey?: keyof NonNullable<SceneScript["animation"]>,
   items?: string[],
 ): SceneNode {
-  const animations = animKey && scene.animation?.[animKey]
-    ? compileAnimation(scene.animation[animKey]!)
-    : [];
+  const explicit = animKey ? scene.animation?.[animKey] : undefined;
+  const spec = explicit ?? defaultAnim(theme.motion, animOrder);
+  const animations = spec.type === "none" ? [] : compileAnimation(spec);
 
   return {
     id: nodeId(type),
@@ -56,17 +75,24 @@ function makeNode(
 
 // ─── Background helper ────────────────────────────────────────────────────────
 
-function backgroundNode(theme: VideoTheme, palette: string[]): SceneNode {
+function backgroundNode(theme: VideoTheme, palette: string[], imageOverride?: string, position?: ImagePosition): SceneNode {
   const primary = palette[0] ?? "#7c3aed";
   const secondary = palette[1] ?? "#2563eb";
-  const bgContent =
-    theme.background === "solid"
-      ? primary
-      : theme.background === "dark-tech-grid"
-      ? "dark-tech-grid:" + primary
-      : theme.background === "particles"
-      ? "particles:" + primary
-      : `gradient:${primary}:${secondary}`;
+
+  // "full" (or no position) → image replaces the background entirely
+  const useImageAsBg = imageOverride && (!position || position === "full");
+
+  const bgContent = useImageAsBg
+    ? `custom:${imageOverride}`
+    : theme.customBackground
+    ? `custom:${theme.customBackground}`
+    : theme.background === "solid"
+    ? primary
+    : theme.background === "dark-tech-grid"
+    ? "dark-tech-grid:" + primary
+    : theme.background === "particles"
+    ? "particles:" + primary
+    : `gradient:${primary}:${secondary}`;
 
   return {
     id: nodeId("background"),
@@ -78,68 +104,132 @@ function backgroundNode(theme: VideoTheme, palette: string[]): SceneNode {
   };
 }
 
+/** Image overlay node for non-full positions. */
+function imageOverlayNode(url: string, position: ImagePosition, theme: VideoTheme): SceneNode {
+  return {
+    id: nodeId("image"),
+    type: "image",
+    transform: identity(),
+    style: baseStyle(theme, { background: `${position}:${url}` }),
+    content: `${position}:${url}`,
+    animations: [],
+  };
+}
+
+/** Particles overlay — rendered on top of whatever the background is (including custom images). */
+function particlesNode(theme: VideoTheme): SceneNode {
+  return {
+    id: nodeId("particles"),
+    type: "particles",
+    transform: identity(),
+    style: baseStyle(theme),
+    animations: [],
+  };
+}
+
+/** Returns true when particles should be rendered (regardless of whether a custom image is set). */
+function shouldAddParticles(theme: VideoTheme, scene: SceneScript): boolean {
+  if (theme.background === "particles") return true;
+  // Also apply particles if the user has an image + a particles scene effect
+  if (scene.backgroundImage && scene.effects?.some((e) => e.type === "particles")) return true;
+  return false;
+}
+
 // ─── Scene builders ───────────────────────────────────────────────────────────
 
 function buildIntroGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
-  const palette = theme.colorPalette;
-  const nodes: SceneNode[] = [backgroundNode(theme, palette)];
-
-  if (theme.background === "particles") {
-    nodes.push({
-      id: nodeId("particles"),
-      type: "particles",
-      transform: identity(),
-      style: baseStyle(theme),
-      animations: [],
-    });
+  const effectivePalette = scene.accentColor
+    ? [scene.accentColor, ...theme.colorPalette.slice(1)]
+    : theme.colorPalette;
+  const pos = scene.backgroundImagePosition;
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  if (scene.backgroundImage && pos && pos !== "full") {
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme));
   }
 
+  if (shouldAddParticles(theme, scene)) {
+    nodes.push(particlesNode(theme));
+  }
+
+  let order = 0;
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -50 }, { fontSize: 52, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -50 }, { fontSize: 52, fontWeight: "bold" }, theme, scene, order++, "titleEnter"));
   }
   if (scene.subtitle) {
-    nodes.push(makeNode("text", scene.subtitle, { y: 20 }, { fontSize: 26, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
+    nodes.push(makeNode("text", scene.subtitle, { y: 20 }, { fontSize: 26, fontWeight: "normal", color: effectivePalette[2] ?? "#e2e8f0" }, theme, scene, order++, "subtitleEnter"));
   }
   if (scene.text) {
     const body = Array.isArray(scene.text) ? scene.text.join(" ") : scene.text;
-    nodes.push(makeNode("text", body, { y: 90 }, { fontSize: 18, fontWeight: "normal", color: palette[3] ?? "#c4b5fd", lineHeight: 1.5 }, theme, scene, "subtitleEnter"));
+    nodes.push(makeNode("text", body, { y: 90 }, { fontSize: 18, fontWeight: "normal", color: effectivePalette[3] ?? "#c4b5fd", lineHeight: 1.5 }, theme, scene, order++, "subtitleEnter"));
   }
   return nodes;
 }
 
 function buildAchievementGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
-  const palette = theme.colorPalette;
-  const nodes: SceneNode[] = [backgroundNode(theme, palette)];
+  const effectivePalette = scene.accentColor
+    ? [scene.accentColor, ...theme.colorPalette.slice(1)]
+    : theme.colorPalette;
+  const pos = scene.backgroundImagePosition;
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  if (scene.backgroundImage && pos && pos !== "full") {
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme));
+  }
 
+  if (shouldAddParticles(theme, scene)) {
+    nodes.push(particlesNode(theme));
+  }
+
+  let order = 0;
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -80 }, { fontSize: 38, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -80 }, { fontSize: 38, fontWeight: "bold" }, theme, scene, order++, "titleEnter"));
   }
 
   const items = scene.items ?? (scene.text ? (Array.isArray(scene.text) ? scene.text : [scene.text]) : []);
   if (items.length > 0) {
-    nodes.push(makeNode("textGroup", undefined, { y: 20 }, { fontSize: 22, textAlign: "left" }, theme, scene, "textEnter", items));
+    nodes.push(makeNode("textGroup", undefined, { y: 20 }, { fontSize: 22, textAlign: "left" }, theme, scene, order++, "textEnter", items));
   }
   return nodes;
 }
 
 function buildSkillsGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
-  const palette = theme.colorPalette;
-  const nodes: SceneNode[] = [backgroundNode(theme, palette)];
+  const effectivePalette = scene.accentColor
+    ? [scene.accentColor, ...theme.colorPalette.slice(1)]
+    : theme.colorPalette;
+  const pos = scene.backgroundImagePosition;
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  if (scene.backgroundImage && pos && pos !== "full") {
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme));
+  }
 
+  if (shouldAddParticles(theme, scene)) {
+    nodes.push(particlesNode(theme));
+  }
+
+  let order = 0;
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -100 }, { fontSize: 38, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -100 }, { fontSize: 38, fontWeight: "bold" }, theme, scene, order++, "titleEnter"));
   }
 
   const skills = scene.skills ?? [];
   if (skills.length > 0) {
-    nodes.push(makeNode("skillBubble", undefined, { y: 20 }, { fontSize: 20, background: palette[1] ?? "#2563eb" }, theme, scene, "textEnter", skills));
+    nodes.push(makeNode("skillBubble", undefined, { y: 20 }, { fontSize: 20, background: effectivePalette[1] ?? "#2563eb" }, theme, scene, order++, "textEnter", skills));
   }
   return nodes;
 }
 
 function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
-  const palette = theme.colorPalette;
-  const nodes: SceneNode[] = [backgroundNode(theme, palette)];
+  const effectivePalette = scene.accentColor
+    ? [scene.accentColor, ...theme.colorPalette.slice(1)]
+    : theme.colorPalette;
+  const pos = scene.backgroundImagePosition;
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  if (scene.backgroundImage && pos && pos !== "full") {
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme));
+  }
+
+  if (shouldAddParticles(theme, scene)) {
+    nodes.push(particlesNode(theme));
+  }
 
   nodes.push({
     id: nodeId("overlay"),
@@ -149,15 +239,16 @@ function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     animations: [],
   });
 
+  let order = 0;
   if (scene.title) {
-    nodes.push(makeNode("text", scene.title, { y: -70 }, { fontSize: 42, fontWeight: "bold" }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", scene.title, { y: -70 }, { fontSize: 42, fontWeight: "bold" }, theme, scene, order++, "titleEnter"));
   }
   if (scene.text) {
     const body = Array.isArray(scene.text) ? scene.text.join(" ") : scene.text;
-    nodes.push(makeNode("text", body, { y: 0 }, { fontSize: 20, fontWeight: "normal", color: palette[2] ?? "#e2e8f0", lineHeight: 1.5 }, theme, scene, "titleEnter"));
+    nodes.push(makeNode("text", body, { y: 0 }, { fontSize: 20, fontWeight: "normal", color: effectivePalette[2] ?? "#e2e8f0", lineHeight: 1.5 }, theme, scene, order++, "titleEnter"));
   }
   if (scene.subtitle) {
-    nodes.push(makeNode("text", scene.subtitle, { y: 65 }, { fontSize: 20, fontWeight: "normal", color: palette[2] ?? "#e2e8f0" }, theme, scene, "subtitleEnter"));
+    nodes.push(makeNode("text", scene.subtitle, { y: 65 }, { fontSize: 20, fontWeight: "normal", color: effectivePalette[2] ?? "#e2e8f0" }, theme, scene, order++, "subtitleEnter"));
   }
   return nodes;
 }

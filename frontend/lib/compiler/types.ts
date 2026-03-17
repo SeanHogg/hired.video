@@ -49,6 +49,8 @@ export interface SceneNode {
   children?: SceneNode[];
   // Resolved animations keyed by property name
   animations: CompiledAnimation[];
+  /** 0–1 progress for typewriter text-reveal animation; undefined = show all text */
+  textRevealProgress?: number;
 }
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -60,6 +62,7 @@ export interface CompiledAnimation {
   startTime: number;   // absolute seconds within scene
   endTime: number;
   easing: EasingType;
+  isTypewriter?: boolean;
   /** Returns interpolated value at elapsed seconds within scene. */
   evaluate(elapsed: number): number;
 }
@@ -82,6 +85,7 @@ export interface CompiledVideo {
   width: number;
   height: number;
   scenes: CompiledScene[];
+  transition: "cut" | "fade" | "slide" | "cinematic-fade";
   /** Returns the scene active at `time` seconds (or the last scene). */
   getSceneAt(time: number): CompiledScene;
 }

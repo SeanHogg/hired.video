@@ -33,7 +33,7 @@ function applyEasing(t: number, easing: CompiledAnimation["easing"]): number {
 // ─── Property mappings ────────────────────────────────────────────────────────
 // Each AnimationType maps to { property, from, to } deltas.
 
-type AnimDef = { property: CompiledAnimation["property"]; from: number; to: number }[];
+type AnimDef = { property: CompiledAnimation["property"]; from: number; to: number; isTypewriter?: boolean }[];
 
 function animationDefs(type: AnimationSpec["type"]): AnimDef {
   switch (type) {
@@ -41,7 +41,7 @@ function animationDefs(type: AnimationSpec["type"]): AnimDef {
     case "slideUp":   return [{ property: "y",      from: 40,   to: 0 }, { property: "alpha", from: 0, to: 1 }];
     case "slideIn":   return [{ property: "x",      from: 60,   to: 0 }, { property: "alpha", from: 0, to: 1 }];
     case "scaleIn":   return [{ property: "scaleX", from: 0.8,  to: 1 }, { property: "scaleY", from: 0.8, to: 1 }, { property: "alpha", from: 0, to: 1 }];
-    case "typewriter": return [{ property: "alpha",  from: 0,   to: 1 }]; // Typewriter handled at render level; alpha as fallback
+    case "typewriter": return [{ property: "alpha",  from: 0,   to: 1, isTypewriter: true }]; // reveal handled at render level
     case "none":      return [];
     default:          return [];
   }
@@ -64,6 +64,7 @@ export function compileAnimation(spec: AnimationSpec): CompiledAnimation[] {
       startTime,
       endTime,
       easing,
+      isTypewriter: def.isTypewriter,
       evaluate(elapsed: number): number {
         if (elapsed <= startTime) return def.from;
         if (elapsed >= endTime)   return def.to;

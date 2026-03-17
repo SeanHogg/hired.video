@@ -1,8 +1,29 @@
 // canvas-nodes.ts — draws a single SceneNode onto a Canvas 2D context.
 // The renderer calls drawNode() for each node in scene.nodes after applying
 // evaluated animation transforms.
+//
+// measureNodeHeight() is exported so frame-renderer can do a layout pass
+// before drawing — computing dynamic y positions that accommodate wrapped text.
 
 import type { SceneNode, Transform2D } from "../compiler/types";
+
+// ─── Image cache ─────────────────────────────────────────────────────────────
+// Synchronous renderer — we start loading on first miss and return null until ready.
+
+const _imgCache = new Map<string, HTMLImageElement | "loading">();
+
+function getCachedImage(url: string): HTMLImageElement | null {
+  const cached = _imgCache.get(url);
+  if (cached && cached !== "loading") return cached;
+  if (!cached) {
+    _imgCache.set(url, "loading");
+    const img = new Image();
+    img.onload = () => _imgCache.set(url, img);
+    img.onerror = () => _imgCache.delete(url);
+    img.src = url;
+  }
+  return null;
+}
 
 // ─── Particle state (per-canvas) ─────────────────────────────────────────────
 
@@ -71,6 +92,65 @@ function drawDarkTechGrid(ctx: CanvasRenderingContext2D, color: string): void {
   }
 }
 
+// ─── Text measurement helpers ─────────────────────────────────────────────────
+
+/** Wraps text into lines fitting maxWidth. Requires ctx.font to be pre-set. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? line + " " + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * Returns the pixel height that drawNode() will occupy for a content node.
+ * Used by frame-renderer to compute dynamic stacking layout.
+ */
+export function measureNodeHeight(ctx: CanvasRenderingContext2D, node: SceneNode): number {
+  const { width } = ctx.canvas;
+  const maxWidth = width * 0.82;
+  switch (node.type) {
+    case "text": {
+      if (!node.content) return 0;
+      ctx.font = `${node.style.fontWeight} ${node.style.fontSize}px ${node.style.fontFamily}`;
+      const lineCount = wrapText(ctx, node.content, maxWidth).length;
+      return lineCount * node.style.fontSize * node.style.lineHeight;
+    }
+    case "textGroup": {
+      if (!node.items?.length) return 0;
+      ctx.font = `${node.style.fontWeight} ${node.style.fontSize}px ${node.style.fontFamily}`;
+      const itemMaxW = width * 0.72; // textGroup is left-aligned, narrower
+      const lineH = node.style.fontSize * 1.8;
+      let totalLines = 0;
+      for (const item of node.items) {
+        totalLines += wrapText(ctx, "• " + item, itemMaxW).length;
+      }
+      return totalLines * lineH;
+    }
+    case "skillBubble": {
+      if (!node.items?.length) return 0;
+      ctx.font = `${node.style.fontWeight} ${node.style.fontSize}px ${node.style.fontFamily}`;
+      const bubbleH = node.style.fontSize * 2.2;
+      const gap = 12;
+      const rowMax = Math.min(2, Math.max(1, Math.floor(width * 0.8 / 140)));
+      const rowCount = Math.ceil(node.items.length / rowMax);
+      return rowCount * (bubbleH + gap) - gap;
+    }
+    default:
+      return 0;
+  }
+}
+
 // ─── Apply transform to context ───────────────────────────────────────────────
 
 export function applyTransform(ctx: CanvasRenderingContext2D, t: Transform2D, cx: number, cy: number): void {
@@ -92,7 +172,21 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
   switch (node.type) {
     case "background": {
       const content = node.content ?? "";
-      if (content.startsWith("gradient:")) {
+      if (content.startsWith("custom:")) {
+        const url = content.slice(7);
+        const img = getCachedImage(url);
+        if (img) {
+          // Cover-fit: scale so image fills canvas, centred
+          const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight);
+          const dw = img.naturalWidth * scale;
+          const dh = img.naturalHeight * scale;
+          ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
+        } else {
+          // Placeholder while image loads
+          ctx.fillStyle = "#111111";
+          ctx.fillRect(0, 0, width, height);
+        }
+      } else if (content.startsWith("gradient:")) {
         const parts = content.split(":");
         drawGradientBackground(ctx, parts[1] ?? "#7c3aed", parts[2] ?? "#2563eb");
       } else if (content.startsWith("dark-tech-grid:")) {
@@ -137,6 +231,73 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
       break;
     }
 
+    case "image": {
+      const content = node.content ?? "";
+      const colonIdx = content.indexOf(":");
+      if (colonIdx === -1) break;
+      const position = content.slice(0, colonIdx);
+      const url = content.slice(colonIdx + 1);
+      const img = getCachedImage(url);
+      if (!img) break;
+
+      ctx.globalAlpha = node.transform.alpha;
+
+      // Compute target rect based on position keyword
+      const pad = Math.round(width * 0.03);
+      const r = 12; // corner radius
+      type Rect = { x: number; y: number; w: number; h: number };
+      const rect: Rect = (() => {
+        switch (position) {
+          case "half-left":  return { x: 0,             y: 0,             w: width / 2,       h: height };
+          case "half-right": return { x: width / 2,     y: 0,             w: width / 2,       h: height };
+          case "small-left":
+            return { x: pad, y: Math.round(height * 0.2), w: Math.round(width * 0.42), h: Math.round(height * 0.6) };
+          case "small-right": {
+            const w2 = Math.round(width * 0.42);
+            return { x: width - w2 - pad, y: Math.round(height * 0.2), w: w2, h: Math.round(height * 0.6) };
+          }
+          case "corner-tl": return { x: pad,             y: pad,              w: Math.round(width * 0.36),  h: Math.round(height * 0.36) };
+          case "corner-tr": return { x: width - Math.round(width * 0.36) - pad, y: pad, w: Math.round(width * 0.36), h: Math.round(height * 0.36) };
+          case "corner-bl": return { x: pad, y: height - Math.round(height * 0.36) - pad, w: Math.round(width * 0.36), h: Math.round(height * 0.36) };
+          case "corner-br": {
+            const cw = Math.round(width * 0.36), ch = Math.round(height * 0.36);
+            return { x: width - cw - pad, y: height - ch - pad, w: cw, h: ch };
+          }
+          default: return { x: 0, y: 0, w: width, h: height }; // full
+        }
+      })();
+
+      // Clip to rounded rect
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(rect.x, rect.y, rect.w, rect.h, r);
+      } else {
+        ctx.rect(rect.x, rect.y, rect.w, rect.h);
+      }
+      ctx.clip();
+
+      // Cover-fit image within rect
+      const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
+
+      // Subtle dark shadow-border for non-full positions
+      if (position !== "full" && position !== "half-left" && position !== "half-right") {
+        ctx.restore(); ctx.save(); // reset clip
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(rect.x, rect.y, rect.w, rect.h, r);
+        } else {
+          ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        }
+        ctx.stroke();
+      }
+      break;
+    }
+
     case "text": {
       if (!node.content) break;
       applyTransform(ctx, node.transform, cx, cy);
@@ -145,42 +306,63 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
       ctx.textAlign = node.style.textAlign;
       ctx.textBaseline = "middle";
 
-      // Word-wrap
-      const maxWidth = width * 0.85;
-      const words = node.content.split(" ");
-      const lines: string[] = [];
-      let line = "";
-      for (const word of words) {
-        const test = line ? line + " " + word : word;
-        if (ctx.measureText(test).width > maxWidth && line) {
-          lines.push(line);
-          line = word;
-        } else {
-          line = test;
-        }
-      }
-      if (line) lines.push(line);
-
+      const lines = wrapText(ctx, node.content, width * 0.82);
       const lineH = node.style.fontSize * node.style.lineHeight;
       const totalH = lines.length * lineH;
-      lines.forEach((l, i) => {
-        ctx.fillText(l, 0, -totalH / 2 + i * lineH + lineH / 2);
-      });
+
+      // Typewriter: reveal characters progressively based on textRevealProgress
+      const reveal = node.textRevealProgress;
+      if (reveal !== undefined && reveal < 1) {
+        const fullText = lines.join(" ");
+        const visibleChars = Math.floor(fullText.length * reveal);
+        let charsLeft = visibleChars;
+        // Rebuild partial lines from char budget
+        const partialLines = lines.map((l) => {
+          if (charsLeft <= 0) return "";
+          const visible = l.slice(0, charsLeft);
+          charsLeft -= l.length + 1; // +1 for the space between lines
+          return visible;
+        });
+        partialLines.forEach((l, i) => {
+          if (l) ctx.fillText(l, 0, -totalH / 2 + i * lineH + lineH / 2);
+        });
+      } else {
+        lines.forEach((l, i) => {
+          ctx.fillText(l, 0, -totalH / 2 + i * lineH + lineH / 2);
+        });
+      }
       break;
     }
 
     case "textGroup": {
       if (!node.items?.length) break;
-      applyTransform(ctx, node.transform, cx * 0.5, cy);
+      // Anchor at canvas centre so we can balance whitespace on both sides
+      applyTransform(ctx, node.transform, cx, cy);
       ctx.font = `${node.style.fontWeight} ${node.style.fontSize}px ${node.style.fontFamily}`;
       ctx.fillStyle = node.style.color;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       const lineH = node.style.fontSize * 1.8;
-      const total = node.items.length;
-      node.items.forEach((item, i) => {
-        const yOff = (i - (total - 1) / 2) * lineH;
-        ctx.fillText("• " + item, 0, yOff);
+      const itemMaxW = width * 0.72;
+
+      // Build all wrapped lines first so we can centre the block vertically
+      const allLines: string[] = [];
+      for (const item of node.items) {
+        const wrapped = wrapText(ctx, "• " + item, itemMaxW);
+        // Indent continuation lines for readability
+        allLines.push(...wrapped.map((l, i) => (i === 0 ? l : "    " + l)));
+      }
+
+      // Measure the widest line so the block is centred horizontally
+      const contentW = Math.min(
+        itemMaxW,
+        allLines.reduce((max, l) => Math.max(max, ctx.measureText(l).width), 0),
+      );
+      const startX = -contentW / 2;
+
+      const totalH = allLines.length * lineH;
+      allLines.forEach((l, i) => {
+        ctx.fillText(l, startX, -totalH / 2 + i * lineH + lineH / 2);
       });
       break;
     }
@@ -189,7 +371,7 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
       if (!node.items?.length) break;
       const bubbleH = node.style.fontSize * 2.2;
       const gap = 12;
-      const rowMax = Math.floor(width * 0.8 / 140); // approx items per row
+      const rowMax = Math.min(2, Math.max(1, Math.floor(width * 0.8 / 140))); // max 2 columns
       const skillBg = node.style.background ?? "#2563eb";
 
       // Lay out bubbles centred

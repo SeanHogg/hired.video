@@ -1,6 +1,7 @@
 // StudioEditor.tsx — tab switcher: Prompt | Storyboard.
 // Auto-switches to Storyboard after generation.
 
+import { Undo2, Redo2 } from "lucide-react";
 import PromptEditor from "@/components/PromptEditor";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import type { StudioProjectState } from "@/types/studio";
@@ -23,17 +24,22 @@ interface Props {
   onScriptChange: (s: VideoScript) => void;
   focusedSceneId?: string;
   onSceneFocus?: (id: string) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export default function StudioEditor({
   tab, onTabChange,
   state, onStateChange, showJD, onToggleJD,
   onScriptChange, focusedSceneId, onSceneFocus,
+  canUndo, canRedo, onUndo, onRedo,
 }: Props) {
   return (
     <div className="studio-editor">
       {/* Tab bar */}
-      <div className="flex border-b shrink-0">
+      <div className="flex items-center border-b shrink-0">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -49,6 +55,30 @@ export default function StudioEditor({
             {t.label}
           </button>
         ))}
+
+        {/* Undo / Redo — right-aligned, only shown when script exists */}
+        {state.script && (
+          <div className="ml-auto flex items-center gap-0.5 pr-3">
+            <button
+              type="button"
+              title="Undo (Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={onUndo}
+              className="p-1.5 rounded hover:bg-accent disabled:opacity-30 transition-colors"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Redo (Ctrl+Shift+Z)"
+              disabled={!canRedo}
+              onClick={onRedo}
+              className="p-1.5 rounded hover:bg-accent disabled:opacity-30 transition-colors"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}

@@ -54,7 +54,7 @@ export default function TimelineEditor({ script, currentTime, onSeek, focusedSce
                 key={scene.id}
                 className={`absolute top-0 rounded border text-[10px] text-white flex items-center justify-center overflow-hidden select-none ${SCENE_COLOURS[scene.type] ?? "bg-muted"} ${focusClass}`}
                 style={{ left, width, height: TRACK_HEIGHT }}
-                onClick={(e) => { e.stopPropagation(); onSceneFocus?.(scene.id); }}
+                onClick={(e) => { e.stopPropagation(); onSceneFocus?.(scene.id); onSeek(scene.start); }}
                 title={`${scene.type}: ${scene.title ?? ""} (${scene.duration}s)`}
               >
                 <span className="truncate px-1">{scene.title ?? scene.type}</span>

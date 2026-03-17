@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Variables } from "../types/index.js";
+import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
 const { studioProjects, videos, users, userProfiles } = schema;
 
-export const studioRoutes = new Hono<{ Variables: Variables }>();
+export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 const StoryboardSceneSchema = z.object({
   duration: z.number(),
@@ -67,11 +68,13 @@ function asIso(value: Date | string | null | undefined): string {
   return new Date(value).toISOString();
 }
 
-function mapStudioStatus(raw: string): "Draft" | "Processing" | "Publishing" | "Completed" | "Failed" {
+function mapStudioStatus(raw: string): "Draft" | "Processing" | "Exported" | "Publishing" | "Completed" | "Published" | "Failed" {
   const v = raw.toLowerCase();
   if (v === "draft" || v === "pending") return "Draft";
+  if (v === "exported") return "Exported";
   if (v === "publishing") return "Publishing";
-  if (v === "published" || v === "completed") return "Completed";
+  if (v === "published") return "Published";
+  if (v === "completed") return "Completed";
   if (v === "publish_failed" || v === "failed") return "Failed";
   return "Processing";
 }
@@ -232,17 +235,11 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
   };
 }
 
-async function callOpenRouter(
-  body: z.infer<typeof GenerateStoryboardSchema>,
-  apiKey: string,
-): Promise<VideoScript> {
-  const { resumeText, prompt, jobDescription, model, temperature, targetDuration = 28, motion = "moderate" } = body;
-
+function buildStudioSystemPrompt(targetDuration: number, motion: string, jobDescription?: string): string {
   const jobBlock = jobDescription
     ? `\n\nPersonalise the intro scene for this role. Filter achievements and skills to only those relevant.\nJob Description:\n${jobDescription.slice(0, 3000)}`
     : "";
-
-  const systemPrompt = `You are a professional video director and career storyteller. Produce a JSON VideoScript for a ${targetDuration}-second video resume that powerfully showcases this specific candidate.
+  return `You are a professional video director and career storyteller. Produce a JSON VideoScript for a ${targetDuration}-second video resume that powerfully showcases this specific candidate.
 
 RULES:
 - Exactly 4 scenes in order: intro → achievement → skills → closing
@@ -274,39 +271,6 @@ interface VideoScript {
   video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
   scenes: Array<{ id: string; start: number; duration: number; type: "intro"|"achievement"|"skills"|"closing"; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[] }>
 }${jobBlock}`;
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://hired.video",
-      "X-Title": "hired.video Studio",
-    },
-    body: JSON.stringify({
-      model: model ?? "google/gemini-flash-1.5",
-      temperature: temperature ?? 0.7,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `${prompt || "Create a professional video resume"}\n\nResume:\n${resumeText.slice(0, 6000)}` },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
-  }
-
-  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty LLM response");
-
-  // Strip markdown code fences if present
-  const stripped = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const parsed = VideoScriptSchema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) throw new Error("LLM returned invalid VideoScript schema");
-  return parsed.data;
 }
 
 studioRoutes.post("/storyboard", async (c) => {
@@ -319,10 +283,16 @@ studioRoutes.post("/storyboard", async (c) => {
   }
 
   let script: VideoScript;
-  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
+  const apiKey = getApiKey(c.env);
   if (apiKey) {
     try {
-      script = await callOpenRouter(parsed.data, apiKey);
+      const { resumeText, prompt, jobDescription, model, temperature, targetDuration = 28, motion = "moderate" } = parsed.data;
+      script = await callLLMJson(apiKey, {
+        model: model ?? "google/gemini-flash-1.5",
+        temperature: temperature ?? 0.7,
+        systemPrompt: buildStudioSystemPrompt(targetDuration, motion, jobDescription),
+        userMessage: `${prompt || "Create a professional video resume"}\n\nResume:\n${resumeText.slice(0, 6000)}`,
+      }, VideoScriptSchema);
     } catch (err) {
       console.error("[studio/storyboard] LLM call failed, using mock:", err);
       script = buildMockVideoScript(parsed.data.resumeText, parsed.data.targetDuration, parsed.data.motion);
@@ -368,19 +338,111 @@ function toProjectDto(
   linkedVideo?: typeof videos.$inferSelect | null,
 ) {
   const storyboard = normalizeStoryboard(project.storyboard);
+  // Use the _name stored inside the storyboard JSONB (set by save-draft) as the
+  // display title so users see their chosen project name, not raw resume text.
+  const meta = project.storyboard as Record<string, unknown> | null;
+  const savedName = meta?._name as string | undefined;
+  const savedPrompt = meta?._prompt as string | undefined;
+  const savedJobDescription = meta?._jobDescription as string | undefined;
+  // If the storyboard is a VideoScript (saved by save-draft), expose it as `script`
+  const maybeScript = VideoScriptSchema.safeParse(project.storyboard);
+  const script = maybeScript.success ? maybeScript.data : null;
   return {
     id: project.id,
     userId: project.userId,
-    title: project.resumeText?.slice(0, 80) || "My Video Resume",
+    title: savedName || project.resumeText?.slice(0, 80) || "My Video Resume",
     status: mapStudioStatus(project.status),
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
     videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
     thumbnailUrl: linkedVideo?.thumbnailUrl ?? null,
     storyboard,
+    script,
+    prompt: savedPrompt ?? null,
+    jobDescription: savedJobDescription ?? null,
+    resumeText: project.resumeText ?? null,
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
   };
 }
+
+// POST /api/studio/save-draft
+// Save or update a project's name + script without requiring a video export.
+studioRoutes.post("/save-draft", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    name:           z.string().min(1).max(200).default("My Video Resume"),
+    resumeText:     z.string().default(""),
+    script:         z.any().optional(),
+    projectId:      z.string().uuid().optional(),
+    prompt:         z.string().max(2000).optional(),
+    jobDescription: z.string().max(4000).optional(),
+  }).safeParse(body);
+
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  }
+
+  const { name, resumeText, script, projectId, prompt, jobDescription } = parsed.data;
+  // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
+  const storyboardValue = script
+    ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription }
+    : { _name: name, _prompt: prompt, _jobDescription: jobDescription };
+  const db = getDb();
+
+  if (projectId) {
+    const [updated] = await db
+      .update(studioProjects)
+      .set({ storyboard: storyboardValue as any, resumeText: resumeText || name } as any)
+      .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+      .returning();
+    if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+    return c.json(ok(toProjectDto(updated)));
+  }
+
+  const [created] = await db
+    .insert(studioProjects)
+    .values({ userId: user.sub, resumeText: resumeText || name, storyboard: storyboardValue as any, status: "draft" } as any)
+    .returning();
+
+  return c.json(ok(toProjectDto(created)), 201);
+});
+
+// POST /api/studio/generate-image — generate AI image for a scene background
+studioRoutes.post("/generate-image", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const prompt = body?.prompt;
+  if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
+    return c.json(fail("VALIDATION_ERROR", "prompt is required"), 400);
+  }
+
+  const ai = (c.env as any).AI;
+  if (!ai) {
+    return c.json(fail("AI_UNAVAILABLE", "AI image generation is not configured"), 503);
+  }
+
+  try {
+    const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
+      prompt: prompt.trim().slice(0, 500),
+      num_steps: 4,
+    });
+
+    // Response is a ReadableStream of PNG bytes
+    const buffer = await new Response(response as ReadableStream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    const imageUrl = `data:image/png;base64,${base64}`;
+
+    return c.json(ok({ imageUrl }));
+  } catch (err) {
+    console.error("[studio/generate-image] AI error:", err);
+    return c.json(fail("GENERATION_FAILED", "Image generation failed"), 500);
+  }
+});
 
 studioRoutes.post("/upload", async (c) => {
   const user = c.var.user;
@@ -577,6 +639,45 @@ studioRoutes.get("/status/:projectId", async (c) => {
     videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
     errorMessage: status === "Failed" ? linkedVideo?.errorMessage ?? "Publishing failed" : null,
   }));
+});
+
+// ─── DELETE /projects/:projectId ──────────────────────────────────────────────
+studioRoutes.delete("/projects/:projectId", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+
+  const [deleted] = await db
+    .delete(studioProjects)
+    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+    .returning();
+
+  if (!deleted) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  return c.json(ok({ id: projectId }));
+});
+
+// ─── PATCH /projects/:projectId/status ────────────────────────────────────────
+studioRoutes.patch("/projects/:projectId/status", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    status: z.enum(["draft", "exported", "published", "processing", "failed"]),
+  }).safeParse(body);
+
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid status", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [updated] = await db
+    .update(studioProjects)
+    .set({ status: parsed.data.status } as any)
+    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+    .returning();
+
+  if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  return c.json(ok(toProjectDto(updated)));
 });
 
 studioRoutes.get("/projects", async (c) => {

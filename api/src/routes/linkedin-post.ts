@@ -4,9 +4,10 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Env, Variables } from "../types/index.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
-export const linkedInPostRoutes = new Hono<{ Variables: Variables }>();
+export const linkedInPostRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 const RequestSchema = z.object({
   videoId:    z.string(),
@@ -40,57 +41,12 @@ function buildMockPost(videoId: string, videoTitle?: string) {
   };
 }
 
-async function callOpenRouterLinkedIn(
-  env: { OPENROUTER_API_KEY?: string },
-  videoId: string,
-  videoTitle?: string,
-  ownerName?: string,
-) {
-  if (!env.OPENROUTER_API_KEY) return null;
-
-  const url = `https://hired.video/v/${videoId}`;
-  const systemPrompt = `You are a LinkedIn copywriter specialist. Write an engaging LinkedIn post for someone who just created a video resume.
-Rules:
-- 3-line hook (curiosity/story/achievement)
-- 4-bullet caption with real-sounding accomplishments
-- 3–5 hashtags (no spaces)
-- Always end with: "Created with hired.video ✨"
-- Keep total under 1300 characters
-Return ONLY a JSON object: { hook, caption, hashtags: string[], fullPost }`;
-
-  const userMsg = `Name: ${ownerName ?? "the user"}
-Video title: ${videoTitle ?? "Video Resume"}
-Public URL: ${url}`;
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
-      "HTTP-Referer": "https://hired.video",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-flash-1.5",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user",   content: userMsg },
-      ],
-    }),
-  });
-
-  if (!res.ok) return null;
-
-  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const raw = json.choices?.[0]?.message?.content;
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as { hook: string; caption: string; hashtags: string[]; fullPost: string };
-  } catch {
-    return null;
-  }
-}
+const LinkedInResponseSchema = z.object({
+  hook: z.string(),
+  caption: z.string(),
+  hashtags: z.array(z.string()),
+  fullPost: z.string(),
+});
 
 linkedInPostRoutes.post("/linkedin-post", async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -100,10 +56,24 @@ linkedInPostRoutes.post("/linkedin-post", async (c) => {
   }
 
   const { videoId, videoTitle, ownerName } = parsed.data;
-  const env = c.env as { OPENROUTER_API_KEY?: string };
+  const apiKey = getApiKey(c.env);
 
-  const llmResult = await callOpenRouterLinkedIn(env, videoId, videoTitle, ownerName).catch(() => null);
-  const post = llmResult ?? buildMockPost(videoId, videoTitle);
+  let post: ReturnType<typeof buildMockPost>;
+  if (apiKey) {
+    const url = `https://hired.video/v/${videoId}`;
+    const systemPrompt = `You are a LinkedIn copywriter specialist. Write an engaging LinkedIn post for someone who just created a video resume.
+Rules:
+- 3-line hook (curiosity/story/achievement)
+- 4-bullet caption with real-sounding accomplishments
+- 3–5 hashtags (no spaces)
+- Always end with: "Created with hired.video ✨"
+- Keep total under 1300 characters
+Return ONLY a JSON object: { hook, caption, hashtags: string[], fullPost }`;
+    const userMessage = `Name: ${ownerName ?? "the user"}\nVideo title: ${videoTitle ?? "Video Resume"}\nPublic URL: ${url}`;
+    post = await callLLMJson(apiKey, { systemPrompt, userMessage }, LinkedInResponseSchema).catch(() => buildMockPost(videoId, videoTitle));
+  } else {
+    post = buildMockPost(videoId, videoTitle);
+  }
 
   return c.json({ success: true, data: post, timestamp: new Date().toISOString() });
 });

@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { Variables } from "../types/index.js";
+import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
-export const interviewRoutes = new Hono<{ Variables: Variables }>();
+export const interviewRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
@@ -59,62 +60,34 @@ const AnalyzeAnswerSchema = z.object({
 
 // ─── AI Helpers ──────────────────────────────────────────────────────────────
 
-async function callOpenRouter<T>(
-  apiKey: string,
-  systemPrompt: string,
-  userContent: string,
-  schema: z.ZodSchema<T>,
-  model = "google/gemini-flash-1.5",
-): Promise<T> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://hired.video",
-      "X-Title": "hired.video Interview Practice",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-    }),
-  });
-
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
-
-  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty LLM response");
-
-  const stripped = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const parsed = schema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) throw new Error(`LLM returned invalid schema: ${JSON.stringify(parsed.error.flatten())}`);
-  return parsed.data;
-}
-
 const QuestionsResponseSchema = z.object({
   questions: z.array(QuestionSchema),
 });
 
-function buildMockQuestions(type: string, count: number): z.infer<typeof QuestionsResponseSchema> {
+function buildMockQuestions(type: string, count: number, jobDescription?: string): z.infer<typeof QuestionsResponseSchema> {
+  // Extract a role hint from the JD so mock questions feel personalised
+  const roleHint = jobDescription
+    ? (() => {
+        const m = jobDescription.match(/(?:senior|lead|staff|principal|junior)?\s*([a-z][a-z\s]{3,40}(?:engineer|developer|manager|designer|analyst|scientist|architect))/i);
+        return m ? m[0].trim() : "this role";
+      })()
+    : "this role";
+
   const behavioral = [
-    { id: "q1", question: "Tell me about yourself and your professional background.", category: "behavioral", timeLimit: 90 },
-    { id: "q2", question: "Describe a challenging project you worked on and how you overcame obstacles.", category: "behavioral", timeLimit: 120 },
-    { id: "q3", question: "Give an example of a time you had to work with a difficult team member.", category: "behavioral", timeLimit: 90 },
-    { id: "q4", question: "What is your greatest professional achievement and why?", category: "behavioral", timeLimit: 90 },
-    { id: "q5", question: "Where do you see yourself in 5 years?", category: "behavioral", timeLimit: 60 },
+    { id: "q1", question: `Tell me about yourself and why you're interested in ${roleHint}.`, category: "behavioral", timeLimit: 90 },
+    { id: "q2", question: "Describe a challenging project you worked on and how you overcame the obstacles.", category: "behavioral", timeLimit: 120 },
+    { id: "q3", question: `What specific experience do you have that makes you a strong fit for ${roleHint}?`, category: "behavioral", timeLimit: 90 },
+    { id: "q4", question: "What is your greatest professional achievement and how did you measure its impact?", category: "behavioral", timeLimit: 90 },
+    { id: "q5", question: "Describe a time you had to work with a difficult team member. How did you handle it?", category: "behavioral", timeLimit: 90 },
+    { id: "q6", question: "Where do you see yourself in 5 years and how does this role fit that path?", category: "behavioral", timeLimit: 60 },
   ];
   const technical = [
-    { id: "q1", question: "Walk me through how you would design a URL shortener service.", category: "technical", timeLimit: 180 },
-    { id: "q2", question: "Explain the difference between REST and GraphQL APIs.", category: "technical", timeLimit: 90 },
-    { id: "q3", question: "How do you approach debugging a production issue?", category: "technical", timeLimit: 120 },
-    { id: "q4", question: "What is your experience with distributed systems and how do you handle consistency?", category: "technical", timeLimit: 120 },
-    { id: "q5", question: "Describe a time you had to make a technical trade-off and explain your reasoning.", category: "technical", timeLimit: 120 },
+    { id: "q1", question: `Walk me through a technically complex project relevant to ${roleHint}.`, category: "technical", timeLimit: 180 },
+    { id: "q2", question: "How do you approach designing a system for high availability and scalability?", category: "technical", timeLimit: 120 },
+    { id: "q3", question: "Explain a technical trade-off you made recently and why you chose that path.", category: "technical", timeLimit: 120 },
+    { id: "q4", question: "How do you approach debugging a production issue under pressure?", category: "technical", timeLimit: 120 },
+    { id: "q5", question: "What is your experience with distributed systems and how do you handle data consistency?", category: "technical", timeLimit: 120 },
+    { id: "q6", question: "How do you ensure code quality and reliability in your team?", category: "technical", timeLimit: 90 },
   ];
   const base = type === "technical" ? technical : behavioral;
   return { questions: base.slice(0, count) };
@@ -209,32 +182,33 @@ interviewRoutes.post("/questions", async (c) => {
   }
 
   const { jobDescription, resumeText, type, count } = parsed.data;
-  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
+  const apiKey = getApiKey(c.env);
 
   if (apiKey) {
     try {
-      const systemPrompt = `You are an expert technical interviewer. Generate ${count} interview questions tailored to the job description.
-Interview type: ${type}
+      const systemPrompt = `You are an expert interviewer conducting a ${type} interview. Generate exactly ${count} interview questions.
 
-Rules:
-- Questions must be directly relevant to the job description
-- Mix question difficulty (warm-up → challenging)
-- Each question should have a timeLimit in seconds (60-180)
-- Return ONLY valid JSON
+CRITICAL RULES — read carefully:
+1. Every question MUST reference specific skills, responsibilities, or technologies mentioned in the job description below. Generic questions are forbidden.
+2. Use the exact role title and company context from the JD in at least 2 questions.
+3. If a resume is provided, tailor questions to probe the candidate's specific experience gaps or highlight relevant wins.
+4. Mix difficulty: 1-2 warm-up, 2-3 core, 1 stretch question.
+5. Set timeLimit (seconds): 60 for simple, 90 for behavioural, 120-180 for technical/design.
+6. Return ONLY valid JSON — no markdown, no explanation.
 
 JSON schema:
 { "questions": [{ "id": "q1", "question": "...", "category": "behavioral|technical|system-design", "timeLimit": 90 }] }`;
 
-      const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nResume:\n${resumeText.slice(0, 2000)}` : ""}`;
+      const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nCandidate Resume:\n${resumeText.slice(0, 2000)}` : ""}`;
 
-      const result = await callOpenRouter(apiKey, systemPrompt, userContent, QuestionsResponseSchema);
+      const result = await callLLMJson(apiKey, { systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
       return c.json(ok(result));
     } catch (err) {
       console.error("[interview/questions] LLM call failed, using mock:", err);
     }
   }
 
-  return c.json(ok(buildMockQuestions(type, count)));
+  return c.json(ok(buildMockQuestions(type, count, jobDescription)));
 });
 
 // POST /api/interview/sessions
@@ -401,19 +375,24 @@ interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Transcript is required for analysis"), 400);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
+  const apiKey = getApiKey(c.env);
   let feedbackResult;
 
   if (apiKey) {
     try {
       const systemPrompt = `You are an expert interview coach. Evaluate the candidate's answer and return a JSON object.
 
+Scoring dimensions (0-10, be calibrated: 6-7 is good, 8-9 is excellent):
+- clarity: how clearly and concisely the answer is communicated
+- confidence: assertive, first-person language with no hedging
+- structure: logical flow; STAR method or equivalent
+- relevance: how directly the answer addresses THIS specific role and JD (penalise generic answers heavily)
+- impact: quantifiable outcomes, metrics, business results
+
 Rules:
-- score: overall 0-10 (be calibrated: 6-7 is good, 8-9 is excellent)
-- scoreBreakdown: rate each dimension 0-10
-- strengths: 2-3 specific things they did well
-- improvements: 2-3 specific, actionable improvements
-- suggestedAnswer: a model answer showing how to improve
+- strengths: 2-3 specific things from their actual answer (not generic praise)
+- improvements: 2-3 actionable, specific improvements referencing the JD where applicable
+- suggestedAnswer: a concrete model answer for this exact question and role — not a generic template
 - Return ONLY valid JSON
 
 Schema:
@@ -430,7 +409,7 @@ Schema:
       const jobContext = extra.data.jobDescription ? `\nJob context: ${extra.data.jobDescription.slice(0, 500)}` : "";
       const userContent = `Question: ${extra.data.question}${jobContext}\n\nCandidate's answer:\n${extra.data.transcript.slice(0, 2000)}`;
 
-      feedbackResult = await callOpenRouter(apiKey, systemPrompt, userContent, FeedbackSchema);
+      feedbackResult = await callLLMJson(apiKey, { systemPrompt, userMessage: userContent }, FeedbackSchema);
     } catch (err) {
       console.error("[interview/analyze] LLM call failed, using mock:", err);
       feedbackResult = buildMockFeedback(extra.data.question, extra.data.transcript);

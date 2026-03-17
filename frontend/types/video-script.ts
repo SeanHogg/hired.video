@@ -7,6 +7,12 @@ export type MotionStyle = "minimal" | "moderate" | "cinematic";
 export type TransitionStyle = "cut" | "fade" | "slide" | "cinematic-fade";
 export type BackgroundStyle = "gradient" | "dark-tech-grid" | "particles" | "solid";
 export type SceneType = "intro" | "achievement" | "skills" | "closing";
+export type ImagePosition =
+  | "full"
+  | "half-left" | "half-right"
+  | "small-left" | "small-right"
+  | "corner-tl"  | "corner-tr"
+  | "corner-bl"  | "corner-br";
 export type AnimationType = "fadeIn" | "slideUp" | "slideIn" | "scaleIn" | "typewriter" | "none";
 export type EasingType = "linear" | "easeIn" | "easeOut" | "easeInOut" | "spring";
 export type EffectType = "particles" | "blur" | "glow" | "vignette";
@@ -17,6 +23,8 @@ export interface VideoTheme {
   motion: MotionStyle;
   transition: TransitionStyle;
   background: BackgroundStyle;
+  /** Blob URL or data URL for a user-uploaded background image */
+  customBackground?: string;
 }
 
 export interface AnimationSpec {
@@ -48,6 +56,20 @@ export interface SceneScript {
     textEnter?: AnimationSpec;
   };
   effects?: SceneEffect[];
+  accentColor?: string;
+  backgroundImage?: string;
+  backgroundImagePosition?: ImagePosition;
+  sceneAudio?: string;
+  sceneAudioLabel?: string;
+}
+
+export interface VideoAudio {
+  /** Preset key or "custom" */
+  track: string;
+  /** Human-readable label */
+  label: string;
+  /** 0–1 */
+  volume: number;
 }
 
 export interface VideoScript {
@@ -57,6 +79,7 @@ export interface VideoScript {
     resolution: VideoResolution;
     aspect: VideoAspect;
     theme: VideoTheme;
+    audio?: VideoAudio;
   };
   scenes: SceneScript[];
 }

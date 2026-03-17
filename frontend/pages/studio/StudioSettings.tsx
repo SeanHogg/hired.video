@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
   Select,
@@ -41,15 +40,6 @@ export default function StudioSettings({ state, onStateChange }: Props) {
     <div className="flex flex-col overflow-y-auto">
       <div className="px-4 py-3 border-b">
         <p className="text-sm font-semibold">Settings</p>
-      </div>
-
-      <div className="px-4 pb-4 border-b space-y-2">
-        <Label className="text-xs">Project name</Label>
-        <Input
-          value={state.name}
-          onChange={(e) => onStateChange({ name: e.target.value })}
-          placeholder="My Video Resume"
-        />
       </div>
 
       <Section title="AI">

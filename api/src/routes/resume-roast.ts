@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Env, Variables } from "../types/index.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
-export const resumeRoastRoutes = new Hono<{ Variables: Variables }>();
+export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
@@ -17,7 +18,7 @@ function fail(code: string, message: string, details?: unknown) {
 }
 
 const RoastRequestSchema = z.object({
-  resumeText: z.string().min(20).max(10000),
+  resumeText: z.string().min(20).max(50000),
 });
 
 const RoastResponseSchema = z.object({
@@ -133,8 +134,7 @@ function buildMockRoast(resumeText: string): RoastResponse {
   };
 }
 
-async function callOpenRouterRoast(resumeText: string, apiKey: string): Promise<RoastResponse> {
-  const systemPrompt = `You are a brutally honest but constructive career coach specialising in tech resumes. Analyse the provided resume and return a JSON object with this exact shape:
+const ROAST_SYSTEM_PROMPT = `You are a brutally honest but constructive career coach specialising in tech resumes. Analyse the provided resume and return a JSON object with this exact shape:
 {
   "score": <number 0-10>,
   "strengths": [<3 specific strengths>],
@@ -151,56 +151,28 @@ Rules:
 - improvedExamples: take 1–2 actual bullet points from the resume and rewrite them
 - Return ONLY valid JSON`;
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://hired.video",
-      "X-Title": "hired.video Resume Roast",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-flash-1.5",
-      temperature: 0.8,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Roast this resume:\n\n${resumeText.slice(0, 6000)}` },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
-  }
-
-  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty LLM response");
-
-  const stripped = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const parsed = RoastResponseSchema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) throw new Error("LLM returned invalid roast schema");
-  return parsed.data;
-}
-
 // POST /api/resume/roast — no auth required (public tool)
 resumeRoastRoutes.post("/roast", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = RoastRequestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–10 000 chars)", parsed.error.flatten()), 400);
+    return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()), 400);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY || (globalThis as any).__ENV?.OPENROUTER_API_KEY;
-  try {
-    if (apiKey) {
-      const roast = await callOpenRouterRoast(parsed.data.resumeText, apiKey);
+  const apiKey = getApiKey(c.env);
+  if (apiKey) {
+    try {
+      const roast = await callLLMJson(apiKey, {
+        model: "google/gemini-flash-1.5",
+        temperature: 0.8,
+        systemPrompt: ROAST_SYSTEM_PROMPT,
+        userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
+      }, RoastResponseSchema);
       return c.json(ok(roast));
+    } catch (err) {
+      console.error("[resume/roast] LLM error, falling back to mock:", err);
     }
-  } catch (err) {
-    console.error("[resume/roast] OpenRouter error, falling back to mock:", err);
   }
 
   return c.json(ok(buildMockRoast(parsed.data.resumeText)));

@@ -13,17 +13,15 @@ routes = [
 binding = "VIDEO_BUCKET"
 bucket_name = "hired-videos-temp"
 
+[ai]
+binding = "AI"
+
 [vars]
 FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
 VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
-# SendPulse API credentials (recommended: set via `wrangler secret put EMAIL_CLIENTID` and `wrangler secret put EMAIL_SECRET`)
-EMAIL_CLIENTID = ""
-EMAIL_SECRET = ""
-# OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY`)
-OPENROUTER_API_KEY = ""
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
@@ -53,15 +51,13 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
-# SendPulse API credentials (recommended: set via `wrangler secret put EMAIL_CLIENTID --env production` and `wrangler secret put EMAIL_SECRET --env production`)
-EMAIL_CLIENTID = ""
-EMAIL_SECRET = ""
-# OpenRouter API key (recommended: set as a secret via `wrangler secret put OPENROUTER_API_KEY --env production`)
-OPENROUTER_API_KEY = ""
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"
 bucket_name = "hired-videos-temp"
+
+[env.production.ai]
+binding = "AI"
 
 # To expose the worker via your custom domains, set your Cloudflare zone_id below and
 # add routes for both the new and legacy domains.

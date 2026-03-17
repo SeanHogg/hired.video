@@ -1,11 +1,16 @@
 // StoryboardEditor.tsx — editable scene cards backed by VideoScript.scenes.
 // Any edit triggers onScriptChange which the parent recompiles immediately.
 
-import { Minus, Plus } from "lucide-react";
+import { useState, useRef } from "react";
+import { Minus, Plus, X, Trash2, ChevronUp, ChevronDown, Sparkles, Loader2, ImagePlus, Upload, Music } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { VideoScript, SceneScript, SceneType } from "@/types/video-script";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import type { VideoScript, SceneScript, SceneType, ImagePosition } from "@/types/video-script";
+import { studioService } from "@/lib/services/studio-service";
 
 interface Props {
   script: VideoScript;
@@ -13,6 +18,132 @@ interface Props {
   focusedSceneId?: string;
   onSceneFocus?: (id: string) => void;
 }
+
+// ─── Skill chips ─────────────────────────────────────────────────────────────
+
+function SkillChips({
+  skills,
+  onChange,
+}: {
+  skills: string[];
+  onChange: (s: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState("");
+  const MAX = 8;
+
+  function add(raw: string) {
+    const s = raw.trim();
+    if (s && !skills.includes(s) && skills.length < MAX) {
+      onChange([...skills, s]);
+    }
+    setDraft("");
+  }
+
+  function startEdit(i: number) {
+    setEditingIdx(i);
+    setEditVal(skills[i]);
+  }
+
+  function commitEdit() {
+    if (editingIdx === null) return;
+    const s = editVal.trim();
+    if (s && s !== skills[editingIdx]) {
+      const next = [...skills];
+      next[editingIdx] = s;
+      onChange(next);
+    }
+    setEditingIdx(null);
+    setEditVal("");
+  }
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      {/* Chips */}
+      {skills.length > 0 && (
+        <div className="flex flex-col gap-1.5 mb-2">
+          {skills.map((s, i) => (
+            editingIdx === i ? (
+              <input
+                key={s + i}
+                autoFocus
+                className="w-full h-7 px-2 text-xs bg-background border border-primary rounded focus:outline-none"
+                value={editVal}
+                onChange={(e) => setEditVal(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+                  if (e.key === "Escape") { setEditingIdx(null); setEditVal(""); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <div
+                key={s}
+                className="flex items-center justify-between px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs cursor-pointer hover:bg-emerald-500/30 transition-colors"
+                onDoubleClick={(e) => { e.stopPropagation(); startEdit(i); }}
+                title="Double-click to edit"
+              >
+                <span className="truncate flex-1">{s}</span>
+                <button
+                  type="button"
+                  className="ml-1.5 hover:text-white transition-colors shrink-0"
+                  onClick={(e) => { e.stopPropagation(); onChange(skills.filter((_, idx) => idx !== i)); }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )
+          ))}
+        </div>
+      )}
+      {/* Add input */}
+      <input
+        className="w-full h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary disabled:opacity-40"
+        placeholder={skills.length >= MAX ? "Max 8 skills reached" : "Add skill — press Enter or comma"}
+        disabled={skills.length >= MAX}
+        value={draft}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v.endsWith(",")) {
+            add(v.slice(0, -1));
+          } else {
+            setDraft(v);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); add(draft); }
+          if (e.key === "Backspace" && !draft && skills.length > 0) {
+            onChange(skills.slice(0, -1));
+          }
+        }}
+      />
+      <p className="text-[10px] text-muted-foreground mt-1">{skills.length}/{MAX} skills · double-click chip to edit</p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const IMAGE_POSITIONS: { value: ImagePosition; label: string; icon: string }[] = [
+  { value: "full",        label: "Full",          icon: "⬛" },
+  { value: "half-left",   label: "Half Left",     icon: "◧" },
+  { value: "half-right",  label: "Half Right",    icon: "◨" },
+  { value: "small-left",  label: "Small Left",    icon: "▐" },
+  { value: "small-right", label: "Small Right",   icon: "▌" },
+  { value: "corner-tl",   label: "Corner TL",     icon: "◸" },
+  { value: "corner-tr",   label: "Corner TR",     icon: "◹" },
+  { value: "corner-bl",   label: "Corner BL",     icon: "◺" },
+  { value: "corner-br",   label: "Corner BR",     icon: "◻" },
+];
+
+const SCENE_IMAGE_PROMPTS: Record<SceneType, string> = {
+  intro: "Professional headshot background, modern office, soft blue gradient lighting, cinematic",
+  achievement: "Abstract data visualization, glowing metrics, dark background, purple tones",
+  skills: "Technology abstract, circuit board patterns, deep purple gradient, futuristic",
+  closing: "Sunrise cityscape, career success, warm golden tones, inspirational",
+};
 
 const TYPE_COLOURS: Record<SceneType, string> = {
   intro:       "bg-violet-500/20 text-violet-300",
@@ -24,17 +155,64 @@ const TYPE_COLOURS: Record<SceneType, string> = {
 function SceneCard({
   scene,
   focused,
+  canMoveUp,
+  canMoveDown,
+  canDelete,
   onChange,
   onFocus,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
 }: {
   scene: SceneScript;
   focused: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canDelete: boolean;
   onChange: (patch: Partial<SceneScript>) => void;
   onFocus: () => void;
+  onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
-  const skills = scene.skills?.join(", ") ?? "";
   const items  = scene.items?.join("\n")  ?? "";
   const textVal = Array.isArray(scene.text) ? scene.text.join("\n") : (scene.text ?? "");
+
+  const [showImagePrompt, setShowImagePrompt] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const imageUploadRef = useRef<HTMLInputElement>(null);
+  const audioUploadRef = useRef<HTMLInputElement>(null);
+
+  async function handleGenerateImage() {
+    if (!imagePrompt.trim()) return;
+    setGeneratingImage(true);
+    try {
+      const res = await studioService.generateImage(imagePrompt.trim());
+      onChange({ backgroundImage: res.data.imageUrl });
+      setShowImagePrompt(false);
+    } catch {
+      // silently fail — image just won't update
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    onChange({ backgroundImage: url });
+    e.target.value = "";
+  }
+
+  function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    onChange({ sceneAudio: url, sceneAudioLabel: file.name });
+    e.target.value = "";
+  }
 
   return (
     <div
@@ -45,20 +223,162 @@ function SceneCard({
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Badge className={`text-xs capitalize ${TYPE_COLOURS[scene.type]}`}>{scene.type}</Badge>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <button
-            type="button"
-            className="p-0.5 hover:text-foreground rounded"
-            onClick={(e) => { e.stopPropagation(); onChange({ duration: Math.max(3, scene.duration - 1) }); }}
-          ><Minus className="w-3 h-3" /></button>
-          <span className="w-6 text-center font-mono">{scene.duration}s</span>
-          <button
-            type="button"
-            className="p-0.5 hover:text-foreground rounded"
-            onClick={(e) => { e.stopPropagation(); onChange({ duration: Math.min(30, scene.duration + 1) }); }}
-          ><Plus className="w-3 h-3" /></button>
+        <div className="flex items-center gap-1.5">
+          <Select
+            value={scene.type}
+            onValueChange={(v) => onChange({ type: v as SceneType })}
+          >
+            <SelectTrigger className="h-6 text-[11px] w-auto border-0 p-0 pr-5 bg-transparent focus:ring-0" onClick={(e) => e.stopPropagation()}>
+              <Badge className={`text-xs capitalize ${TYPE_COLOURS[scene.type]}`}>{scene.type}</Badge>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="intro">Intro</SelectItem>
+              <SelectItem value="achievement">Achievement</SelectItem>
+              <SelectItem value="skills">Skills</SelectItem>
+              <SelectItem value="closing">Closing</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+          {/* Per-scene accent color */}
+          <label className="flex items-center gap-0.5 cursor-pointer" title="Scene accent color" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="color"
+              value={scene.accentColor ?? "#7c3aed"}
+              className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+              onChange={(e) => { e.stopPropagation(); onChange({ accentColor: e.target.value }); }}
+            />
+          </label>
+          {/* Duration +/- */}
+          <button type="button" className="p-0.5 hover:text-foreground rounded" onClick={(e) => { e.stopPropagation(); onChange({ duration: Math.max(3, scene.duration - 1) }); }}><Minus className="w-3 h-3" /></button>
+          <span className="w-6 text-center font-mono">{scene.duration}s</span>
+          <button type="button" className="p-0.5 hover:text-foreground rounded" onClick={(e) => { e.stopPropagation(); onChange({ duration: Math.min(30, scene.duration + 1) }); }}><Plus className="w-3 h-3" /></button>
+          {/* Reorder */}
+          <button type="button" className="p-0.5 hover:text-foreground rounded disabled:opacity-25" disabled={!canMoveUp} onClick={(e) => { e.stopPropagation(); onMoveUp(); }}><ChevronUp className="w-3 h-3" /></button>
+          <button type="button" className="p-0.5 hover:text-foreground rounded disabled:opacity-25" disabled={!canMoveDown} onClick={(e) => { e.stopPropagation(); onMoveDown(); }}><ChevronDown className="w-3 h-3" /></button>
+          {/* Delete */}
+          {canDelete && (
+            <button type="button" className="p-0.5 hover:text-red-400 rounded ml-0.5" onClick={(e) => { e.stopPropagation(); onDelete(); }} title="Delete scene"><Trash2 className="w-3 h-3" /></button>
+          )}
+        </div>
+      </div>
+
+      {/* AI Image */}
+      <div onClick={(e) => e.stopPropagation()}>
+        {scene.backgroundImage ? (
+          <div className="flex flex-col gap-1.5">
+            <div className="relative group">
+              <img
+                src={scene.backgroundImage}
+                alt="Scene background"
+                className="w-full h-16 object-cover rounded-md border border-border"
+              />
+              <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-md">
+                <button
+                  type="button"
+                  className="text-[10px] text-white px-2 py-0.5 bg-primary/80 rounded hover:bg-primary"
+                  onClick={() => { setShowImagePrompt(true); setImagePrompt(SCENE_IMAGE_PROMPTS[scene.type]); }}
+                >
+                  Regenerate
+                </button>
+                <button
+                  type="button"
+                  className="text-[10px] text-white px-2 py-0.5 bg-primary/80 rounded hover:bg-primary"
+                  onClick={() => imageUploadRef.current?.click()}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  className="text-[10px] text-white px-2 py-0.5 bg-red-500/80 rounded hover:bg-red-500"
+                  onClick={() => onChange({ backgroundImage: undefined, backgroundImagePosition: undefined })}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            {/* Position picker */}
+            <div className="flex flex-wrap gap-1">
+              {IMAGE_POSITIONS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  title={p.label}
+                  className={`flex items-center justify-center w-7 h-7 rounded text-sm border transition-colors ${
+                    (scene.backgroundImagePosition ?? "full") === p.value
+                      ? "border-primary bg-primary/20 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
+                  onClick={() => onChange({ backgroundImagePosition: p.value })}
+                >
+                  {p.icon}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-1.5">
+            {/* AI generate */}
+            <button
+              type="button"
+              className="flex-1 flex items-center justify-center gap-1.5 h-7 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
+              onClick={() => { setShowImagePrompt((v) => !v); if (!imagePrompt) setImagePrompt(SCENE_IMAGE_PROMPTS[scene.type]); }}
+            >
+              <Sparkles className="w-3 h-3" /> AI Image
+            </button>
+            {/* Upload image */}
+            <button
+              type="button"
+              title="Upload image"
+              className="flex items-center justify-center gap-1 h-7 px-2 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
+              onClick={() => imageUploadRef.current?.click()}
+            >
+              <ImagePlus className="w-3 h-3" />
+            </button>
+            {/* Upload audio */}
+            <button
+              type="button"
+              title={scene.sceneAudio ? `Audio: ${scene.sceneAudioLabel ?? "custom"}` : "Upload scene audio"}
+              className={`flex items-center justify-center gap-1 h-7 px-2 text-xs border border-dashed rounded-md transition-colors ${
+                scene.sceneAudio
+                  ? "border-emerald-500/60 text-emerald-400 hover:border-red-400 hover:text-red-400"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+              onClick={() => {
+                if (scene.sceneAudio) {
+                  onChange({ sceneAudio: undefined, sceneAudioLabel: undefined });
+                } else {
+                  audioUploadRef.current?.click();
+                }
+              }}
+            >
+              <Music className="w-3 h-3" />
+            </button>
+            <input ref={imageUploadRef} type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} />
+            <input ref={audioUploadRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a" className="sr-only" onChange={handleAudioUpload} />
+          </div>
+        )}
+
+        {showImagePrompt && (
+          <div className="flex gap-1.5 mt-1.5">
+            <input
+              autoFocus
+              className="flex-1 h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary min-w-0"
+              placeholder="Describe the background…"
+              value={imagePrompt}
+              onChange={(e) => setImagePrompt(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleGenerateImage(); if (e.key === "Escape") setShowImagePrompt(false); }}
+            />
+            <button
+              type="button"
+              disabled={generatingImage || !imagePrompt.trim()}
+              className="shrink-0 h-7 px-2.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
+              onClick={handleGenerateImage}
+            >
+              {generatingImage ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</> : <><Sparkles className="w-3 h-3" /> Generate</>}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Title */}
@@ -92,14 +412,11 @@ function SceneCard({
         />
       )}
 
-      {/* Skills */}
+      {/* Skills — individual chip tags */}
       {scene.type === "skills" && (
-        <Input
-          className="h-7 text-xs"
-          placeholder="React, TypeScript, Node.js, …"
-          value={skills}
-          onChange={(e) => onChange({ skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-          onClick={(e) => e.stopPropagation()}
+        <SkillChips
+          skills={scene.skills ?? []}
+          onChange={(s) => onChange({ skills: s })}
         />
       )}
 
@@ -118,36 +435,72 @@ function SceneCard({
 }
 
 export default function StoryboardEditor({ script, onScriptChange, focusedSceneId, onSceneFocus }: Props) {
-  function patchScene(index: number, patch: Partial<SceneScript>) {
-    const scenes = [...script.scenes];
-    scenes[index] = { ...scenes[index], ...patch };
-
-    // Recalculate start times after duration change
+  function applyScenes(scenes: SceneScript[]) {
     let cursor = 0;
     const restarted = scenes.map((s) => {
       const out = { ...s, start: cursor };
       cursor += s.duration;
       return out;
     });
+    onScriptChange({ ...script, video: { ...script.video, duration: cursor }, scenes: restarted });
+  }
 
-    onScriptChange({
-      ...script,
-      video: { ...script.video, duration: cursor },
-      scenes: restarted,
-    });
+  function patchScene(index: number, patch: Partial<SceneScript>) {
+    const scenes = [...script.scenes];
+    scenes[index] = { ...scenes[index], ...patch };
+    applyScenes(scenes);
+  }
+
+  function deleteScene(index: number) {
+    applyScenes(script.scenes.filter((_, i) => i !== index));
+  }
+
+  function moveScene(index: number, dir: -1 | 1) {
+    const scenes = [...script.scenes];
+    const target = index + dir;
+    if (target < 0 || target >= scenes.length) return;
+    [scenes[index], scenes[target]] = [scenes[target], scenes[index]];
+    applyScenes(scenes);
+  }
+
+  function addScene() {
+    const newScene: SceneScript = {
+      id: `scene-${Date.now()}`,
+      start: 0,
+      duration: 7,
+      type: "achievement",
+      title: "New Scene",
+      items: [],
+    };
+    applyScenes([...script.scenes, newScene]);
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 p-5">
-      {script.scenes.map((scene, i) => (
-        <SceneCard
-          key={scene.id}
-          scene={scene}
-          focused={focusedSceneId === scene.id}
-          onChange={(patch) => patchScene(i, patch)}
-          onFocus={() => onSceneFocus?.(scene.id)}
-        />
-      ))}
+    <div className="p-5">
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        {script.scenes.map((scene, i) => (
+          <SceneCard
+            key={scene.id}
+            scene={scene}
+            focused={focusedSceneId === scene.id}
+            canMoveUp={i > 0}
+            canMoveDown={i < script.scenes.length - 1}
+            canDelete={script.scenes.length > 1}
+            onChange={(patch) => patchScene(i, patch)}
+            onFocus={() => onSceneFocus?.(scene.id)}
+            onDelete={() => deleteScene(i)}
+            onMoveUp={() => moveScene(i, -1)}
+            onMoveDown={() => moveScene(i, 1)}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+        onClick={addScene}
+      >
+        <Plus className="w-3.5 h-3.5" /> Add Scene
+      </button>
     </div>
   );
 }
