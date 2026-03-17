@@ -35,67 +35,73 @@ function hz(semitone: number): number {
   return 8.175799 * Math.pow(2, semitone / 12);
 }
 
-/** A4 = semitone 69 */
-const A3 = 57;  // 220 Hz
-const E3 = 52;  // 164 Hz
-const D3 = 50;  // 147 Hz
-const G3 = 55;  // 196 Hz
+// Semitone values for reference notes
+const C4 = 60;  // 261 Hz — bright and clear
+const D4 = 62;  // 294 Hz — warm and driven
+const F3 = 53;  // 175 Hz — full and soaring
+const G3 = 55;  // 196 Hz — confident
+const A3 = 57;  // 220 Hz — clean focus
 
 const PRESETS: Record<string, PresetDef> = {
+  // Bright G major — confident, professional, forward-moving
   "corporate-inspire": {
-    baseHz: hz(A3),
-    padIntervals:  [0, 7, 12, 16],        // A-E-A-C# (Amaj pad)
-    melody:        [0, 4, 7, 12, 7, 4, 0, 4, 7, 16, 12, 7, 4, 7, 12, 7],
-    stepSec:       0.45,
-    padWave:       "sine",
-    melodyWave:    "sine",
-    masterGain:    0.28,
-    attack:        0.12,
-    release:       0.30,
+    baseHz:       hz(G3 + 12),              // G4 = 392 Hz
+    padIntervals: [0, 4, 7, 12],            // G major chord
+    melody:       [0, 4, 7, 12, 7, 4, 12, 16, 12, 7, 4, 7, 12, 16, 7, 4],
+    stepSec:      0.28,
+    padWave:      "sine",
+    melodyWave:   "sine",
+    masterGain:   0.38,
+    attack:       0.05,
+    release:      0.16,
   },
+  // D major with 9th — energetic, tech-forward, rhythmic
   "tech-ambient": {
-    baseHz: hz(E3),
-    padIntervals:  [0, 5, 10, 17],        // E-A-D-B (wide open voicing)
-    melody:        [0, 7, 12, 7, 5, 12, 17, 12, 7, 5, 0, 5, 7, 12, 7, 5],
-    stepSec:       0.6,
-    padWave:       "triangle",
-    melodyWave:    "triangle",
-    masterGain:    0.22,
-    attack:        0.18,
-    release:       0.45,
+    baseHz:       hz(D4),                   // D4 = 294 Hz
+    padIntervals: [0, 4, 7, 14],            // D major + 9th
+    melody:       [0, 7, 4, 12, 7, 14, 12, 7, 4, 7, 12, 16, 12, 7, 14, 7],
+    stepSec:      0.32,
+    padWave:      "triangle",
+    melodyWave:   "triangle",
+    masterGain:   0.34,
+    attack:       0.06,
+    release:      0.20,
   },
+  // C major — bright, upbeat, positive momentum
   "upbeat-career": {
-    baseHz: hz(D3),
-    padIntervals:  [0, 4, 7, 11],         // Dmaj7
-    melody:        [0, 4, 7, 12, 11, 7, 4, 7, 12, 16, 14, 12, 11, 7, 4, 0],
-    stepSec:       0.3,
-    padWave:       "sine",
-    melodyWave:    "sine",
-    masterGain:    0.30,
-    attack:        0.08,
-    release:       0.20,
+    baseHz:       hz(C4),                   // C4 = 261 Hz
+    padIntervals: [0, 4, 7, 12],            // C major
+    melody:       [0, 4, 7, 12, 16, 12, 7, 4, 7, 12, 16, 19, 16, 12, 7, 4],
+    stepSec:      0.22,
+    padWave:      "sine",
+    melodyWave:   "sine",
+    masterGain:   0.44,
+    attack:       0.04,
+    release:      0.12,
   },
+  // F major — expansive, soaring, cinematic optimism
   "cinematic-rise": {
-    baseHz: hz(G3),
-    padIntervals:  [0, 7, 12, 19],        // G-D-G-D (open fifth, two octaves)
-    melody:        [0, 7, 12, 7, 19, 12, 7, 12, 19, 24, 19, 12, 7, 12, 19, 24],
-    stepSec:       0.7,
-    padWave:       "triangle",
-    melodyWave:    "sine",
-    masterGain:    0.26,
-    attack:        0.25,
-    release:       0.60,
+    baseHz:       hz(F3),                   // F3 = 175 Hz
+    padIntervals: [0, 4, 7, 12],            // F major
+    melody:       [0, 7, 12, 16, 12, 19, 16, 12, 7, 12, 16, 19, 24, 19, 16, 12],
+    stepSec:      0.45,
+    padWave:      "triangle",
+    melodyWave:   "sine",
+    masterGain:   0.36,
+    attack:       0.10,
+    release:      0.28,
   },
+  // A major — clean, clear, productive flow
   "minimal-focus": {
-    baseHz: hz(A3),
-    padIntervals:  [0, 12],               // A-A (pure octave drone)
-    melody:        [0, 0, 7, 0, 12, 0, 7, 0, 0, 12, 7, 0, 12, 7, 0, 7],
-    stepSec:       0.8,
-    padWave:       "sine",
-    melodyWave:    "sine",
-    masterGain:    0.18,
-    attack:        0.20,
-    release:       0.65,
+    baseHz:       hz(A3),                   // A3 = 220 Hz
+    padIntervals: [0, 4, 7],               // A major triad
+    melody:       [0, 4, 7, 4, 12, 7, 4, 7, 12, 7, 4, 0, 4, 7, 12, 4],
+    stepSec:      0.42,
+    padWave:      "sine",
+    melodyWave:   "sine",
+    masterGain:   0.30,
+    attack:       0.08,
+    release:      0.30,
   },
 };
 

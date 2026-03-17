@@ -123,8 +123,10 @@ const VideoScriptSchema = z.object({
       motion: z.enum(["minimal", "moderate", "cinematic"]).default("moderate"),
       transition: z.enum(["cut", "fade", "slide", "cinematic-fade"]).default("fade"),
       background: z.enum(["gradient", "dark-tech-grid", "particles", "solid"]).default("gradient"),
-    }),
-  }),
+    }).passthrough(),
+    // Preserve music selection and any other video-level fields
+    audio: z.object({ track: z.string(), label: z.string(), volume: z.number() }).optional(),
+  }).passthrough(),
   scenes: z.array(z.object({
     id: z.string(),
     start: z.number(),
@@ -136,8 +138,17 @@ const VideoScriptSchema = z.object({
     items: z.array(z.string()).optional(),
     skills: z.array(z.string()).optional(),
     highlight: z.boolean().optional(),
-  })),
-});
+    // Preserve all user-set per-scene customisations
+    accentColor: z.string().optional(),
+    backgroundImage: z.string().optional(),
+    backgroundImagePosition: z.string().optional(),
+    imageAnimation: z.string().optional(),
+    sceneAudio: z.string().optional(),
+    sceneAudioLabel: z.string().optional(),
+    textAlign: z.string().optional(),
+    contentPosition: z.string().optional(),
+  }).passthrough()),
+}).passthrough();
 
 type VideoScript = z.infer<typeof VideoScriptSchema>;
 
@@ -697,6 +708,44 @@ studioRoutes.get("/projects", async (c) => {
   const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
 
   return c.json(ok(projects.map((p) => toProjectDto(p, p.videoId ? videoById.get(p.videoId) ?? null : null))));
+});
+
+// ─── GET /videos/user/:userId ─────────────────────────────────────────────────
+// Returns published studio videos for a user (for profile display).
+// No auth required — returns public/published videos only.
+studioRoutes.get("/videos/user/:userId", async (c) => {
+  const userId = c.req.param("userId");
+  const db = getDb();
+
+  const rows = await db
+    .select({
+      id: videos.id,
+      title: videos.title,
+      youtubeUrl: videos.youtubeUrl,
+      youtubeVideoId: videos.youtubeVideoId,
+      r2Key: videos.r2Key,
+      thumbnailUrl: videos.thumbnailUrl,
+      description: videos.description,
+      privacyStatus: videos.privacyStatus,
+      createdAt: videos.createdAt,
+    })
+    .from(studioProjects)
+    .innerJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(and(eq(studioProjects.userId, userId), eq(studioProjects.status, "published")))
+    .orderBy(desc(videos.createdAt))
+    .limit(20);
+
+  return c.json(ok(rows.map((v) => ({
+    id: v.id,
+    title: v.title,
+    videoUrl: v.youtubeUrl ?? (v.r2Key ? `https://cdn.hired.video/${v.r2Key}` : null),
+    youtubeUrl: v.youtubeUrl,
+    youtubeVideoId: v.youtubeVideoId,
+    thumbnailUrl: v.thumbnailUrl,
+    description: v.description,
+    privacyStatus: v.privacyStatus,
+    createdAt: asIso(v.createdAt),
+  }))));
 });
 
 // ─── GET /videos/resume/:resumeId ─────────────────────────────────────────────

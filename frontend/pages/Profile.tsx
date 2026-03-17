@@ -18,6 +18,10 @@ import {
   Download,
   Share,
   ExternalLink,
+  Link as LinkIcon,
+  Check,
+  X as XIcon,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -50,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
+import { userService } from "@/lib/services/user-service";
 import {
   roleToSelectValue,
   formatRoleForDisplay,
@@ -69,6 +74,13 @@ function ProfileContent() {
   const [isEditing, setIsEditing] = useState(searchParams.get("edit") === "true");
   const [saving, setSaving] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+
+  // Slug editor state
+  const [slugInput, setSlugInput] = useState("");
+  const [slugEditing, setSlugEditing] = useState(false);
+  const [slugChecking, setSlugChecking] = useState(false);
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [slugSaving, setSlugSaving] = useState(false);
 
   const { user, isAuthenticated, refreshUser } = useAuth();
 
@@ -379,6 +391,76 @@ function ProfileContent() {
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
                           {joinedText}
+                        </div>
+                        {/* Custom URL / Slug */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <LinkIcon className="h-4 w-4 shrink-0" />
+                          {slugEditing ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <div className="flex items-center border rounded-md overflow-hidden text-xs">
+                                <span className="px-2 py-1 bg-muted text-muted-foreground border-r">hired.video/people/</span>
+                                <input
+                                  className="px-2 py-1 w-32 outline-none bg-background text-foreground"
+                                  value={slugInput}
+                                  onChange={async (e) => {
+                                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+                                    setSlugInput(val);
+                                    setSlugAvailable(null);
+                                    if (val.length >= 2) {
+                                      setSlugChecking(true);
+                                      const res = await userService.checkSlug(val).catch(() => ({ available: false }));
+                                      setSlugAvailable(res.available);
+                                      setSlugChecking(false);
+                                    }
+                                  }}
+                                  placeholder="your-name"
+                                  autoFocus
+                                />
+                                {slugChecking && <Loader2 className="h-3 w-3 animate-spin mx-1 text-muted-foreground" />}
+                                {!slugChecking && slugAvailable === true && <Check className="h-3 w-3 mx-1 text-emerald-500" />}
+                                {!slugChecking && slugAvailable === false && <XIcon className="h-3 w-3 mx-1 text-destructive" />}
+                              </div>
+                              <button
+                                className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground disabled:opacity-50"
+                                disabled={!slugAvailable || slugSaving || slugInput.length < 2}
+                                onClick={async () => {
+                                  if (!slugAvailable || slugInput.length < 2) return;
+                                  setSlugSaving(true);
+                                  try {
+                                    await userService.updateSlug(slugInput);
+                                    await refreshUser();
+                                    setSlugEditing(false);
+                                  } catch {}
+                                  setSlugSaving(false);
+                                }}
+                              >
+                                {slugSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                              </button>
+                              <button
+                                className="text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => setSlugEditing(false)}
+                              >Cancel</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs">
+                                {user?.slug
+                                  ? <a href={`/people/${user.slug}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">hired.video/people/{user.slug}</a>
+                                  : <span className="text-muted-foreground">No custom URL set</span>
+                                }
+                              </span>
+                              <button
+                                className="text-xs text-muted-foreground hover:text-foreground underline"
+                                onClick={() => {
+                                  setSlugInput((user as any)?.slug ?? "");
+                                  setSlugAvailable(null);
+                                  setSlugEditing(true);
+                                }}
+                              >
+                                {user?.slug ? "Edit" : "Set custom URL"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : null}

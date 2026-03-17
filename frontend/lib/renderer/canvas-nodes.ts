@@ -123,7 +123,8 @@ export function measureNodeHeight(ctx: CanvasRenderingContext2D, node: SceneNode
     case "text": {
       if (!node.content) return 0;
       ctx.font = `${node.style.fontWeight} ${node.style.fontSize}px ${node.style.fontFamily}`;
-      const lineCount = wrapText(ctx, node.content, maxWidth).length;
+      const paragraphs = node.content.split("\n");
+      const lineCount = paragraphs.flatMap(p => p.trim() ? wrapText(ctx, p, maxWidth) : [""]).length;
       return lineCount * node.style.fontSize * node.style.lineHeight;
     }
     case "textGroup": {
@@ -162,7 +163,7 @@ export function applyTransform(ctx: CanvasRenderingContext2D, t: Transform2D, cx
 
 // ─── Main draw function ───────────────────────────────────────────────────────
 
-export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
+export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapsed = 0, sceneProgress = 0): void {
   const { width, height } = ctx.canvas;
   const cx = width / 2;
   const cy = height / 2;
@@ -176,11 +177,22 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
         const url = content.slice(7);
         const img = getCachedImage(url);
         if (img) {
-          // Cover-fit: scale so image fills canvas, centred
-          const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight);
+          const kbScale2 = node.kenBurns ? (() => {
+            const p = Math.max(0, Math.min(1, sceneProgress));
+            if (node.kenBurns === "zoom-in")  return 1 + p * 0.12;
+            if (node.kenBurns === "zoom-out") return 1.12 - p * 0.12;
+            return 1;
+          })() : 1;
+          const kbOffX = node.kenBurns ? (() => {
+            const p = Math.max(0, Math.min(1, sceneProgress));
+            if (node.kenBurns === "pan-left")  return p * width * 0.08;
+            if (node.kenBurns === "pan-right") return -p * width * 0.08;
+            return 0;
+          })() : 0;
+          const scale = Math.max(width / img.naturalWidth, height / img.naturalHeight) * kbScale2;
           const dw = img.naturalWidth * scale;
           const dh = img.naturalHeight * scale;
-          ctx.drawImage(img, (width - dw) / 2, (height - dh) / 2, dw, dh);
+          ctx.drawImage(img, (width - dw) / 2 + kbOffX, (height - dh) / 2, dw, dh);
         } else {
           // Placeholder while image loads
           ctx.fillStyle = "#111111";
@@ -276,11 +288,25 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
       }
       ctx.clip();
 
-      // Cover-fit image within rect
-      const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight);
+      // Ken Burns: compute animated source crop/offset from sceneProgress (0→1)
+      let kbScale = 1;
+      let kbOffsetX = 0;
+      let kbOffsetY = 0;
+      if (node.kenBurns) {
+        const p = Math.max(0, Math.min(1, sceneProgress));
+        switch (node.kenBurns) {
+          case "zoom-in":  kbScale = 1 + p * 0.18; break;
+          case "zoom-out": kbScale = 1.18 - p * 0.18; break;
+          case "pan-left":  kbOffsetX = p * rect.w * 0.15; break;
+          case "pan-right": kbOffsetX = -p * rect.w * 0.15; break;
+        }
+      }
+
+      // Cover-fit image within rect with Ken Burns applied
+      const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight) * kbScale;
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
-      ctx.drawImage(img, rect.x + (rect.w - dw) / 2, rect.y + (rect.h - dh) / 2, dw, dh);
+      ctx.drawImage(img, rect.x + (rect.w - dw) / 2 + kbOffsetX, rect.y + (rect.h - dh) / 2 + kbOffsetY, dw, dh);
 
       // Subtle dark shadow-border for non-full positions
       if (position !== "full" && position !== "half-left" && position !== "half-right") {
@@ -306,9 +332,20 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
       ctx.textAlign = node.style.textAlign;
       ctx.textBaseline = "middle";
 
-      const lines = wrapText(ctx, node.content, width * 0.82);
+      // Split on newlines first, then word-wrap each paragraph
+      const maxW = width * 0.82;
+      const paragraphs = node.content.split("\n");
+      const lines = paragraphs.flatMap(p => p.trim() ? wrapText(ctx, p, maxW) : [""]);
       const lineH = node.style.fontSize * node.style.lineHeight;
       const totalH = lines.length * lineH;
+
+      // Adjust x anchor so text doesn't overflow when left/right aligned
+      // ctx.textAlign controls which side the text hangs from the anchor point
+      const textX = node.style.textAlign === "right"
+        ? width * 0.41   // anchor near right edge → text flows left from there
+        : node.style.textAlign === "left"
+          ? -width * 0.41 // anchor near left edge → text flows right from there
+          : 0;            // center → text centred at canvas midpoint
 
       // Typewriter: reveal characters progressively based on textRevealProgress
       const reveal = node.textRevealProgress;
@@ -324,11 +361,11 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode): void {
           return visible;
         });
         partialLines.forEach((l, i) => {
-          if (l) ctx.fillText(l, 0, -totalH / 2 + i * lineH + lineH / 2);
+          if (l) ctx.fillText(l, textX, -totalH / 2 + i * lineH + lineH / 2);
         });
       } else {
         lines.forEach((l, i) => {
-          ctx.fillText(l, 0, -totalH / 2 + i * lineH + lineH / 2);
+          ctx.fillText(l, textX, -totalH / 2 + i * lineH + lineH / 2);
         });
       }
       break;

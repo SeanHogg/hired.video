@@ -18,6 +18,9 @@ import {
   TrendingUp,
   Play,
   Share2,
+  ChevronDown,
+  ChevronRight,
+  GripHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -291,6 +294,28 @@ export default function StudioLayout() {
   const [linkedInOpen, setLinkedInOpen] = useState(false);
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [videoHeight, setVideoHeight] = useState(160);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ y: 0, height: 0 });
+
+  // ── Video panel drag-to-resize ────────────────────────────────────────────
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!isDraggingRef.current) return;
+      const delta = e.clientY - dragStartRef.current.y;
+      setVideoHeight(Math.max(80, dragStartRef.current.height + delta));
+    }
+    function onMouseUp() {
+      isDraggingRef.current = false;
+    }
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
 
   // ── Undo / Redo ───────────────────────────────────────────────────────────
   const historyRef = useRef<VideoScript[]>([]);
@@ -542,6 +567,7 @@ export default function StudioLayout() {
       resumeText: p.resumeText ?? "",
       prompt: p.prompt ?? defaultStudioState.prompt,
       jobDescription: p.jobDescription ?? "",
+      ...(script?._meta?.model ? { model: script._meta.model } : {}),
     });
     setCompiledVideo(cv);
     setIsPublishedToProfile(p.status === "Published");
@@ -603,23 +629,39 @@ export default function StudioLayout() {
   }
 
   async function handlePublishToProfile() {
-    if (!state.projectId && !state.videoBlob) return;
+    if (!state.videoBlob && !state.projectId) return;
     try {
+      patchState({ status: "uploading" });
       let projectId = state.projectId;
-      // Save first if not yet saved
-      if (!projectId) {
+
+      // Upload video blob if we have one (creates a proper video record with r2Key)
+      if (state.videoBlob) {
+        const uploadRes = await studioService.uploadVideo(
+          state.videoBlob,
+          state.name,
+          projectId ?? undefined,
+          state.resumeId,
+        );
+        if (!uploadRes.data) throw new Error("Upload failed");
+        projectId = uploadRes.data.id;
+        patchState({ projectId });
+      } else if (!projectId) {
+        // No blob, no project — save draft first
         const saveRes = await studioService.saveDraft(state.name, state.resumeText, state.script);
         if (!saveRes.data) throw new Error("Save failed");
         projectId = saveRes.data.id;
         patchState({ projectId });
       }
-      const res = await studioService.updateProjectStatus(projectId, "published");
+
+      const res = await studioService.updateProjectStatus(projectId!, "published");
       if (res.data) {
         setProjects((prev) => prev.map((p) => p.id === res.data!.id ? res.data! : p));
         setIsPublishedToProfile(true);
+        patchState({ status: "done" });
         toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
       }
     } catch (e: unknown) {
+      patchState({ status: "error" });
       toast({ title: "Publish failed", description: String(e), variant: "destructive" });
     }
   }
@@ -652,7 +694,7 @@ export default function StudioLayout() {
 
     if (customImageUrl) {
       // Store as a special background value on the theme (handled by canvas renderer)
-      (updatedScript.video.theme as Record<string, unknown>).customBackground = customImageUrl;
+      (updatedScript.video.theme as unknown as Record<string, unknown>).customBackground = customImageUrl;
     }
 
     handleScriptChange(updatedScript);
@@ -663,10 +705,14 @@ export default function StudioLayout() {
   async function handleSave() {
     setIsSaving(true);
     try {
+      // Embed model setting into the script metadata so it round-trips through the DB
+      const scriptToSave = state.script
+        ? { ...state.script, _meta: { ...state.script._meta, model: state.model } }
+        : null;
       const res = await studioService.saveDraft(
         state.name,
         state.resumeText,
-        state.script,
+        scriptToSave,
         state.projectId ?? undefined,
         state.prompt,
         state.jobDescription,
@@ -740,8 +786,8 @@ export default function StudioLayout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            {/* Video preview — fills center width, height set by 16:9 aspect ratio */}
-            <div className="shrink-0 border-b">
+            {/* Video preview — height controlled by drag handle */}
+            <div className="shrink-0 overflow-hidden border-b" style={{ height: videoHeight }}>
               <StudioPreview
                 state={state}
                 compiledVideo={compiledVideo}
@@ -754,28 +800,51 @@ export default function StudioLayout() {
                 onPublish={handlePublish}
                 onPublishToProfile={handlePublishToProfile}
                 isPublishedToProfile={isPublishedToProfile}
+                profileUrl={user?.id ? `/people/${user.id}` : undefined}
                 onLinkedInPost={() => setLinkedInOpen(true)}
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
                 showActions={false}
-                className="w-full"
+                className="w-full h-full"
               />
             </div>
 
-            {/* Timeline — always visible; shows placeholder until script is generated */}
+            {/* Drag handle — grab to resize video preview */}
+            <div
+              className="shrink-0 h-2 flex items-center justify-center cursor-row-resize bg-border/30 hover:bg-primary/20 transition-colors group border-b"
+              onMouseDown={(e) => {
+                isDraggingRef.current = true;
+                dragStartRef.current = { y: e.clientY, height: videoHeight };
+                e.preventDefault();
+              }}
+            >
+              <GripHorizontal className="w-4 h-3 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+            </div>
+
+            {/* Timeline — collapsible, collapsed by default */}
             <div className="shrink-0 border-b">
-              {state.script ? (
-                <TimelineEditor
-                  script={state.script}
-                  currentTime={currentTime}
-                  onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
-                  focusedSceneId={focusedSceneId}
-                  onSceneFocus={(id) => { setFocusedSceneId(id); setTab("storyboard"); }}
-                />
-              ) : (
-                <div className="px-5 py-3 text-xs text-muted-foreground">
-                  Generate a script to see the timeline
-                </div>
+              <button
+                type="button"
+                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setTimelineOpen((v) => !v)}
+              >
+                {timelineOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                Timeline
+              </button>
+              {timelineOpen && (
+                state.script ? (
+                  <TimelineEditor
+                    script={state.script}
+                    currentTime={currentTime}
+                    onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
+                    focusedSceneId={focusedSceneId}
+                    onSceneFocus={(id) => { setFocusedSceneId(id); setTab("storyboard"); }}
+                  />
+                ) : (
+                  <div className="px-5 py-3 text-xs text-muted-foreground">
+                    Generate a script to see the timeline
+                  </div>
+                )
               )}
             </div>
 
@@ -811,6 +880,7 @@ export default function StudioLayout() {
               onPublish={handlePublish}
               onPublishToProfile={handlePublishToProfile}
               isPublishedToProfile={isPublishedToProfile}
+              profileUrl={user?.id ? `/people/${user.id}` : undefined}
               onLinkedInPost={() => setLinkedInOpen(true)}
               onMakePublic={handleMakePublic}
               isPublic={isPublic}

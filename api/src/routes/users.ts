@@ -78,6 +78,7 @@ function toUserProfileDto(
   profile?: {
     headline?: string | null; summary?: string | null; location?: string | null;
     website?: string | null; phone?: string | null;
+    customUrlSlug?: string | null;
     linkedIn?: string | null; github?: string | null; twitter?: string | null;
     currentRole?: string | null; currentCompany?: string | null;
     avatarUrl?: string | null; openToWork?: boolean | null; openToRemote?: boolean | null;
@@ -93,7 +94,7 @@ function toUserProfileDto(
   const profileUpdatedAt = profile?.updatedAt ?? row.updatedAt ?? row.createdAt;
   return {
     id: row.id,
-    slug: "",
+    slug: profile?.customUrlSlug ?? "",
     email: row.email,
     userName: row.email,
     data: {
@@ -183,6 +184,7 @@ userRoutes.get("/me", async (c) => {
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+
     })
     .from(users)
     .where(eq(users.id, user.sub))
@@ -215,6 +217,7 @@ userRoutes.get("/profile", async (c) => {
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+
     })
     .from(users)
     .where(eq(users.id, user.sub))
@@ -265,6 +268,7 @@ userRoutes.put("/profile", async (c) => {
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+
     });
 
   if (!updated) {
@@ -341,6 +345,7 @@ userRoutes.put("/me", async (c) => {
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+
     });
 
   if (!updated) {
@@ -539,33 +544,88 @@ userRoutes.get("/:id/resumes", async (c) => {
   return c.json(success([]), 200);
 });
 
-/** GET /api/users/:id — public profile by id */
+/** PATCH /api/users/slug — update the authenticated user's custom URL slug */
+userRoutes.patch("/slug", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, "Slug may only contain lowercase letters, numbers and hyphens"),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid slug", { issues: parsed.error.flatten() }), 400);
+  }
+  const db = getDb();
+  // Check uniqueness across userProfiles
+  const [existing] = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.customUrlSlug, parsed.data.slug))
+    .limit(1);
+  if (existing && existing.userId !== user.sub) {
+    return c.json(error("CONFLICT", "This slug is already taken"), 409);
+  }
+  // Upsert profile row with new slug
+  await db
+    .insert(userProfiles)
+    .values({ userId: user.sub, customUrlSlug: parsed.data.slug, createdAt: new Date(), updatedAt: new Date() } as any)
+    .onConflictDoUpdate({ target: userProfiles.userId, set: { customUrlSlug: parsed.data.slug, updatedAt: new Date() } as any });
+  return c.json(success({ slug: parsed.data.slug }), 200);
+});
+
+/** GET /api/users/check-slug/:slug — check if a slug is available (no auth required) */
+userRoutes.get("/check-slug/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  const meId = (c.var as any).user?.sub as string | undefined;
+  if (!/^[a-z0-9-]{2,60}$/.test(slug)) {
+    return c.json(success({ available: false, reason: "Invalid format" }), 200);
+  }
+  const db = getDb();
+  const [existing] = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.customUrlSlug, slug))
+    .limit(1);
+  const available = !existing || existing.userId === meId;
+  return c.json(success({ available }), 200);
+});
+
+/** GET /api/users/:id — public profile by id or custom slug */
 userRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
   const db = getDb();
-  const [me] = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  let me: { id: string; email: string; name: string; role: string; emailVerified: boolean; createdAt: Date | string; updatedAt?: Date | string } | undefined;
+  let profile: typeof userProfiles.$inferSelect | undefined;
+
+  if (isUUID) {
+    const [row] = await db
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    me = row;
+    if (me) {
+      const [p] = await db.select().from(userProfiles).where(eq(userProfiles.userId, me.id)).limit(1);
+      profile = p;
+    }
+  } else {
+    // Slug lookup via userProfiles
+    const [p] = await db.select().from(userProfiles).where(eq(userProfiles.customUrlSlug, id)).limit(1);
+    profile = p;
+    if (p) {
+      const [row] = await db
+        .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
+        .from(users)
+        .where(eq(users.id, p.userId))
+        .limit(1);
+      me = row;
+    }
+  }
 
   if (!me) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
-
-  const [profile] = await db
-    .select()
-    .from(userProfiles)
-    .where(eq(userProfiles.userId, id))
-    .limit(1);
 
   return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
 });

@@ -175,6 +175,19 @@ export const PublicVideoSchema = z.object({
 });
 export type PublicVideo = z.infer<typeof PublicVideoSchema>;
 
+export const UserVideoSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  videoUrl: z.string().nullable(),
+  youtubeUrl: z.string().nullable(),
+  youtubeVideoId: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
+  description: z.string().nullable(),
+  privacyStatus: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type UserVideo = z.infer<typeof UserVideoSchema>;
+
 export interface GenerateStoryboardParams {
   resumeText: string;
   resumeId?: string;
@@ -325,6 +338,13 @@ export const studioService = {
     status: "draft" | "exported" | "published" | "processing" | "failed",
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.patch(`/api/studio/projects/${projectId}/status`, { status }, StudioProjectSchema);
+  },
+
+  /**
+   * Get published studio videos for a user (for profile display).
+   */
+  async getVideosForUser(userId: string): Promise<ApiSuccessResponse<UserVideo[]>> {
+    return apiClient.get(`/api/studio/videos/user/${userId}`, z.array(UserVideoSchema));
   },
 
 };

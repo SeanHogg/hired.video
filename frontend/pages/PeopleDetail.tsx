@@ -29,6 +29,7 @@ import {
   FileText,
   UserCog,
   MoreVertical,
+  Video,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
@@ -65,6 +66,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { userService, type UserProfile } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService, type UserVideo } from "@/lib/services/studio-service";
 import {
   recruiterService,
   type AddToTalentPoolRequest,
@@ -216,6 +218,9 @@ export default function PeopleDetail() {
   const [hasPublicMasterResume, setHasPublicMasterResume] = useState(false);
   const [publicMasterResume, setPublicMasterResume] = useState<import("@/lib/services/user-service").ResumeSummary | null>(null);
 
+  // Published studio videos
+  const [publishedVideos, setPublishedVideos] = useState<UserVideo[]>([]);
+
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -251,6 +256,14 @@ export default function PeopleDetail() {
     return () => {
       isMounted = false;
     };
+  }, [userProfile?.id]);
+
+  // Fetch published studio videos for this user
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    studioService.getVideosForUser(userProfile.id)
+      .then((res) => { if (res.data?.length) setPublishedVideos(res.data); })
+      .catch(() => {});
   }, [userProfile?.id]);
 
   // SEO: update title/description and structured data at top-level (hooks must not be called inside callbacks)
@@ -797,6 +810,53 @@ export default function PeopleDetail() {
                     </p>
                   </CardContent>
                 </Card>
+
+                {/* Video Resume Section */}
+                {publishedVideos.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Video className="h-5 w-5" />
+                        Video Resume
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {publishedVideos.map((v) => (
+                          <div key={v.id} className="rounded-lg overflow-hidden border">
+                            {v.videoUrl ? (
+                              <video
+                                src={v.videoUrl}
+                                controls
+                                className="w-full aspect-video bg-black"
+                                poster={v.thumbnailUrl ?? undefined}
+                              />
+                            ) : v.youtubeVideoId ? (
+                              <div className="aspect-video">
+                                <iframe
+                                  src={`https://www.youtube.com/embed/${v.youtubeVideoId}`}
+                                  className="w-full h-full"
+                                  allowFullScreen
+                                  title={v.title ?? "Video Resume"}
+                                />
+                              </div>
+                            ) : (
+                              <div className="aspect-video bg-muted flex items-center justify-center">
+                                <Video className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            {v.title && (
+                              <div className="p-3">
+                                <p className="font-medium text-sm">{v.title}</p>
+                                {v.description && <p className="text-xs text-muted-foreground mt-1">{v.description}</p>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Professional Details - Show Master resume if available */}
                 {hasPublicMasterResume ? (

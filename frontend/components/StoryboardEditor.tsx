@@ -126,6 +126,26 @@ function SkillChips({
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+const TEXT_ALIGNS: { value: "left" | "center" | "right"; icon: string; label: string }[] = [
+  { value: "left",   icon: "⬤◻◻", label: "Left" },
+  { value: "center", icon: "◻⬤◻", label: "Center" },
+  { value: "right",  icon: "◻◻⬤", label: "Right" },
+];
+
+const CONTENT_POSITIONS: { value: "top" | "center" | "bottom"; icon: string; label: string }[] = [
+  { value: "top",    icon: "▲", label: "Top" },
+  { value: "center", icon: "■", label: "Center" },
+  { value: "bottom", icon: "▼", label: "Bottom" },
+];
+
+const IMAGE_ANIMATIONS: { value: string; label: string }[] = [
+  { value: "none",      label: "Static" },
+  { value: "zoom-in",   label: "Zoom In" },
+  { value: "zoom-out",  label: "Zoom Out" },
+  { value: "pan-left",  label: "Pan Left" },
+  { value: "pan-right", label: "Pan Right" },
+];
+
 const IMAGE_POSITIONS: { value: ImagePosition; label: string; icon: string }[] = [
   { value: "full",        label: "Full",          icon: "⬛" },
   { value: "half-left",   label: "Half Left",     icon: "◧" },
@@ -138,12 +158,24 @@ const IMAGE_POSITIONS: { value: ImagePosition; label: string; icon: string }[] =
   { value: "corner-br",   label: "Corner BR",     icon: "◻" },
 ];
 
-const SCENE_IMAGE_PROMPTS: Record<SceneType, string> = {
-  intro: "Professional headshot background, modern office, soft blue gradient lighting, cinematic",
-  achievement: "Abstract data visualization, glowing metrics, dark background, purple tones",
-  skills: "Technology abstract, circuit board patterns, deep purple gradient, futuristic",
-  closing: "Sunrise cityscape, career success, warm golden tones, inspirational",
+const SCENE_IMAGE_BASE: Record<SceneType, string> = {
+  intro: "Professional portrait background, modern office environment, soft directional lighting, cinematic depth of field",
+  achievement: "Abstract success visualization, upward trending graphs, glowing data, premium dark background",
+  skills: "Futuristic technology, flowing circuit patterns, vibrant gradient, high-tech workspace",
+  closing: "Bright sunrise cityscape, optimistic career horizon, warm golden hour, inspirational vista",
 };
+
+function buildScenePrompt(scene: SceneScript): string {
+  const parts: string[] = [];
+  if (scene.title) parts.push(scene.title);
+  if (scene.subtitle) parts.push(scene.subtitle);
+  if (scene.text) parts.push(Array.isArray(scene.text) ? scene.text.join(" ") : scene.text);
+  if (scene.items?.length) parts.push(scene.items.slice(0, 2).join(", "));
+  if (scene.skills?.length) parts.push(scene.skills.slice(0, 4).join(", "));
+  const context = parts.map(p => p.trim()).filter(Boolean).join(" · ").slice(0, 200);
+  const base = SCENE_IMAGE_BASE[scene.type];
+  return context ? `${base}. Subject context: ${context}` : base;
+}
 
 const TYPE_COLOURS: Record<SceneType, string> = {
   intro:       "bg-violet-500/20 text-violet-300",
@@ -188,7 +220,18 @@ function SceneCard({
     if (!imagePrompt.trim()) return;
     setGeneratingImage(true);
     try {
-      const res = await studioService.generateImage(imagePrompt.trim());
+      // Merge scene context (name, role, text) into the prompt so the AI has
+      // relevant subject info even when the user only describes the visual style.
+      const contextParts: string[] = [];
+      if (scene.title) contextParts.push(scene.title);
+      if (scene.subtitle) contextParts.push(scene.subtitle);
+      if (scene.text) contextParts.push(Array.isArray(scene.text) ? scene.text.slice(0,1).join(" ") : scene.text.slice(0, 120));
+      if (scene.skills?.length) contextParts.push(scene.skills.slice(0, 3).join(", "));
+      const sceneCtx = contextParts.filter(Boolean).join(" · ").slice(0, 200);
+      const fullPrompt = sceneCtx
+        ? `${imagePrompt.trim()} — Scene: ${sceneCtx}`
+        : imagePrompt.trim();
+      const res = await studioService.generateImage(fullPrompt);
       onChange({ backgroundImage: res.data.imageUrl });
       setShowImagePrompt(false);
     } catch {
@@ -277,7 +320,7 @@ function SceneCard({
                 <button
                   type="button"
                   className="text-[10px] text-white px-2 py-0.5 bg-primary/80 rounded hover:bg-primary"
-                  onClick={() => { setShowImagePrompt(true); setImagePrompt(SCENE_IMAGE_PROMPTS[scene.type]); }}
+                  onClick={() => { setShowImagePrompt(true); setImagePrompt(buildScenePrompt(scene)); }}
                 >
                   Regenerate
                 </button>
@@ -315,6 +358,24 @@ function SceneCard({
                 </button>
               ))}
             </div>
+            {/* Ken Burns animation */}
+            <div className="flex gap-1 flex-wrap mt-1">
+              {IMAGE_ANIMATIONS.map((a) => (
+                <button
+                  key={a.value}
+                  type="button"
+                  title={a.label}
+                  className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
+                    (scene.imageAnimation ?? "none") === a.value
+                      ? "border-primary bg-primary/20 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                  onClick={() => onChange({ imageAnimation: a.value as import("@/types/video-script").ImageAnimation })}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex gap-1.5">
@@ -322,7 +383,7 @@ function SceneCard({
             <button
               type="button"
               className="flex-1 flex items-center justify-center gap-1.5 h-7 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
-              onClick={() => { setShowImagePrompt((v) => !v); if (!imagePrompt) setImagePrompt(SCENE_IMAGE_PROMPTS[scene.type]); }}
+              onClick={() => { setShowImagePrompt((v) => !v); if (!imagePrompt) setImagePrompt(buildScenePrompt(scene)); }}
             >
               <Sparkles className="w-3 h-3" /> AI Image
             </button>
@@ -354,10 +415,12 @@ function SceneCard({
             >
               <Music className="w-3 h-3" />
             </button>
-            <input ref={imageUploadRef} type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} />
             <input ref={audioUploadRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a" className="sr-only" onChange={handleAudioUpload} />
           </div>
         )}
+
+        {/* Hidden file input — always mounted so imageUploadRef is valid even when an image is shown */}
+        <input ref={imageUploadRef} type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} />
 
         {showImagePrompt && (
           <div className="flex gap-1.5 mt-1.5">
@@ -379,6 +442,47 @@ function SceneCard({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Text layout controls */}
+      <div className="flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
+        {/* Text alignment */}
+        <div className="flex gap-0.5">
+          {TEXT_ALIGNS.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              title={`Align ${a.label}`}
+              className={`w-7 h-6 flex items-center justify-center rounded text-xs border transition-colors ${
+                (scene.textAlign ?? "center") === a.value
+                  ? "border-primary bg-primary/20 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40"
+              }`}
+              onClick={() => onChange({ textAlign: a.value })}
+            >
+              {a.value === "left" ? "L" : a.value === "right" ? "R" : "C"}
+            </button>
+          ))}
+        </div>
+        {/* Content position */}
+        <div className="flex gap-0.5">
+          {CONTENT_POSITIONS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              title={`Position ${p.label}`}
+              className={`w-7 h-6 flex items-center justify-center rounded text-xs border transition-colors ${
+                (scene.contentPosition ?? "center") === p.value
+                  ? "border-primary bg-primary/20 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40"
+              }`}
+              onClick={() => onChange({ contentPosition: p.value })}
+            >
+              {p.icon}
+            </button>
+          ))}
+        </div>
+        <span className="text-[10px] text-muted-foreground ml-1">Layout</span>
       </div>
 
       {/* Title */}

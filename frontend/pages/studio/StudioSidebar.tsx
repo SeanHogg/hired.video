@@ -109,17 +109,33 @@ async function loadTemplate(file: string): Promise<VideoScript | null> {
   }
 }
 
+const SIDEBAR_PREFS_KEY = "studio_sidebar_collapsed";
+
+function loadCollapsed() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_PREFS_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, boolean>;
+  } catch {}
+  return { templates: false, backgrounds: false, theme: false, music: false };
+}
+
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [collapsed, setCollapsed] = useState({ templates: false, backgrounds: false, theme: false, music: false });
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
-  function toggleSection(key: keyof typeof collapsed) {
+  // Persist collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
+  }, [collapsed]);
+
+  function toggleSection(key: string) {
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
   }
 
@@ -166,9 +182,9 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
+    setCustomBgUrl(url);
     setActiveBg("custom");
     onBackgroundSelect?.("custom", url);
-    // reset so same file can be re-selected
     e.target.value = "";
   }
 
@@ -302,6 +318,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </button>
         {!collapsed.templates && <ul className="flex flex-col gap-2">
           {TEMPLATES.map((t) => {
+
             const isActive = activeTemplate === t.file;
             return (
               <li key={t.file}>
@@ -340,7 +357,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               </li>
             );
           })}
-        </ul>
+        </ul>}
       </section>
 
       {/* Backgrounds */}
@@ -353,43 +370,63 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           <Layers className="w-3 h-3" /> <span className="flex-1 text-left">Backgrounds</span>
           {collapsed.backgrounds ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
-        {!collapsed.backgrounds && <div className="grid grid-cols-4 gap-1.5 mb-2">
-          {BG_PRESETS.map((bg) => (
-            <button
-              key={bg.value}
-              type="button"
-              title={bg.label}
-              onClick={() => handleBgPreset(bg)}
-              className={`relative h-9 rounded-md border-2 transition-all overflow-hidden ${
-                activeBg === bg.value ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/40"
-              }`}
-              style={{ background: bg.preview }}
-            >
-              {activeBg === bg.value && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white drop-shadow" />
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* Custom upload */}
-        <input
-          ref={bgUploadRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleBgUpload}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full h-7 text-xs"
-          onClick={() => bgUploadRef.current?.click()}
-        >
-          <ImagePlus className="w-3 h-3 mr-1.5" />
-          {activeBg === "custom" ? "Change Image" : "Upload Image"}
-        </Button>}
+        {!collapsed.backgrounds && <>
+          <div className="grid grid-cols-4 gap-1.5 mb-2">
+            {/* Uploaded custom background — shown as first swatch when available */}
+            {customBgUrl && (
+              <button
+                type="button"
+                title="Custom upload"
+                onClick={() => { setActiveBg("custom"); onBackgroundSelect?.("custom", customBgUrl); }}
+                className={`relative h-9 rounded-md border-2 transition-all overflow-hidden ${
+                  activeBg === "custom" ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/40"
+                }`}
+              >
+                <img src={customBgUrl} className="w-full h-full object-cover" alt="Custom background" />
+                {activeBg === "custom" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <Check className="w-3 h-3 text-white drop-shadow" />
+                  </div>
+                )}
+              </button>
+            )}
+            {BG_PRESETS.map((bg) => (
+              <button
+                key={bg.value}
+                type="button"
+                title={bg.label}
+                onClick={() => handleBgPreset(bg)}
+                className={`relative h-9 rounded-md border-2 transition-all overflow-hidden ${
+                  activeBg === bg.value ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/40"
+                }`}
+                style={{ background: bg.preview }}
+              >
+                {activeBg === bg.value && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white drop-shadow" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+          {/* Custom upload */}
+          <input
+            ref={bgUploadRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleBgUpload}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-xs"
+            onClick={() => bgUploadRef.current?.click()}
+          >
+            <ImagePlus className="w-3 h-3 mr-1.5" />
+            {customBgUrl ? "Change Upload" : "Upload Image"}
+          </Button>
+        </>}
       </section>
 
       {/* Theme */}
@@ -560,6 +597,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           <p className="text-[10px] text-muted-foreground mt-1.5 leading-tight">
             Music plays during preview and is mixed during export.
           </p>
+          </>}
         </section>
       )}
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck,
+  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface Props {
   onPublish: () => void;
   onPublishToProfile: () => void;
   isPublishedToProfile?: boolean;
+  profileUrl?: string;
   onLinkedInPost: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
@@ -46,7 +47,7 @@ function formatTime(s: number): string {
 
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime, exportProgress,
-  onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile,
+  onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
   onLinkedInPost, onMakePublic, isPublic,
   onGenerate,
   showVideo = true, showActions = true, className,
@@ -196,7 +197,7 @@ export default function StudioPreview({
         {([
           { n: 1, title: "Generate Script", done: !!state.script,   active: !state.script || state.status === "generating" },
           { n: 2, title: "Export MP4",      done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
-          { n: 3, title: "Share",           done: !!state.youtubeVideoId, active: !!state.videoBlob },
+          { n: 3, title: "Share",           done: !!state.youtubeVideoId, active: !!state.videoBlob || !!isPublishedToProfile },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
             {/* Step badge */}
@@ -239,7 +240,7 @@ export default function StudioPreview({
                   {state.status === "exporting" && <Progress value={exportProgress * 100} className="h-1" />}
                   <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onExport} disabled={!compiledVideo || busy}>
                     <Download className="w-3 h-3 mr-1.5" />
-                    {state.videoBlob ? "Re-export MP4" : "Export MP4"}
+                    {state.videoBlob ? "Re-generate Video" : "Generate Video"}
                   </Button>
                 </>
               )}
@@ -273,6 +274,16 @@ export default function StudioPreview({
                         ? <><Check className="w-3 h-3 mr-1.5" /> Published to Profile</>
                         : <><UserCheck className="w-3 h-3 mr-1.5" /> Publish to Profile</>}
                     </Button>
+                  )}
+                  {isPublishedToProfile && profileUrl && (
+                    <a
+                      href={profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 w-full h-7 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLink className="w-3 h-3" /> View Profile
+                    </a>
                   )}
                   {hasYoutube && (
                     <>

@@ -51,6 +51,8 @@ export interface SceneNode {
   animations: CompiledAnimation[];
   /** 0–1 progress for typewriter text-reveal animation; undefined = show all text */
   textRevealProgress?: number;
+  /** Ken Burns animation key for image nodes */
+  kenBurns?: string;
 }
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -77,6 +79,7 @@ export interface CompiledScene {
   nodes: SceneNode[];
   /** Background fill: CSS colour or "gradient:…" token. */
   background: string;
+  contentPosition?: "top" | "center" | "bottom";
 }
 
 export interface CompiledVideo {

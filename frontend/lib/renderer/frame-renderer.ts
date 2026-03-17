@@ -19,7 +19,7 @@ const BG_TYPES = new Set<SceneNode["type"]>(["background", "overlay", "particles
 
 const LAYOUT_GAP_RATIO = 0.045; // gap = 4.5% of canvas height
 
-function computeLayout(ctx: CanvasRenderingContext2D, nodes: SceneNode[]): SceneNode[] {
+function computeLayout(ctx: CanvasRenderingContext2D, nodes: SceneNode[], contentPosition?: "top" | "center" | "bottom"): SceneNode[] {
   const { height } = ctx.canvas;
   const contentNodes = nodes.filter(n => !BG_TYPES.has(n.type));
   if (contentNodes.length === 0) return nodes;
@@ -28,14 +28,21 @@ function computeLayout(ctx: CanvasRenderingContext2D, nodes: SceneNode[]): Scene
   const gap = height * LAYOUT_GAP_RATIO;
   const totalH = heights.reduce((s, h) => s + h, 0) + gap * (contentNodes.length - 1);
 
-  let curY = -totalH / 2;
+  let curY: number;
+  if (contentPosition === "top") {
+    curY = -(height / 2) + height * 0.09;
+  } else if (contentPosition === "bottom") {
+    curY = height / 2 - height * 0.09 - totalH;
+  } else {
+    curY = -totalH / 2;
+  }
+
   const laidOut = contentNodes.map((node, i) => {
     const centerY = curY + heights[i] / 2;
     curY += heights[i] + gap;
     return { ...node, transform: { ...node.transform, y: centerY } };
   });
 
-  // bg nodes first (preserve draw order), then laid-out content
   return [...nodes.filter(n => BG_TYPES.has(n.type)), ...laidOut];
 }
 
@@ -94,10 +101,10 @@ function renderScene(
   ctx.globalAlpha = alpha;
   if (offsetX !== 0) ctx.translate(offsetX, 0);
 
-  const laidOutNodes = computeLayout(ctx, scene.nodes);
+  const laidOutNodes = computeLayout(ctx, scene.nodes, scene.contentPosition);
   for (const node of laidOutNodes) {
     const resolved = evaluateNode(node, elapsed);
-    drawNode(ctx, resolved);
+    drawNode(ctx, resolved, elapsed, scene.duration > 0 ? elapsed / scene.duration : 0);
   }
   ctx.restore();
 }

@@ -13,6 +13,9 @@ export type ImagePosition =
   | "small-left" | "small-right"
   | "corner-tl"  | "corner-tr"
   | "corner-bl"  | "corner-br";
+export type TextAlign = "left" | "center" | "right";
+export type ContentPosition = "top" | "center" | "bottom";
+export type ImageAnimation = "none" | "zoom-in" | "zoom-out" | "pan-left" | "pan-right";
 export type AnimationType = "fadeIn" | "slideUp" | "slideIn" | "scaleIn" | "typewriter" | "none";
 export type EasingType = "linear" | "easeIn" | "easeOut" | "easeInOut" | "spring";
 export type EffectType = "particles" | "blur" | "glow" | "vignette";
@@ -61,6 +64,9 @@ export interface SceneScript {
   backgroundImagePosition?: ImagePosition;
   sceneAudio?: string;
   sceneAudioLabel?: string;
+  textAlign?: TextAlign;
+  contentPosition?: ContentPosition;
+  imageAnimation?: ImageAnimation;
 }
 
 export interface VideoAudio {
@@ -82,4 +88,8 @@ export interface VideoScript {
     audio?: VideoAudio;
   };
   scenes: SceneScript[];
+  /** Internal metadata not rendered by the compiler — persisted with the draft */
+  _meta?: {
+    model?: string;
+  };
 }

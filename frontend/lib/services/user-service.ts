@@ -527,6 +527,33 @@ export class UserService {
     );
     return response.data.map((r) => normalizeResume(r));
   }
+
+  /**
+   * Update the current user's custom URL slug.
+   */
+  async updateSlug(slug: string): Promise<{ slug?: string | null }> {
+    const response = await apiClient.patch<{ slug?: string | null }>(
+      "/api/users/slug",
+      { slug },
+      z.object({ slug: z.string().nullish() }),
+    );
+    return response.data;
+  }
+
+  /**
+   * Check if a slug is available.
+   */
+  async checkSlug(slug: string): Promise<{ available: boolean }> {
+    try {
+      const response = await apiClient.get<{ available: boolean }>(
+        `/api/users/check-slug/${encodeURIComponent(slug)}`,
+        z.object({ available: z.boolean() }),
+      );
+      return response.data;
+    } catch {
+      return { available: false };
+    }
+  }
 }
 
 // ============================================================================

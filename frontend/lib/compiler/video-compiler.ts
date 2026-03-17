@@ -52,6 +52,7 @@ export function compile(script: VideoScript): CompiledVideo {
     start: scene.start,
     duration: scene.duration,
     background: sceneBackground(theme),
+    contentPosition: scene.contentPosition,
     nodes: buildSceneGraph(scene, theme),
   }));
 
