@@ -1,51 +1,167 @@
 /**
- * Email service — sends transactional emails via the SendPulse API.
+ * Email service — transactional emails for hired.video.
  *
- * Templates are inlined (no filesystem reads) for Cloudflare Workers
- * compatibility. Branding is updated for hired.video.
+ * Architecture:
+ *   EmailProvider (interface) ← SendPulseEmailProvider (implementation)
  *
- * Environment variables (set as Wrangler secrets / vars):
+ * The public send functions (sendVerificationEmail, sendPasswordResetEmail, etc.)
+ * only depend on the EmailProvider interface. Swapping the vendor means writing
+ * a new class that implements EmailProvider and updating getEmailProvider().
+ *
+ * Environment variables (Wrangler secrets / vars):
  *   EMAIL_CLIENTID   — SendPulse Client ID
  *   EMAIL_SECRET     — SendPulse Client Secret
  *   EMAIL_FROM       — From address (default: info@hired.video)
- *   FRONTEND_URL / BASE_URL — Base URL for link generation
+ *   FRONTEND_URL     — Base URL for link generation
  */
 
 // ============================================================================
-// CONFIGURATION HELPERS
+// EMAIL PROVIDER INTERFACE
 // ============================================================================
 
-function getSendPulseCredentials(): { clientId: string; clientSecret: string } {
-  const clientId =
-    process.env.EMAIL_CLIENTID ||
-    (globalThis as any).__ENV?.EMAIL_CLIENTID ||
-    "";
-  const clientSecret =
-    process.env.EMAIL_SECRET ||
-    (globalThis as any).__ENV?.EMAIL_SECRET ||
-    "";
-
-  return { clientId, clientSecret };
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  html: string;
+  fromName?: string;
+  fromEmail?: string;
 }
 
-function getFromAddress(): string {
-  return (
-    process.env.EMAIL_FROM ||
-    (globalThis as any).__ENV?.EMAIL_FROM ||
-    "info@hired.video"
-  );
+export interface EmailProvider {
+  send(message: EmailMessage): Promise<void>;
 }
+
+// ============================================================================
+// SENDPULSE IMPLEMENTATION
+// ============================================================================
+
+class SendPulseEmailProvider implements EmailProvider {
+  private tokenCache: { token: string; expiresAt: number } | null = null;
+
+  constructor(
+    private readonly clientId: string,
+    private readonly clientSecret: string,
+    private readonly defaultFrom: string,
+  ) {}
+
+  private async getAccessToken(): Promise<string | null> {
+    const now = Date.now();
+    if (this.tokenCache && this.tokenCache.expiresAt > now + 30_000) {
+      return this.tokenCache.token;
+    }
+
+    try {
+      const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grant_type: "client_credentials",
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("[email:sendpulse] Token fetch failed:", res.status, await res.text());
+        return null;
+      }
+
+      const data = (await res.json()) as { access_token?: string; expires_in?: number };
+      if (!data.access_token) {
+        console.error("[email:sendpulse] Missing access_token in response", data);
+        return null;
+      }
+
+      this.tokenCache = {
+        token: data.access_token,
+        expiresAt: Date.now() + (Number(data.expires_in) || 3600) * 1000,
+      };
+
+      return this.tokenCache.token;
+    } catch (err) {
+      console.error("[email:sendpulse] Failed to fetch access token:", err);
+      return null;
+    }
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    const token = await this.getAccessToken();
+    if (!token) return;
+
+    const fromEmail = message.fromEmail ?? this.defaultFrom;
+    const fromName = message.fromName ?? "hired.video";
+
+    try {
+      const res = await fetch("https://api.sendpulse.com/smtp/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: {
+            subject: message.subject,
+            html: message.html,
+            from: { email: fromEmail, name: fromName },
+            to: [{ email: message.to }],
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("[email:sendpulse] Send failed:", res.status, await res.text());
+      }
+    } catch (err) {
+      console.error("[email:sendpulse] Network error:", err);
+    }
+  }
+}
+
+// ============================================================================
+// PROVIDER FACTORY
+// ============================================================================
+
+function getEnv(key: string): string {
+  return process.env[key] || (globalThis as any).__ENV?.[key] || "";
+}
+
+let _provider: EmailProvider | null = null;
+
+function getEmailProvider(): EmailProvider | null {
+  if (_provider) return _provider;
+
+  const clientId = getEnv("EMAIL_CLIENTID");
+  const clientSecret = getEnv("EMAIL_SECRET");
+
+  if (!clientId || !clientSecret) {
+    console.warn("[email] Provider credentials not configured — emails will be skipped");
+    return null;
+  }
+
+  const fromAddress = getEnv("EMAIL_FROM") || "info@hired.video";
+  _provider = new SendPulseEmailProvider(clientId, clientSecret, fromAddress);
+  return _provider;
+}
+
+// ============================================================================
+// URL BUILDERS
+// ============================================================================
 
 function getBaseUrl(): string {
-  // FRONTEND_URL may be comma-separated (multiple CORS origins); use the first one.
-  const frontendUrl =
-    process.env.FRONTEND_URL || (globalThis as any).__ENV?.FRONTEND_URL || "";
-  const first = frontendUrl.split(",")[0]?.trim();
-  return first || "https://hired.video";
+  const frontendUrl = getEnv("FRONTEND_URL");
+  return frontendUrl.split(",")[0]?.trim() || "https://hired.video";
+}
+
+export function buildVerifyUrl(token: string): string {
+  return `${getBaseUrl()}/verify-email?token=${encodeURIComponent(token)}`;
+}
+
+export function buildPasswordResetUrl(token: string): string {
+  return `${getBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
 }
 
 // ============================================================================
-// EMAIL LAYOUT
+// EMAIL LAYOUT + TEMPLATES
 // ============================================================================
 
 const LAYOUT_HEADER = `<!DOCTYPE html>
@@ -112,11 +228,6 @@ const LAYOUT_FOOTER = `            </td>
 </body>
 </html>`;
 
-// ============================================================================
-// TEMPLATE BODIES
-// ============================================================================
-
-/** Welcome + email verification (sent on registration) */
 const VERIFY_EMAIL_BODY = `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
                 <tr>
@@ -189,7 +300,6 @@ const VERIFY_EMAIL_BODY = `
                 </tr>
               </table>`;
 
-/** Resend verification (triggered by user request when already registered) */
 const RESEND_VERIFY_BODY = `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
                 <tr>
@@ -246,7 +356,6 @@ const RESEND_VERIFY_BODY = `
                 </tr>
               </table>`;
 
-/** Password reset request */
 const PASSWORD_RESET_BODY = `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 16px;">
                 <tr>
@@ -301,7 +410,6 @@ const PASSWORD_RESET_BODY = `
                 <tr><td style="padding-top: 16px;"></td></tr>
               </table>`;
 
-/** Two-factor authentication code */
 const TWO_FACTOR_BODY = `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
                 <tr>
@@ -344,8 +452,16 @@ const TWO_FACTOR_BODY = `
               </table>`;
 
 // ============================================================================
-// RENDERING
+// TEMPLATE RENDERING
 // ============================================================================
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 function render(body: string, vars: Record<string, string>): string {
   let html = LAYOUT_HEADER + body + LAYOUT_FOOTER;
@@ -356,162 +472,55 @@ function render(body: string, vars: Record<string, string>): string {
   return html;
 }
 
-/** Escape user-supplied values before embedding in HTML */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// ============================================================================
-// TRANSPORT (SendPulse)
-// ============================================================================
-
-let sendPulseTokenCache: { token: string; expiresAt: number } | null = null;
-
-async function getSendPulseAccessToken(): Promise<string | null> {
-  const now = Date.now();
-  if (sendPulseTokenCache && sendPulseTokenCache.expiresAt > now + 30_000) {
-    return sendPulseTokenCache.token;
-  }
-
-  const { clientId, clientSecret } = getSendPulseCredentials();
-  if (!clientId || !clientSecret) {
-    console.warn("[email] SendPulse credentials not configured — skipping send");
-    return null;
-  }
-
-  try {
-    const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("[email] SendPulse token fetch failed:", res.status, text);
-      return null;
-    }
-
-    const data = (await res.json()) as { access_token?: string; expires_in?: number };
-    const token = data.access_token;
-    const expiresIn = Number(data.expires_in) || 3600;
-    if (!token) {
-      console.error("[email] SendPulse token response missing access_token", data);
-      return null;
-    }
-
-    sendPulseTokenCache = {
-      token,
-      expiresAt: Date.now() + expiresIn * 1000,
-    };
-
-    return token;
-  } catch (err) {
-    console.error("[email] Failed to fetch SendPulse access token:", err);
-    return null;
-  }
-}
-
-async function send(to: string, subject: string, html: string): Promise<void> {
-  const token = await getSendPulseAccessToken();
-  if (!token) return;
-
-  try {
-    const res = await fetch("https://api.sendpulse.com/smtp/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: {
-          subject,
-          html,
-          from: { email: getFromAddress(), name: "hired.video" },
-          to: [{ email: to }],
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("[email] SendPulse API error:", res.status, text);
-    }
-  } catch (err) {
-    console.error("[email] Failed to reach SendPulse API:", err);
-  }
-}
-
-// ============================================================================
-// URL BUILDERS
-// ============================================================================
-
-export function buildVerifyUrl(token: string): string {
-  return `${getBaseUrl()}/verify-email?token=${encodeURIComponent(token)}`;
-}
-
-export function buildPasswordResetUrl(token: string): string {
-  return `${getBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
-}
-
 // ============================================================================
 // PUBLIC EMAIL FUNCTIONS
 // ============================================================================
 
-/** Registration welcome + email verification link */
 export async function sendVerificationEmail(
   to: string,
   recipientName: string,
   token: string,
 ): Promise<void> {
-  const verifyUrl = buildVerifyUrl(token);
-  const html = render(VERIFY_EMAIL_BODY, { RecipientName: recipientName, VerifyUrl: verifyUrl });
-  await send(to, "Verify your email – hired.video", html);
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const html = render(VERIFY_EMAIL_BODY, { RecipientName: recipientName, VerifyUrl: buildVerifyUrl(token) });
+  await provider.send({ to, subject: "Verify your email – hired.video", html });
 }
 
-/** Resend verification (manually requested by logged-in user) */
 export async function sendResendVerificationEmail(
   to: string,
   recipientName: string,
   token: string,
 ): Promise<void> {
-  const verifyUrl = buildVerifyUrl(token);
-  const html = render(RESEND_VERIFY_BODY, { RecipientName: recipientName, VerifyUrl: verifyUrl });
-  await send(to, "Verify your email – hired.video", html);
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const html = render(RESEND_VERIFY_BODY, { RecipientName: recipientName, VerifyUrl: buildVerifyUrl(token) });
+  await provider.send({ to, subject: "Verify your email – hired.video", html });
 }
 
-/** Password reset link */
 export async function sendPasswordResetEmail(
   to: string,
   recipientName: string,
   token: string,
 ): Promise<void> {
-  const resetUrl = buildPasswordResetUrl(token);
-  const html = render(PASSWORD_RESET_BODY, { RecipientName: recipientName, ResetUrl: resetUrl });
-  await send(to, "Password reset request – hired.video", html);
+  const provider = getEmailProvider();
+  if (!provider) return;
+  const html = render(PASSWORD_RESET_BODY, { RecipientName: recipientName, ResetUrl: buildPasswordResetUrl(token) });
+  await provider.send({ to, subject: "Password reset request – hired.video", html });
 }
 
-/** Two-factor authentication code */
 export async function sendTwoFactorEmail(
   to: string,
   recipientName: string,
   code: string,
   expiryMinutes = 10,
 ): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) return;
   const html = render(TWO_FACTOR_BODY, {
     RecipientName: recipientName,
     TwoFactorCode: code,
     CodeExpiryMinutes: String(expiryMinutes),
   });
-  await send(to, "Your verification code – hired.video", html);
+  await provider.send({ to, subject: "Your verification code – hired.video", html });
 }
