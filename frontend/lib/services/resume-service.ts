@@ -601,64 +601,111 @@ export class ResumeService {
       // Parse the JSON result from the AI parsing
       const parsedData = JSON.parse(response.data.result);
 
+      // Support both camelCase (AI output) and PascalCase (legacy MetaResume format)
+      const basics = parsedData.basics ?? parsedData.Basics ?? {};
+      const location = basics.location ?? basics.Location ?? null;
+      const work = parsedData.work ?? parsedData.Work ?? [];
+      const education = parsedData.education ?? parsedData.Education ?? [];
+      const skills = parsedData.skills ?? parsedData.Skills ?? [];
+      const volunteer = parsedData.volunteer ?? parsedData.Volunteer ?? [];
+      const awards = parsedData.awards ?? parsedData.Awards ?? [];
+      const certificates = parsedData.certificates ?? parsedData.Certificates ?? [];
+      const publications = parsedData.publications ?? parsedData.Publications ?? [];
+      const languages = parsedData.languages ?? parsedData.Languages ?? [];
+      const interests = parsedData.interests ?? parsedData.Interests ?? [];
+      const references = parsedData.references ?? parsedData.References ?? [];
+      const projects = parsedData.projects ?? parsedData.Projects ?? [];
+
       // Convert to ResumeData format
       const resumeData: ResumeData = {
         Basics: {
-          Name: parsedData.basics?.name ?? "",
-          Label: parsedData.basics?.label ?? "",
-          Image: parsedData.basics?.image ?? "",
-          Email: parsedData.basics?.email ?? "",
-          Phone: parsedData.basics?.phone ?? "",
-          Url: parsedData.basics?.url ?? "",
-          Summary: parsedData.basics?.summary ?? "",
-          Location: parsedData.basics?.location
+          Name: basics.name ?? basics.Name ?? "",
+          Label: basics.label ?? basics.Label ?? "",
+          Image: basics.image ?? basics.Image ?? "",
+          Email: basics.email ?? basics.Email ?? "",
+          Phone: basics.phone ?? basics.Phone ?? "",
+          Url: basics.url ?? basics.Url ?? "",
+          Summary: basics.summary ?? basics.Summary ?? "",
+          Location: location
             ? {
-              Address: parsedData.basics.location.address ?? "",
-              PostalCode: parsedData.basics.location.postalCode ?? "",
-              City: parsedData.basics.location.city ?? "",
-              CountryCode: parsedData.basics.location.countryCode ?? "",
-              Region: parsedData.basics.location.region ?? "",
+              Address: location.address ?? location.Address ?? "",
+              PostalCode: location.postalCode ?? location.PostalCode ?? "",
+              City: location.city ?? location.City ?? "",
+              CountryCode: location.countryCode ?? location.CountryCode ?? "",
+              Region: location.region ?? location.Region ?? "",
             }
             : null,
         },
-        Work: Array.isArray(parsedData.work)
-          ? parsedData.work.map((w: any) => ({
-            Name: w?.name ?? w?.company ?? "",
-            Position: w?.position ?? "",
-            Summary: w?.summary ?? "",
-            StartDate: w?.startDate ?? "",
-            EndDate: w?.endDate ?? "",
-            Highlights: Array.isArray(w?.highlights) ? w.highlights : [],
-            Url: w?.url ?? "",
+        Work: Array.isArray(work)
+          ? work.map((w: any) => ({
+            Name: w?.name ?? w?.Name ?? w?.company ?? w?.Company ?? "",
+            Position: w?.position ?? w?.Position ?? "",
+            Summary: w?.summary ?? w?.Summary ?? "",
+            StartDate: w?.startDate ?? w?.StartDate ?? "",
+            EndDate: w?.endDate ?? w?.EndDate ?? "",
+            Highlights: Array.isArray(w?.highlights ?? w?.Highlights) ? (w?.highlights ?? w?.Highlights) : [],
+            Url: w?.url ?? w?.Url ?? "",
           }))
           : [],
-        Education: Array.isArray(parsedData.education)
-          ? parsedData.education.map((e: any) => ({
-            Institution: e?.institution ?? "",
-            Area: e?.area ?? "",
-            StudyType: e?.studyType ?? "",
-            StartDate: e?.startDate ?? "",
-            EndDate: e?.endDate ?? "",
-            Score: e?.score ?? "",
-            Courses: Array.isArray(e?.courses) ? e.courses : null,
-            Url: e?.url ?? "",
+        Education: Array.isArray(education)
+          ? education.map((e: any) => ({
+            Institution: e?.institution ?? e?.Institution ?? "",
+            Area: e?.area ?? e?.Area ?? "",
+            StudyType: e?.studyType ?? e?.StudyType ?? "",
+            StartDate: e?.startDate ?? e?.StartDate ?? "",
+            EndDate: e?.endDate ?? e?.EndDate ?? "",
+            Score: e?.score ?? e?.Score ?? "",
+            Courses: Array.isArray(e?.courses ?? e?.Courses) ? (e?.courses ?? e?.Courses) : null,
+            Url: e?.url ?? e?.Url ?? "",
           }))
           : [],
-        Skills: Array.isArray(parsedData.skills)
-          ? parsedData.skills.map((s: any) => ({
-            Name: s?.name ?? "",
-            Level: s?.level ?? "",
-            Keywords: Array.isArray(s?.keywords) ? s.keywords : [],
+        Skills: Array.isArray(skills)
+          ? skills.map((s: any) => ({
+            Name: s?.name ?? s?.Name ?? "",
+            Level: s?.level ?? s?.Level ?? "",
+            Keywords: Array.isArray(s?.keywords ?? s?.Keywords) ? (s?.keywords ?? s?.Keywords) : [],
           }))
           : [],
-        Volunteer: [],
-        Awards: [],
-        Certificates: [],
-        Publications: [],
-        Languages: [],
-        Interests: [],
-        References: [],
-        Projects: [],
+        Volunteer: Array.isArray(volunteer)
+          ? volunteer.map((v: any) => ({
+            Organization: v?.organization ?? v?.Organization ?? "",
+            Position: v?.position ?? v?.Position ?? "",
+            Summary: v?.summary ?? v?.Summary ?? "",
+            StartDate: v?.startDate ?? v?.StartDate ?? "",
+            EndDate: v?.endDate ?? v?.EndDate ?? "",
+            Highlights: Array.isArray(v?.highlights ?? v?.Highlights) ? (v?.highlights ?? v?.Highlights) : null,
+            Url: v?.url ?? v?.Url ?? "",
+          }))
+          : [],
+        Awards: Array.isArray(awards)
+          ? awards.map((a: any) => ({
+            Title: a?.title ?? a?.Title ?? "",
+            Date: a?.date ?? a?.Date ?? "",
+            Awarder: a?.awarder ?? a?.Awarder ?? "",
+            Summary: a?.summary ?? a?.Summary ?? "",
+          }))
+          : [],
+        Certificates: Array.isArray(certificates)
+          ? certificates.map((cert: any) => ({
+            Name: cert?.name ?? cert?.Name ?? "",
+            Date: cert?.date ?? cert?.Date ?? "",
+            Issuer: cert?.issuer ?? cert?.Issuer ?? "",
+            Url: cert?.url ?? cert?.Url ?? "",
+          }))
+          : [],
+        Publications: Array.isArray(publications)
+          ? publications.map((p: any) => ({
+            Name: p?.name ?? p?.Name ?? "",
+            Publisher: p?.publisher ?? p?.Publisher ?? "",
+            ReleaseDate: p?.releaseDate ?? p?.ReleaseDate ?? "",
+            Url: p?.url ?? p?.Url ?? "",
+            Summary: p?.summary ?? p?.Summary ?? "",
+          }))
+          : [],
+        Languages: Array.isArray(languages) ? languages : [],
+        Interests: Array.isArray(interests) ? interests : [],
+        References: Array.isArray(references) ? references : [],
+        Projects: Array.isArray(projects) ? projects : [],
         Meta: undefined,
       };
 

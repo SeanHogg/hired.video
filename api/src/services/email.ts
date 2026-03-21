@@ -32,25 +32,37 @@ export interface EmailProvider {
 }
 
 // ============================================================================
-// SENDPULSE IMPLEMENTATION (uses sendpulse-api npm package)
+// SENDPULSE IMPLEMENTATION (direct fetch — no filesystem dependency)
 // ============================================================================
 
-import * as sendpulse from "sendpulse-api";
+/** In-memory token cache — survives across requests within the same Worker instance */
+let _cachedToken: string | null = null;
+let _tokenExpiresAt = 0;
 
-/** Promisify sendpulse.init — authenticates and caches the OAuth token */
-function initSendPulse(clientId: string, clientSecret: string): Promise<void> {
-  return new Promise((resolve) => {
-    sendpulse.init(clientId, clientSecret, "/tmp/", () => resolve());
-  });
-}
+async function getSendPulseToken(clientId: string, clientSecret: string): Promise<string> {
+  if (_cachedToken && Date.now() < _tokenExpiresAt) {
+    console.log("[email:sendpulse] Using cached token");
+    return _cachedToken;
+  }
 
-/** Promisify sendpulse.smtpSendMail */
-function smtpSend(email: object): Promise<any> {
-  return new Promise((resolve) => {
-    sendpulse.smtpSendMail((result: any) => {
-      resolve(result);
-    }, email);
+  console.log("[email:sendpulse] Fetching new OAuth token");
+  const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret }),
   });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`SendPulse auth failed: ${res.status} ${body}`);
+  }
+
+  const data: any = await res.json();
+  _cachedToken = data.access_token as string;
+  // Tokens are valid for 3600s; refresh 60s early
+  _tokenExpiresAt = Date.now() + ((data.expires_in ?? 3600) - 60) * 1000;
+  console.log("[email:sendpulse] Token acquired, expires in", data.expires_in ?? 3600, "s");
+  return _cachedToken;
 }
 
 class SendPulseEmailProvider implements EmailProvider {
@@ -62,20 +74,34 @@ class SendPulseEmailProvider implements EmailProvider {
 
   async send(message: EmailMessage): Promise<void> {
     try {
-      await initSendPulse(this.clientId, this.clientSecret);
+      const token = await getSendPulseToken(this.clientId, this.clientSecret);
 
       const fromEmail = message.fromEmail ?? this.defaultFrom;
       const fromName = message.fromName ?? "hired.video";
 
-      const result = await smtpSend({
-        html: message.html,
-        subject: message.subject,
-        from: { name: fromName, email: fromEmail },
-        to: [{ email: message.to }],
+      console.log("[email:sendpulse] Sending email to:", message.to, "subject:", message.subject);
+      console.log("[email:sendpulse] html length:", message.html?.length ?? 0, "| first 300 chars:", message.html?.slice(0, 300) ?? "(empty)");
+
+      const htmlBase64 = Buffer.from(message.html, "utf-8").toString("base64");
+
+      const res = await fetch("https://api.sendpulse.com/smtp/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          email: {
+            html: htmlBase64,
+            subject: message.subject,
+            from: { name: fromName, email: fromEmail },
+            to: [{ email: message.to }],
+          },
+        }),
       });
 
-      if (result && result.result === false) {
-        console.error("[email:sendpulse] Send failed:", JSON.stringify(result));
+      const body = await res.text().catch(() => "");
+      if (!res.ok) {
+        console.error("[email:sendpulse] Send failed:", res.status, body);
+      } else {
+        console.log("[email:sendpulse] Send OK:", res.status, body);
       }
     } catch (err) {
       console.error("[email:sendpulse] Error:", err);

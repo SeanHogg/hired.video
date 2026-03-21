@@ -4,6 +4,21 @@ main = "src/worker.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 # Routes (both new and legacy domains)
 routes = [
   "api.hired.video/*",
@@ -25,9 +40,14 @@ EMAIL_FROM = "info@hired.video"
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
+# -- Stripe (default payment provider) --
 # wrangler secret put STRIPE_PUBLISHABLE_KEY
 # wrangler secret put STRIPE_SECRET_KEY
 # wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY
+# -- Helcim (alternative — set PAYMENT_PROVIDER=helcim to activate) --
+# wrangler secret put HELCIM_ACCOUNT_ID
+# wrangler secret put HELCIM_API_TOKEN
+# wrangler secret put HELCIM_WEBHOOK_TOKEN
 # wrangler secret put OPENROUTER_MODELS
 # wrangler secret put GOOGLE_GEMINI_KEY
 # wrangler secret put YOUTUBE_CLIENT_ID

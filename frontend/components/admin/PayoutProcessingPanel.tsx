@@ -133,7 +133,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
 
       toast({
         title: "Success",
-        description: "Payout processing initiated via Stripe",
+        description: "Payout processing initiated",
       });
 
       // Reload payouts
@@ -142,7 +142,7 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
       // console.error("Failed to process payout:", error);
       toast({
         title: "Error",
-        description: "Failed to process payout via Stripe",
+        description: "Failed to process payout",
         variant: "destructive",
       });
     } finally {
@@ -337,9 +337,9 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Process Payout via Stripe</AlertDialogTitle>
+                                    <AlertDialogTitle>Process Payout</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will initiate the payout of {formatCurrency(payout.amountCents)} to {payout.affiliateUserName} via Stripe.
+                                      This will initiate the payout of {formatCurrency(payout.amountCents)} to {payout.affiliateUserName}.
                                       The payout will be processed immediately.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
@@ -414,11 +414,11 @@ export function PayoutProcessingPanel({ open, onOpenChange }: PayoutProcessingPa
                       </div>
                     )}
 
-                    {selectedPayout.stripeReferenceId && (
+                    {selectedPayout.providerReferenceId && (
                       <div>
-                        <Label className="text-sm font-medium">Stripe Reference</Label>
+                        <Label className="text-sm font-medium">Provider Reference</Label>
                         <p className="text-sm font-mono bg-muted p-2 rounded">
-                          {selectedPayout.stripeReferenceId}
+                          {selectedPayout.providerReferenceId}
                         </p>
                       </div>
                     )}

@@ -17,7 +17,7 @@ export interface SubscriptionSummary {
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd: boolean;
   trialEnd?: string | null;
-  stripeSubscriptionId?: string | null; // For refund and cancellation purposes
+  providerSubscriptionId?: string | null; // For refund and cancellation purposes
 }
 
 export interface PaymentMethod {
@@ -97,6 +97,23 @@ export const billingService = {
       { successUrl, cancelUrl }
     );
     return res.data.Url;
+  },
+
+  async initPaymentCollection(successUrl: string, cancelUrl: string): Promise<{
+    flowType: "embedded" | "redirect";
+    clientSecret?: string;
+    checkoutToken?: string;
+    sdkScriptUrl?: string;
+    redirectUrl?: string;
+  }> {
+    const res = await apiClient.post<{
+      flowType: "embedded" | "redirect";
+      clientSecret?: string;
+      checkoutToken?: string;
+      sdkScriptUrl?: string;
+      redirectUrl?: string;
+    }>("/api/payment/init-collection", { successUrl, cancelUrl });
+    return res.data;
   },
 
   async deletePaymentMethod(paymentMethodId: string): Promise<string> {

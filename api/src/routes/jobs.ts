@@ -55,19 +55,15 @@ jobRoutes.post("/", async (c) => {
   return c.json(success(created), 201);
 });
 
-/** GET /api/Job/GetSummaryItems (legacy) and /api/job/getsummaryitems **/
-jobRoutes.get("/GetSummaryItems", async (c) => {
+/** GET /api/Job/GetSummaryItems — legacy PascalCase alias; getsummaryitems is the canonical form **/
+const summaryItemsHandler = async (c: any) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const items = await jobService.getUserJobs(userId);
   return c.json(success(items));
-});
-jobRoutes.get("/getsummaryitems", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const items = await jobService.getUserJobs(userId);
-  return c.json(success(items));
-});
+};
+jobRoutes.get("/getsummaryitems", summaryItemsHandler);
+jobRoutes.get("/GetSummaryItems", summaryItemsHandler); // legacy PascalCase alias
 
 /** GET /api/job/user-jobs — legacy recruiter flow alias */
 jobRoutes.get("/user-jobs", async (c) => {
@@ -250,19 +246,15 @@ jobRoutes.post("/", async (c) => {
   return c.json(success(created), 201);
 });
 
-/** GET /api/Job/GetSummaryItems (legacy) and /api/job/getsummaryitems **/
-jobRoutes.get("/GetSummaryItems", async (c) => {
+/** GET /api/Job/GetSummaryItems — legacy PascalCase alias; getsummaryitems is the canonical form **/
+const summaryItemsHandler = async (c: any) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const items = await jobService.getUserJobs(userId);
   return c.json(success(items));
-});
-jobRoutes.get("/getsummaryitems", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const items = await jobService.getUserJobs(userId);
-  return c.json(success(items));
-});
+};
+jobRoutes.get("/getsummaryitems", summaryItemsHandler);
+jobRoutes.get("/GetSummaryItems", summaryItemsHandler); // legacy PascalCase alias
 
 /** GET /api/job/user-jobs — legacy recruiter flow alias */
 jobRoutes.get("/user-jobs", async (c) => {

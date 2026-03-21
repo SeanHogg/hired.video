@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { authMiddleware } from "./middleware/auth.js";
+import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
+import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
@@ -131,6 +133,27 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     return authMiddleware(c as any, next);
+  });
+
+  // Enforce email verification on all authenticated routes.
+  // Exemptions: auth (handles unverified flows), password management, and
+  // security settings (so users can still manage 2FA before verifying email).
+  const EMAIL_VERIFY_EXEMPT = ["/api/auth", "/api/passwordmanagement", "/api/settings/security"];
+  app.use("/api/*", async (c, next) => {
+    const path = c.req.path;
+    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
+    if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
+    return emailVerifiedMiddleware(c as any, next);
+  });
+
+  // Block users who have mustChangePassword set from accessing anything except
+  // the auth routes and the force-change endpoint itself.
+  const PASSWORD_CHANGE_EXEMPT = ["/api/auth", "/api/passwordmanagement"];
+  app.use("/api/*", async (c, next) => {
+    const path = c.req.path;
+    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
+    if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
+    return passwordChangeMiddleware(c as any, next);
   });
 
   // Simple health check (includes DB connectivity)

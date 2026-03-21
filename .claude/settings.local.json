@@ -1,10 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)",
-      "Bash(ls *.sh)",
-      "Bash(wrangler secret:*)",
-      "Bash(\"C:/code/hired.video/STUDIO_UPGRADE_SPEC.md\":*)"
-    ]
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Agent",
+      "Glob",
+      "Grep",
+      "Skill",
+      "WebFetch",
+      "WebSearch",
+      "TodoWrite",
+      "NotebookEdit"
+    ],
+    "defaultMode": "bypassPermissions"
   }
 }

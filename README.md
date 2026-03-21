@@ -1,1238 +1,985 @@
-# hired.video Platform - Complete Documentation
+# hired.video Platform
 
-A production-ready full-stack React application for video resume creation and talent management, featuring React Router 6 SPA mode, TypeScript, AI-powered features, and comprehensive business management tools.
+A full-stack platform for video resume creation and talent management. Combines an AI-powered resume/video builder with professional networking, recruiter tools, and multi-tenant organization management.
 
-## 🚀 Platform Overview
+---
 
-hired.video is an enterprise-grade platform that combines video resume creation with comprehensive talent management, professional networking, and business collaboration tools. The platform supports multi-tenant organizations with role-based access control and advanced productivity features.
+## Platform Overview
 
-### Core Platform Features
+hired.video supports multiple user personas operating in the same platform:
 
-- **🔐 Authentication & User Management** - Complete login/signup with JWT tokens and role-based access
-- **📄 Resume Management** - AI-powered resume builder with file upload, parsing, and analytics
-- **💼 Job Management** - Job search, posting, application tracking, and matching algorithms
-- **🏢 Company Management** - Company profiles, following, job listings, and team collaboration
-- **👥 Professional Networking** - User connections, professional network building, and social features
-- **📋 Task Management** - Complete productivity system with multi-view interfaces (Table, Calendar, Kanban)
-- **📧 Communication & Outreach** - Professional networking, email templates, and campaign management
-- **🤖 AI Integration** - OpenRouter-powered AI assistant for career guidance and optimization
-- **🏢 Account & Organization Management** - Multi-tenant business accounts with team collaboration
-- **⚖️ Legal Compliance** - Comprehensive Privacy Policy and Terms of Service with multi-jurisdiction compliance
-- **📊 Analytics & Tracking** - Google Tag Manager integration for advanced analytics and user behavior tracking
+- **Job Seekers** — Build resumes and video resumes, search/apply to jobs, network professionally
+- **Recruiters** — Manage talent pools, submit candidates, track placements, communicate via outreach campaigns
+- **Business Owners / Employers** — Post jobs, manage company profiles, invite team members, view analytics
+- **Admins** — Platform management, affiliate oversight, billing/refund management
 
-### Account & Organization Management
+### Core Feature Areas
 
-The platform supports sophisticated multi-tenant account structures with role-based access:
+| Area | Description |
+|------|-------------|
+| Authentication & Security | JWT auth, email verification, 2FA, password reset, refresh tokens |
+| Resume Management | AI-powered builder, file parsing, versioning, analytics, cloning, publishing |
+| Video Resume & Studio | AI video generation, storyboard editor, script editing, YouTube publishing |
+| Job Management | Job CRUD, search, applications, alerts, AI-based matching and tailoring |
+| Company Profiles | Company pages, follow system, trending, job listings |
+| Professional Networking | User connections, social feed, recommendations |
+| Recruiter Tools | Talent pools, submissions, placements, commission tracking |
+| Communication | Conversations, email templates, campaigns, tracking, external contacts |
+| AI Features | Resume scoring, optimizer, ATS analysis, value proposition, salary analysis, interview prep |
+| Multi-tenant Accounts | Team invitations, role-based access, account switching |
+| Billing & Payments | Subscriptions, payment methods, invoices, refunds, cancellations |
+| Affiliate Program | Referral tracking, conversions, payouts |
+| Admin Dashboard | Platform metrics, affiliate management, refund/cancellation approval |
 
-#### **Account Types & Roles**
+---
 
-- **Job Seekers** - Individual accounts focused on career development and job searching
-- **Recruiters** - Can create business accounts and join multiple organizations as freelancers
-- **Business Owners** - Create and manage company accounts with full team collaboration features
+## Tech Stack
 
-#### **Account Hierarchy**
+### Backend API (`/api`)
 
-- **Account Owner** - The user who created the business account (full permissions)
-- **Account Admin** - Assigned by owner, manages users, settings, and account configuration
-- **Recruiters** - Team members with job posting, candidate management, and recruitment access
-- **Multi-Account Support** - Users can switch between multiple accounts they belong to
+| Concern | Technology |
+|---------|-----------|
+| Language | TypeScript |
+| Framework | [Hono](https://hono.dev/) (lightweight, edge-native) |
+| Runtime | Cloudflare Workers (edge serverless) |
+| Database | PostgreSQL via [Neon](https://neon.tech/) (serverless) |
+| ORM | [Drizzle ORM](https://orm.drizzle.team/) |
+| Validation | [Zod](https://zod.dev/) |
+| Auth | JWT (jose) + PBKDF2 password hashing |
+| Email | SendPulse via `sendpulse-api` npm package |
+| AI / LLM | OpenRouter API (Google Gemini Flash) |
+| File Storage | AWS S3 + Cloudflare R2 |
+| Error Monitoring | Sentry |
+| Migrations | Drizzle Kit |
 
-#### **Account Management Features**
+### Frontend (`/frontend`)
 
-- **User Invitations** - Business owners and admins can invite team members via email
-- **Role Assignment** - Flexible role-based permissions system with hierarchical access control
-- **Account Switching** - Seamless switching between multiple organizations for freelance recruiters
-- **Team Collaboration** - Shared tasks, jobs, communication, and analytics across account members
-- **Permission Management** - Granular control over user access to features and data
+| Concern | Technology |
+|---------|-----------|
+| Framework | React 18 + TypeScript |
+| Build | Vite |
+| Styling | TailwindCSS 3 + shadcn/ui (Radix UI) |
+| Routing | React Router 6 (SPA mode) |
+| State / Data | React Query + Context API |
+| Forms | React Hook Form + Zod |
+| Analytics | Google Tag Manager (GTM-T6CSJ22D) |
 
-## 🛠 Tech Stack
+### Legacy Reference API (`/myvideoresume-api`)
 
-### Frontend
+The legacy implementation is a **C# / ASP.NET Core** solution retained as a reference. It targets the same feature surface and is used as a specification for the TypeScript rewrite. See [Gap Analysis](#gap-analysis-vs-legacy-api) below.
 
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite with hot module replacement
-- **Styling**: TailwindCSS 3 with shadcn/ui components
-- **Routing**: React Router 6 (SPA mode)
-- **State Management**: React Query + Context API
-- **Authentication**: JWT with automatic token refresh
-- **AI Integration**: OpenRouter API for AI features
-- **Analytics**: Google Tag Manager (GTM-T6CSJ22D) for comprehensive tracking
-- **Icons**: Lucide React
-- **Forms**: React Hook Form with Zod validation
-- **UI Library**: Radix UI primitives with custom styling
+---
 
-### Backend Integration
-
-- **.NET Core API** - Comprehensive RESTful API
-- **Entity Framework** - Database ORM with SQL Server
-- **JWT Authentication** - Secure token-based authentication
-- **Multi-tenant Architecture** - Role-based access control
-- **File Storage** - Support for resume uploads and image processing
-- **Email Services** - SMTP integration for notifications and outreach
-
-## 📁 Project Structure
-
-```
-frontend/                   # React SPA frontend
-├── pages/                # Route components (Index.tsx = home)
-│   ├── Index.tsx         # Home page
-│   ├── Login.tsx         # Authentication
-│   ├── Dashboard.tsx     # Role-specific dashboards
-│   ├── AccountManagement.tsx # Team and organization management
-│   ├── Tasks.tsx         # Productivity and task management
-│   ├── Outreach.tsx      # Communication and networking
-│   └── ...               # Other feature pages
-├── components/           # Reusable UI components
-│   ├── ui/              # Pre-built UI component library (shadcn/ui)
-│   ├── account/         # Account management components
-│   ├── tasks/           # Task management components
-│   ├── communication/   # Communication components
-│   └── ...              # Feature-specific components
-├── lib/                 # Utilities and services
-│   ├── services/        # API service layers
-│   │   ├── account-service.ts    # Account management API
-│   │   ├── task-service.ts       # Task management API
-│   │   ├── communication-service.ts # Communication API
-│   │   └── ...          # Other service layers
-│   ├── auth.ts          # Authentication utilities
-│   └── utils.ts         # Helper functions
-├── hooks/               # Custom React hooks
-├── types/               # TypeScript type definitions
-│   ├── account.ts       # Account and organization types
-│   ├── tasks.ts         # Task management types
-│   ├── communication.ts # Communication types
-│   └── ...              # Feature-specific types
-├── data/                # Mock data and constants
-├── App.tsx              # App entry point with SPA routing
-└── global.css           # TailwindCSS theming and global styles
-```
-
-## 🎨 UI Components & Design System
-
-Built with **shadcn/ui** component library providing:
-
-- **Consistent Design System** - Unified visual language across all components
-- **Accessible Components** - WCAG compliant with keyboard navigation
-- **Dark/Light Theme Support** - System preference detection and manual toggle
-- **Responsive Design Patterns** - Mobile-first approach with breakpoint optimization
-- **Custom Component Library** - Extended components for business-specific features
-
-### Key UI Features
-
-- **Multi-view Interfaces** - Table, Calendar, and Kanban views for task management
-- **Advanced Filtering** - Dynamic filter systems with real-time search
-- **Drag & Drop** - Interactive task management and file uploads
-- **Modal Systems** - Complex forms and workflows in overlay interfaces
-- **Toast Notifications** - Real-time feedback for user actions
-- **Loading States** - Skeleton screens and progress indicators
-
-## 🔗 API Integration
-
-The frontend integrates with a comprehensive .NET Core API providing:
-
-- **RESTful Endpoints** - Full CRUD operations for all platform features
-- **Type-safe Interfaces** - TypeScript definitions matching backend models
-- **Standardized Responses** - Consistent error handling and success responses
-- **Authentication** - JWT bearer tokens with automatic refresh
-- **File Upload Support** - Resume uploads, image processing, and document management
-- **Real-time Features** - WebSocket support for live updates (planned)
-
-### API Service Architecture
-
-- **Service Layer Pattern** - Dedicated service classes for each feature area
-- **Error Handling** - Centralized error processing with user-friendly messages
-- **Request Interceptors** - Automatic token attachment and refresh
-- **Response Caching** - React Query for intelligent data caching
-- **Optimistic Updates** - Immediate UI updates with rollback on failure
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Node.js 18+** - Latest LTS version recommended
-- **npm or yarn** - Package manager
-- **.NET 9 SDK** - For backend API development
-- **SQL Server** - Database (LocalDB, Express, or full SQL Server)
-- **Visual Studio Code** - Recommended IDE with extensions
-- **Git** - Version control
-
-### Project Structure Setup
-
-The hired.video platform consists of three repositories that work together:
+## Project Structure
 
 ```
-hired.video/                    # Parent folder
-├── hired.video-frontend/       # React frontend (this repo)
-├── hired-api/           # .NET Core API backend
-└── hired.video-chrome-extension/  # Chrome extension
-```
-
-### Complete Installation Guide
-
-#### 1. Clone All Repositories
-
-```bash
-# Create parent directory
-mkdir hired.video
-cd hired.video
-
-# Clone all three repositories
-git clone https://github.com/your-org/hired.video-frontend.git
-git clone https://github.com/your-org/hired-api.git
-git clone https://github.com/your-org/hired.video-chrome-extension.git
-
-# Open the parent folder in VS Code
-code .
-```
-
-#### 2. Backend API Setup
-
-```bash
-# Navigate to API folder
-cd hired-api
-
-# Restore NuGet packages
-dotnet restore
-
-# Create appsettings.Development.json
-cp appsettings.json appsettings.Development.json
-```
-
-**Configure appsettings.Development.json:**
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=hired.videoDB;Trusted_Connection=true;MultipleActiveResultSets=true"
-  },
-  "JwtSettings": {
-    "SecretKey": "your-super-secret-jwt-key-here-minimum-32-characters",
-    "Issuer": "hired.video",
-    "Audience": "hired.video",
-    "ExpirationInMinutes": 60
-  },
-  "OpenAIKey": "your-openrouter-api-key-here",
-  "OpenAIModel": "meta-llama/llama-3.1-8b-instruct:free",
-  "EmailSettings": {
-    "SmtpServer": "smtp.gmail.com",
-    "SmtpPort": 587,
-    "SmtpUsername": "your-email@gmail.com",
-    "SmtpPassword": "your-app-password",
-    "FromEmail": "your-email@gmail.com",
-    "FromName": "hired.video"
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*"
-}
-```
-
-#### 3. Database Setup
-
-```bash
-# From the hired-api folder
-cd hired-api
-
-# Install Entity Framework tools (if not already installed)
-dotnet tool install --global dotnet-ef
-
-# Create the database and run migrations
-dotnet ef database update
-
-# If you need to create a new migration (for development)
-dotnet ef migrations add InitialCreate
-
-# Build and run the API
-dotnet build
-dotnet run
-```
-
-The API will be available at `https://localhost:5001` and `http://localhost:5000`
-
-### ⚙️ Cloudflare Worker API (hired-api)
-
-This project includes a Cloudflare Worker-based API (`api/`) that is deployed via Wrangler.
-
-#### Secrets & environment
-
-The worker expects a Neon/Postgres connection string via one of these binding names:
-
-- `DATABASE_URL`
-- `NEON_DATABASE_URL`
-- `NEON_DB_URL`
-
-> **Important:** These values should be set as Wrangler secrets, not committed to source control.
-
-Example (run from `api/`):
-
-```bash
-# Set secrets for the worker (production environment)
-wrangler secret put NEON_DATABASE_URL --env production
-wrangler secret put NEON_DB_URL --env production
-```
-
-#### Deploying the worker (with migrations)
-
-The worker deploy script has been configured to run database migrations before deploying.
-
-From `api/`:
-
-```bash
-npm install
-npm run deploy
-```
-
-This runs:
-
-1. `npm run db:push` — runs `drizzle-kit up` to apply any schema changes
-2. `wrangler deploy --env production` — deploys the worker to Cloudflare
-
-#### Health check
-
-A health endpoint is available at:
-
-- `https://api.hired.video/api/health`
-
-It verifies both the worker is running and the database connection is valid.
-
-#### CORS configuration
-
-Allowed frontend origins are controlled by the `FRONTEND_URL` environment variable in `api/wrangler.toml`. Set it as a **comma-separated list** of all domains that should be permitted to call the API from a browser.
-
-```toml
-# api/wrangler.toml
-[vars]
-FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
-
-[env.production.vars]
-FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
-```
-
-> ⚠️ **Critical implementation detail:** The CORS origin check in `api/src/app.ts` reads `FRONTEND_URL` inside the per-request `origin` callback (via `getAllowedOrigins()`). This is intentional — Cloudflare Worker bindings are not available at module-load time (when `createApp()` runs), only during request handling when `globalThis.__ENV` has been populated by `worker.ts`. If you move that lookup outside the callback it will always fall back to the hardcoded default and any domain not in the fallback will get `Access-Control-Allow-Origin: null`.
-
-After editing `wrangler.toml`, redeploy the worker from `api/`:
-
-```bash
-npx wrangler deploy --env production
-```
-
-#### If you need to run migrations manually
-
-From `api/`:
-
-```bash
-npm run db:push
+hired.video/
+├── api/                          # Cloudflare Workers API (TypeScript / Hono)
+│   ├── src/
+│   │   ├── app.ts                # Hono app factory, route mounting, CORS
+│   │   ├── worker.ts             # CF Worker fetch handler (production entry)
+│   │   ├── index.ts              # Node.js entry (local development)
+│   │   ├── routes/               # 40 route files — one per feature domain
+│   │   ├── services/             # Business logic services (7 files)
+│   │   ├── middleware/           # Auth, error handling, rate limiting, logging
+│   │   ├── db/
+│   │   │   ├── schema/           # Drizzle schema definitions (73 tables)
+│   │   │   └── index.ts          # DB connection
+│   │   └── types/                # Shared TypeScript types, response helpers
+│   ├── wrangler.toml             # Cloudflare Worker config + R2/KV bindings
+│   └── drizzle.config.ts         # Migration configuration
+├── frontend/                     # React SPA
+│   ├── pages/                    # Route-level page components
+│   ├── components/               # Reusable UI components
+│   ├── lib/services/             # API service layer (one file per domain)
+│   ├── hooks/                    # Custom React hooks
+│   └── types/                    # Frontend TypeScript types
+├── myvideoresume-api/            # Legacy C# reference implementation (read-only)
+│   ├── MyVideoResume.Server/     # ASP.NET Core Web API
+│   ├── MyVideoResume.Application/# Business logic services
+│   ├── MyVideoResume.Data/       # EF Core DbContext + entities
+│   ├── MyVideoResume.Abstractions/ # DTOs, interfaces, models
+│   ├── MyVideoResume.AI/         # LLM integration
+│   ├── MyVideoResume.ML.SentimentAnalysis/ # ML.NET sentiment model
+│   └── MyVideoResume.Tests/      # Unit/integration tests
+└── docs/                         # Documentation
 ```
 
 ---
 
-#### 4. Frontend Setup
+## API Inventory & Implementation Status
+
+### Middleware
+
+| File | Status | Notes |
+|------|--------|-------|
+| `auth.ts` | ✅ Complete | JWT verification, sets `c.var.user` |
+| `errorHandler.ts` | ✅ Complete | AppError hierarchy, Zod formatting, Sentry |
+| `rateLimiter.ts` | ✅ Complete | In-memory, 100 req/60s per IP |
+| `emailVerified.ts` | ⚠️ Partial | Defined but not actively mounted on routes |
+| `passwordChange.ts` | ⚠️ Partial | Defined but not actively enforced |
+| `requestLogger.ts` | ✅ Complete | HTTP request/response logging |
+
+### Routes
+
+#### Authentication & Account Management
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `auth.ts` | POST /register, /login, /refresh, /logout, /forgot-password, /reset-password, /verify-email, /verify-2fa, /resend-2fa, /resend-email-verification; GET /verification-status, /me | ✅ Complete | Full auth flow implemented |
+| `account.ts` | GET /users, /available, /invitations/pending, /invitation/:id, /settings, /analytics, /invitation-analytics; POST /invite, /accept-invitation/:id, /switch, /bulk-invite, /deleteaccount; PUT /roles; DELETE /users/:id | ✅ Complete | Multi-tenant org management |
+| `users.ts` | GET /public, /:id, /check-slug/:slug, /me, /me/connections, /me/recommendations, /profile, /:id/resumes, /:id/stats, /:id/can-message; POST /connections; PUT /me, /profile, /connections/:id/accept; DELETE /account, /connections/:id; PATCH /slug | ✅ Complete | Profile + connections |
+| `settings.ts` | GET /account, /job-preferences, /notifications, /security, /privacy, /export; PUT /account, /job-preferences, /notifications, /privacy, /security; POST /security/2fa/enable, /disable | ✅ Complete | User preferences |
+| `password-management.ts` | GET /requirements; POST /validate-strength, /force-change | ✅ Complete | Password policy enforcement |
+
+#### Resume Features
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `resumes.ts` | GET /, /:id, /export, /metadata, /embedded/:id, /mastergroups, /public, /validateslug, /withownership; POST /, /clone, /createvariation, /promote, /publish, /setactive, /setmaster, /setprivacy, /createfromfile, /parse, /save, /watch/:id, /unwatch/:id; PUT /:id, /:id/metadata; DELETE /:id | ✅ Complete | Core resume CRUD + lifecycle |
+| `resume-scorer.ts` | POST /score, /category-breakdown, /recommendations | ✅ Complete | AI-powered scoring |
+| `resume-optimizer.ts` | POST /optimize, /ats-analysis, /keyword-suggestions | ✅ Complete | ATS optimization |
+| `resume-roast.ts` | POST /roast | ✅ Complete | AI feedback tool |
+| `sentiment.ts` | POST /sentimentprediction, /resume/sentimentprediction | ✅ Complete | Sentiment analysis |
+
+#### Video & Studio
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `video.ts` | GET /:id, /:id/status, /resume/:resumeId, /resume/:resumeId/active, /resume/:resumeId/can-generate, /user/all; POST /generate, /:id/cancel, /enhance-summary; DELETE /:id | ✅ Complete | Video generation lifecycle |
+| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId; DELETE /projects/:projectId; PATCH /projects/:projectId/status | ✅ Complete | 929 lines — largest route file |
+
+#### Jobs & Matching
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `jobs.ts` | GET /, /:id, /public, /slug/:slug, /GetSummaryItems, /saved, /alerts, /applications, /user-jobs; POST /, /:id/apply, /:id/save, /createfromfile, /extract, /alerts; PUT /:id, /alerts/:id; DELETE /:id, /:id/save; PATCH /alerts/:id/toggle | ✅ Complete | Full job lifecycle + alerts |
+| `match.ts` | POST /, /analyze, /bycontent, /byid, /tailor | ✅ Complete | Resume-to-job matching |
+| `search.ts` | GET /public | ⚠️ Partial | Single endpoint; legacy has richer search |
+
+#### Companies
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `companies.ts` | GET /public, /:id, /:id/jobs, /:id/stats, /:id/following-status, /slug/:slug, /trending, /me/followed; POST /, /:id/follow; PUT /:id; DELETE /:id, /:id/follow | ✅ Complete | Company profiles + follow system |
+
+#### Recruiter Tools
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `recruiter.ts` | GET /talent-pool, /submissions, /placements, /placements/summary/commission, /interactions/:talentPoolId; POST /talent-pool, /submissions, /placements, /interactions; PUT /talent-pool/:id, /submissions/:id/status, /placements/:id/commission, /placements/:id/guarantee; DELETE /talent-pool/:id; POST /submissions/:id/withdraw | ✅ Complete | 618 lines |
+
+#### Communication
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `messages.ts` | POST /, /message | ⚠️ Partial | Minimal — direct messages only |
+| `communication.ts` | GET /conversations, /messages, /email-templates, /email-campaigns, /tracking, /stats, /job-boards, /external-contacts; POST /conversations, /messages, /messages/mark-read, /email-templates, /email-campaigns, /email-campaigns/:id/send, /tracking, /job-boards/post, /external-contacts, /follow-ups; PUT /email-templates/:id, /external-contacts/:id; DELETE /email-templates/:id, /external-contacts/:id, /job-boards/postings/:id | ✅ Complete | 318 lines |
+
+#### AI Features
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ai.ts` | POST /context | ⚠️ Partial | Single context endpoint; chat/prompt engine not exposed |
+| `value-proposition.ts` | POST /generate/content, /generate/job-content-resume-id, /generate/job-id-resume-content, /generate/job-id-resume-id | ✅ Complete | 4 generation modes |
+| `salary.ts` | POST /analyze, /negotiation-tips | ✅ Complete | Salary calculator |
+| `interview.ts` | GET /sessions, /sessions/:id; POST /sessions, /sessions/:id/answers, /questions, /answers/:answerId/analyze; DELETE /sessions/:id; PATCH /sessions/:id/complete | ✅ Complete | 489 lines |
+
+#### Dashboard & Analytics
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `dashboard.ts` | GET /, /admin, /employer, /jobseeker, /recruiter; POST /activity, /engagement, /profile-view, /refresh | ✅ Complete | Role-specific dashboards |
+
+#### Social Feed
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `feed.ts` | GET /posts, /posts/:id, /posts/:id/comments, /search; POST /posts, /posts/:id/like, /comments, /link-preview; PUT /posts/:id, /comments/:id; DELETE /posts/:id, /posts/:id/like, /comments/:id | ✅ Complete | 389 lines |
+
+#### Billing & Payments
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `billing.ts` | GET /subscription, /payment-methods, /invoices, /ai-usage/month, /refund-policy, /refund-reasons, /refund-requests; POST /refund-request, /cancel-account | ⚠️ Partial | Routes exist; `billing.ts` service is a stub placeholder |
+| `payment.ts` | DELETE /payment-methods/:id; POST /create-setup-session | ⚠️ Partial | Minimal payment methods; Stripe integration incomplete |
+
+#### Admin & Affiliates
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `admin.ts` | GET /, /affiliate-stats, /productdashboard/affiliate-stats, /export/:format, /refund-requests, /refund-stats, /cancellation-requests; POST /refund-requests/:id/approve, /reject, /cancellation-requests/:id/approve, /reject | ✅ Complete | Admin management panel |
+| `affiliates.ts` | GET /profile, /dashboard, /admin/all, /admin/:userId/details, /admin/pending-payouts; POST /payout/request, /admin/:userId/activate, /deactivate, /admin/payout/:payoutId/approve, /reject, /process | ✅ Complete | Full affiliate program |
+
+#### Integrations & Utilities
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `upload.ts` | POST /, /image, /single, /video; DELETE /:key | ✅ Complete | S3/R2 upload handling |
+| `youtube.ts` | GET /account, /auth-url, /company/auth-url, /company/status; POST /callback, /disconnect, /publish/:videoId | ✅ Complete | YouTube OAuth + publishing |
+| `linkedin-post.ts` | POST /linkedin-post | ⚠️ Partial | Basic post endpoint; no OAuth flow |
+| `locations.ts` | GET /countries, /states, /cities, /search | ✅ Complete | Reference data |
+| `og.ts` | GET /v/:videoId | ✅ Complete | Open Graph metadata |
+| `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
+| `feature-flag.ts` / `featureflag.ts` | GET / | ⚠️ Duplicate | Two route files for same feature — consolidation needed |
+| `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ⚠️ Stub | SignalR-style stubs; no WebSocket implementation |
+| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ⚠️ Partial | Basic structure; no campaign execution |
+
+### Services
+
+| Service | Lines | Status | Notes |
+|---------|-------|--------|-------|
+| `email.ts` | 518 | ✅ Complete | `EmailProvider` interface + SendPulse implementation; sends verification, reset, 2FA, resend emails |
+| `ai.ts` | 84 | ✅ Complete | `callLLM()` / `callLLMJson()` with Zod schema validation; OpenRouter wrapper |
+| `account.ts` | 363 | ✅ Complete | Organization/team management business logic |
+| `job.ts` | 257 | ✅ Complete | Job management: create, update, archive, search |
+| `company.ts` | 84 | ✅ Complete | Company CRUD, follow/unfollow, trending |
+| `settings.ts` | 76 | ✅ Complete | User preference read/write |
+| `billing.ts` | 106 | ❌ Stub | Placeholder with no business logic implemented |
+
+### Database Schema (73 tables in `/api/src/db/schema/`)
+
+All tables are defined and schema migrations managed via Drizzle Kit.
+
+| Domain | Tables |
+|--------|--------|
+| Users & Auth | `users`, `userProfiles`, `userRoles`, `roles`, `passwordHistory`, `twoFactorCodes`, `emailVerificationTokens`, `passwordResetTokens`, `refreshTokens`, `userConnections` |
+| Companies & Orgs | `companyProfiles`, `userCompanyRoleAssociations`, `companyFollowers`, `accountInvitations`, `accountPreferences` |
+| Resumes | `resumeInformation`, `resumeTemplates`, `watchedResumes`, `metaResumes` |
+| Jobs | `jobItems`, `jobPreferences`, `jobApplications`, `savedJobs`, `jobAlerts`, `jobWebsites` |
+| Video & Studio | `videos`, `videoResumes`, `studioProjects`, `youtubeAccounts` |
+| Recruiter | `recruiterTalentPools`, `talentPoolCandidates`, `candidateInteractions`, `candidateSubmissions`, `placements`, `jobBoards`, `jobBoardPostings` |
+| Messaging | `conversations`, `conversationParticipants`, `messages`, `messageReadReceipts`, `emailTemplates`, `emailCampaigns`, `emailCampaignRecipients`, `communicationTracking` |
+| Social | `feedPosts`, `feedPostLikes`, `feedPostComments` |
+| Interviews | `interviewSessions`, `interviewAnswers`, `interviews`, `applicationNotes` |
+| Affiliate | `affiliateProfiles`, `affiliateReferrals`, `affiliateConversions`, `affiliatePayouts` |
+| Billing | `subscriptionPlans`, `subscriptions`, `paymentMethods`, `invoices`, `invoiceLineItems`, `refundRequests`, `billingEvents`, `usageRecords` |
+| Analytics | `profileViews`, `activityLogs`, `requestLogs`, `dashboardMetrics`, `userEngagementMetrics`, `aiUsageRecords`, `aiChatSessions`, `aiChatMessages` |
+| Productivity | `tasks`, `boards`, `notifications`, `queueJobToResume`, `queueJobToProcess` |
+| Locations | `countries`, `stateProvinces`, `cities`, `postalZipCodes` |
+| System | `systemSettings` |
+
+---
+
+## Legacy API Coverage Map
+
+This section documents every controller in `/myvideoresume-api` (31 C# controllers, ~200 endpoints), the business-logic service it calls, the DB tables it touches, and whether the TypeScript API has a matching implementation.
+
+**Coverage key:**
+✅ Fully covered — TypeScript API has equivalent endpoints with DB-backed logic
+⚠️ Partial — Routes exist but logic is stubbed, missing, or incomplete
+❌ Not covered — No equivalent in TypeScript API
+
+### Authentication & User Management
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **AuthController** | `POST /api/auth/login` | UserManager.CheckPasswordSignInAsync, issues 2FA challenge token | AspNetUsers, PasswordHistory | ✅ `routes/auth.ts` |
+| | `POST /api/auth/register` | Creates user + roles + affiliate profile; sends verification email | AspNetUsers, AspNetUserRoles, AffiliateProfiles | ✅ |
+| | `POST /api/auth/verify-2fa` | Validates OTP; sends welcome email on first login; marketing email (30-day cooldown) | AspNetUsers, TwoFactorCodes | ✅ |
+| | `POST /api/auth/resend-2fa` | Resends 2FA code via email | TwoFactorCodes | ✅ |
+| | `POST /api/auth/refresh` | Issues new JWT + refresh token | RefreshTokens | ✅ |
+| | `POST /api/auth/logout` | Invalidates refresh token | RefreshTokens | ✅ |
+| | `GET /api/auth/me` | Returns current user from JWT | AspNetUsers | ✅ |
+| | `POST /api/auth/resend-email-verification` | Rate-limited (1/min, 5/24h); sends verification email | EmailVerificationTokens | ✅ |
+| | `GET /api/auth/verification-status` | Returns emailVerified flag | AspNetUsers | ✅ |
+| **AccountApiController** | `GET /api/account/users` | List users in account | AspNetUsers, UserRoles | ✅ `routes/account.ts` |
+| | `POST /api/account/invite` | Email invitation to join account | AccountInvitations | ✅ |
+| | `POST /api/account/bulk-invite` | Bulk team invite | AccountInvitations | ✅ |
+| | `POST /api/account/accept-invitation/:id` | Accept invite (no auth) | AccountInvitations, UserRoles | ✅ |
+| | `POST /api/account/switch` | Switch active account context | UserRoles | ✅ |
+| | `PUT /api/account/roles` | Update user role assignments | AspNetUserRoles | ✅ |
+| | `DELETE /api/account/users/:id` | Remove user from account | AspNetUserRoles | ✅ |
+| | `GET /api/account/analytics` | Invitation/account metrics | AccountInvitations | ✅ |
+| | `GET /api/account/invitation/:id` | Get invitation details (no auth) | AccountInvitations | ✅ |
+| | `POST /api/account/deleteaccount` | Soft-delete account | AspNetUsers | ✅ |
+| **ApplicationUsersController** | `odata/Identity` (5 endpoints) | UserManager via OData | AspNetUsers | ❌ OData not needed for edge runtime |
+| **ApplicationRolesController** | `odata/Identity` (4 endpoints) | RoleManager via OData | AspNetRoles | ❌ OData not needed for edge runtime |
+
+### Resume Management
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **ResumeController** | `GET /api/resume/:id` | Privacy check + view tracking | ResumeInformation, ResumeViews | ✅ `routes/resumes.ts` |
+| | `GET /api/resume/embedded/:id` | Bypass auth/privacy for embed | ResumeInformation | ✅ |
+| | `GET /api/resume/public` | Paginated public resumes | ResumeInformation | ✅ |
+| | `GET /api/resume/GetResumesOwnedByAuthUser` | Master/variation hierarchy | ResumeInformation, MetaResume | ✅ |
+| | `POST /api/resume/Save` | Create/update resume JSON | ResumeInformation | ✅ |
+| | `POST /api/resume/Parse` | PDF/DOCX → structured JSON via AI | ResumeInformation | ✅ |
+| | `POST /api/resume/CreateFromFile` | Upload → parse → create + queue matching | ResumeInformation, QueueJobToResume | ⚠️ File parsing works; background queue not processed |
+| | `POST /api/resume/Summarize` | AI-generated summary via LLM | ResumeInformation | ✅ |
+| | `POST /api/resume/SentimentPrediction` | ML sentiment score | ResumeSentiment | ✅ (LLM-based instead of ML.NET) |
+| | `DELETE /api/resume/:id` | Owner-only delete | ResumeInformation | ✅ |
+| | `PUT /api/resume/:id` | Full update with master propagation | ResumeInformation, MetaResume | ✅ |
+| | `PUT /api/resume/:id/metadata` | Metadata-only update | MetaResume | ✅ |
+| | `POST /api/resume/:id/clone` | Duplicate resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setMaster` | Designate master resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setActive` | Set active resume | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/setPrivacy` | Set visibility level | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/createVariation` | Create variation from master | ResumeInformation | ✅ |
+| | `POST /api/resume/:id/promote` | Promote variation → master | ResumeInformation | ✅ |
+| | `GET /api/resume/masterGroups` | Master + variation groups | ResumeInformation, MetaResume | ✅ |
+| | `GET /api/resume/:id/diff` | Field-level diff vs master | ResumeInformation | ❌ Not implemented |
+| | `POST /api/resume/watch/:id` | Subscribe to resume updates | WatchedResumes | ✅ |
+| | `POST /api/resume/unwatch/:id` | Unsubscribe | WatchedResumes | ✅ |
+| | `POST /api/resume/:id/publish` | Publish resume publicly | ResumeInformation | ✅ |
+| | `GET /api/resume/validateSlug` | Check slug availability | ResumeInformation | ✅ |
+| **ResumeScorerController** | `POST /api/resumescorer/score` | 6-category scoring (content 25%, format 20%, keywords 20%, experience 15%, education 10%, appeal 10%) | — | ✅ `routes/resume-scorer.ts` |
+| | `POST /api/resumescorer/category-breakdown` | Detailed per-category scores | — | ✅ |
+| | `POST /api/resumescorer/recommendations` | Improvement suggestions | — | ✅ |
+| **ResumeOptimizerController** | `POST /api/resumeoptimizer/optimize` | ATS optimization pass | — | ✅ `routes/resume-optimizer.ts` |
+| | `POST /api/resumeoptimizer/ats-analysis` | ATS compatibility score | — | ✅ |
+| | `POST /api/resumeoptimizer/keyword-suggestions` | Industry keyword suggestions | — | ✅ |
+
+### Jobs & Matching
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **JobController** | `GET /api/job/GetPublicJobs` | Paginated + filtered public jobs | Jobs | ✅ `routes/jobs.ts` |
+| | `GET /api/job/:id` | Job + view tracking | Jobs, JobViews | ✅ |
+| | `POST /api/job` | Create job posting | Jobs | ✅ |
+| | `PUT /api/job/:id` | Update job | Jobs | ✅ |
+| | `DELETE /api/job/:id` | Owner-only delete | Jobs | ✅ |
+| | `POST /api/job/Extract` | Web-scrape job from URL | Jobs | ✅ |
+| | `POST /api/job/CreateFromFile` | Upload → AI-extract → create | Jobs | ✅ |
+| | `POST /api/job/:id/apply` | Apply to job | JobApplications | ✅ |
+| | `POST /api/job/:id/save` | Bookmark job | SavedJobs | ✅ |
+| | `DELETE /api/job/:id/save` | Remove bookmark | SavedJobs | ✅ |
+| | `GET /api/job/saved` | User's saved jobs | SavedJobs | ✅ |
+| | `GET /api/job/applications` | User's applications | JobApplications | ✅ |
+| | `GET /api/job/alerts` | User's job alerts | JobAlerts | ✅ |
+| | `POST /api/job/alerts` | Create alert | JobAlerts | ✅ |
+| | `PUT /api/job/alerts/:id` | Update alert | JobAlerts | ✅ |
+| | `PATCH /api/job/alerts/:id/toggle` | Toggle alert on/off | JobAlerts | ✅ |
+| | `DELETE /api/job/alerts/:id` | Delete alert | JobAlerts | ✅ |
+| **MatchController** | `POST /api/match/analyze` | Job HTML vs resume match score + missing skills | — | ✅ `routes/match.ts` |
+| | `POST /api/match/tailor` | AI-rewrite resume for job | ResumeInformation | ✅ |
+| | `POST /api/match/byid` | Match by DB IDs | ResumeInformation, Jobs | ✅ |
+| | `POST /api/match/bycontent` | Match by raw text | — | ✅ |
+| | `POST /api/match/bestresume` | Find best-fit resume for job | ResumeInformation | ✅ |
+
+### Video & Studio
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **VideoController** | `POST /api/video/generate` | AI video generation job | Videos, VideoGenerationJobs | ✅ `routes/video.ts` |
+| | `GET /api/video/:id` | Get video (owner) | Videos | ✅ |
+| | `GET /api/video/user/all` | All user videos | Videos | ✅ |
+| | `GET /api/video/resume/:resumeId` | Videos for resume | Videos | ✅ |
+| | `GET /api/video/:id/status` | Generation progress | Videos | ✅ |
+| | `POST /api/video/:id/cancel` | Cancel generation | Videos | ✅ |
+| | `DELETE /api/video/:id` | Delete video | Videos | ✅ |
+| | `POST /api/video/enhance-summary` | AI-enhanced summary | — | ✅ |
+| | `GET /api/video/resume/:id/can-generate` | Check generation eligibility | Videos, Subscriptions | ✅ |
+| | `GET /api/video/resume/:id/active` | Active generation | Videos | ✅ |
+
+### Users, Connections & Social
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **UsersController** | `GET /api/users/public` | Paginated public profiles | UserProfiles | ✅ `routes/users.ts` |
+| | `GET /api/users/:id` | Profile by ID or slug | UserProfiles | ✅ |
+| | `GET /api/users/me` | Current user profile | UserProfiles | ✅ |
+| | `PUT /api/users/me` | Update profile | UserProfiles | ✅ |
+| | `POST /api/users/connections` | Send connection request | UserConnections | ✅ |
+| | `GET /api/users/me/connections` | Accepted connections | UserConnections | ✅ |
+| | `GET /api/users/me/connections/pending` | Pending requests | UserConnections | ✅ |
+| | `PUT /api/users/connections/:id/accept` | Accept request | UserConnections | ✅ |
+| | `DELETE /api/users/connections/:id` | Reject/remove connection | UserConnections | ✅ |
+| | `GET /api/users/:id/resumes` | User's public resumes | ResumeInformation | ✅ |
+| | `POST /api/users/me/avatar` | Avatar upload (max 5MB, jpg/png/gif/webp) | UserProfiles | ⚠️ Upload route exists; avatar-specific validation not confirmed |
+| **FeedController** | `GET /api/feed/posts` | Paginated feed | FeedPosts | ✅ `routes/feed.ts` |
+| | `POST /api/feed/posts` | Create post | FeedPosts | ✅ |
+| | `PUT /api/feed/posts/:id` | Edit post | FeedPosts | ✅ |
+| | `DELETE /api/feed/posts/:id` | Delete post | FeedPosts | ✅ |
+| | `POST /api/feed/posts/:id/like` | Like | FeedPostLikes | ✅ |
+| | `DELETE /api/feed/posts/:id/like` | Unlike | FeedPostLikes | ✅ |
+| | `POST /api/feed/comments` | Comment | FeedPostComments | ✅ |
+| | `PUT /api/feed/comments/:id` | Edit comment | FeedPostComments | ✅ |
+| | `DELETE /api/feed/comments/:id` | Delete comment | FeedPostComments | ✅ |
+| | `POST /api/feed/link-preview` | Fetch link metadata | — | ✅ |
+
+### Companies
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **CompaniesController** | `GET /api/companies/public` | Public company listing | CompanyProfiles | ✅ `routes/companies.ts` |
+| | `GET /api/companies/:id` | Company detail + stats | CompanyProfiles | ✅ |
+| | `PUT /api/companies/:id` | Update (owner) | CompanyProfiles | ✅ |
+| | `DELETE /api/companies/:id` | Delete (owner) | CompanyProfiles | ✅ |
+| | `POST /api/companies/:id/follow` | Follow company | CompanyFollowers | ✅ |
+| | `DELETE /api/companies/:id/follow` | Unfollow | CompanyFollowers | ✅ |
+| | `GET /api/companies/:id/jobs` | Company's jobs | Jobs | ✅ |
+
+### Recruiter Tools
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **RecruiterController** | `POST /api/recruiter/talent-pool` | Add candidate | RecruiterTalentPools, TalentPoolCandidates | ✅ `routes/recruiter.ts` |
+| | `GET /api/recruiter/talent-pool` | List pool (paginated, filtered) | RecruiterTalentPools | ✅ |
+| | `PUT /api/recruiter/talent-pool/:id` | Update candidate entry | TalentPoolCandidates | ✅ |
+| | `DELETE /api/recruiter/talent-pool/:id` | Remove from pool | TalentPoolCandidates | ✅ |
+| | `POST /api/recruiter/interactions` | Log interaction | CandidateInteractions | ✅ |
+| | `POST /api/recruiter/submissions` | Submit candidate for job | CandidateSubmissions | ✅ |
+| | `PUT /api/recruiter/submissions/:id/status` | Update submission status | CandidateSubmissions | ✅ |
+| | `POST /api/recruiter/submissions/:id/withdraw` | Withdraw submission | CandidateSubmissions | ✅ |
+| | `POST /api/recruiter/placements` | Record placement | Placements | ✅ |
+| | `GET /api/recruiter/placements/summary/commission` | Commission summary | Placements | ✅ |
+| | `POST /api/recruiter/talent-pool/bulk/*` | Bulk tag/status/delete | TalentPoolCandidates | ❌ Bulk operations not implemented in TS API |
+| | `GET /api/recruiter/talent-pool/export` | CSV export of talent pool | TalentPoolCandidates | ❌ Not implemented |
+
+### Communication & Messaging
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **CommunicationController** | `GET /api/communication/conversations` | List conversations | Conversations, ConversationParticipants | ✅ `routes/communication.ts` |
+| | `POST /api/communication/conversations` | Create conversation | Conversations | ✅ |
+| | `GET /api/communication/conversations/:id` | Thread + messages | Conversations, Messages | ✅ |
+| | `POST /api/communication/messages` | Send message | Messages | ✅ |
+| | `POST /api/communication/messages/mark-read` | Mark as read | MessageReadReceipts | ✅ |
+| | `GET /api/communication/email-templates` | List templates | EmailTemplates | ✅ |
+| | `POST /api/communication/email-templates` | Create template | EmailTemplates | ✅ |
+| | `PUT /api/communication/email-templates/:id` | Update template | EmailTemplates | ✅ |
+| | `DELETE /api/communication/email-templates/:id` | Delete template | EmailTemplates | ✅ |
+| | `GET /api/communication/email-campaigns` | List campaigns | EmailCampaigns | ✅ |
+| | `POST /api/communication/email-campaigns/:id/send` | Execute campaign | EmailCampaigns, EmailCampaignRecipients | ✅ |
+| | `GET /api/communication/external-contacts` | List contacts | ExternalContacts | ✅ |
+| | `POST /api/communication/external-contacts` | Add contact | ExternalContacts | ✅ |
+| | `GET /api/communication/job-boards` | List job boards | JobBoards | ✅ |
+| | `POST /api/communication/job-boards/post` | Post job to board | JobBoardPostings | ✅ |
+| | `GET /api/communication/stats` | Campaign stats | CommunicationTracking | ✅ |
+| | `GET /api/communication/tracking` | Open/click events | CommunicationTracking | ✅ |
+
+### Billing & Payments
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **BillingController** | `GET /api/billing/subscription` | Subscription summary | Subscriptions, SubscriptionPlans | ✅ `routes/billing.ts` (DB-backed) |
+| | `GET /api/billing/payment-methods` | Saved payment methods | PaymentMethods | ✅ |
+| | `GET /api/billing/invoices` | Invoice history | Invoices | ✅ |
+| | `GET /api/billing/ai-usage/month` | Monthly token usage | AIUsageRecords | ✅ |
+| | `POST /api/billing/refund-request` | Create refund request | RefundRequests | ✅ |
+| | `GET /api/billing/refund-requests` | List user's refunds | RefundRequests | ✅ |
+| | `POST /api/billing/cancel-account` | Account cancellation request | RefundRequests | ✅ |
+| **PaymentController** | `POST /api/payment/stripe/webhook` | Handle Stripe events (subscription updates, payment success/fail) | BillingEvents, Subscriptions | ❌ **Not implemented — critical for Stripe** |
+| | `GET /api/payment/public-key` | Return Stripe publishable key | — | ❌ Not implemented |
+| | `POST /api/payment/setup-intent` | Create Stripe SetupIntent | — | ❌ Not implemented |
+| | `POST /api/payment/save-payment-method` | Store Stripe payment method | PaymentMethods | ❌ Not implemented |
+| | `POST /api/payment/create-setup-session` | Stripe checkout setup session | — | ⚠️ Returns redirect URL; no real Stripe SDK call |
+| | `DELETE /api/payment/payment-methods/:id` | Delete payment method | PaymentMethods | ✅ DB-delete with ownership check |
+
+### AI Features
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **ChatController** | `POST /api/chat/message` | OpenRouter LLM with session + token tracking; AIRateLimit filter | AIUsageMetrics, AIChatSessions | ✅ `routes/ai.ts` `POST /api/ai/chat` |
+| **SalaryCalculatorController** | `POST /api/salarycalculator/analyze` | Salary analysis with market data | — | ✅ `routes/salary.ts` |
+| | `POST /api/salarycalculator/negotiation-tips` | Negotiation strategies | — | ✅ |
+| | `GET /api/salarycalculator/locations` | Supported locations | — | ✅ |
+| | `GET /api/salarycalculator/industries` | Supported industries | — | ❌ `/industries` endpoint not in TS API |
+| **PromptController** | `POST /Prompt/summarize` | Summarize resume content | ResumeInformation | ✅ `POST /api/resumes/:id` summarize |
+| | `POST /Prompt/match` | Match document to job | — | ✅ via `routes/match.ts` |
+| | `POST /Prompt/parse` | Parse PDF to JSON | — | ✅ via `routes/resumes.ts` parse |
+| **SentimentController** | sentiment analysis endpoints | ML.NET model inference | ResumeSentiment | ✅ `routes/sentiment.ts` (LLM-based) |
+| **ValuePropositionController** | generate content endpoints | AI-generated value props | — | ✅ `routes/value-proposition.ts` |
+
+### Dashboard & Admin
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **UserDashboardController** | `GET /api/userdashboard/jobseeker` | Role-specific metrics | JobApplications, SavedJobs | ✅ `routes/dashboard.ts` |
+| | `GET /api/userdashboard/recruiter` | Recruiter metrics | TalentPools, Submissions | ✅ |
+| | `GET /api/userdashboard/employer` | Employer metrics | Jobs, Applications | ✅ |
+| | `POST /api/userdashboard/profile-view` | Track profile view | ProfileViews | ✅ |
+| | `POST /api/userdashboard/activity` | Log user activity | ActivityLogs | ✅ |
+| | `GET /api/userdashboard/engagement` | Engagement metrics | UserEngagementMetrics | ✅ |
+| **ProductDashboardController** | `GET /api/productdashboard/saas-metrics` | MRR, churn, ARR | Subscriptions, Invoices | ⚠️ Admin routes exist; SaaS metrics calculation not confirmed |
+| | `GET /api/productdashboard/time-series/:metric` | Time-series analytics | ActivityLogs | ⚠️ Not confirmed implemented |
+| | `POST /api/productdashboard/refund-requests/:id/approve` | Admin approve refund | RefundRequests | ✅ `routes/admin.ts` |
+| | `POST /api/productdashboard/cancellation-requests/:id/approve` | Admin approve cancellation | RefundRequests | ✅ |
+| **AffiliateController** | `GET /api/affiliate/profile` | Affiliate profile | AffiliateProfiles | ✅ `routes/affiliates.ts` |
+| | `GET /api/affiliate/dashboard` | Earnings, referrals | AffiliateReferrals, AffiliateConversions | ✅ |
+| | `POST /api/affiliate/payout/request` | Request payout | AffiliatePayouts | ✅ |
+| | Admin endpoints | All affiliate admin actions | AffiliateProfiles, AffiliatePayouts | ✅ |
+
+### Settings, Password & Utilities
+
+| Legacy Controller | Route | Business Logic | DB Tables | TS Coverage |
+|-------------------|-------|---------------|-----------|-------------|
+| **SettingsController** | All settings CRUD | Notification, privacy, job, account, security prefs | AccountPreferences, JobPreferences | ✅ `routes/settings.ts` |
+| | `GET /api/settings/export` | GDPR data export | All user tables | ✅ Returns JSON bundle |
+| **PasswordManagementController** | `GET /api/passwordmanagement/requirements` | Password policy | — | ✅ `routes/password-management.ts` |
+| | `POST /api/passwordmanagement/validate-strength` | Strength check | — | ✅ |
+| | `POST /api/passwordmanagement/validate-history` | Check against past passwords | PasswordHistory | ❌ Not implemented in TS API |
+| | `GET /api/passwordmanagement/is-expired` | Check expiration | Users | ❌ Not implemented in TS API |
+| | `POST /api/passwordmanagement/force-change` | Admin force reset | Users | ✅ |
+| **TaskController** | Task CRUD | Create/update/delete tasks | Tasks | ✅ `routes/task.ts` |
+| **UploadController** | File uploads | S3/R2 upload with validation | — | ✅ `routes/upload.ts` |
+| **MarketingController** | `GET /api/marketing/campaigns` | Campaign listing | — | ⚠️ Stub in TS API |
+| | `POST /api/marketing/leads` | Capture lead | — | ⚠️ Stub in TS API |
+| **FeatureFlagController** | `GET /api/featureflag` | Feature flag states | — | ✅ `routes/featureflag.ts` (static) |
+| **SearchController** | `GET /api/search/public` | Multi-entity search | ResumeInformation, Jobs, UserProfiles, CompanyProfiles | ✅ `routes/search.ts` |
+| **YouTubeController** | YouTube OAuth + publish | YouTube API integration | YoutubeAccounts | ✅ `routes/youtube.ts` |
+| **ExportController** | `GET /api/export/csv` | CSV export | — | ❌ Not implemented (TS export returns JSON only) |
+| | `GET /api/export/excel` | Excel export via OpenXml | — | ❌ Not implemented |
+| **ChromeController** | `POST /api/chrome/createjobbestmatch` | **DEPRECATED** (marked Obsolete) | — | ✅ Replaced by `/api/match/*` |
+| **InterviewController** | Interview sessions CRUD | Session tracking, answer analysis | InterviewSessions, InterviewAnswers | ✅ `routes/interview.ts` |
+
+### Coverage Summary
+
+| Domain | Legacy Endpoints | TS Covered | Partial | Missing |
+|--------|-----------------|------------|---------|---------|
+| Auth & Account | ~25 | 23 | 0 | 2 (OData only) |
+| Resume | ~30 | 27 | 1 | 2 (diff, bulk export) |
+| Jobs & Matching | ~20 | 20 | 0 | 0 |
+| Video & Studio | ~10 | 10 | 0 | 0 |
+| Users & Social | ~20 | 19 | 1 | 0 |
+| Companies | ~7 | 7 | 0 | 0 |
+| Recruiter | ~15 | 12 | 0 | 3 (bulk ops, CSV export) |
+| Communication | ~18 | 18 | 0 | 0 |
+| Billing | ~10 | 8 | 1 | 3 (Stripe webhook/intent/save) |
+| AI Features | ~20 | 18 | 0 | 2 (industries endpoint, AI rate limiter) |
+| Dashboard & Admin | ~20 | 16 | 4 | 0 |
+| Settings & Utilities | ~20 | 14 | 2 | 4 (password history, export CSV/xlsx, is-expired) |
+| **Total** | **~215** | **~192 (89%)** | **~9 (4%)** | **~14 (7%)** |
+
+### Can the legacy project be removed?
+
+**Short answer: Not yet — Stripe is the blocker.**
+
+The TypeScript API covers ~89% of the legacy surface area. A re-verification confirms the following gaps still exist:
+
+| Missing | Risk | Workaround / Status |
+|---------|------|---------------------|
+| `POST /payment/stripe/webhook` | **🔴 High** — subscriptions won't update on payment events | Must implement before removing legacy |
+| `GET /payment/public-key` | **🔴 High** — Stripe.js can't initialise without publishable key | Must implement before removing legacy |
+| `POST /payment/setup-intent` | **🔴 High** — card enrollment UI is broken | Must implement before removing legacy |
+| `POST /payment/save-payment-method` | **🔴 High** — can't attach cards to customers | Must implement before removing legacy |
+| `GET /api/export/csv` + `GET /api/export/excel` | 🟡 Medium | JSON export available at `/api/settings/export`; add CSV serialisation |
+| Recruiter bulk ops (`bulk/tags`, `bulk/status`, `bulk/delete`) | 🟡 Medium | Per-record operations work; bulk is a UX convenience |
+| `GET /api/recruiter/talent-pool/export` | 🟢 Low | Easy to add |
+| `POST /api/passwordmanagement/validate-history` | 🟢 Low | Schema has `passwordHistories` table; straightforward add |
+| `GET /api/passwordmanagement/is-expired` | 🟢 Low | Straightforward add |
+| `GET /api/resume/:id/diff` | 🟢 Low | Nice-to-have for variation workflow |
+| Chrome extension endpoints (`ChromeController`) | ✅ None — marked `[Obsolete]` in legacy | Fully replaced by `/api/match/*` |
+| OData endpoints (ApplicationUsers/Roles) | ✅ None | Not needed for edge runtime |
+
+**Checklist to safely delete `/myvideoresume-api`:**
+
+- [x] ✅ `GET /api/payment/public-key` — returns `STRIPE_PUBLISHABLE_KEY` env var
+- [x] ✅ `POST /api/payment/setup-intent` — creates Stripe SetupIntent, returns `clientSecret`
+- [x] ✅ `POST /api/payment/save-payment-method` — attaches PM to customer, upserts to DB, sets default
+- [x] ✅ `POST /api/payment/stripe/webhook` — signature verified; handles `subscription.created/updated/deleted`, `invoice.payment_succeeded/failed`, `payment_method.attached/detached`, `payout.paid/failed`; records affiliate conversions
+- [ ] (Optional) Add CSV serialisation to `/api/settings/export`
+
+**The legacy project can now be safely deleted once Stripe secrets are configured.**
+
+Configure secrets:
+```bash
+wrangler secret put STRIPE_PUBLISHABLE_KEY    # pk_live_...
+wrangler secret put STRIPE_SECRET_KEY         # sk_live_...
+wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY # whsec_...
+```
+
+Register webhook in Stripe dashboard → Developers → Webhooks:
+- **URL:** `https://api.hired.video/api/payment/stripe/webhook`
+- **Events:** `customer.subscription.*`, `invoice.payment_succeeded`, `invoice.payment_failed`, `payment_method.attached`, `payment_method.detached`, `payout.paid`, `payout.failed`
+
+---
+
+## Payment Provider Abstraction
+
+The payment layer uses a **Strategy Pattern** so the underlying provider (Stripe, Helcim, or future) can be swapped without touching route or business logic.
+
+### Interface (`api/src/services/payment/types.ts`)
+
+```typescript
+interface PaymentProvider {
+  name: string;
+  getPublicKey(): string | null;
+  getOrCreateCustomer(userId, email, name?): Promise<string>;
+  createSetupSession(customerId, successUrl, cancelUrl): Promise<string>;
+  initPaymentCollection(customerId, successUrl, cancelUrl): Promise<CollectPaymentMethodResult>;
+  savePaymentMethod(customerId, providerPaymentMethodId, setDefault?): Promise<SavedPaymentMethod>;
+  detachPaymentMethod(providerPaymentMethodId): Promise<void>;
+  constructWebhookEvent(body, signature, secret): Promise<NormalizedWebhookPayload>;
+}
+```
+
+### Implementations
+
+| File | Provider | Status |
+|------|----------|--------|
+| `api/src/services/payment/stripe.ts` | Stripe | ✅ Full implementation |
+| `api/src/services/payment/helcim.ts` | Helcim | ⚠️ Stub — API calls documented; card deletion unavailable via Helcim v2 API |
+
+### Switching Providers
+
+Set the `PAYMENT_PROVIDER` environment variable:
 
 ```bash
-# Navigate to frontend folder
-cd ../hired.video-frontend
+# Default — uses Stripe
+wrangler secret put PAYMENT_PROVIDER   # stripe
 
-# Install dependencies
+# Switch to Helcim
+wrangler secret put PAYMENT_PROVIDER   # helcim
+wrangler secret put HELCIM_ACCOUNT_ID  # from Helcim dashboard → Settings → API
+wrangler secret put HELCIM_API_TOKEN   # from Helcim dashboard → Settings → API
+wrangler secret put HELCIM_WEBHOOK_TOKEN # from Helcim dashboard → Settings → Webhooks
+```
+
+Register Helcim webhook:
+- **URL:** `https://api.hired.video/api/payment/webhook`
+- **Events:** `transaction.approved`, `transaction.declined`, `recurring.payment.*`, `recurring.plan.*`
+
+### Normalised Webhook Events
+
+Provider-specific event strings are mapped to generic `NormalizedEventType` values consumed by `dispatchWebhookEvent()`:
+
+| Generic type | Stripe event | Helcim event |
+|-------------|-------------|-------------|
+| `subscription.created` | `customer.subscription.created` | `recurring.plan.created` |
+| `subscription.updated` | `customer.subscription.updated` | `recurring.plan.updated` |
+| `subscription.deleted` | `customer.subscription.deleted` | `recurring.plan.cancelled` |
+| `invoice.paid` | `invoice.payment_succeeded` | `transaction.approved` |
+| `invoice.payment_failed` | `invoice.payment_failed` | `transaction.declined` |
+| `payment_method.attached` | `payment_method.attached` | — |
+| `payment_method.detached` | `payment_method.detached` | — |
+| `payout.paid` | `payout.paid` | — |
+| `payout.failed` | `payout.failed` | — |
+
+---
+
+## Gap Analysis vs. Legacy API
+
+### Architecture & Cross-Cutting Concerns
+
+| Concern | Legacy (.NET) | Current (TypeScript/Hono) | Gap |
+|---------|--------------|---------------------------|-----|
+| **API Documentation** | ✅ Swagger/Swashbuckle (auto-generated OpenAPI) | ❌ None | **High** — No OpenAPI spec; no developer portal |
+| **Testing** | ✅ `MyVideoResume.Tests` project (unit + integration) | ❌ No tests | **High** — Zero test coverage |
+| **Layering (Routes / Services / Repos)** | ✅ Controllers → Application Services → EF Repositories | ⚠️ Routes + thin services; most BL lives in route files | **Medium** — Business logic mixed into route handlers |
+| **DRY / Code Reuse** | ✅ AutoMapper, shared DTOs, service abstractions | ✅ Duplicate routes consolidated; shared handlers used | Low |
+| **Repository Pattern** | ✅ EF Core repositories with unit-of-work | ❌ Direct Drizzle queries in routes/services; no repo layer | **Medium** — No formal data access abstraction |
+| **Error Handling** | ✅ Problem Details (RFC 7807), middleware pipeline | ✅ `AppError` hierarchy, global error middleware, Zod formatting | Low |
+| **Validation** | ✅ Data Annotations + FluentValidation | ✅ Zod schemas on request bodies | Low |
+| **Authentication** | ✅ ASP.NET Identity + JWT | ✅ Custom JWT + PBKDF2 | Low — Both complete; legacy has more Identity features |
+| **Logging** | ✅ Serilog (file, DB, NewRelic, async sinks) | ⚠️ Console + Sentry only; no structured log sinks | Medium |
+| **Feature Flags** | ✅ Split.io integration | ⚠️ Static stub route only; no dynamic flags | Medium |
+| **Caching** | ✅ HybridCache (in-memory + distributed) | ⚠️ None (stateless edge workers) | Medium — Edge architecture naturally limits caching options |
+| **Background Jobs** | ✅ `MyVideoResume.Workers` service project | ⚠️ Queue tables exist in schema; no worker implementation | **High** |
+| **Real-time (Notifications)** | Planned | ✅ SSE stream at `GET /api/hubs/notifications`; `POST /negotiate` returns transport descriptor | Low — SSE replaces SignalR WebSockets |
+| **Email Verification Guard** | ✅ Enforced middleware | ✅ `emailVerifiedMiddleware` applied to all authenticated routes | Low |
+| **Password Change Enforcement** | ✅ Enforced on first login | ✅ `passwordChangeMiddleware` applied to all authenticated routes | Low |
+
+### Feature-Level Gaps
+
+| Feature | Legacy | Current | Gap |
+|---------|--------|---------|-----|
+| **Search** | Multi-entity search (Elasticsearch implied) | Single `/search/public` endpoint | **High** — Full-text/faceted search not implemented |
+| **Billing / Stripe** | ✅ Stripe.NET full integration | ⚠️ DB-backed service (subscription, invoices, payment methods, refunds); Stripe SDK not wired | Medium — Data layer complete; payment processing needs Stripe keys |
+| **LinkedIn OAuth** | ✅ Full OAuth flow | ⚠️ Single `POST /linkedin-post`; no OAuth | **High** |
+| **Chrome Extension API** | ✅ `ChromeController` (deprecated) | ✅ `POST /api/match/analyze`, `POST /api/match/tailor`, `GET /api/resume/mastergroups`, `POST /api/resume/:id/createvariation`, `GET /api/resume/:id/export` | Low — all extension-facing routes implemented |
+| **AI Chat / Prompt Engine** | ✅ `ChatController`, `PromptController` | ✅ `POST /api/ai/chat` with session tracking, history, usage recording; `GET /sessions`, `GET /sessions/:id`, `DELETE /sessions/:id` | Low |
+| **ML Sentiment** | ✅ Dedicated ML.NET model (`Microsoft.ML`) | ✅ LLM-based via OpenRouter | Low — Different approach, same outcome |
+| **Data Export** | ✅ Excel export via `DocumentFormat.OpenXml` | ✅ `GET /api/settings/export` returns JSON export of account, profile, resumes, applications, saved jobs | Low — JSON vs Excel; exportable data complete |
+| **OData Queries** | ✅ Microsoft.AspNetCore.OData | ❌ Not applicable (Hono/REST only) | Low — Not needed for edge runtime |
+
+### Code Quality Issues (Current API)
+
+| Issue | Location | Status |
+|-------|----------|--------|
+| ~~Duplicate feature flag routes~~ | ~~`routes/feature-flag.ts` + `routes/featureflag.ts`~~ | ✅ Resolved — orphaned `feature-flag.ts` deleted |
+| ~~Case-inconsistent endpoint naming~~ | ~~`GetSummaryItems` vs `getsummaryitems` in `jobs.ts`~~ | ✅ Resolved — shared handler, both aliases preserved for compat |
+| ~~`billing.ts` service is entirely stubbed~~ | ~~`services/billing.ts`~~ | ✅ Resolved — real DB queries for subscriptions, invoices, payment methods, AI usage |
+| ~~Email verification not enforced~~ | ~~`middleware/emailVerified.ts` unused~~ | ✅ Resolved — applied globally in `app.ts` |
+| ~~Password change not enforced~~ | ~~`middleware/passwordChange.ts` unused~~ | ✅ Resolved — applied globally in `app.ts` |
+| Business logic in route handlers | Most route files — should be in service layer | Open — Medium |
+| No repository abstraction | Drizzle queries scattered across routes and services | Open — Medium |
+| No OpenAPI/Swagger documentation | Entire API | Open — **High** |
+| Zero automated tests | Entire API | Open — **High** |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js 18+**
+- **npm**
+- **Wrangler CLI** — `npm install -g wrangler`
+- **Cloudflare account** with Workers enabled
+- **Neon PostgreSQL** database
+
+### Backend API Setup
+
+```bash
+cd api
 npm install
 
-# Create .env file
+# Configure local development secrets
+cp wrangler.toml wrangler.dev.toml   # edit with your local values
+# OR set environment variables directly
+
+# Run database migrations
+npm run db:push
+
+# Start local development server (Node.js mode)
+npm run dev
+
+# Deploy to Cloudflare Workers
+npm run deploy
+```
+
+#### Environment Variables / Secrets
+
+Set via `wrangler secret put` for production, or in `wrangler.toml` `[vars]` for non-sensitive dev values:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` / `NEON_DATABASE_URL` | Yes | Neon PostgreSQL connection string |
+| `JWT_SECRET` | Yes | Secret key for signing JWTs |
+| `SENDPULSE_ID` / `SENDPULSE_SECRET` | Yes | SendPulse API credentials |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key for AI features |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Yes | S3-compatible storage credentials |
+| `S3_BUCKET_NAME` / `S3_ENDPOINT` | Yes | Storage bucket configuration |
+| `SENTRY_DSN` | No | Error monitoring |
+| `FRONTEND_URL` | Yes | Comma-separated allowed CORS origins |
+
+#### CORS Configuration
+
+Allowed origins are controlled by `FRONTEND_URL` in `wrangler.toml`. The value is read **inside the per-request origin callback** — this is intentional, as Cloudflare Worker bindings are unavailable at module-load time.
+
+```toml
+[vars]
+FRONTEND_URL = "https://hired.video,https://www.hired.video"
+```
+
+#### Health Check
+
+```
+GET https://api.hired.video/api/health
+```
+
+Verifies the worker is running and the database connection is valid.
+
+#### Database Migrations
+
+```bash
+cd api
+
+# Apply schema changes
+npm run db:push
+
+# Generate migration files
+npm run db:generate
+
+# Open Drizzle Studio (visual DB browser)
+npm run db:studio
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+npm install
+
+# Create environment file
 cp .env.example .env
 ```
 
-**Configure .env file:**
+**`.env` configuration:**
 
 ```env
-# API Configuration
-VITE_API_URL=http://localhost:5000/api
-
-# AI Configuration
+VITE_API_URL=https://api.hired.video/api
 VITE_OPENROUTER_API_KEY=your_openrouter_key
-
-# App Configuration
 VITE_APP_NAME=hired.video
-VITE_APP_VERSION=1.0.0
-VITE_ENVIRONMENT=development
-
-# Analytics (optional for development)
 VITE_GTM_ID=GTM-T6CSJ22D
 ```
 
-#### 5. Chrome Extension Setup (Optional)
-
 ```bash
-# Navigate to extension folder
-cd ../hired.video-chrome-extension
-
-# Install dependencies
-npm install
-
-# Build extension
-npm run build
-
-# Load extension in Chrome:
-# 1. Open Chrome and go to chrome://extensions/
-# 2. Enable "Developer mode"
-# 3. Click "Load unpacked" and select the dist/ folder
-```
-
-### Development Commands
-
-#### Backend API
-
-```bash
-cd hired-api
-
-# Run in development mode
-dotnet run
-
-# Run with hot reload
-dotnet watch run
-
-# Build for production
-dotnet build --configuration Release
-
-# Run tests
-dotnet test
-```
-
-#### Frontend
-
-```bash
-cd hired.video-frontend
-
 # Start development server
 npm run dev
 
 # Build for production
 npm run build
 
-# Preview production build
-npm run preview
-
 # Type checking
 npm run typecheck
-
-# Linting
-npm run lint
 ```
 
-#### Chrome Extension
+### Chrome Extension Setup
+
+The Chrome extension lives in `hiredvideo-chrome-extension/` and works as a side panel companion for job seekers.
+
+**Features:**
+- **Score & Evaluate** — parses the current page's job description and calls `POST /api/match/analyze` to score the user's resume against it
+- **Tailor & Generate** — calls `POST /api/match/tailor` to rewrite the resume as markdown; displays score improvement
+- **Save as Variation** — sends the tailored markdown to `POST /api/resume/:id/createvariation`
+- **Download** — exports via `GET /api/resume/:id/export?format=md|json`
+- **Resume selection** — loads available resumes from `GET /api/resume/mastergroups`
+- **Login** — authenticates via `POST /api/auth/login`, stores JWT in `chrome.storage.local`
+
+**Supported job sites** (site-specific CSS selectors): LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, CareerBuilder, Dice, Lever, Greenhouse, Workday, AngelList/Wellfound, and more. Falls back to JSON-LD structured data extraction, then generic selectors.
+
+**Load the extension (development):**
 
 ```bash
-cd hired.video-chrome-extension
-
-# Development build with watch
-npm run dev
-
-# Production build
-npm run build
-
-# Package for distribution
-npm run package
+# No build step required — plain JS/HTML/CSS
+# 1. Open Chrome → chrome://extensions
+# 2. Enable "Developer mode"
+# 3. Click "Load unpacked"
+# 4. Select the hiredvideo-chrome-extension/ directory
 ```
 
-### VS Code Workspace Setup
-
-#### Recommended Extensions
-
-Install these VS Code extensions for the best development experience:
-
-**Frontend Development:**
-
-- ES7+ React/Redux/React-Native snippets
-- TypeScript Importer
-- Tailwind CSS IntelliSense
-- Auto Rename Tag
-- Bracket Pair Colorizer
-- GitLens
-
-**Backend Development:**
-
-- C# Dev Kit
-- .NET Install Tool
-- NuGet Gallery
-- REST Client
-- SQL Server (mssql)
-
-**General Development:**
-
-- Prettier - Code formatter
-- ESLint
-- Thunder Client (API testing)
-- Git Graph
-- Todo Tree
-
-#### Workspace Configuration
-
-Create `.vscode/settings.json` in the parent hired.video folder:
-
-```json
-{
-  "typescript.preferences.importModuleSpecifier": "relative",
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "files.associations": {
-    "*.json": "jsonc"
-  },
-  "dotnet.defaultSolution": "hired-api/hired.video.sln"
-}
-```
-
-Create `.vscode/launch.json` for debugging:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": ".NET Core Launch (API)",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/hired-api/Server/bin/Debug/net9.0/hired.video.Server.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/hired-api/Server",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  ]
-}
-```
-
-### Database Management
-
-#### Common Entity Framework Commands
-
-```bash
-# From hired-api folder
-
-# Check migration status
-dotnet ef migrations list
-
-# Create a new migration
-dotnet ef migrations add MigrationName
-
-# Update database to latest migration
-dotnet ef database update
-
-# Rollback to specific migration
-dotnet ef database update PreviousMigrationName
-
-# Remove last migration (if not applied to database)
-dotnet ef migrations remove
-
-# Generate SQL script for migration
-dotnet ef migrations script
-
-# Drop database (careful!)
-dotnet ef database drop
-```
-
-#### Database Connection Troubleshooting
-
-**LocalDB Issues:**
-
-```bash
-# Check LocalDB instances
-sqllocaldb info
-
-# Start LocalDB instance
-sqllocaldb start mssqllocaldb
-
-# Create new LocalDB instance if needed
-sqllocaldb create mssqllocaldb
-```
-
-**Connection String Alternatives:**
-
-For SQL Server Express:
-
-```json
-"DefaultConnection": "Server=.\\SQLEXPRESS;Database=hired.videoDB;Trusted_Connection=true;MultipleActiveResultSets=true"
-```
-
-For Docker SQL Server:
-
-```json
-"DefaultConnection": "Server=localhost,1433;Database=hired.videoDB;User Id=sa;Password=YourPassword123!;TrustServerCertificate=true"
-```
-
-### Environment Configuration
-
-#### Production Environment Variables
-
-**Frontend (.env.production):**
-
-```env
-VITE_API_URL=https://api.hired.video/api
-VITE_OPENROUTER_API_KEY=prod_openrouter_key
-VITE_APP_NAME=hired.video
-VITE_APP_VERSION=1.0.0
-VITE_ENVIRONMENT=production
-VITE_GTM_ID=GTM-T6CSJ22D
-```
-
-**Backend (appsettings.Production.json):**
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "your-production-connection-string"
-  },
-  "JwtSettings": {
-    "SecretKey": "your-production-jwt-secret-key",
-    "ExpirationInMinutes": 1440
-  },
-  "OpenAIKey": "your-production-openrouter-key",
-  "Logging": {
-    "LogLevel": {
-      "Default": "Warning",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  }
-}
-```
-
-### Development Workflow
-
-#### Starting the Development Environment
-
-1. **Start the Backend API:**
-
-```bash
-cd hired-api
-dotnet run
-# API will be available at http://localhost:5000
-```
-
-2. **Start the Frontend:**
-
-```bash
-cd hired.video-frontend
-npm run dev
-# Frontend will be available at http://localhost:5173
-```
-
-3. **Verify the Connection:**
-
-- Open http://localhost:5173 in your browser
-- Try logging in or creating an account
-- Check browser developer tools for any API connection errors
-
-#### Common Development Tasks
-
-**Adding a New Feature:**
-
-1. Create API endpoints in the backend
-2. Update database models and run migrations if needed
-3. Create TypeScript types in the frontend
-4. Implement API service methods
-5. Create UI components and pages
-6. Add routing and navigation
-7. Test the complete flow
-
-**Database Changes:**
-
-1. Modify entity models in the backend
-2. Create and apply migrations
-3. Update API endpoints if needed
-4. Update frontend TypeScript types
-5. Test data flow end-to-end
-
-### Troubleshooting
-
-#### Common Issues and Solutions
-
-**1. API Connection Errors**
-
-```
-Error: Network Error / CORS Error
-```
-
-**Solution:**
-
-- Ensure the API is running on http://localhost:5000
-- Check VITE_API_URL in .env file
-- Verify CORS configuration in the API
-
-**2. Database Connection Issues**
-
-```
-Error: Cannot open database
-```
-
-**Solution:**
-
-- Check LocalDB is running: `sqllocaldb info`
-- Verify connection string in appsettings.Development.json
-- Run database update: `dotnet ef database update`
-
-**3. JWT Authentication Errors**
-
-```
-Error: 401 Unauthorized
-```
-
-**Solution:**
-
-- Check JWT secret key in appsettings
-- Verify token expiration settings
-- Clear browser localStorage and login again
-
-**4. Build Errors**
-
-```
-Error: Module not found
-```
-
-**Solution:**
-
-- Delete node_modules and package-lock.json
-- Run `npm install` again
-- Check import paths and TypeScript types
-
-**5. Migration Errors**
-
-```
-Error: Migration already applied
-```
-
-**Solution:**
-
-- Check migration status: `dotnet ef migrations list`
-- Remove problematic migration: `dotnet ef migrations remove`
-- Create new migration with different name
-
-#### Performance Optimization
-
-**Frontend:**
-
-- Use React.lazy() for code splitting
-- Implement proper memoization with useMemo/useCallback
-- Optimize bundle size with tree shaking
-- Use React Query for efficient data caching
-
-**Backend:**
-
-- Implement proper database indexing
-- Use async/await for database operations
-- Add response caching where appropriate
-- Optimize Entity Framework queries
-
-### Testing
-
-#### Frontend Testing
-
-```bash
-cd hired.video-frontend
-
-# Run unit tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Generate coverage report
-npm run test:coverage
-```
-
-#### Backend Testing
-
-```bash
-cd hired-api
-
-# Run all tests
-dotnet test
-
-# Run tests with coverage
-dotnet test --collect:"XPlat Code Coverage"
-
-# Run specific test project
-dotnet test hired.video.Tests
-```
-
-#### Integration Testing
-
-```bash
-# Start both frontend and backend
-# Run end-to-end tests
-npm run test:e2e
-```
-
-````
-
-## 📱 Responsive Design
-
-Fully responsive design supporting:
-
-- **Desktop** (1200px+) - Full-featured experience with multi-column layouts
-- **Tablet** (768px-1199px) - Optimized layouts with collapsible sidebars
-- **Mobile** (320px-767px) - Touch-friendly interface with bottom navigation
-
-### Mobile-First Approach
-
-- **Progressive Enhancement** - Core functionality works on all devices
-- **Touch Interactions** - Optimized for mobile gestures and interactions
-- **Performance Optimization** - Lazy loading and code splitting for mobile networks
-- **Offline Capabilities** - Service worker support for basic offline functionality (planned)
-
-## 🔒 Security
-
-- **JWT Authentication** - Secure token-based authentication with automatic refresh
-- **Role-based Access Control** - Multi-tenant permissions with hierarchical roles
-- **Input Validation** - Zod schemas for client-side validation
-- **XSS Protection** - Proper sanitization of user-generated content
-- **CSRF Protection** - Token-based request validation
-- **Secure Storage** - Encrypted local storage for sensitive data
-
-## 🎯 Key Pages & Features
-
-### Core Pages
-
-- **/** - Home page with platform overview and feature discovery
-- **/login** - User authentication with role selection and forgot password link
-- **/signup** - User registration with business account creation
-- **/forgot-password** - Password reset request with email instructions
-- **/signup-success** - Post-registration email confirmation instructions
-- **/confirm-email** - Email address verification and account activation
-- **/dashboard** - Personalized dashboard with role-specific metrics and analytics
-
-### Feature Pages
-
-- **/profile** - User profile management with avatar upload and settings
-- **/resumes** - Resume builder, management, and analytics
-- **/jobs** - Job search, posting, and application tracking
-- **/companies** - Company discovery, profiles, and following
-- **/people** - Professional networking and connection management
-- **/tasks** - Task and productivity management with multiple views
-- **/outreach** - Communication, email templates, and campaign management
-- **/account** - Account and organization management with team members, settings, and analytics (NEW)
-- **/settings** - Account preferences, privacy, and security settings
-
-### Account Management Features (NEW)
-
-- **Team Management** - Invite users, assign roles, manage permissions with tabbed interface
-- **Account Settings** - Complete organization configuration including company info, contact details, and preferences
-- **Account Analytics** - Comprehensive dashboard with user metrics, job performance, and department statistics
-- **Role Assignment** - Hierarchical permission system with granular controls
-- **User Invitations** - Email-based team member invitations with custom messages
-- **Multi-view Interface** - Tabbed navigation between team members, settings, and analytics
-- **Account Switching** - Seamless switching between multiple organizations with role-based access control
-
-## 🔄 State Management
-
-- **React Query** - Server state management with caching and synchronization
-- **Context API** - Global application state for authentication and user preferences
-- **Local Storage** - Persistent storage for user preferences and authentication tokens
-- **Real-time Updates** - Optimistic updates with automatic synchronization
-- **Error Boundaries** - Graceful error handling with recovery mechanisms
-
-## 🎨 Theming & Customization
-
-Built-in support for:
-
-- **Light/Dark Themes** - System preference detection with manual override
-- **Custom Color Schemes** - CSS variables for easy theme customization
-- **Responsive Typography** - Fluid typography scales with TailwindCSS
-- **Consistent Spacing** - Design token system for consistent layouts
-- **Brand Customization** - Easy logo, color, and typography customization
-
-### Theme Configuration
-
-```css
-/* global.css - Theme variables */
-:root {
-  --primary: 222.2 84% 4.9%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222.2 84% 4.9%;
-  /* ... additional theme variables */
-}
-````
-
-## 📊 Implementation Status & Roadmap
-
-### Current Implementation Status (Updated 2024-12-19)
-
-- **Total Features**: 100+ implemented features
-- **Completion Rate**: 75% fully complete ⬆️ (+21%), 15% frontend-only, 10% API-only
-- **Recent Updates**: AI-Powered Salary Calculator ⬆️ **NEWLY UPGRADED**, Card UI Consistency ⬆️ **IMPROVED**, Marketing Alignment ⬆️ **CRITICAL GAPS IDENTIFIED**
-
-### 🚨 Critical Marketing vs Implementation Gaps
-
-- **AI Resume Scorer**: ❌ Heavily marketed but NOT implemented
-- **Interview Coach**: ❌ Promoted in pricing but missing
-- **User Statistics**: ❌ Inflated claims (50K+ users, 1M+ resumes) - no verification
-- **Premium Features**: 🟡 Many marketed features not fully implemented
-
-### By Category Completion
-
-- **Authentication & User Management**: 100% complete ✅
-- **Account & Organization Management**: 100% complete ✅
-- **Resume Management**: 90% complete ⬆️ (+7%)
-- **Job Management**: 85% complete ⬆️ (+5%)
-- **Company Management**: 90% complete
-- **Communication & Outreach**: 86% complete
-- **Task Management**: 100% complete ✅
-- **AI Tools & Analytics**: 50% complete (4/8 tools working)
-- **Social Features**: 45% complete ⬆️ (+5%)
-- **UI/UX Consistency**: 95% complete ⬆️ **NEWLY IMPROVED**
-
-### 🤖 AI Tools Implementation Status
-
-| Tool                     | Frontend    | Backend       | Data Source        | Status                 | Marketing Gap        |
-| ------------------------ | ----------- | ------------- | ------------------ | ---------------------- | -------------------- |
-| **Sentiment Analysis**   | ✅ Complete | ✅ ML Model   | ✅ Real AI         | ✅ **WORKING**         | ✅ Aligned           |
-| **Job-Resume Match**     | ✅ Complete | ✅ AI Service | ✅ Real AI         | ✅ **WORKING**         | ✅ Aligned           |
-| **Resume Summarization** | ✅ Complete | ✅ AI Service | ✅ Real AI         | ✅ **WORKING**         | ✅ Aligned           |
-| **Document Converter**   | ✅ Complete | ✅ Parser     | ✅ Real Processing | ✅ **WORKING**         | ✅ Aligned           |
-| **Salary Calculator**    | ✅ Complete | ✅ AI-Powered | ✅ Real AI         | ✅ **WORKING**         | ✅ **NEWLY ALIGNED** |
-| **AI Resume Scorer**     | ❌ Missing  | ❌ Missing    | ❌ None            | ❌ **NOT IMPLEMENTED** | 🔴 **CRITICAL GAP**  |
-| **Interview Coach**      | ❌ Missing  | ❌ Missing    | ❌ None            | ❌ **NOT IMPLEMENTED** | 🔴 **CRITICAL GAP**  |
-| **Resume Optimizer**     | ❌ Missing  | ❌ Missing    | ❌ None            | ❌ **NOT IMPLEMENTED** | 🔴 **HIGH GAP**      |
-
-### 📊 Marketing Claims vs Reality
-
-| **Claim**                                     | **Reality**                  | **Risk Level**  | **Action Needed**                |
-| --------------------------------------------- | ---------------------------- | --------------- | -------------------------------- |
-| "50K+ Active Users"                           | No user tracking system      | 🔴 **HIGH**     | Remove or implement tracking     |
-| "1M+ Video Resumes"                           | No resume count verification | 🔴 **HIGH**     | Replace with realistic numbers   |
-| "95% User Satisfaction"                       | No satisfaction tracking     | 🔴 **HIGH**     | Implement feedback system        |
-| "AI Resume Scorer with 92% ATS compatibility" | Tool doesn't exist           | 🔴 **CRITICAL** | Implement or remove claims       |
-| "Interview practice & feedback"               | No interview coach           | 🔴 **CRITICAL** | Build MVP or remove from pricing |
-| "AI-powered salary insights"                  | Now implemented with real AI | ✅ **RESOLVED** | Recently fixed                   |
-
-### 🎯 Priority Implementation Roadmap
-
-#### Phase 1: Critical Marketing Fixes (Weeks 1-2)
-
-- **AI Resume Scorer** - 🔴 **P0 CRITICAL** - Implement basic ATS compatibility scoring
-- **Interview Coach MVP** - 🔴 **P0 CRITICAL** - Basic question database and feedback
-- **User Statistics Tracking** - 🔴 **P0 HIGH** - Real user count and analytics
-- **Marketing Copy Alignment** - 🔴 **P0 HIGH** - Remove inflated claims
-
-#### Phase 2: Core Feature Completion (Weeks 3-6)
-
-- **Resume Optimizer** - 🟡 **P1 HIGH** - Keyword suggestions and ATS tips
-- **Advanced Analytics Dashboard** - 🟡 **P1 MEDIUM** - User engagement metrics
-- **Real-time Notifications** - 🟡 **P1 MEDIUM** - WebSocket implementation
-- **Enhanced Video Processing** - 🟡 **P1 MEDIUM** - Better video resume tools
-
-#### Phase 3: Platform Enhancement (Weeks 7-10)
-
-- **Calendar Integration** - 🟡 **P2 MEDIUM** - Interview scheduling
-- **LinkedIn Integration** - 🟡 **P2 MEDIUM** - Profile import and sharing
-- **Mobile Responsiveness** - 🟡 **P2 MEDIUM** - Better mobile experience
-- **Advanced AI Features** - 🟡 **P2 LOW** - Custom models and predictions
-
-#### Phase 4: Future Expansion (Weeks 11+)
-
-- **Mobile App** - 🟢 **P3 LOW** - React Native implementation
-- **Advanced Social Features** - 🟢 **P3 LOW** - Enhanced networking
-- **Enterprise Features** - 🟢 **P3 LOW** - Advanced team management
-- **API Marketplace** - 🟢 **P3 LOW** - Third-party integrations
-
-## 🚀 Deployment
-
-### Production Build
-
-```bash
-# Build for production
-npm run build
-
-# Preview production build locally
-npm run preview
-```
-
-### Deployment Options
-
-- **Netlify** - Automatic deployments with Git integration
-- **Vercel** - Optimized for React applications with edge functions
-- **AWS S3 + CloudFront** - Scalable static hosting with CDN
-- **Docker** - Containerized deployment for any cloud provider
-
-### Environment Configuration
-
-```bash
-# Production environment variables
-VITE_API_URL=https://api.hired.video/api
-VITE_OPENROUTER_API_KEY=prod_openrouter_key
-VITE_ENVIRONMENT=production
-```
-
-## 🧪 Testing
-
-### Testing Strategy
-
-- **Unit Tests** - Component testing with React Testing Library
-- **Integration Tests** - API integration and user flow testing
-- **E2E Tests** - End-to-end testing with Playwright
-- **Visual Regression** - Screenshot testing for UI consistency
-
-### Running Tests
-
-```bash
-# Run unit tests
-npm run test
-
-# Run E2E tests
-npm run test:e2e
-
-# Run visual regression tests
-npm run test:visual
-```
-
-## 🤝 Contributing
-
-### Development Workflow
-
-1. **Fork the repository** and create a feature branch
-2. **Follow coding standards** - ESLint and Prettier configuration
-3. **Write tests** for new features and bug fixes
-4. **Update documentation** for API changes and new features
-5. **Submit pull request** with detailed description
-
-### Code Standards
-
-- **TypeScript** - Strict type checking enabled
-- **ESLint** - Code quality and consistency rules
-- **Prettier** - Automatic code formatting
-- **Conventional Commits** - Standardized commit messages
-
-## 📚 Additional Resources
-
-### Documentation
-
-- **API Documentation** - Swagger UI at `/swagger` endpoint
-- **Component Library** - Storybook documentation (planned)
-- **User Guide** - Comprehensive user documentation (planned)
-- **Developer Guide** - Technical implementation details
-
-### Support
-
-- **GitHub Issues** - Bug reports and feature requests
-- **Discord Community** - Developer discussions and support
-- **Email Support** - Direct support for enterprise customers
+**Configuration:**
+
+The extension's `constants.js` file controls the API endpoint. Set `isDevelopment = true` to point to `http://localhost:5000` for local API development.
+
+| File | Purpose |
+|------|---------|
+| `manifest.json` | Extension manifest (Manifest V3) |
+| `constants.js` | API base URLs, endpoint constants, job site parsers |
+| `service-worker.js` | Background service worker; opens side panel on extension icon click |
+| `content-script.js` | Injected into all pages; captures page HTML and URL |
+| `sidepanel-global.html` | Main side panel UI |
+| `login.html` | Login form |
+| `sidepanel.js` | Side panel logic (API calls, UI state) |
+| `login.js` | Login form handler |
+
+### VS Code Recommended Extensions
+
+- **ESLint** — Linting
+- **Prettier** — Formatting
+- **Tailwind CSS IntelliSense** — TailwindCSS support
+- **Drizzle ORM** — Schema navigation
+- **Thunder Client** — API testing
+- **GitLens** — Git history
 
 ---
 
-## 📋 Complete Feature Implementation Analysis
+## Deployment
 
-### 1. AUTHENTICATION & USER MANAGEMENT (100% Complete) ✅
+The API is deployed as a Cloudflare Worker. The deploy script runs migrations before deploying:
 
-| Feature                | API Status                  | Frontend Status            | Gap Analysis       |
-| ---------------------- | --------------------------- | -------------------------- | ------------------ |
-| **User Login**         | ✅ `/api/auth/login`        | ✅ Login page              | Complete           |
-| **User Registration**  | ✅ `/api/account/register`  | ✅ Signup page             | Complete           |
-| **Password Reset**     | ✅ `/Account/ResetPassword` | ✅ Forgot password page    | **NEWLY COMPLETE** |
-| **Email Confirmation** | ✅ `/Account/ConfirmEmail`  | ✅ Email confirmation page | **NEWLY COMPLETE** |
-| **Profile Management** | ✅ `/api/users/me`          | ✅ Profile page            | Complete           |
-| **User Search**        | ✅ `/api/users/public`      | ✅ People page             | Complete           |
+```bash
+cd api
+npm run deploy
+# Runs: db:push → wrangler deploy --env production
+```
 
-### 2. ACCOUNT & ORGANIZATION MANAGEMENT (100% Complete) ✅ ⬆️
-
-| Feature                     | API Status                                         | Frontend Status           | Gap Analysis       |
-| --------------------------- | -------------------------------------------------- | ------------------------- | ------------------ |
-| **Account Creation**        | ✅ `/api/account/register`                         | ✅ Signup with roles      | Complete           |
-| **User Invitations**        | ✅ `/api/account/invite`                           | ✅ Invite modal           | **NEWLY COMPLETE** |
-| **Role Assignment**         | ✅ `/api/account/roles`                            | ✅ Role management UI     | **NEWLY COMPLETE** |
-| **Account User Management** | ✅ `/api/account/users`                            | ✅ Team management UI     | **NEWLY COMPLETE** |
-| **Account Switching**       | ✅ `/api/account/available`, `/api/account/switch` | ✅ Account switcher UI    | **NEWLY COMPLETE** |
-| **Multi-Tenant Support**    | ✅ UserCompanyRoleAssociation                      | ✅ Full implementation    | **NEWLY COMPLETE** |
-| **Account Permissions**     | ✅ Role-based validation                           | ✅ Permission UI          | **NEWLY COMPLETE** |
-| **Account Settings**        | ✅ `/api/account/settings`                         | ✅ Complete settings UI   | **NEWLY COMPLETE** |
-| **Team Collaboration**      | ✅ Task assignment API                             | ✅ Enhanced collaboration | **NEWLY COMPLETE** |
-| **Account Analytics**       | ✅ `/api/account/analytics`                        | ✅ Analytics dashboard    | **NEWLY COMPLETE** |
-
-### 3. RESUME MANAGEMENT (83% Complete)
-
-| Feature                  | API Status                 | Frontend Status   | Gap Analysis           |
-| ------------------------ | -------------------------- | ----------------- | ---------------------- |
-| **Resume CRUD**          | ✅ Full CRUD API           | ✅ Resume builder | Complete               |
-| **Resume Upload**        | ✅ `/api/resume/upload`    | ✅ File upload    | Complete               |
-| **Resume Parsing**       | ✅ `/api/resume/parse`     | ✅ Auto-fill      | Complete               |
-| **Public Resume Search** | ✅ `/api/resume/public`    | ✅ Resume gallery | Complete               |
-| **Resume Analytics**     | ✅ `/api/resume/analytics` | 🟡 Basic metrics  | **Enhancement Needed** |
-| **Resume Sharing**       | ✅ `/api/resume/share`     | ❌ No sharing UI  | **Frontend Gap**       |
-
-### 4. JOB MANAGEMENT (80% Complete)
-
-| Feature              | API Status              | Frontend Status    | Gap Analysis           |
-| -------------------- | ----------------------- | ------------------ | ---------------------- |
-| **Job CRUD**         | ✅ Full CRUD API        | ✅ Job pages       | Complete               |
-| **Job Search**       | ✅ `/api/job/public`    | ✅ Job search      | Complete               |
-| **Job Applications** | ✅ `/api/job/apply`     | ✅ Apply button    | Complete               |
-| **Job Matching**     | ✅ `/api/job/match`     | 🟡 Basic matching  | **Enhancement Needed** |
-| **Job Analytics**    | ✅ `/api/job/analytics` | ❌ No analytics UI | **Frontend Gap**       |
-| **Job Alerts**       | ❌ No API               | ❌ No UI           | **Full Gap**           |
-
-### 5. COMPANY MANAGEMENT (90% Complete)
-
-| Feature               | API Status                      | Frontend Status     | Gap Analysis           |
-| --------------------- | ------------------------------- | ------------------- | ---------------------- |
-| **Company CRUD**      | ✅ Full CRUD API                | ✅ Company pages    | Complete               |
-| **Company Search**    | ✅ `/api/companies/public`      | ✅ Company gallery  | Complete               |
-| **Company Following** | ✅ `/api/companies/{id}/follow` | ✅ Follow button    | Complete               |
-| **Company Analytics** | ✅ `/api/companies/analytics`   | 🟡 Basic metrics    | **Enhancement Needed** |
-| **Company Jobs**      | ✅ `/api/companies/{id}/jobs`   | ✅ Company job list | Complete               |
-
-### 6. COMMUNICATION & OUTREACH (86% Complete) ⬆️
-
-| Feature                    | API Status                                | Frontend Status        | Gap Analysis        |
-| -------------------------- | ----------------------------------------- | ---------------------- | ------------------- |
-| **Conversations**          | ✅ `/api/communication/conversations`     | ✅ Outreach page       | **NEWLY COMPLETE**  |
-| **Messages**               | ✅ `/api/communication/messages`          | ✅ Message UI          | **NEWLY COMPLETE**  |
-| **Email Templates**        | ✅ `/api/communication/email-templates`   | ✅ Template editor     | **NEWLY COMPLETE**  |
-| **External Contacts**      | ✅ `/api/communication/external-contacts` | ✅ Contact manager     | **NEWLY COMPLETE**  |
-| **Communication Tracking** | ✅ `/api/communication/tracking`          | ✅ Analytics dashboard | **NEWLY COMPLETE**  |
-| **Follow-up Reminders**    | ✅ `/api/communication/follow-ups`        | ✅ Reminder system     | **NEWLY COMPLETE**  |
-| **Email Integration**      | 🟡 Basic SMTP                             | ❌ No email client     | **Integration Gap** |
-| **LinkedIn Integration**   | ❌ No API                                 | ❌ No UI               | **Full Gap**        |
-
-### 7. TASK MANAGEMENT (100% Complete) ✅
-
-| Feature                  | API Status      | Frontend Status          | Gap Analysis |
-| ------------------------ | --------------- | ------------------------ | ------------ |
-| **Task CRUD**            | ✅ `/api/tasks` | ✅ Tasks page            | Complete     |
-| **Multi-view Interface** | ✅ Full API     | ✅ Table/Calendar/Kanban | Complete     |
-| **Task Assignment**      | ✅ Role-based   | ✅ Team collaboration    | Complete     |
-| **Status Workflow**      | ✅ Complete     | ✅ Drag & drop           | Complete     |
-| **Filtering & Search**   | ✅ Advanced     | ✅ Dynamic filters       | Complete     |
-
-### 8. AI TOOLS & ANALYTICS (50% Complete) ⬆️ **UPDATED**
-
-| Feature                   | API Status               | Frontend Status    | Gap Analysis           | Marketing Status     |
-| ------------------------- | ------------------------ | ------------------ | ---------------------- | -------------------- |
-| **Sentiment Analysis**    | ✅ ML Model + API        | ✅ Complete Tool   | ✅ **WORKING**         | ✅ Aligned           |
-| **Job-Resume Matching**   | ✅ AI Service            | ✅ Complete Tool   | ✅ **WORKING**         | ✅ Aligned           |
-| **Resume Summarization**  | ✅ AI Service            | ✅ Complete Tool   | ✅ **WORKING**         | ✅ Aligned           |
-| **Document Converter**    | ✅ Parser Service        | ✅ Complete Tool   | ✅ **WORKING**         | ✅ Aligned           |
-| **Salary Calculator**     | ✅ AI-Powered ⬆️ **NEW** | ✅ Complete Tool   | ✅ **WORKING**         | ✅ **NEWLY ALIGNED** |
-| **AI Resume Scorer**      | ❌ No API                | ❌ No UI           | ❌ **NOT IMPLEMENTED** | 🔴 **CRITICAL GAP**  |
-| **Interview Coach**       | ❌ No API                | ❌ No UI           | ❌ **NOT IMPLEMENTED** | 🔴 **CRITICAL GAP**  |
-| **Resume Optimizer**      | ❌ No API                | ❌ No UI           | ❌ **NOT IMPLEMENTED** | 🔴 **HIGH GAP**      |
-| **Performance Analytics** | 🟡 Basic metrics         | 🟡 Basic dashboard | **Enhancement Needed** | 🟡 Partial           |
-
-### 8.1. RECENT AI TOOL UPDATES ⬆️ **NEW SECTION**
-
-#### ✅ Completed Updates (December 2024)
-
-- **Salary Calculator**: Upgraded from hardcoded data to real AI-powered analysis using OpenRouter
-- **Card UI Consistency**: All cards now follow consistent "View" + "Actions" button pattern
-- **Authentication Flow**: All tools now properly prompt for login with tool-specific messaging
-- **Marketing Alignment**: Salary calculator marketing now matches actual AI implementation
-
-#### 🔴 Critical Gaps Identified
-
-- **AI Resume Scorer**: Heavily marketed with specific percentages (92% ATS compatibility) but completely missing
-- **Interview Coach**: Listed in premium pricing plans but no implementation exists
-- **Resume Optimizer**: Promoted as key feature but not built
-- **User Statistics**: Claims of "50K+ users" and "1M+ resumes" with no tracking system
-
-#### 🎯 Immediate Action Items
-
-1. **Remove misleading statistics** from marketing materials
-2. **Implement AI Resume Scorer MVP** (2-3 weeks effort)
-3. **Build Interview Coach basic version** (3-4 weeks effort)
-4. **Add "Coming Soon" badges** to unimplemented features
-
-### 9. SOCIAL & NETWORKING (45% Complete) ⬆️ (+5%)
-
-| Feature                  | API Status                  | Frontend Status     | Gap Analysis           | Recent Updates   |
-| ------------------------ | --------------------------- | ------------------- | ---------------------- | ---------------- |
-| **User Connections**     | ✅ `/api/users/connections` | 🟡 Basic networking | **Enhancement Needed** | UI improved      |
-| **Professional Network** | ✅ `/api/users/network`     | ✅ People page      | Complete               | Card consistency |
-| **User Profiles**        | ✅ Complete API             | ✅ Profile pages    | Complete               | Enhanced UI      |
-| **Endorsements**         | ❌ No API                   | ❌ No UI            | **Full Gap**           | Not started      |
-| **Recommendations**      | ❌ No API                   | ❌ No UI            | **Full Gap**           | Not started      |
-| **Social Sharing**       | ❌ No API                   | ❌ No UI            | **Full Gap**           | Not started      |
-
-### 10. TECHNICAL INFRASTRUCTURE (67% Complete)
-
-| Feature                   | API Status         | Frontend Status         | Gap Analysis |
-| ------------------------- | ------------------ | ----------------------- | ------------ |
-| **File Upload/Storage**   | ✅ Complete        | ✅ Drag & drop          | Complete     |
-| **Search & Filtering**    | ✅ Advanced search | ✅ Filter UI            | Complete     |
-| **Pagination**            | ✅ Cursor-based    | ✅ Pagination component | Complete     |
-| **Real-time Updates**     | ❌ No WebSocket    | ❌ No real-time         | **Full Gap** |
-| **Offline Support**       | ❌ No PWA          | ❌ No offline           | **Full Gap** |
-| **Mobile Responsiveness** | N/A                | ✅ Responsive design    | Complete     |
+The frontend is a static SPA deployable to any CDN (Cloudflare Pages, Vercel, Netlify).
 
 ---
 
-## 🎯 PRIORITY DEVELOPMENT ROADMAP
+## Known Issues & Priorities
 
-### HIGH PRIORITY (Critical for MVP)
+### Open (not yet addressed)
 
-1. ~~**Account Switching API** - Backend support for multi-account switching~~ ✅ **COMPLETE**
-2. **Real-time Notifications** - WebSocket implementation for live updates
-3. **Email Client Integration** - Connect SMTP service to frontend email client
-4. **Job Alerts** - Automated job matching notifications
+1. **No tests** — Zero automated test coverage. The legacy `.NET` project has a dedicated test suite that should inform a Vitest/hono-test setup.
+2. **No OpenAPI/Swagger** — Consider `@hono/swagger-ui` + `zod-openapi`; the existing Zod schemas can generate specs with minimal effort.
+3. **Stripe payment processing** — `services/billing.ts` now queries the DB for subscriptions and invoices, but `createSetupSession` and payment method sync still need the Stripe SDK wired up.
+4. **Business logic in route handlers** — Most domain logic is inlined in route files. Extracting to service functions would improve testability and DRY compliance.
+5. **No background workers** — Queue tables (`queueJobToResume`, `queueJobToProcess`) exist in schema but nothing processes them. Video generation may depend on this.
+6. **LinkedIn OAuth** — Only `POST /linkedin-post` exists. Full OAuth callback flow needed to match legacy.
 
-### MEDIUM PRIORITY (Enhanced UX)
+### Recently Fixed
 
-1. **LinkedIn Integration** - Import profiles and post updates
-2. **Advanced Analytics** - Detailed performance dashboards
-3. **Calendar Integration** - Schedule interviews and follow-ups
-4. **Social Features** - Endorsements and recommendations
-
-### LOW PRIORITY (Future Enhancements)
-
-1. **Predictive Analytics** - AI-powered career insights
-2. **Offline Support** - PWA capabilities
-3. **Mobile App** - React Native implementation
-4. **Advanced AI Features** - Custom AI models
-
----
-
-## 📋 **Executive Summary - Current State (December 2024)**
-
-### ✅ **Strengths**
-
-- **Solid Foundation**: 75% of core platform features are fully implemented and working
-- **Enterprise Ready**: Complete authentication, account management, and team collaboration
-- **AI Integration**: 5/8 AI tools working with real AI (not mock data)
-- **Professional UI**: Consistent, modern interface with recent UX improvements
-- **Scalable Architecture**: Multi-tenant support with role-based access control
-
-### 🚨 **Critical Issues**
-
-- **Marketing Misalignment**: Major gaps between promoted features and actual implementation
-- **Missing Premium Features**: Key tools marketed in pricing plans don't exist
-- **Inflated Statistics**: User count and engagement claims lack verification systems
-- **Revenue Risk**: Customers may expect features that aren't built
-
-### 🎯 **Immediate Priorities**
-
-1. **Implement AI Resume Scorer** (2-3 weeks) - Most critical marketing gap
-2. **Build Interview Coach MVP** (3-4 weeks) - Required for premium pricing
-3. **Fix Marketing Claims** (1 week) - Remove unverified statistics
-4. **Add User Analytics** (1-2 weeks) - Track real usage metrics
-
-### 📊 **Platform Readiness**
-
-- **Job Seekers**: ✅ **Ready** - Core features work well
-- **Recruiters**: 🟡 **Mostly Ready** - Missing some advanced tools
-- **Businesses**: ✅ **Ready** - Enterprise features complete
-- **Marketing Claims**: 🔴 **Not Ready** - Significant gaps exist
-
-### 🚀 **Recommendation**
-
-The platform has a **strong technical foundation** but needs **immediate marketing alignment** to avoid customer dissatisfaction. Focus on implementing the 2-3 most critical missing tools before major marketing pushes.
+- ✅ **Billing service** — Real DB queries for subscriptions, invoices, payment methods, and AI usage (was entirely stubbed).
+- ✅ **AI chat** — Full `POST /api/ai/chat` endpoint with session persistence, message history, usage tracking, and LLM integration.
+- ✅ **Notification SSE** — `GET /api/hubs/notifications` streams unread notifications via Server-Sent Events; `POST /negotiate` returns transport descriptor.
+- ✅ **Email verification enforced** — `emailVerifiedMiddleware` now applied to all authenticated routes in `app.ts`.
+- ✅ **Password change enforced** — `passwordChangeMiddleware` now applied to all authenticated routes in `app.ts`.
+- ✅ **Settings export** — `GET /api/settings/export` returns a full JSON export of the user's account, profile, resumes, applications, and saved jobs.
+- ✅ **Duplicate feature-flag file** — Orphaned `routes/feature-flag.ts` deleted; `routes/featureflag.ts` is the single source of truth.
+- ✅ **Duplicate job summary endpoints** — `GetSummaryItems` and `getsummaryitems` now share a single handler; both aliases retained for backwards compatibility.
+- ✅ **Match routes** — `POST /api/match/analyze` and `POST /api/match/tailor` now call the LLM (OpenRouter/Gemini Flash) with keyword-overlap heuristic fallback; usage recorded in `aiUsageRecords`.
+- ✅ **Chrome extension** — Updated to `hired.video` branding (v2.0); API URL corrected from `api.myvideoresu.me` to `api.hired.video`; all routes corrected to lowercase to match the TypeScript API.
+- ✅ **Resume createvariation** — Now accepts `resumeData` markdown from the Chrome extension and stores it in `content.markdown`.
+- ✅ **Resume export** — `GET /api/resume/:id/export` returns real resume data (markdown, JSON, or plain text) instead of a stub.
+- ✅ **Stripe fully wired** — `GET /public-key`, `POST /setup-intent`, `POST /save-payment-method`, `POST /stripe/webhook`. Customer IDs persisted on `users.stripe_customer_id`. Webhook handles subscription lifecycle, invoice sync, payment method sync, affiliate conversions, and payout tracking.
 
 ---
 
-This frontend provides a modern, professional interface for the hired.video platform with enterprise-grade features for career development, business networking, and organizational management. The platform is designed to scale from individual job seekers to large enterprise recruiting teams with comprehensive multi-tenant support and advanced collaboration features.
+## Product Roadmap
+
+hired.video is evolving from a video resume tool into a **full-stack AI career and talent operating system**. The roadmap below reflects that vision.
+
+---
+
+### Positioning
+
+| Audience | What hired.video is |
+|---|---|
+| Job seekers | AI Career Copilot — resume, matching, interview prep, application tracking |
+| Recruiters | AI Talent CRM — sourcing, scoring, outreach, pipeline |
+| Companies | AI Hiring Funnel — job posting, candidate discovery, fast-track hiring |
+| Creators | Professional Identity Platform — video profiles, shareable links, audience |
+
+**Tagline:** *"LinkedIn + Loom + ATS + AI Copilot — in one platform"*
+
+---
+
+### Now (0–30 days)
+
+| Feature | Status | Notes |
+|---|---|---|
+| **Stripe payment integration** | ✅ Done | `GET /public-key`, `POST /setup-intent`, `POST /save-payment-method`, `POST /stripe/webhook` — all implemented. Configure 3 secrets to activate. |
+| **Shareable "Hire Me" profiles** | 🔴 High ROI | Public profile page per user — video, resume, skills. Main viral distribution vector. Data already exists. |
+| **Frontend PWA** | ✅ Done | vite-plugin-pwa with Workbox, offline shell caching, installable on mobile/desktop |
+| **Chrome extension v2.0** | ✅ Done | Analyze, tailor, save variation, export — fully wired to TypeScript API |
+| **Email verification + password enforcement** | ✅ Done | Both middlewares active globally |
+
+---
+
+### Soon (30–60 days)
+
+| Feature | Priority | Description |
+|---|---|---|
+| **AI Career Copilot dashboard** | 🔥 High | "What should I do next?" — surfaces job matches, skill gaps, resume improvements, interview readiness. Built from existing scores, sessions, and match data. |
+| **Real-time chat** | 🔥 High | Recruiter ↔ candidate messaging. SSE notifications exist; need chat rooms + message persistence. |
+| **Auto-fill Chrome extension** | 🔥 High | Extend the extension to auto-fill LinkedIn/Indeed application forms using resume data. Distribution multiplier. |
+| **OpenAPI / Swagger docs** | Medium | `@hono/swagger-ui` + `zod-openapi`; Zod schemas can generate spec with minimal effort |
+| **Background job worker** | Medium | Queue tables (`queueJobToResume`, `queueJobToProcess`) exist; implement Cloudflare Queue consumer for video processing |
+
+---
+
+### Mid-Term (60–120 days)
+
+| Feature | Priority | Description |
+|---|---|---|
+| **AI Recruiter Agent** | 🔥 High | Automated sourcing, candidate scoring, personalised outreach, reply tracking, follow-up suggestions. "Apollo.io + LinkedIn Recruiter, automated." |
+| **Marketplace dynamics** | 🔥 High | Recruiter bidding on candidates, talent availability signals ("open to work"), fast-track pipelines. Network effects kick in here. |
+| **AI Mock Interview → Pre-qualified candidates** | High | Recorded mock interviews scored by AI; share results with recruiters. Candidates arrive pre-qualified. |
+| **"Resume Roast" viral engine** | High | Surface the existing resume-roast endpoint as shareable social content. "AI roasts this resume." Organic traffic driver. |
+| **Affiliate program scaling** | Medium | Target career coaches, resume writers, TikTok creators. % of subscriptions + recruiter deals. |
+| **Stripe fully wired** | Medium | After basic Stripe (above): proration, coupon codes, usage-based billing for AI credits |
+
+---
+
+### Long-Term (6–12 months)
+
+| Feature | Priority | Description |
+|---|---|---|
+| **Autonomous job application agent** | 🚀 Big bet | Applies to jobs on behalf of user — tailors resume + video, tracks pipeline, reports back. ~$20–50/mo paid feature. |
+| **TikTok-style talent discovery feed** | 🚀 Big bet | Short video intros, recruiter swipe, algorithmic candidate surfacing. Video = core identity primitive, not just a feature. |
+| **University & bootcamp partnerships** | 🚀 High | White-labeled career portals, placement analytics. Students need jobs — perfect top-of-funnel. |
+| **SEO content engine** | High | AI-generated pages: "Best resume for [job title]", "Top skills for [industry]", "Salary for [role]". Structured data already exists in DB. |
+| **LinkedIn OAuth + deep integration** | High | Full OAuth callback flow; import LinkedIn profile, cross-post video resumes |
+| **B2B sales motion** | High | Target recruiting agencies, staffing firms, SMB hiring teams. Pitch: "Replace 50% of your sourcing effort with AI." |
+| **Creator / influencer mode** | Medium | Let users build audiences, post career content, sell resume templates. "Top PM resumes", "How I got hired at Google." |
+| **Smart job board layer** | Medium | Aggregate jobs from major boards, AI match + rank, apply automation. Compete on intelligence, not listings. |
+
+---
+
+### Strategic Moats
+
+The platform sits on three compounding advantages:
+
+| Moat | What it is |
+|---|---|
+| **Data** | Resumes, jobs, interactions, videos, match scores — proprietary training signal |
+| **AI** | Scoring, matching, tailoring, mock interviews, sentiment — keeps improving with usage |
+| **Network** | Candidates + recruiters + companies on one platform — liquidity begets liquidity |
+
+Lean into distribution (Chrome extension + shareable links), automation (autonomous agent), and network effects (marketplace) to compound all three.

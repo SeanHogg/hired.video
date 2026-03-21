@@ -35,7 +35,7 @@ export function RefundRequestModal({
 
   const [formData, setFormData] = useState<CreateRefundRequest>({
     subscriptionId: subscriptionId || '',
-    stripeChargeId: chargeId || '',
+    chargeId: chargeId || '',
     amountCents: defaultAmount || 0,
     reason: '',
     description: '',
@@ -109,7 +109,7 @@ export function RefundRequestModal({
   const resetForm = () => {
     setFormData({
       subscriptionId: subscriptionId || '',
-      stripeChargeId: chargeId || '',
+      chargeId: chargeId || '',
       amountCents: defaultAmount || 0,
       reason: '',
       description: '',

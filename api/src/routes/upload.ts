@@ -1,11 +1,5 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import {
-  S3Client,
-  PutObjectCommand,
-  HeadObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
 import type { Variables } from "../types/index.js";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -23,21 +17,6 @@ const UploadSchema = z.object({
   contentType: z.string().min(1),
 });
 
-function getS3Client(): S3Client {
-  return new S3Client({
-    endpoint: process.env.STORAGE_ENDPOINT,
-    region: process.env.STORAGE_REGION ?? "auto",
-    credentials: {
-      accessKeyId: process.env.STORAGE_ACCESS_KEY ?? "",
-      secretAccessKey: process.env.STORAGE_SECRET_KEY ?? "",
-    },
-    forcePathStyle: true,
-  });
-}
-
-function getBucket(): string {
-  return process.env.STORAGE_BUCKET ?? "hired.video";
-}
 
 export const uploadRoutes = new Hono<{ Variables: Variables }>();
 
@@ -90,16 +69,10 @@ uploadRoutes.post("/", async (c) => {
   const extension = filename.includes(".") ? filename.split(".").pop() : "";
   const key = `uploads/${user.sub}/${crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
 
-  const s3 = getS3Client();
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: Buffer.from(body),
-      ContentType: contentType,
-      Metadata: { userId: user.sub, originalFilename: filename },
-    }),
-  );
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  await bucket.put(key, body, { httpMetadata: { contentType } });
 
   return c.json(
     ok({ key, url: cdnUrl(key), contentType, size: body.byteLength }),
@@ -126,16 +99,12 @@ uploadRoutes.post("/image", async (c) => {
   const ext = fileExt(part.name || "image");
   const key = `uploads/${user.sub}/images/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
 
-  const s3 = getS3Client();
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: Buffer.from(bytes),
-      ContentType: contentType,
-      Metadata: { userId: user.sub, originalFilename: part.name || "image" },
-    }),
-  );
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) {
+    return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+  }
+
+  await bucket.put(key, bytes, { httpMetadata: { contentType } });
 
   return c.json(ok({ url: cdnUrl(key) }), 201);
 });
@@ -154,16 +123,10 @@ uploadRoutes.post("/single", async (c) => {
   const ext = fileExt(part.name || "file");
   const key = `uploads/${user.sub}/files/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
 
-  const s3 = getS3Client();
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: Buffer.from(bytes),
-      ContentType: part.type || "application/octet-stream",
-      Metadata: { userId: user.sub, originalFilename: part.name || "file" },
-    }),
-  );
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  await bucket.put(key, bytes, { httpMetadata: { contentType: part.type || "application/octet-stream" } });
 
   return c.json(ok({ url: cdnUrl(key) }), 201);
 });
@@ -187,16 +150,10 @@ uploadRoutes.post("/video", async (c) => {
   const ext = fileExt(part.name || "video");
   const key = `uploads/${user.sub}/videos/${crypto.randomUUID()}${ext ? `.${ext}` : ".webm"}`;
 
-  const s3 = getS3Client();
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: Buffer.from(bytes),
-      ContentType: contentType,
-      Metadata: { userId: user.sub, originalFilename: part.name || "video" },
-    }),
-  );
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
+
+  await bucket.put(key, bytes, { httpMetadata: { contentType } });
 
   return c.json(
     ok({
@@ -223,16 +180,13 @@ uploadRoutes.delete("/:key{.+}", async (c) => {
     return c.json(fail("FORBIDDEN", "You do not have permission to delete this file"), 403);
   }
 
-  const s3 = getS3Client();
-  const bucket = getBucket();
+  const bucket: R2Bucket | undefined = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) return c.json(fail("INTERNAL_SERVER_ERROR", "Storage not configured"), 500);
 
-  try {
-    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-  } catch {
-    return c.json(fail("NOT_FOUND", "File not found"), 404);
-  }
+  const existing = await bucket.head(key);
+  if (!existing) return c.json(fail("NOT_FOUND", "File not found"), 404);
 
-  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  await bucket.delete(key);
 
   return c.json(ok(null));
 });

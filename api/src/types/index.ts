@@ -12,6 +12,16 @@ export interface Env {
   // YouTube company OAuth
   YOUTUBE_COMPANY_CLIENT_ID?: string;
   YOUTUBE_COMPANY_CLIENT_SECRET?: string;
+  // Payment provider selection (defaults to "stripe")
+  PAYMENT_PROVIDER?: string;
+  // Stripe
+  STRIPE_PUBLISHABLE_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SIGNING_KEY?: string;
+  // Helcim (alternative provider)
+  HELCIM_ACCOUNT_ID?: string;
+  HELCIM_API_TOKEN?: string;
+  HELCIM_WEBHOOK_TOKEN?: string;
 }
 
 // ── Hono context variables ───────────────────────────────────────────────────

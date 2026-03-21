@@ -79,7 +79,7 @@ const AffiliatePayoutSummarySchema = z.object({
   status: z.string(),
   requestedAt: z.string(),
   paidAt: z.string().nullable().optional(),
-  stripeReferenceId: z.string().nullable().optional(),
+  providerReferenceId: z.string().nullable().optional(),
 });
 
 const AffiliateAdminStatsSchema = z.object({

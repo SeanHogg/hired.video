@@ -398,14 +398,60 @@ resumeRoutes.post("/:id/publish", async (c) => {
   return c.json(ok(rowToLegacyResume(updated)), 200);
 });
 
-resumeRoutes.get("/:id/export", (c) => {
-  const format = c.req.query("format") ?? "pdf";
-  const content = `Resume export (${format})`;
-  return new Response(content, {
+resumeRoutes.get("/:id/export", async (c) => {
+  const id = c.req.param("id");
+  const user = c.var.user;
+  const format = (c.req.query("format") ?? "json").toLowerCase();
+  const db = getDb();
+
+  const [row] = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .limit(1);
+
+  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+
+  const content = row.content as Record<string, unknown> | null;
+
+  if (format === "md" || format === "markdown") {
+    // Return markdown if stored, otherwise serialise the JSON
+    const md = typeof content?.markdown === "string"
+      ? content.markdown
+      : `# ${row.title}\n\n${JSON.stringify(content, null, 2)}`;
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.md"`,
+      },
+    });
+  }
+
+  if (format === "pdf" || format === "docx") {
+    // PDF/DOCX generation requires an external rendering service (e.g. Puppeteer,
+    // Gotenberg, or a managed PDF API). Until one is configured, return the
+    // markdown/JSON so the Chrome extension can still download something useful.
+    const md = typeof content?.markdown === "string"
+      ? content.markdown
+      : `# ${row.title}\n\n${JSON.stringify(content, null, 2)}`;
+    return new Response(md, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.txt"`,
+        "X-Export-Note": "PDF/DOCX rendering not yet available; content returned as plain text",
+      },
+    });
+  }
+
+  // Default: JSON export
+  const exportPayload = JSON.stringify({ id: row.id, title: row.title, content, exportedAt: new Date().toISOString() }, null, 2);
+  return new Response(exportPayload, {
     status: 200,
     headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Disposition": `attachment; filename=\"resume.${format}\"`,
+      "Content-Type": "application/json",
+      "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.json"`,
     },
   });
 });
@@ -478,12 +524,25 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
   const [parent] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
 
+  // When resumeData (markdown string) is supplied by the Chrome extension or other
+  // clients, store it alongside the structured content so it can be rendered/exported.
+  const baseContent: Record<string, unknown> = typeof parent.content === "object" && parent.content !== null
+    ? { ...(parent.content as Record<string, unknown>) }
+    : {};
+
+  if (typeof body?.resumeData === "string" && body.resumeData.trim()) {
+    baseContent.markdown = body.resumeData.trim();
+  }
+  if (typeof body?.description === "string") {
+    baseContent.variationDescription = body.description;
+  }
+
   const [created] = await db
     .insert(resumes)
     .values({
       userId: user.sub,
       title: name ?? `${parent.title} Variation`,
-      content: parent.content ?? {},
+      content: baseContent,
       status: "draft",
       parentId: parent.id,
       isMaster: false,

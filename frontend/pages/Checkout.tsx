@@ -81,7 +81,7 @@ export default function Checkout() {
     }
   }, [items.length, isAuthenticated, navigate]);
 
-  // Handle cancellation from Stripe
+  // Handle cancellation from payment provider redirect
   useEffect(() => {
     const cancelled = searchParams.get("cancelled");
     if (cancelled === "true") {
@@ -103,26 +103,23 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      if (paymentMethod === "us_bank_account") {
-        // For ACH payments, redirect to Stripe for bank account setup
-        const successUrl = `${window.location.origin}/checkout/success`;
-        const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
+      const successUrl = `${window.location.origin}/checkout/success`;
+      const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
 
-        const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
+      const result = await billingService.initPaymentCollection(successUrl, cancelUrl);
 
-        // Redirect to Stripe for ACH setup
-        window.location.href = setupUrl;
+      if (result.flowType === "redirect" && result.redirectUrl) {
+        // Provider uses a hosted payment page — redirect there
+        window.location.href = result.redirectUrl;
         return; // Don't set isProcessing to false since we're redirecting
-      } else {
-        // For card payments, implement card processing logic here
-        // This is a placeholder - in a real implementation, you'd integrate with Stripe Elements
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-
-        // Clear cart and show success
-        clearCart();
-        toast.success("Payment successful! Welcome to Premium! 🎉");
-        navigate("/dashboard");
       }
+
+      // Embedded flow (Stripe SetupIntent or Helcim checkoutToken)
+      // The client secret / checkoutToken is used by the payment SDK on this page.
+      // For now navigate to success; a real integration mounts the SDK widget here.
+      clearCart();
+      toast.success("Payment successful! Welcome to Premium! 🎉");
+      navigate("/dashboard");
     } catch (error) {
       console.error("Payment processing error:", error);
       toast.error("Payment failed. Please try again.");
@@ -459,7 +456,7 @@ export default function Checkout() {
                               Bank Account Setup
                             </div>
                             <p className="text-sm text-blue-700 mb-3">
-                              Bank account payments are processed securely through Stripe. When you click "Complete Purchase", you'll be redirected to a secure Stripe page to connect your bank account.
+                              Bank account payments are processed securely. When you click "Complete Purchase", you'll be redirected to a secure page to connect your bank account.
                             </p>
                             <div className="text-xs text-blue-600 space-y-1">
                               <p>✓ Lower processing fees than credit cards</p>
@@ -490,7 +487,7 @@ export default function Checkout() {
                     {isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        {paymentMethod === "us_bank_account" ? "Redirecting to Stripe..." : "Processing Payment..."}
+                        {paymentMethod === "us_bank_account" ? "Redirecting..." : "Processing Payment..."}
                       </>
                     ) : (
                       <>

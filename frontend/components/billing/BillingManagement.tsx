@@ -427,7 +427,7 @@ export function BillingManagement() {
             });
           }
         }}
-        subscriptionId={subscription?.stripeSubscriptionId}
+        subscriptionId={subscription?.providerSubscriptionId}
       />
     </div>
   );

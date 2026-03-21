@@ -140,6 +140,53 @@ settingsRoutes.post("/security/2fa/disable", async (c) => {
   return c.json(success({ success: true }), 200);
 });
 
-settingsRoutes.get("/export", (c) => c.json(success({ message: "Export started. You will receive an email when your data is ready." }), 200));
+settingsRoutes.get("/export", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [user] = await db
+    .select({ email: users.email, name: users.name, role: users.role, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt })
+    .from(users)
+    .where(eq(users.id, uid))
+    .limit(1);
+
+  const [profile] = await db
+    .select()
+    .from(schema.userProfiles)
+    .where(eq(schema.userProfiles.userId, uid))
+    .limit(1);
+
+  const resumes = await db
+    .select({ id: schema.resumeInformation.id, title: schema.resumeInformation.title, status: schema.resumeInformation.status, createdAt: schema.resumeInformation.createdAt })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.userId, uid));
+
+  const applications = await db
+    .select()
+    .from(schema.jobApplications)
+    .where(eq(schema.jobApplications.userId, uid));
+
+  const savedJobsList = await db
+    .select()
+    .from(schema.savedJobs)
+    .where(eq(schema.savedJobs.userId, uid));
+
+  const [prefs] = await db
+    .select()
+    .from(accountPreferences)
+    .where(eq(accountPreferences.userId, uid))
+    .limit(1);
+
+  return c.json(success({
+    exportedAt: new Date().toISOString(),
+    account: user ?? null,
+    profile: profile ?? null,
+    preferences: prefs ?? null,
+    resumes,
+    jobApplications: applications,
+    savedJobs: savedJobsList,
+  }), 200);
+});
 
 settingsRoutes.all("*", (c) => c.json({ error: { code: "NOT_FOUND", message: "Settings endpoint not found" } }, 404));

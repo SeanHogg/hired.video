@@ -219,9 +219,11 @@ authRoutes.post("/register", async (c) => {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
   });
 
-  // Send verification email (fire-and-forget — never block registration on email failure)
-  void sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
-    console.error("[register] Failed to send verification email:", err),
+  // Send verification email — use waitUntil so the Worker stays alive for the async fetch
+  c.executionCtx.waitUntil(
+    sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
+      console.error("[register] Failed to send verification email:", err),
+    ),
   );
 
   const isDev = process.env.NODE_ENV !== "production";
@@ -273,8 +275,10 @@ authRoutes.post("/login", async (c) => {
   // If user has MFA enabled, step through the 2FA flow instead of issuing a JWT.
   if (user.mfaEnabled) {
     const entry = await createTwoFactorEntry(user.id);
-    void sendTwoFactorEmail(user.email, user.name, entry.code).catch((err) =>
-      console.error("[login] Failed to send 2FA email:", err),
+    c.executionCtx.waitUntil(
+      sendTwoFactorEmail(user.email, user.name, entry.code).catch((err) =>
+        console.error("[login] Failed to send 2FA email:", err),
+      ),
     );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(
@@ -290,7 +294,7 @@ authRoutes.post("/login", async (c) => {
   }
 
   const token = await createJwt(
-    { sub: user.id, email: user.email, roles: [user.role], emailVerified: false, mustChangePassword: false },
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false },
     getJwtSecret(),
   );
 
@@ -368,8 +372,10 @@ authRoutes.post("/forgot-password", async (c) => {
       .set({ used: true } as any)
       .where(eq(passwordResetTokens.userId, user.id));
     await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt });
-    void sendPasswordResetEmail(user.email, user.name, token).catch((err) =>
-      console.error("[forgot-password] Failed to send reset email:", err),
+    c.executionCtx.waitUntil(
+      sendPasswordResetEmail(user.email, user.name, token).catch((err) =>
+        console.error("[forgot-password] Failed to send reset email:", err),
+      ),
     );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(
@@ -521,8 +527,10 @@ authRoutes.post("/resend-2fa", async (c) => {
     .where(eq(users.id, existing.userId))
     .limit(1);
   if (userForEmail) {
-    void sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code).catch((err) =>
-      console.error("[resend-2fa] Failed to send 2FA email:", err),
+    c.executionCtx.waitUntil(
+      sendTwoFactorEmail(userForEmail.email, userForEmail.name, entry.code).catch((err) =>
+        console.error("[resend-2fa] Failed to send 2FA email:", err),
+      ),
     );
   }
 
@@ -606,8 +614,10 @@ authRoutes.post("/resend-email-verification", async (c) => {
       token: newToken,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
-    void sendResendVerificationEmail(user.email, user.name, newToken).catch((err) =>
-      console.error("[resend-email-verification] Failed to send email:", err),
+    c.executionCtx.waitUntil(
+      sendResendVerificationEmail(user.email, user.name, newToken).catch((err) =>
+        console.error("[resend-email-verification] Failed to send email:", err),
+      ),
     );
     const isDev = process.env.NODE_ENV !== "production";
     return c.json(success(isDev ? { verificationToken: newToken } : null, "Verification email sent"), 200);

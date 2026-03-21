@@ -5,7 +5,7 @@ import type { ApiResponse, ApiSuccessResponse } from "@shared/api";
 // Zod schemas for type validation
 export const CreateRefundRequestSchema = z.object({
   subscriptionId: z.string().optional(),
-  stripeChargeId: z.string().optional(),
+  chargeId: z.string().optional(),
   amountCents: z.number().int().positive(),
   reason: z.string().min(1).max(500),
   description: z.string().max(1000).optional(),
@@ -15,7 +15,7 @@ export const RefundRequestSchema = z.object({
   id: z.string(),
   userId: z.string(),
   subscriptionId: z.string().optional(),
-  stripeChargeId: z.string().optional(),
+  chargeId: z.string().optional(),
   amountCents: z.number(),
   reason: z.string(),
   description: z.string().optional(),
@@ -25,7 +25,7 @@ export const RefundRequestSchema = z.object({
   adminUserId: z.string().optional(),
   adminNotes: z.string().optional(),
   rejectionReason: z.string().optional(),
-  stripeRefundId: z.string().optional(),
+  refundId: z.string().optional(),
 });
 
 export const CreateCancellationRequestSchema = z.object({
