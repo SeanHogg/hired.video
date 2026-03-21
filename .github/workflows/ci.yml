@@ -86,6 +86,11 @@ jobs:
       - name: Install dependencies
         run: cd api && npm ci
 
+      - name: Push DB schema
+        run: cd api && npm run db:push
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Deploy to Cloudflare Workers
         run: cd api && npx wrangler deploy --env production
         env:
