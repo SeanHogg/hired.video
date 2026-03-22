@@ -435,7 +435,7 @@ export class ResumeService {
     });
 
     const response = await apiClient.get<any>(
-      `/api/Resume/public?${params.toString()}`,
+      `/api/resumes/public?${params.toString()}`,
       PaginatedResumesSchema,
     );
 
@@ -507,7 +507,7 @@ export class ResumeService {
    */
   async getUserResumes(): Promise<ResumeSummary[]> {
     const response = await apiClient.get<ResumeSummary[]>(
-      "/api/Resume/GetResumesOwnedbyAuthUser",
+      "/api/resumes/getresumesownedbyauthuser",
       z.array(ResumeSummarySchema),
     );
 
@@ -519,7 +519,7 @@ export class ResumeService {
    */
   async getResumeById(id: string): Promise<FrontendResume> {
     const response = await apiClient.get<any>(
-      `/api/Resume/${id}`,
+      `/api/resumes/${id}`,
       z.any(), // Use any for now since we need to transform the response
     );
 
@@ -532,7 +532,7 @@ export class ResumeService {
    */
   async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
     const response = await apiClient.get<any>(
-      `/api/Resume/embedded/${identifier}`,
+      `/api/resumes/embedded/${identifier}`,
       z.any(),
     );
     return this.transformApiResumeToResume(response.data);
@@ -583,7 +583,7 @@ export class ResumeService {
       result: string;
       errorMessage?: string;
     }>(
-      "/api/Resume/Parse",
+      "/api/resumes/parse",
       {
         method: "POST",
         body: formData,
@@ -729,7 +729,7 @@ export class ResumeService {
 
     // Note: This will need special handling for FormData
     const response = await apiClient.request<Resume>(
-      "/api/Resume/CreateFromFile",
+      "/api/resumes/createfromfile",
       {
         method: "POST",
         body: formData,
@@ -749,7 +749,7 @@ export class ResumeService {
     updates: Partial<CreateResume>,
   ): Promise<Resume> {
     const response = await apiClient.put<Resume>(
-      `/api/Resume/${id}`,
+      `/api/resumes/${id}`,
       updates,
       ResumeSchema,
     );
@@ -777,7 +777,7 @@ export class ResumeService {
     const qs = updates.slug ? `?slug=${encodeURIComponent(updates.slug)}` : "";
 
     const response = await apiClient.put<any>(
-      `/api/Resume/${id}${qs}`,
+      `/api/resumes/${id}${qs}`,
       body,
       z.any(),
     );
@@ -794,7 +794,7 @@ export class ResumeService {
     metadata: ResumeSectionMeta[],
   ): Promise<FrontendResume> {
     const response = await apiClient.put<any>(
-      `/api/Resume/${id}/metadata`,
+      `/api/resumes/${id}/metadata`,
       metadata,
       z.any(),
     );
@@ -809,7 +809,7 @@ export class ResumeService {
       const qs = new URLSearchParams({ slug });
       if (resumeId) qs.set("resumeId", resumeId);
       const response = await apiClient.get<{ slug: string; available: boolean }>(
-        `/api/Resume/validateSlug?${qs.toString()}`,
+        `/api/resumes/validateslug?${qs.toString()}`,
         z.object({ slug: z.string(), available: z.boolean() }),
       );
       return response.data;
@@ -820,7 +820,7 @@ export class ResumeService {
    * Delete resume
    */
   async deleteResume(id: string): Promise<void> {
-    await apiClient.delete(`/api/Resume/${id}`);
+    await apiClient.delete(`/api/resumes/${id}`);
   }
 
   /**
@@ -828,7 +828,7 @@ export class ResumeService {
    */
   async cloneResume(id: string): Promise<Resume> {
     const response = await apiClient.post<Resume>(
-      `/api/Resume/${id}/clone`,
+      `/api/resumes/${id}/clone`,
       {},
       ResumeSchema,
     );
@@ -840,7 +840,7 @@ export class ResumeService {
    */
   async exportResume(id: string, format = "pdf"): Promise<Blob> {
     const response = await apiClient.request<Blob>(
-      `/api/Resume/${id}/export?format=${format}`,
+      `/api/resumes/${id}/export?format=${format}`,
       { method: "GET" },
     );
 
@@ -852,14 +852,14 @@ export class ResumeService {
    * Watch/track resume
    */
   async watchResume(id: string): Promise<void> {
-    await apiClient.post(`/api/Resume/watch/${id}`);
+    await apiClient.post(`/api/resumes/watch/${id}`);
   }
 
   /**
    * Unwatch/untrack resume
    */
   async unwatchResume(id: string): Promise<void> {
-    await apiClient.post(`/api/Resume/unwatch/${id}`);
+    await apiClient.post(`/api/resumes/unwatch/${id}`);
   }
 
   /**
@@ -1240,7 +1240,7 @@ export class ResumeService {
    */
   async getResumeSummary(id: string): Promise<string> {
     const response = await apiClient.post<{ summary: string }>(
-      `/api/Resume/Summarize`,
+      `/api/resumes/summarize`,
       { resumeId: id },
       z.object({ summary: z.string() }),
     );
@@ -1255,7 +1255,7 @@ export class ResumeService {
     id: string,
   ): Promise<{ sentiment: string; score: number }> {
     const response = await apiClient.post<{ sentiment: string; score: number }>(
-      `/api/Resume/SentimentPrediction`,
+      `/api/resumes/sentimentprediction`,
       { resumeId: id },
       z.object({
         sentiment: z.string(),
@@ -1271,7 +1271,7 @@ export class ResumeService {
    */
   async parseResume(content: string): Promise<Partial<CreateResume>> {
     const response = await apiClient.post<Partial<CreateResume>>(
-      `/api/Resume/Parse`,
+      `/api/resumes/parse`,
       { content },
       CreateResumeSchema.partial(),
     );
@@ -1287,7 +1287,7 @@ export class ResumeService {
   async setMasterResume(id: string): Promise<boolean> {
     try {
       const response = await apiClient.post<boolean>(
-        `/api/Resume/${id}/setMaster`,
+        `/api/resumes/${id}/setmaster`,
         {},
         z.boolean(),
       );
@@ -1308,7 +1308,7 @@ export class ResumeService {
   async setActiveResume(id: string): Promise<boolean> {
     try {
       const response = await apiClient.post<boolean>(
-        `/api/Resume/${id}/setActive`,
+        `/api/resumes/${id}/setactive`,
         {},
         z.boolean(),
       );
@@ -1328,7 +1328,7 @@ export class ResumeService {
    */
   async setResumePrivacy(id: string, privacy: ResumePrivacy): Promise<boolean> {
     const response = await apiClient.post<boolean>(
-      `/api/Resume/${id}/setPrivacy`,
+      `/api/resumes/${id}/setprivacy`,
       { privacy },
       z.boolean()
     );
@@ -1339,7 +1339,7 @@ export class ResumeService {
   async promoteVariantToMaster(id: string): Promise<boolean> {
     try {
       const response = await apiClient.post<boolean>(
-        `/api/Resume/${id}/promote`,
+        `/api/resumes/${id}/promote`,
         {},
         z.boolean(),
       );
@@ -1358,7 +1358,7 @@ export class ResumeService {
   async createResumeVariation(parentId: string, name: string): Promise<Resume> {
     try {
       const response = await apiClient.post<Resume>(
-        `/api/Resume/${parentId}/createVariation`,
+        `/api/resumes/${parentId}/createvariation`,
         { name },
         ResumeSchema,
       );
@@ -1379,7 +1379,7 @@ export class ResumeService {
   async getMasterResumeGroups(): Promise<MasterResumeGroup[]> {
     try {
       const response = await apiClient.get<MasterResumeGroup[]>(
-        `/api/Resume/masterGroups`,
+        `/api/resumes/mastergroups`,
         z.array(MasterResumeGroupSchema),
       );
       return response.data;
@@ -1470,7 +1470,7 @@ export class ResumeService {
   async getResumesWithOwnership(): Promise<ResumeWithOwnership[]> {
     try {
       const response = await apiClient.get<ResumeWithOwnership[]>(
-        `/api/Resume/withOwnership`,
+        `/api/resumes/withownership`,
         z.array(ResumeWithOwnershipSchema),
       );
       return response.data;
