@@ -516,3 +516,61 @@ export async function sendTwoFactorEmail(
   });
   await provider.send({ to, subject: "Your verification code – hired.video", html });
 }
+
+const MAGIC_LINK_BODY = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <span style="color: #111827; font-size: 24px; font-weight: bold;">Sign in to <span style="color: #2563eb;">hired.video</span></span>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top: 8px;">
+                    <span style="color: #6b7280; font-size: 14px;">Your one-click sign-in link is ready</span>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color: #111827; padding-bottom: 8px;">Hi {{RecipientName}},</td>
+                </tr>
+                <tr>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 16px;">
+                    Click the button below to sign in. No password needed — this link expires in <strong>15 minutes</strong> and can only be used once.
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 24px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{MagicUrl}}" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;">
+                      Sign in to hired.video
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:12px;">
+                    <span style="color: #9ca3af; font-size: 13px;">Or copy this link: <a href="{{MagicUrl}}" style="color: #2563eb;">{{MagicUrl}}</a></span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #9ca3af; font-size: 13px;">If you didn't request this link, you can safely ignore this email.</p>
+`;
+
+export async function sendMagicLinkEmail(
+  to: string,
+  recipientName: string,
+  token: string,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping magic link email");
+    return;
+  }
+  const magicUrl = `${getBaseUrl()}/auth/magic-link?token=${encodeURIComponent(token)}`;
+  const html = render(MAGIC_LINK_BODY, { RecipientName: recipientName, MagicUrl: magicUrl });
+  await provider.send({ to, subject: "Your sign-in link for hired.video", html });
+}

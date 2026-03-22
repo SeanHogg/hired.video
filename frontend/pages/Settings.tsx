@@ -100,6 +100,14 @@ function SettingsContent() {
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTab, setActiveTab] = useState("notifications");
 
+  const [security, setSecurity] = useState<{
+    twoFactorEnabled: boolean;
+    hasPassword: boolean;
+    linkedAccounts: Array<{ id: string; provider: string; email: string | null; displayName: string | null; createdAt: string }>;
+  } | null>(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+
   // YouTube integration state
   const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
@@ -246,6 +254,17 @@ function SettingsContent() {
       });
   }, [isAuthenticated, activeTab]);
 
+  // Lazy-load security settings when security tab is active
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== "security" || security !== null) return;
+    setSecurityLoading(true);
+    settingsService
+      .getLinkedSecuritySettings()
+      .then(setSecurity)
+      .catch((err) => console.error("Failed to load security settings", err))
+      .finally(() => setSecurityLoading(false));
+  }, [isAuthenticated, activeTab, security]);
+
   // Cooldown timer for resend button
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -328,6 +347,21 @@ function SettingsContent() {
       toast({ title: "Failed to disconnect YouTube account", variant: "destructive" });
     } finally {
       setYoutubeLoading(false);
+    }
+  };
+
+  const handleUnlinkProvider = async (provider: string) => {
+    setUnlinkingProvider(provider);
+    try {
+      await settingsService.unlinkOAuthProvider(provider);
+      setSecurity((prev) =>
+        prev ? { ...prev, linkedAccounts: prev.linkedAccounts.filter((a) => a.provider !== provider) } : null,
+      );
+      toast({ title: `${provider.charAt(0).toUpperCase() + provider.slice(1)} account disconnected` });
+    } catch (err: any) {
+      toast({ title: "Failed to disconnect account", description: err?.message ?? "Please try again", variant: "destructive" });
+    } finally {
+      setUnlinkingProvider(null);
     }
   };
 
@@ -628,7 +662,7 @@ function SettingsContent() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
               {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
               <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-6 gap-1 min-w-max sm:min-w-0">
+                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-7 gap-1 min-w-max sm:min-w-0">
                   <TabsTrigger
                     value="notifications"
                     className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
@@ -642,6 +676,13 @@ function SettingsContent() {
                   >
                     <Shield className="h-4 w-4" />
                     <span>Privacy</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="security"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Lock className="h-4 w-4" />
+                    <span>Security</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="appearance"
@@ -1174,6 +1215,114 @@ function SettingsContent() {
                   </CardContent>
                 </Card>
                 */}
+              </TabsContent>
+
+              {/* Security Tab */}
+              <TabsContent value="security" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Connected Accounts</CardTitle>
+                    <CardDescription>
+                      Sign in faster with your existing accounts. Connect multiple providers to your account.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {securityLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                      </div>
+                    ) : (
+                      <>
+                        {(["google", "linkedin", "github", "microsoft"] as const).map((provider) => {
+                          const linked = security?.linkedAccounts.find((a) => a.provider === provider);
+                          const providerLabel = { google: "Google", linkedin: "LinkedIn", github: "GitHub", microsoft: "Microsoft" }[provider];
+                          const apiBase = (import.meta as any).env?.VITE_API_URL ?? "/api";
+                          return (
+                            <div key={provider} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-sm font-bold">
+                                  {provider === "google" && <span className="text-blue-500">G</span>}
+                                  {provider === "linkedin" && <span className="text-blue-700">in</span>}
+                                  {provider === "github" && <span>⌬</span>}
+                                  {provider === "microsoft" && <span className="text-blue-500">⊞</span>}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{providerLabel}</p>
+                                  {linked ? (
+                                    <p className="text-xs text-muted-foreground">{linked.displayName ?? linked.email ?? "Connected"}</p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Not connected</p>
+                                  )}
+                                </div>
+                              </div>
+                              {linked ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={unlinkingProvider === provider}
+                                  onClick={() => handleUnlinkProvider(provider)}
+                                >
+                                  {unlinkingProvider === provider ? <Loader2 className="h-3 w-3 animate-spin" /> : "Disconnect"}
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => { window.location.href = `${apiBase}/auth/oauth/${provider}?redirect=/settings`; }}
+                                >
+                                  Connect
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Password</CardTitle>
+                    <CardDescription>
+                      {security?.hasPassword
+                        ? "Update your password to keep your account secure."
+                        : "Your account uses social login. Add a password to also sign in with email."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" className="gap-2" asChild>
+                      <Link to="/forgot-password">
+                        <RefreshCw className="h-4 w-4" />
+                        {security?.hasPassword ? "Change Password" : "Set Password"}
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Two-Factor Authentication</CardTitle>
+                    <CardDescription>Add an extra layer of security to your account.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {security?.twoFactorEnabled ? "Enabled" : "Disabled"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {security?.twoFactorEnabled
+                            ? "Your account is protected with 2FA."
+                            : "Enable 2FA to get a code by email when you sign in."}
+                        </p>
+                      </div>
+                      <Badge variant={security?.twoFactorEnabled ? "default" : "secondary"}>
+                        {security?.twoFactorEnabled ? "On" : "Off"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* Job Preferences Tab */}

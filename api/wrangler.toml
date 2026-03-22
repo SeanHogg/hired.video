@@ -54,6 +54,16 @@ EMAIL_FROM = "info@hired.video"
 # wrangler secret put YOUTUBE_CLIENT_SECRET
 # wrangler secret put EMAIL_CLIENTID
 # wrangler secret put EMAIL_SECRET
+# -- OAuth social login --
+# wrangler secret put GOOGLE_CLIENT_ID        # Google Cloud Console → Credentials
+# wrangler secret put GOOGLE_CLIENT_SECRET    # Callback: https://api.hired.video/api/auth/oauth/google/callback
+# wrangler secret put LINKEDIN_CLIENT_ID      # LinkedIn Developer Portal
+# wrangler secret put LINKEDIN_CLIENT_SECRET  # Callback: https://api.hired.video/api/auth/oauth/linkedin/callback
+# wrangler secret put GITHUB_CLIENT_ID        # GitHub → Settings → Developer settings → OAuth Apps
+# wrangler secret put GITHUB_CLIENT_SECRET    # Callback: https://api.hired.video/api/auth/oauth/github/callback
+# wrangler secret put MICROSOFT_CLIENT_ID     # Azure Portal → App registrations
+# wrangler secret put MICROSOFT_CLIENT_SECRET # Callback: https://api.hired.video/api/auth/oauth/microsoft/callback
+# wrangler secret put API_URL                 # https://api.hired.video (used to build OAuth callback URLs)
 
 [env.production]
 name = "hired-api"

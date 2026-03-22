@@ -119,8 +119,31 @@ settingsRoutes.get("/security", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  const [user] = await db.select({ mfaEnabled: users.mfaEnabled }).from(users).where(eq(users.id, uid)).limit(1);
-  return c.json(success({ twoFactorEnabled: user?.mfaEnabled ?? false, loginNotifications: true, sessionTimeout: 30, allowedDevices: [] }), 200);
+  const [user] = await db
+    .select({ mfaEnabled: users.mfaEnabled, passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, uid))
+    .limit(1);
+
+  const linkedAccounts = await db
+    .select({
+      id: schema.oauthAccounts.id,
+      provider: schema.oauthAccounts.provider,
+      email: schema.oauthAccounts.email,
+      displayName: schema.oauthAccounts.displayName,
+      avatarUrl: schema.oauthAccounts.avatarUrl,
+      createdAt: schema.oauthAccounts.createdAt,
+    })
+    .from(schema.oauthAccounts)
+    .where(eq(schema.oauthAccounts.userId, uid));
+
+  return c.json(success({
+    twoFactorEnabled: user?.mfaEnabled ?? false,
+    hasPassword: !!(user?.passwordHash),
+    linkedAccounts,
+    loginNotifications: true,
+    sessionTimeout: 30,
+  }), 200);
 });
 
 settingsRoutes.put("/security", async (c) => c.json(success({ ...defaultSecuritySettings(), ...(await c.req.json().catch(() => ({}))) }), 200));

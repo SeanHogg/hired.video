@@ -2,8 +2,6 @@ import {
   Video,
   Sparkles,
   ArrowRight,
-  Users,
-  Target,
   Heart,
   Brain,
   Zap,
@@ -15,7 +13,7 @@ import {
   Star,
   MessageCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -32,6 +30,9 @@ import {
 } from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import PeopleCard from "@/components/PeopleCard";
+import { userService } from "@/lib/services/user-service";
+import type { UserMetadata } from "@/types/people";
 
 export default function About() {
   const location = useLocation();
@@ -74,32 +75,39 @@ export default function About() {
     },
   ];
 
-  const team = [
-    {
-      name: "Sarah Chen",
-      role: "CEO & Co-Founder",
-      bio: "Former VP of Talent at Google, passionate about transforming how people find and showcase their careers.",
-      image: "/placeholder.svg",
-    },
-    {
-      name: "Marcus Rodriguez",
-      role: "CTO & Co-Founder",
-      bio: "AI researcher and former Meta engineer, focused on building intelligent systems that enhance human potential.",
-      image: "/placeholder.svg",
-    },
-    {
-      name: "Elena Kowalski",
-      role: "VP of Product",
-      bio: "Design thinking expert with 10+ years creating user-centered products at Spotify and Airbnb.",
-      image: "/placeholder.svg",
-    },
-    {
-      name: "David Kim",
-      role: "VP of Engineering",
-      bio: "Full-stack architect who's built scalable platforms at Uber and Netflix, ensuring our technology grows with you.",
-      image: "/placeholder.svg",
-    },
-  ];
+  const [teamMembers, setTeamMembers] = useState<UserMetadata[]>([]);
+
+  useEffect(() => {
+    userService.getUserBySlug("seanhogg").then((profile) => {
+      const member: UserMetadata = {
+        id: profile.id || "",
+        slug: profile.slug || "seanhogg",
+        firstName: profile.firstName || "",
+        lastName: profile.lastName || "",
+        fullName: `${profile.firstName || ""} ${profile.lastName || ""}`.trim(),
+        avatar: profile.profilePicture || undefined,
+        headline: profile.currentRole || profile.bio || "",
+        location: profile.location || "",
+        role: profile.role || "",
+        visibility: "public",
+        status: "active",
+        createdAt: profile.createdAt || new Date().toISOString(),
+        updatedAt: profile.updatedAt || new Date().toISOString(),
+        lastActiveAt: profile.updatedAt || new Date().toISOString(),
+        profileViews: profile.profileViews || 0,
+        connectionCount: 0,
+        followerCount: 0,
+        emailConfirmed: profile.isVerified || false,
+        isPremium: profile.isPremium || false,
+        openToWork: profile.openToWork || false,
+        currentPosition: profile.currentRole || undefined,
+        currentCompany: profile.currentCompany || undefined,
+      };
+      setTeamMembers([member]);
+    }).catch(() => {
+      // Failed to load team member — render nothing
+    });
+  }, []);
 
   const stats = [
     { number: "50K+", label: "Active Users" },
@@ -275,23 +283,8 @@ export default function About() {
                 </p>
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                {team.map((member, index) => (
-                  <Card key={index} className="text-center">
-                    <CardHeader>
-                      <div className="w-24 h-24 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <Users className="h-12 w-12 text-primary" />
-                      </div>
-                      <CardTitle className="text-lg">{member.name}</CardTitle>
-                      <CardDescription className="font-medium text-primary">
-                        {member.role}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        {member.bio}
-                      </p>
-                    </CardContent>
-                  </Card>
+                {teamMembers.map((member) => (
+                  <PeopleCard key={member.id} person={member} />
                 ))}
               </div>
             </div>

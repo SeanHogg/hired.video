@@ -13,7 +13,7 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
@@ -197,3 +197,35 @@ export const userConnections = pgTable("user_connections", {
 
 export type UserConnection = typeof userConnections.$inferSelect;
 export type NewUserConnection = typeof userConnections.$inferInsert;
+
+export const oauthAccounts = pgTable("oauth_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  displayName: varchar("display_name", { length: 255 }),
+  avatarUrl: text("avatar_url"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  scope: text("scope"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type OAuthAccount = typeof oauthAccounts.$inferSelect;
+export type NewOAuthAccount = typeof oauthAccounts.$inferInsert;
+
+export const magicLinkTokens = pgTable("magic_link_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  used: boolean("used").default(false).notNull(),
+  redirect: varchar("redirect", { length: 500 }).default("/dashboard").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
+export type NewMagicLinkToken = typeof magicLinkTokens.$inferInsert;

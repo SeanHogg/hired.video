@@ -410,6 +410,15 @@ export class SettingsService {
     return response.data;
   }
 
+  async getLinkedSecuritySettings(): Promise<any> {
+    const response = await apiClient.get("/settings/security");
+    return response.data;
+  }
+
+  async unlinkOAuthProvider(provider: string): Promise<void> {
+    await apiClient.delete(`/auth/unlink/${provider}`);
+  }
+
   /**
    * Delete user account
    */

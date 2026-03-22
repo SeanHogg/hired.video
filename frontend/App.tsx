@@ -31,6 +31,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ConfirmEmail from "./pages/ConfirmEmail";
 import VerifyEmail from "./pages/VerifyEmail";
+import OAuthCallback from "./pages/OAuthCallback";
+import MagicLinkVerify from "./pages/MagicLinkVerify";
 import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
@@ -284,6 +286,8 @@ const App = () => (
                           <Route path="/verify-email" element={<VerifyEmail />} />
 
                       <Route path="/confirm-email" element={<ConfirmEmail />} />
+                      <Route path="/auth/callback" element={<OAuthCallback />} />
+                      <Route path="/auth/magic-link" element={<MagicLinkVerify />} />
                       <Route
                         path="/accept-invitation"
                         element={<AcceptInvitation />}

@@ -44,7 +44,8 @@ async function hashPassword(password: string): Promise<string> {
   return `${saltHex}:${hashHex}`;
 }
 
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
+async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
+  if (!stored) return false;
   const [saltHex, hashHex] = stored.split(":");
   if (!saltHex || !hashHex) return false;
 

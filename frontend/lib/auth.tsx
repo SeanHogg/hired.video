@@ -39,6 +39,7 @@ interface AuthContextType {
   verifyTwoFactor: (code: string) => Promise<boolean>;
   resendTwoFactorCode: () => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
+  loginWithToken: (token: string) => Promise<void>;
   getVerificationStatus: () => Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }>;
   signup: (
     email: string,
@@ -302,6 +303,18 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
+  const loginWithToken = async (token: string): Promise<void> => {
+    localStorage.setItem("auth_token", token);
+    try {
+      const profile = await authService.getCurrentUser();
+      if (profile) {
+        setUser(userProfileToUser(profile));
+      }
+    } catch (err) {
+      console.error("loginWithToken: failed to load user", err);
+    }
+  };
+
   const logout = async (): Promise<void> => {
     try {
       await authService.logout();
@@ -447,6 +460,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     verifyTwoFactor,
     resendTwoFactorCode,
     resendEmailVerification,
+    loginWithToken,
     getVerificationStatus,
     signup,
     logout,

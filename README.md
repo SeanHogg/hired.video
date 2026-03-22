@@ -17,7 +17,7 @@ hired.video supports multiple user personas operating in the same platform:
 
 | Area | Description |
 |------|-------------|
-| Authentication & Security | JWT auth, email verification, 2FA, password reset, refresh tokens |
+| Authentication & Security | JWT auth, email verification, 2FA, password reset, refresh tokens, OAuth (Google, LinkedIn, GitHub, Microsoft), magic links, passkeys |
 | Resume Management | AI-powered builder, file parsing, versioning, analytics, cloning, publishing |
 | Video Resume & Studio | AI video generation, storyboard editor, script editing, YouTube publishing |
 | Job Management | Job CRUD, search, applications, alerts, AI-based matching and tailoring |
@@ -745,6 +745,11 @@ Set via `wrangler secret put` for production, or in `wrangler.toml` `[vars]` for
 | `S3_BUCKET_NAME` / `S3_ENDPOINT` | Yes | Storage bucket configuration |
 | `SENTRY_DSN` | No | Error monitoring |
 | `FRONTEND_URL` | Yes | Comma-separated allowed CORS origins |
+| `API_URL` | Yes (OAuth) | Public API base URL — used to build OAuth callback URLs |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | Google OAuth 2.0 credentials |
+| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | OAuth | LinkedIn OAuth credentials |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth | GitHub OAuth App credentials |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | OAuth | Azure AD app credentials |
 
 #### CORS Configuration
 
@@ -777,6 +782,136 @@ npm run db:generate
 # Open Drizzle Studio (visual DB browser)
 npm run db:studio
 ```
+
+#### OAuth Provider Setup
+
+The API supports social login via Google, LinkedIn, GitHub, and Microsoft. Each provider requires creating an OAuth app and storing the credentials as Wrangler secrets.
+
+**Callback URL pattern:** `https://api.hired.video/api/auth/oauth/{provider}/callback`
+
+---
+
+##### Google
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+2. **Create credentials** → **OAuth 2.0 Client ID** → Application type: **Web application**
+3. Under **Authorized redirect URIs**, add:
+   ```
+   https://api.hired.video/api/auth/oauth/google/callback
+   http://localhost:8787/api/auth/oauth/google/callback   # local dev
+   ```
+4. Go to **OAuth consent screen** → set User Type to **External** → add scopes: `email`, `profile`, `openid`
+5. While in test mode, add your own Google account as a test user
+6. Copy **Client ID** and **Client Secret**
+
+```bash
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+> **Gotcha:** The consent screen must be published (or your account added as a test user) before any login attempts work. "Access blocked" errors mean the consent screen isn't configured.
+
+---
+
+##### LinkedIn
+
+1. Go to [LinkedIn Developer Portal](https://developer.linkedin.com/) → **Create app**
+2. Fill in app name, company page, and logo (required)
+3. Under **Auth** tab → **OAuth 2.0 settings** → add redirect URL:
+   ```
+   https://api.hired.video/api/auth/oauth/linkedin/callback
+   ```
+4. Under **Products** tab → request **Sign In with LinkedIn using OpenID Connect**
+   - This unlocks the `openid`, `profile`, and `email` scopes — without it, login will fail
+   - Approval is usually instant
+5. Copy **Client ID** and **Client Secret** from the Auth tab
+
+```bash
+wrangler secret put LINKEDIN_CLIENT_ID
+wrangler secret put LINKEDIN_CLIENT_SECRET
+```
+
+> **Gotcha:** You must add the "Sign In with LinkedIn using OpenID Connect" product — the basic API access does not grant the `email` scope.
+
+---
+
+##### GitHub
+
+1. Go to [GitHub Settings → Developer settings → OAuth Apps](https://github.com/settings/developers) → **New OAuth App**
+2. Set:
+   - **Application name:** hired.video
+   - **Homepage URL:** `https://hired.video`
+   - **Authorization callback URL:** `https://api.hired.video/api/auth/oauth/github/callback`
+3. Click **Register application**, then **Generate a new client secret**
+
+```bash
+wrangler secret put GITHUB_CLIENT_ID
+wrangler secret put GITHUB_CLIENT_SECRET
+```
+
+> **Gotcha:** GitHub OAuth Apps only support a single callback URL. For local dev, either create a separate "hired.video (dev)" OAuth App or temporarily update the callback URL while developing.
+
+---
+
+##### Microsoft
+
+1. Go to [Azure Portal](https://portal.azure.com/) → **Microsoft Entra ID** → **App registrations** → **New registration**
+2. Set:
+   - **Name:** hired.video
+   - **Supported account types:** Accounts in any organizational directory and personal Microsoft accounts
+   - **Redirect URI:** Web → `https://api.hired.video/api/auth/oauth/microsoft/callback`
+3. After registration, go to **Certificates & secrets** → **New client secret** → copy the value immediately
+4. Copy the **Application (client) ID** from the Overview page
+
+```bash
+wrangler secret put MICROSOFT_CLIENT_ID
+wrangler secret put MICROSOFT_CLIENT_SECRET
+```
+
+---
+
+##### API_URL Secret
+
+All OAuth callback URLs are built from `API_URL` at runtime. Set it alongside the other secrets:
+
+```bash
+wrangler secret put API_URL   # value: https://api.hired.video
+```
+
+---
+
+##### Local Development
+
+Create `api/.dev.vars` (gitignored) with all secrets for local dev:
+
+```ini
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-local-secret-min-32-chars
+
+# OAuth
+API_URL=http://localhost:8787
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+LINKEDIN_CLIENT_ID=...
+LINKEDIN_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+MICROSOFT_CLIENT_ID=...
+MICROSOFT_CLIENT_SECRET=...
+```
+
+Wrangler automatically loads `.dev.vars` when running `npm run dev`.
+
+---
+
+##### Provider Summary
+
+| Provider | Setup time | Notable gotcha |
+|----------|-----------|----------------|
+| GitHub | ~2 min | Single callback URL per app — create a separate dev app |
+| Google | ~5 min | Must configure OAuth consent screen and add test users |
+| LinkedIn | ~5 min | Must request "Sign In with LinkedIn using OpenID Connect" product |
+| Microsoft | ~10 min | Azure Portal UX is complex; choose "any org + personal accounts" |
 
 ### Frontend Setup
 
@@ -939,6 +1074,9 @@ hired.video is evolving from a video resume tool into a **full-stack AI career a
 | **AI Career Copilot dashboard** | 🔥 High | "What should I do next?" — surfaces job matches, skill gaps, resume improvements, interview readiness. Built from existing scores, sessions, and match data. |
 | **Real-time chat** | 🔥 High | Recruiter ↔ candidate messaging. SSE notifications exist; need chat rooms + message persistence. |
 | **Auto-fill Chrome extension** | 🔥 High | Extend the extension to auto-fill LinkedIn/Indeed application forms using resume data. Distribution multiplier. |
+| **OAuth / Social Login** | 🔥 High | Google and LinkedIn sign-in. Users strongly prefer one-click auth over email/password. Requires new `oauth_accounts` table (one user → many providers), OAuth routes (`/api/auth/oauth/:provider` + callback), and account-linking logic (merge on matching email). LinkedIn is critical for this platform — profile import on sign-up. Google covers the remainder of sign-ups. |
+| **Magic Links (passwordless email)** | Medium | One-time login link sent to email — no password needed. Low friction for casual/infrequent users. Reuses existing token pattern (`magic_link_tokens` table, 15-min expiry). Endpoint: `POST /api/auth/magic-link` → `GET /api/auth/magic-link/verify?token=...`. |
+| **Security settings tab** | Medium | New tab in Settings for users to manage auth methods: connected OAuth accounts (connect/disconnect), change or add password (OAuth-only accounts have no password), 2FA enable/disable, and active session list with per-session revoke. Must block disconnecting the last auth method without a password set. |
 | **OpenAPI / Swagger docs** | Medium | `@hono/swagger-ui` + `zod-openapi`; Zod schemas can generate spec with minimal effort |
 | **Background job worker** | Medium | Queue tables (`queueJobToResume`, `queueJobToProcess`) exist; implement Cloudflare Queue consumer for video processing |
 
@@ -948,6 +1086,8 @@ hired.video is evolving from a video resume tool into a **full-stack AI career a
 
 | Feature | Priority | Description |
 |---|---|---|
+| **Passkeys / WebAuthn** | High | FIDO2 browser-native biometric auth (fingerprint, Face ID, Windows Hello). No password, no phishing. Requires `webauthn_credentials` table (credentialId, publicKey, counter, userId). Increasingly expected on mobile. |
+| **GitHub + Microsoft OAuth** | Medium | Additional OAuth providers for tech-role candidates (GitHub) and enterprise/recruiter accounts (Microsoft). Same `oauth_accounts` table as Google/LinkedIn; just add provider config. |
 | **AI Recruiter Agent** | 🔥 High | Automated sourcing, candidate scoring, personalised outreach, reply tracking, follow-up suggestions. "Apollo.io + LinkedIn Recruiter, automated." |
 | **Marketplace dynamics** | 🔥 High | Recruiter bidding on candidates, talent availability signals ("open to work"), fast-track pipelines. Network effects kick in here. |
 | **AI Mock Interview → Pre-qualified candidates** | High | Recorded mock interviews scored by AI; share results with recruiters. Candidates arrive pre-qualified. |
@@ -965,7 +1105,7 @@ hired.video is evolving from a video resume tool into a **full-stack AI career a
 | **TikTok-style talent discovery feed** | 🚀 Big bet | Short video intros, recruiter swipe, algorithmic candidate surfacing. Video = core identity primitive, not just a feature. |
 | **University & bootcamp partnerships** | 🚀 High | White-labeled career portals, placement analytics. Students need jobs — perfect top-of-funnel. |
 | **SEO content engine** | High | AI-generated pages: "Best resume for [job title]", "Top skills for [industry]", "Salary for [role]". Structured data already exists in DB. |
-| **LinkedIn OAuth + deep integration** | High | Full OAuth callback flow; import LinkedIn profile, cross-post video resumes |
+| **LinkedIn OAuth deep integration** | High | LinkedIn OAuth covers sign-in (roadmapped for 30–60 days). Long-term: import full LinkedIn profile on sign-up, cross-post video resumes to LinkedIn, sync connections. |
 | **B2B sales motion** | High | Target recruiting agencies, staffing firms, SMB hiring teams. Pitch: "Replace 50% of your sourcing effort with AI." |
 | **Creator / influencer mode** | Medium | Let users build audiences, post career content, sell resume templates. "Top PM resumes", "How I got hired at Google." |
 | **Smart job board layer** | Medium | Aggregate jobs from major boards, AI match + rank, apply automation. Compete on intelligence, not listings. |

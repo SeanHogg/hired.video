@@ -47,6 +47,7 @@ import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
+import { oauthRoutes } from "./routes/oauth.js";
 export function createApp() {
   const app = new Hono();
 
@@ -113,6 +114,7 @@ export function createApp() {
   // Apply JWT auth middleware to all /api/* routes except public ones
   const PUBLIC_PREFIXES = [
     "/api/auth",
+    "/api/auth/oauth",
     "/api/search/public",
     "/api/users/public",
     "/api/jobs/public",
@@ -189,6 +191,8 @@ export function createApp() {
   // (no business logic currently needed)
   app.get("/api/collab/:id", (c) => c.body(null, 204));
 
+  app.route("/api/auth/oauth", oauthRoutes);
+  app.route("/api/auth", oauthRoutes);
   app.route("/api/auth", authRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);
