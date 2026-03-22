@@ -35,12 +35,12 @@ async function createJwt(sub: string, email: string, role: string, emailVerified
     .sign(secret);
 }
 
-async function createOAuthState(redirect: string): Promise<string> {
+async function createOAuthState(redirect: string, linkUserId?: string): Promise<string> {
   const secret = getJwtSecret();
   const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now() });
+  const payload = JSON.stringify({ nonce, redirect: redirect || "/dashboard", ts: Date.now(), ...(linkUserId ? { linkUserId } : {}) });
   const key = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
@@ -50,7 +50,7 @@ async function createOAuthState(redirect: string): Promise<string> {
   return btoa(payload + "|" + sigHex);
 }
 
-async function verifyOAuthState(state: string): Promise<{ redirect: string } | null> {
+async function verifyOAuthState(state: string): Promise<{ redirect: string; linkUserId?: string } | null> {
   try {
     const secret = getJwtSecret();
     const decoded = atob(state);
@@ -64,9 +64,9 @@ async function verifyOAuthState(state: string): Promise<{ redirect: string } | n
     const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
     const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
     if (!valid) return null;
-    const { redirect, ts } = JSON.parse(payload);
+    const { redirect, ts, linkUserId } = JSON.parse(payload);
     if (Date.now() - ts > 10 * 60 * 1000) return null;
-    return { redirect: redirect || "/dashboard" };
+    return { redirect: redirect || "/dashboard", linkUserId };
   } catch {
     return null;
   }
@@ -191,7 +191,20 @@ oauthRoutes.get("/:provider", async (c) => {
   if (!cfg.clientId()) return c.json(error("SERVICE_UNAVAILABLE", `${name} login not configured`), 503);
 
   const redirect = c.req.query("redirect") || "/dashboard";
-  const state = await createOAuthState(redirect);
+
+  // If the user is already logged in (connecting from Settings), embed their userId in state
+  // so the callback links to the existing account instead of doing email-based lookup.
+  let linkUserId: string | undefined;
+  const linkToken = c.req.query("link_token");
+  if (linkToken) {
+    try {
+      const { jwtVerify } = await import("jose");
+      const { payload } = await jwtVerify(linkToken, new TextEncoder().encode(getJwtSecret()), { algorithms: ["HS256"] });
+      linkUserId = payload.sub as string;
+    } catch { /* invalid token — treat as unauthenticated flow */ }
+  }
+
+  const state = await createOAuthState(redirect, linkUserId);
   const callbackUrl = `${getApiBase()}/api/auth/oauth/${name}/callback`;
 
   const params = new URLSearchParams({
@@ -240,7 +253,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     return c.redirect(`${base}/login?error=auth_failed`);
   }
 
-  if (!providerUser.email) return c.redirect(`${base}/login?error=no_email`);
+  if (!providerUser.email && !stateData.linkUserId) return c.redirect(`${base}/login?error=no_email`);
 
   const db = getDb();
   const [existingOAuth] = await db
@@ -252,6 +265,10 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   let userId: string;
 
   if (existingOAuth) {
+    // Already linked — if this is a link flow, ensure it belongs to the right user
+    if (stateData.linkUserId && existingOAuth.userId !== stateData.linkUserId) {
+      return c.redirect(`${base}/settings?error=already_linked_other`);
+    }
     userId = existingOAuth.userId;
     await db.update(oauthAccounts).set({
       accessToken: tokens.access_token,
@@ -261,14 +278,29 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       avatarUrl: providerUser.avatar ?? null,
       updatedAt: new Date(),
     } as any).where(eq(oauthAccounts.id, existingOAuth.id));
+  } else if (stateData.linkUserId) {
+    // Linking a new provider to an existing logged-in user — skip email lookup entirely
+    userId = stateData.linkUserId;
+    await db.insert(oauthAccounts).values({
+      userId,
+      provider: name,
+      providerAccountId: providerUser.id,
+      email: providerUser.email?.toLowerCase() ?? null,
+      displayName: providerUser.name,
+      avatarUrl: providerUser.avatar ?? null,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? null,
+      tokenExpiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
+    } as any);
   } else {
-    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, providerUser.email.toLowerCase())).limit(1);
+    // New login flow — find or create user by email
+    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, providerUser.email!.toLowerCase())).limit(1);
 
     if (existing) {
       userId = existing.id;
     } else {
       const [newUser] = await db.insert(users).values({
-        email: providerUser.email.toLowerCase(),
+        email: providerUser.email!.toLowerCase(),
         name: providerUser.name,
         passwordHash: null,
         emailVerified: true,
@@ -283,7 +315,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
       userId,
       provider: name,
       providerAccountId: providerUser.id,
-      email: providerUser.email.toLowerCase(),
+      email: providerUser.email!.toLowerCase(),
       displayName: providerUser.name,
       avatarUrl: providerUser.avatar ?? null,
       accessToken: tokens.access_token,

@@ -1268,7 +1268,10 @@ function SettingsContent() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => { window.location.href = `${apiBase}/api/auth/oauth/${provider}?redirect=/settings`; }}
+                                  onClick={() => {
+                                    const token = localStorage.getItem("auth_token") ?? "";
+                                    window.location.href = `${apiBase}/api/auth/oauth/${provider}?redirect=/settings&link_token=${encodeURIComponent(token)}`;
+                                  }}
                                 >
                                   Connect
                                 </Button>
