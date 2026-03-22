@@ -200,6 +200,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./"),
         "@shared": path.resolve(__dirname, "../shared"),
+        "zod": path.resolve(__dirname, "./node_modules/zod"),
       },
     },
     optimizeDeps: {
