@@ -268,7 +268,7 @@ export class ApiClient {
 
   private async handleResponse<T>(
     response: Response,
-    schema?: z.ZodSchema<T>,
+    schema?: z.ZodType<T>,
   ): Promise<ApiSuccessResponse<T>> {
     console.log("ApiClient.handleResponse: Processing response", {
       status: response.status,

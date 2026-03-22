@@ -17,6 +17,7 @@ import { USER_ROLES } from "./user-roles";
 // Use a loose object so unmodeled properties (e.g., `data`, `error`) are preserved
 export const ApiResponseSchema = z.looseObject({
   success: z.boolean(),
+  data: z.unknown().optional(),
   // Some backends return null for message; accept undefined or null
   message: z.string().nullish(),
   // Accept broad RFC3339/ISO8601-like timestamps (some backends emit >3 fractional seconds)
@@ -360,7 +361,7 @@ export const nullableBoolean = () =>
  */
 export function validateApiResponse<T>(
   data: unknown,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): { success: true; data: T } | { success: false; error: string } {
   try {
     // Convert null values to undefined before validation
