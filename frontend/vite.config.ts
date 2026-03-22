@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: "autoUpdate",
+        registerType: "prompt",
         // Service worker is generated at build; in dev mode a no-op SW is used
         devOptions: {
           enabled: false,
@@ -76,7 +76,6 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: "hired.video — AI Career & Talent Network",
           short_name: "hired.video",
-          version: "2026.03.22",
           description:
             "AI-powered career copilot: match resumes, prep for interviews, track jobs, and connect with top talent.",
           theme_color: "#7c3aed",

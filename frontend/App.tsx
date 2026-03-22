@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -263,6 +264,7 @@ const App = () => (
             <TooltipProvider>
                 <Toaster />
                 <Sonner />
+                <PWAUpdatePrompt />
                 <BrowserRouter>
 	                  <ReferralCapture />
 
