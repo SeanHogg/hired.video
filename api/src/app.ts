@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { authMiddleware } from "./middleware/auth.js";
+import { authMiddleware, optionalAuthMiddleware } from "./middleware/auth.js";
 import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
 import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
@@ -131,9 +131,16 @@ export function createApp() {
     "/health",
     "/api/health",
   ];
+  // Profile lookup by ID or slug — single segment, not a known protected name.
+  // Access is visibility-conditional; the route handler applies optional auth.
+  const USER_PROFILE_BY_ID = /^\/api\/users\/(?!me$|profile$|account$|slug$|public$)[^/]+$/;
+
   app.use("/api/*", async (c, next) => {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
+    if (c.req.method === "GET" && USER_PROFILE_BY_ID.test(path)) {
+      return optionalAuthMiddleware(c as any, next);
+    }
     return authMiddleware(c as any, next);
   });
 
@@ -145,6 +152,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
+    if (c.req.method === "GET" && USER_PROFILE_BY_ID.test(path)) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
 
@@ -155,6 +163,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
+    if (c.req.method === "GET" && USER_PROFILE_BY_ID.test(path)) return next();
     return passwordChangeMiddleware(c as any, next);
   });
 

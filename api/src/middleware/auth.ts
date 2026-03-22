@@ -2,6 +2,39 @@ import { jwtVerify } from "jose";
 import type { MiddlewareHandler } from "hono";
 import type { Variables, JwtPayload } from "../types/index.js";
 
+/**
+ * Optional auth — sets c.var.user if a valid Bearer token is present, otherwise
+ * passes through without error. Use on endpoints that are public but benefit
+ * from knowing who the caller is (e.g. visibility-conditional profile lookups).
+ */
+export const optionalAuthMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
+  const authHeader = c.req.header("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    const secret = process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET;
+    if (secret) {
+      try {
+        const secretKey = new TextEncoder().encode(secret);
+        const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
+        const user: JwtPayload = {
+          sub: payload.sub as string,
+          email: payload["email"] as string,
+          roles: (payload["roles"] as string[]) ?? [],
+          emailVerified: (payload["emailVerified"] as boolean) ?? false,
+          mustChangePassword: (payload["mustChangePassword"] as boolean) ?? false,
+          companyId: payload["companyId"] as string | undefined,
+          iat: payload.iat,
+          exp: payload.exp,
+        };
+        c.set("user", user);
+      } catch {
+        // Invalid/expired token — treat as unauthenticated
+      }
+    }
+  }
+  return next();
+};
+
 export const authMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {

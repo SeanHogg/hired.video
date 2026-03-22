@@ -53,7 +53,7 @@ function OAuthSignupButton({ provider, label, icon }: { provider: string; label:
       type="button"
       variant="outline"
       className="w-full flex items-center gap-2 min-h-[44px]"
-      onClick={() => { window.location.href = `${API_BASE}/auth/oauth/${provider}?redirect=/dashboard`; }}
+      onClick={() => { window.location.href = `${API_BASE}/api/auth/oauth/${provider}?redirect=/dashboard`; }}
     >
       {icon}
       {label}

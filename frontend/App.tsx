@@ -20,6 +20,7 @@ import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error
 import AIChatPanel from "./components/AIChatPanel";
 import FloatingAIButton from "./components/FloatingAIButton";
 import MobileBottomNav from "./components/MobileBottomNav";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 // Critical pages (loaded immediately)
 import Index from "./pages/Index";
@@ -521,6 +522,7 @@ const App = () => (
                   {/* Global AI Components - Available on all pages */}
                   <FloatingAIButton />
                   <AIChatPanel />
+                  <PWAInstallPrompt />
                 </BrowserRouter>
               </TooltipProvider>
             </AIProvider>

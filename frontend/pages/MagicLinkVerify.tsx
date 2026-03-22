@@ -21,7 +21,7 @@ export default function MagicLinkVerify() {
     }
 
     apiClient
-      .get(`/auth/magic-link/verify?token=${encodeURIComponent(token)}`)
+      .get(`/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`)
       .then(async (res: any) => {
         const data = res.data;
         if (data?.token) {

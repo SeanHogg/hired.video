@@ -589,9 +589,10 @@ userRoutes.get("/check-slug/:slug", async (c) => {
   return c.json(success({ available }), 200);
 });
 
-/** GET /api/users/:id — public profile by id or custom slug */
+/** GET /api/users/:id — profile by id or custom slug; visibility-conditional */
 userRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
+  const caller = c.var.user; // set by optionalAuthMiddleware — may be undefined
   const db = getDb();
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
@@ -625,6 +626,19 @@ userRoutes.get("/:id", async (c) => {
 
   if (!me) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
+  }
+
+  const visibility = profile?.profileVisibility ?? "public";
+  const isOwner = caller?.sub === me.id;
+
+  // Private profiles are only visible to the owner
+  if (visibility === "private" && !isOwner) {
+    return c.json(error("FORBIDDEN", "This profile is private"), 403);
+  }
+
+  // Connections-only profiles require authentication at minimum
+  if (visibility === "connections" && !caller) {
+    return c.json(error("UNAUTHORIZED", "Authentication required to view this profile"), 401);
   }
 
   return c.json(success(toUserProfileDto(me, profile ?? null)), 200);

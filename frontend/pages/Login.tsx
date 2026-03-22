@@ -45,13 +45,22 @@ const GitHubIcon = () => (
   </svg>
 );
 
+const MicrosoftIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M11.4 11.4H0V0h11.4v11.4z" fill="#F25022" />
+    <path d="M24 11.4H12.6V0H24v11.4z" fill="#7FBA00" />
+    <path d="M11.4 24H0V12.6h11.4V24z" fill="#00A4EF" />
+    <path d="M24 24H12.6V12.6H24V24z" fill="#FFB900" />
+  </svg>
+);
+
 function OAuthButton({ provider, label, icon, redirect }: { provider: string; label: string; icon: React.ReactNode; redirect: string }) {
   return (
     <Button
       type="button"
       variant="outline"
       className="w-full flex items-center gap-2 min-h-[44px]"
-      onClick={() => { window.location.href = `${API_BASE}/auth/oauth/${provider}?redirect=${encodeURIComponent(redirect)}`; }}
+      onClick={() => { window.location.href = `${API_BASE}/api/auth/oauth/${provider}?redirect=${encodeURIComponent(redirect)}`; }}
     >
       {icon}
       {label}
@@ -131,7 +140,7 @@ export default function Login() {
     setMagicLinkLoading(true);
     setError("");
     try {
-      await apiClient.post("/auth/magic-link", { email, redirect: redirectParam });
+      await apiClient.post("/api/auth/magic-link", { email, redirect: redirectParam });
       setMagicLinkSent(true);
     } catch { setError("Failed to send sign-in link. Please try again."); }
     finally { setMagicLinkLoading(false); }
@@ -164,6 +173,7 @@ export default function Login() {
                       <OAuthButton provider="google" label="Continue with Google" icon={<GoogleIcon />} redirect={redirectParam} />
                       <OAuthButton provider="linkedin" label="Continue with LinkedIn" icon={<LinkedInIcon />} redirect={redirectParam} />
                       <OAuthButton provider="github" label="Continue with GitHub" icon={<GitHubIcon />} redirect={redirectParam} />
+                      <OAuthButton provider="microsoft" label="Continue with Microsoft" icon={<MicrosoftIcon />} redirect={redirectParam} />
                     </div>
 
                     <div className="relative">

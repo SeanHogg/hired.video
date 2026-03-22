@@ -1268,7 +1268,7 @@ function SettingsContent() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => { window.location.href = `${apiBase}/auth/oauth/${provider}?redirect=/settings`; }}
+                                  onClick={() => { window.location.href = `${apiBase}/api/auth/oauth/${provider}?redirect=/settings`; }}
                                 >
                                   Connect
                                 </Button>
