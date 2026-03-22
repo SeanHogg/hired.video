@@ -179,143 +179,6 @@ jobRoutes.delete("/alerts/:id", async (c) => {
   return c.json(success({ success: true }));
 });
 
-/** GET /api/jobs/:id — get a specific job */
-jobRoutes.get("/:id", async (c) => {
-  const id = c.req.param("id");
-  const job = await jobService.getJobById(id);
-  if (!job) {
-    return c.json(error("NOT_FOUND", "Job not found"), 404);
-  }
-  return c.json(success(job));
-});
-
-/** PUT /api/jobs/:id — update a job */
-jobRoutes.put("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateJobSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-
-  const updated = await jobService.updateJob(c.req.param("id"), parsed.data, userId);
-  if (!updated) {
-    return c.json(error("NOT_FOUND", "Job not found"), 404);
-  }
-
-  return c.json(success(updated));
-});
-
-/** DELETE /api/jobs/:id — delete a job */
-jobRoutes.delete("/:id", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  await jobService.deleteJob(c.req.param("id"), userId);
-  return c.json(success(null, "Job deleted"));
-});
-
-/**
- * NOTE: This routes file currently contains stubbed behavior to support the frontend.
- * The real domain logic belongs in `api/src/services/job.ts` and should eventually
- * replace these stubs with real database-backed implementations.
- */
-
-// Public listing endpoint. Frontend legacy calls /api/Job with query params.
-jobRoutes.get("/", async (c) => {
-  const query = c.req.query();
-  const data = await jobService.getPublicJobs({
-    page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
-    search: query.search,
-    location: query.location,
-  });
-  return c.json(success(data));
-});
-
-/** POST /api/jobs or /api/job — create a new job */
-jobRoutes.post("/", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = CreateJobSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const created = await jobService.createJob(parsed.data, userId);
-  return c.json(success(created), 201);
-});
-
-/** GET /api/Job/GetSummaryItems — legacy PascalCase alias; getsummaryitems is the canonical form **/
-const summaryItemsHandler = async (c: any) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const items = await jobService.getUserJobs(userId);
-  return c.json(success(items));
-};
-jobRoutes.get("/getsummaryitems", summaryItemsHandler);
-jobRoutes.get("/GetSummaryItems", summaryItemsHandler); // legacy PascalCase alias
-
-/** GET /api/job/user-jobs — legacy recruiter flow alias */
-jobRoutes.get("/user-jobs", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const items = await jobService.getUserJobs(userId);
-  return c.json(success(items));
-});
-
-/** GET /api/Job/saved — get saved jobs */
-jobRoutes.get("/saved", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const items = await jobService.getSavedJobs(userId);
-  return c.json(success(items));
-});
-
-/** GET /api/jobs/public — explicit public listing */
-jobRoutes.get("/public", async (c) => {
-  const query = c.req.query();
-  const data = await jobService.getPublicJobs({
-    page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
-    search: query.search,
-    location: query.location,
-  });
-  return c.json(success(data));
-});
-
-/** POST /api/Job/:id/save — save/bookmark a job */
-jobRoutes.post("/:id/save", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  await jobService.saveJob(c.req.param("id"), userId);
-  return c.json(success({ success: true }));
-});
-
-/** DELETE /api/Job/:id/save — remove saved job */
-jobRoutes.delete("/:id/save", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  await jobService.unsaveJob(c.req.param("id"), userId);
-  return c.json(success({ success: true }));
-});
-
-/** POST /api/Job/:id/apply — apply to a job */
-jobRoutes.post("/:id/apply", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  await jobService.applyToJob(c.req.param("id"), userId, body ?? { resumeId: "" });
-  return c.json(success({ success: true }));
-});
-
-/** GET /api/Job/slug/:slug — get job by slug */
-jobRoutes.get("/slug/:slug", async (c) => {
-  const job = await jobService.getJobBySlug(c.req.param("slug"));
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-  return c.json(success(job));
-});
-
 /** POST /api/Job/CreateFromFile — create job from uploaded file */
 jobRoutes.post("/CreateFromFile", async (c) => {
   const userId = c.var.user?.sub;
@@ -405,7 +268,6 @@ jobRoutes.post("/extract", async (c) => {
   return c.json(success(created), 201);
 });
 
-
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
@@ -418,14 +280,14 @@ jobRoutes.get("/:id", async (c) => {
 
 /** PUT /api/jobs/:id — update a job */
 jobRoutes.put("/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => null);
   const parsed = UpdateJobSchema.safeParse(body);
   if (!parsed.success) {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const updated = await jobService.updateJob(c.req.param("id"), parsed.data, userId);
   if (!updated) {
     return c.json(error("NOT_FOUND", "Job not found"), 404);
