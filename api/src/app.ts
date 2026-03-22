@@ -201,7 +201,6 @@ export function createApp() {
   app.get("/api/collab/:id", (c) => c.body(null, 204));
 
   app.route("/api/auth/oauth", oauthRoutes);
-  app.route("/api/auth", oauthRoutes);
   app.route("/api/auth", authRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);

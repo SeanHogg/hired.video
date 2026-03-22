@@ -411,12 +411,12 @@ export class SettingsService {
   }
 
   async getLinkedSecuritySettings(): Promise<any> {
-    const response = await apiClient.get("/settings/security");
+    const response = await apiClient.get("/api/settings/security");
     return response.data;
   }
 
   async unlinkOAuthProvider(provider: string): Promise<void> {
-    await apiClient.delete(`/auth/unlink/${provider}`);
+    await apiClient.delete(`/api/auth/oauth/unlink/${provider}`);
   }
 
   /**
