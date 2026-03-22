@@ -12,6 +12,8 @@ const CreateResumeSchema = z.object({
   title: z.string().min(1),
   content: z.record(z.string(), z.unknown()).default({}),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
+  isMaster: z.boolean().optional().default(false),
+  privacy: z.string().optional(),
 });
 
 const UpdateResumeSchema = CreateResumeSchema.partial();
@@ -143,10 +145,18 @@ resumeRoutes.post("/", async (c) => {
   const parsed = CreateResumeSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
+  const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
   const db = getDb();
   const [created] = await db
     .insert(resumes)
-    .values({ userId: user.sub, title: parsed.data.title, content: parsed.data.content, status: parsed.data.status } as any)
+    .values({
+      userId: user.sub,
+      title: parsed.data.title,
+      content: parsed.data.content,
+      status: parsed.data.status,
+      isMaster: parsed.data.isMaster ?? false,
+      privacyLevel,
+    } as any)
     .returning();
 
   return c.json(ok(rowToLegacyResume(created)), 201);

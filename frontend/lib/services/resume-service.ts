@@ -549,15 +549,17 @@ export class ResumeService {
     isMaster?: boolean;
     isActive?: boolean;
   }): Promise<Resume> {
-    // Backend expects a JSON string literal ([FromBody] string)
-    const raw = JSON.stringify(request.data); // object -> JSON
-    const body = JSON.stringify(raw); // wrap as JSON string literal
-
     const response = await apiClient.request<Resume>(
-      "/api/Resume/Save",
+      "/api/resumes/",
       {
         method: "POST",
-        body,
+        body: JSON.stringify({
+          title: request.name,
+          content: request.data as unknown as Record<string, unknown>,
+          status: "draft",
+          isMaster: request.isMaster ?? false,
+          privacy: request.privacy ?? "private",
+        }),
         headers: {
           "Content-Type": "application/json",
         },

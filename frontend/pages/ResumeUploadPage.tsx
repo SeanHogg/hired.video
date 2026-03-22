@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { generateResumeId } from "@/lib/utils";
 import type { ResumeUploadResponse } from "@/types/resume";
 
 export default function ResumeUploadPage() {
@@ -23,15 +22,7 @@ export default function ResumeUploadPage() {
   const { isAuthenticated, user } = useAuth();
 
   const handleUploadSuccess = (response: ResumeUploadResponse) => {
-    // Generate a new resume ID and navigate to create page with the uploaded data
-    const newResumeId = generateResumeId();
-    // In a real app, you would save the uploaded data and navigate to the create page
-    navigate(`/resumes/create/${newResumeId}`, {
-      state: {
-        uploadedData: response.data,
-        resumeName: response.message,
-      },
-    });
+    navigate(`/resumes/edit/${response.id}`);
   };
 
   const handleCancel = () => {

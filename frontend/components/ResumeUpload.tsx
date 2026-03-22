@@ -17,7 +17,6 @@ import {
 import { resumeService, type Resume } from "@/lib/services/resume-service";
 import type {
   ResumePrivacy,
-  UploadResumeRequest,
   ResumeUploadResponse,
   ResumeData,
 } from "@/types/resume";
@@ -209,23 +208,22 @@ export default function ResumeUpload({
     setUploadProgress(0);
 
     try {
-      const uploadRequest: UploadResumeRequest = {
-        name: name.trim(),
-        file,
-        privacy,
-        isMaster,
-      };
-
-      // Parse resume file without saving to database
-      const parsed = await resumeService.parseResumeFromFile(uploadRequest.file);
-
-      // Map parsed data to ResumeData for the builder
+      // Parse resume file
+      const parsed = await resumeService.parseResumeFromFile(file);
       const uploadedData = parsed.data || getEmptyResumeData();
 
-      const response: ResumeUploadResponse = {
-        id: `resume_${Date.now()}`, // Temporary ID for form
+      // Save to DB immediately with all upload settings
+      const savedResume = await resumeService.createResume({
+        name: name.trim(),
         data: uploadedData,
-        message: uploadRequest.name,
+        privacy,
+        isMaster,
+      });
+
+      const response: ResumeUploadResponse = {
+        id: savedResume.id ?? "",
+        data: uploadedData,
+        message: name.trim(),
         confidence: parsed.confidence || 0.8,
       };
 
