@@ -107,6 +107,57 @@ hired.video/
 
 ---
 
+## Frontend Architecture
+
+### Dashboard
+
+The dashboard system uses a **role-based component loader pattern**. The main container reads the user's `rolePermissions` and renders the appropriate role-specific component.
+
+```
+/frontend/pages/Dashboard.tsx (main container — 323 lines)
+/frontend/components/dashboard/
+├── JobSeekerDashboard.tsx       # Profile stats, applications, job matches, interviews, messages, career progress
+├── RecruiterDashboard.tsx       # Candidate pipeline, job posting stats, recruitment metrics, scheduled interviews
+├── EmployerDashboard.tsx        # Team metrics, budget stats, company stats, candidate pipeline, performance summaries
+├── AdminDashboard.tsx           # Platform stats, revenue stats, system health, support metrics, feature usage
+├── shared/
+│   ├── MetricCard.tsx           # MetricCard (single metric + trend indicator) and MetricGrid (responsive grid)
+│   ├── ActivityFeed.tsx         # Activity timeline; customizable title and "View All" action
+│   ├── OnboardingProgress.tsx   # Progress bar + task list; auto-hides at 100% completion
+│   ├── QuickActions.tsx         # Role-based action buttons; includes Video Resume Wizard modal
+│   └── index.ts                 # Re-exports all shared components
+└── index.ts
+
+/frontend/hooks/dashboard/
+├── useDashboard.ts              # Fetches role-appropriate data, loading/error states, page-view analytics, Affiliate support
+├── useOnboarding.ts             # Memoized progress — task list, completed count, percentage, incomplete tasks, completion flag
+└── index.ts
+```
+
+**Role-based routing:**
+
+```typescript
+if (rolePermissions.isJobSeeker) {
+  return <JobSeekerDashboard dashboardData={dashboardData} />;
+}
+```
+
+**Importing shared components:**
+
+```typescript
+import { MetricGrid, ActivityFeed, OnboardingProgress } from "./shared";
+```
+
+**Data fetching:**
+
+```typescript
+const { dashboardData, loading, error, refreshDashboard } = useDashboard();
+```
+
+**Adding a new role dashboard:** create `NewRoleDashboard.tsx`, add the role check in `Dashboard.tsx`, import shared components as needed. Each role dashboard is self-contained.
+
+---
+
 ## API Inventory & Implementation Status
 
 ### Middleware
