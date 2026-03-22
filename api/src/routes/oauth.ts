@@ -104,7 +104,7 @@ const PROVIDERS: Record<string, ProviderCfg> = {
     parseUser: (d) => ({
       id: d.sub,
       email: d.email,
-      name: d.name ?? `${d.given_name ?? ""} ${d.family_name ?? ""}`.trim() || d.email,
+      name: d.name ?? (`${d.given_name ?? ""} ${d.family_name ?? ""}`.trim() || d.email),
       avatar: d.picture,
     }),
   },
