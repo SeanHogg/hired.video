@@ -27,7 +27,7 @@ interface AppConfig {
     MAX_ENTRIES: number;
   };
   VERSION: string;
-
+  BUILD: string;
 }
 
 declare global {
@@ -94,7 +94,7 @@ class RuntimeConfig {
         MAX_ENTRIES: parseInt(import.meta.env.VITE_LOG_MAX_ENTRIES || "100"),
       },
       VERSION: import.meta.env.VITE_APP_VERSION || "unknown",
-
+      BUILD: import.meta.env.VITE_BUILD_DATE || "dev",
     };
   }
 
@@ -121,6 +121,10 @@ class RuntimeConfig {
 
   get version(): string {
     return this.config.VERSION;
+  }
+
+  get build(): string {
+    return this.config.BUILD;
   }
 
 

@@ -37,6 +37,7 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+BUILD_DATE = "dev"
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
@@ -71,6 +72,7 @@ VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+BUILD_DATE = "dev"
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"

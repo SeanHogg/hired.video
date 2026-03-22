@@ -105,6 +105,11 @@ export function createApp() {
     }),
   );
 
+  app.get("/api/version", (c) => {
+    const env = (globalThis as any).__ENV;
+    return c.json({ build: env?.BUILD_DATE || "dev" });
+  });
+
   app.use("/api/*", async (c, next) => {
     if (c.req.path.startsWith("/api/auth")) return next();
     return rateLimiterMiddleware(c, next);

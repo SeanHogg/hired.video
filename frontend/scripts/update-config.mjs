@@ -30,6 +30,7 @@ try {
   const pad = (n) => String(n).padStart(2, '0');
   const buildTimestamp = `${ts.getUTCFullYear()}${pad(ts.getUTCMonth() + 1)}${pad(ts.getUTCDate())}${pad(ts.getUTCHours())}${pad(ts.getUTCMinutes())}${pad(ts.getUTCSeconds())}`;
   const buildId = `v${version}-${buildTimestamp}`;
+  const buildDate = `${ts.getUTCFullYear()}.${pad(ts.getUTCMonth() + 1)}.${pad(ts.getUTCDate())}`;
 
   // Check if config file exists
   if (fs.existsSync(configPath)) {
@@ -40,6 +41,10 @@ try {
     configContent = configContent.replace(
       /VERSION: "[\d.]+"/,
       `VERSION: "${version}"`
+    );
+    configContent = configContent.replace(
+      /BUILD: "[^"]*"/,
+      `BUILD: "${buildDate}"`
     );
 
     const apiUrlFromEnv = process.env.VITE_API_URL;
