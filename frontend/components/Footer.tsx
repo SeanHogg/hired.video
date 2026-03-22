@@ -141,11 +141,11 @@ export default function Footer() {
         <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <div className="mb-4 md:mb-0">
             <Copyright />
+            <p className="text-xs text-muted-foreground mt-1">
+              UI {runtimeConfig.build}{apiBuild ? ` · API ${apiBuild}` : ""}
+            </p>
           </div>
           <LegalLinks />
-        </div>
-        <div className="mt-2 text-center text-xs text-muted-foreground">
-          UI {runtimeConfig.build}{apiBuild ? ` · API ${apiBuild}` : ""}
         </div>
       </div>
     </footer>
