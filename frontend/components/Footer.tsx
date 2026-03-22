@@ -1,20 +1,10 @@
 import { Video, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
 import Copyright from "./Copyright";
 import LegalLinks from "./LegalLinks";
 import { runtimeConfig } from "@/lib/runtime-config";
 
 export default function Footer() {
-  const [apiBuild, setApiBuild] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${runtimeConfig.apiUrl}/version`)
-      .then((r) => r.json())
-      .then((d: any) => setApiBuild(d?.build ?? null))
-      .catch(() => {});
-  }, []);
-
   return (
     <footer className="bg-background border-t border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -142,7 +132,7 @@ export default function Footer() {
           <div className="mb-4 md:mb-0">
             <Copyright />
             <p className="text-xs text-muted-foreground mt-1">
-              UI {runtimeConfig.build}{apiBuild ? ` · API ${apiBuild}` : ""}
+              Build {runtimeConfig.build}
             </p>
           </div>
           <LegalLinks />

@@ -62,8 +62,13 @@ jobs:
       - name: Install dependencies
         run: cd frontend && npm ci
 
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV
+
       - name: Build application
         run: cd frontend && npm run build
+        env:
+          VITE_BUILD_DATE: ${{ env.BUILD_DATE }}
 
       - name: Deploy to Cloudflare Pages
         run: cd frontend && npx wrangler pages deploy dist --project-name hired
@@ -95,7 +100,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Deploy to Cloudflare Workers
-        run: cd api && npx wrangler deploy --env production --var BUILD_DATE:$(date -u +'%Y.%m.%d')
+        run: cd api && npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
