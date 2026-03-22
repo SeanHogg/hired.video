@@ -34,6 +34,5 @@ window.APP_CONFIG = {
   
   // App Version
   VERSION: "1.2.0-dev",
-  
-
+  BUILD: "dev",
 };
