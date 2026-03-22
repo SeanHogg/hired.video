@@ -66,5 +66,10 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
   }
 
   console.error("[errorHandler]", err);
-  return c.json({ error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred." } }, 500);
+  return c.json({
+    error: {
+      code: "INTERNAL_ERROR",
+      message: err instanceof Error ? err.message : String(err),
+    }
+  }, 500);
 };
