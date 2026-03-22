@@ -114,7 +114,7 @@ searchRoutes.get("/public", async (c) => {
     : Promise.resolve([] as Array<{ user: typeof users.$inferSelect; profile: typeof userProfiles.$inferSelect | null }>);
 
   const resumesWhere = search
-    ? or(ilike(resumeInformation.title, `%${search}%`), ilike(resumeInformation.content, `%${search}%`))
+    ? ilike(resumeInformation.title, `%${search}%`)
     : undefined;
   const resumesPromise = includeResumes
     ? db
