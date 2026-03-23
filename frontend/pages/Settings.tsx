@@ -265,6 +265,14 @@ function SettingsContent() {
       .finally(() => setSecurityLoading(false));
   }, [isAuthenticated, activeTab, security]);
 
+  // After returning from an OAuth connect flow, reload security data and clear the param
+  useEffect(() => {
+    if (!searchParams.get("connected") || !isAuthenticated) return;
+    setActiveTab("security");
+    setSecurity(null); // force reload
+    setSearchParams((p) => { p.delete("connected"); return p; }, { replace: true });
+  }, [searchParams, isAuthenticated]);
+
   // Cooldown timer for resend button
   useEffect(() => {
     if (resendCooldown <= 0) return;

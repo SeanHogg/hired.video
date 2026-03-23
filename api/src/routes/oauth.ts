@@ -330,9 +330,17 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     return c.redirect(`${base}/login?error=account_disabled`);
   }
 
+  const redirectPath = stateData.redirect || "/dashboard";
+
+  // Connect flow: user is already logged in — don't replace their JWT.
+  // Redirect straight back so their existing session is preserved.
+  if (stateData.linkUserId) {
+    return c.redirect(`${base}${redirectPath}?connected=${encodeURIComponent(name)}`);
+  }
+
+  // Login/signup flow: issue a new JWT
   await storeRefreshToken(userId);
   const jwt = await createJwt(user.id, user.email, user.role, true);
-  const redirectPath = stateData.redirect || "/dashboard";
 
   return c.redirect(`${base}/auth/callback?token=${encodeURIComponent(jwt)}&redirect=${encodeURIComponent(redirectPath)}`);
 });
