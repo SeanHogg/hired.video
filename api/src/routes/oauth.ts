@@ -265,12 +265,11 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   let userId: string;
 
   if (existingOAuth) {
-    // Already linked — if this is a link flow, ensure it belongs to the right user
-    if (stateData.linkUserId && existingOAuth.userId !== stateData.linkUserId) {
-      return c.redirect(`${base}/settings?error=already_linked_other`);
-    }
-    userId = existingOAuth.userId;
+    // Already linked — if this is a connect flow and it's on a different account,
+    // re-link it to the current user (they just proved ownership of both via link_token + OAuth).
+    userId = stateData.linkUserId ?? existingOAuth.userId;
     await db.update(oauthAccounts).set({
+      userId,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? null,
       tokenExpiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
