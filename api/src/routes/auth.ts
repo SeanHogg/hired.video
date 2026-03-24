@@ -10,10 +10,11 @@ import {
   sendResendVerificationEmail,
   sendPasswordResetEmail,
   sendTwoFactorEmail,
+  sendMagicLinkEmail,
 } from "../services/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 
-const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
+const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens } = schema;
 
 function getJwtSecret(): string {
   return process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET || "";
@@ -634,6 +635,92 @@ authRoutes.post("/resend-email-verification", async (c) => {
 });
 
 /** GET /api/auth/me — requires valid JWT passed as Authorization header */
+// ---------------------------------------------------------------------------
+// POST /api/auth/magic-link — send a one-time login link to email
+// ---------------------------------------------------------------------------
+authRoutes.post("/magic-link", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
+  const redirect = typeof body.redirect === "string" ? body.redirect : "/dashboard";
+  if (!email) return c.json(error("VALIDATION_ERROR", "email is required"), 400);
+
+  const db = getDb();
+  const [user] = await db
+    .select({ id: users.id, email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  // Always return 200 to avoid user enumeration
+  if (!user) return c.json(success({ sent: true }), 200);
+
+  // Invalidate any existing unused tokens for this email
+  await db
+    .update(magicLinkTokens)
+    .set({ used: true } as any)
+    .where(and(eq(magicLinkTokens.email, email), eq(magicLinkTokens.used, false)));
+
+  // Generate a secure token
+  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = Array.from(rawBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+  await db.insert(magicLinkTokens).values({ email, token, expiresAt, redirect, used: false });
+
+  try {
+    await sendMagicLinkEmail(user.email, user.name, token, redirect);
+  } catch {
+    // Don't fail if email service is unavailable — token is stored and usable
+  }
+
+  return c.json(success({ sent: true }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/magic-link/verify?token= — exchange token for a JWT session
+// ---------------------------------------------------------------------------
+authRoutes.get("/magic-link/verify", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.json(error("VALIDATION_ERROR", "token is required"), 400);
+
+  const db = getDb();
+  const now = new Date();
+  const [entry] = await db
+    .select()
+    .from(magicLinkTokens)
+    .where(and(eq(magicLinkTokens.token, token), eq(magicLinkTokens.used, false), gt(magicLinkTokens.expiresAt, now)))
+    .limit(1);
+
+  if (!entry) return c.json(error("UNAUTHORIZED", "Invalid or expired magic link"), 401);
+
+  // Mark token as used
+  await db.update(magicLinkTokens).set({ used: true } as any).where(eq(magicLinkTokens.id, entry.id));
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, entry.email))
+    .limit(1);
+
+  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+
+  // Mark email verified if not already
+  if (!user.emailVerified) {
+    await db.update(users).set({ emailVerified: true } as any).where(eq(users.id, user.id));
+  }
+  await db.update(users).set({ lastLoginAt: new Date() } as any).where(eq(users.id, user.id));
+
+  const jwtSecret = getJwtSecret();
+  if (!jwtSecret) return c.json(error("SERVER_ERROR", "JWT secret not configured"), 500);
+
+  const jwt = await createJwt(
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: true, mustChangePassword: user.mustChangePassword },
+    jwtSecret,
+  );
+
+  return c.json(success({ token: jwt, redirect: entry.redirect, user: { id: user.id, email: user.email, name: user.name, role: user.role } }), 200);
+});
+
 authRoutes.get("/me", async (c) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {

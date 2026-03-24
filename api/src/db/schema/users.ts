@@ -133,6 +133,8 @@ export const userProfiles = pgTable("user_profiles", {
   preferredRoles: jsonb("preferred_roles").$type<string[]>().default([]),
   profileVisibility: varchar("profile_visibility", { length: 50 }).default("public").notNull(),
   customUrlSlug: varchar("custom_url_slug", { length: 100 }),
+  // Featured candidate profile — paid one-off boost for recruiter search visibility
+  featuredUntil: timestamp("featured_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

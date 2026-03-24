@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, desc, count, sum, sql } from "drizzle-orm";
+import { eq, and, desc, count, sum, sql, inArray } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -154,6 +154,39 @@ recruiterRoutes.get("/talent-pool", async (c) => {
 		.where(eq(schema.talentPoolCandidates.recruiterId, user.sub))
 		.orderBy(desc(schema.talentPoolCandidates.addedAt));
 	return c.json(success(entries.map(rowToTalentPoolEntry)));
+});
+
+// GET /talent-pool/export — download pool as CSV (must be before /:id)
+recruiterRoutes.get("/talent-pool/export", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+	const entries = await db
+		.select()
+		.from(schema.talentPoolCandidates)
+		.where(eq(schema.talentPoolCandidates.recruiterId, user.sub))
+		.orderBy(desc(schema.talentPoolCandidates.addedAt));
+
+	const header = ["id", "candidateName", "candidateEmail", "candidateTitle", "currentCompany", "currentTitle", "status", "relationshipStrength", "tags", "notes", "lastContactedAt", "addedAt"];
+	const escape = (v: unknown) => {
+		const s = v == null ? "" : String(v);
+		return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+	};
+	const rows = entries.map((e) => [
+		e.id, e.candidateName, e.candidateEmail ?? "", e.candidateTitle ?? "",
+		e.currentCompany ?? "", e.currentTitle ?? "", e.status, e.relationshipStrength,
+		Array.isArray(e.tags) ? (e.tags as string[]).join("; ") : "",
+		e.notes ?? "", e.lastContactedAt?.toISOString() ?? "", e.addedAt.toISOString(),
+	].map(escape).join(","));
+
+	const csv = [header.join(","), ...rows].join("\n");
+	const date = new Date().toISOString().slice(0, 10);
+	return new Response(csv, {
+		status: 200,
+		headers: {
+			"Content-Type": "text/csv; charset=utf-8",
+			"Content-Disposition": `attachment; filename="talent-pool-${date}.csv"`,
+		},
+	});
 });
 
 // GET /talent-pool/check/:candidateUserId — check if candidate is in pool (static before /:id)
@@ -613,6 +646,68 @@ recruiterRoutes.post("/submissions/:id/withdraw", async (c) => {
 	return c.json(responseEnvelope(rowToSubmission(updated)));
 });
 
+// ─── Bulk Operations ──────────────────────────────────────────────────────────
 
+// POST /bulk/tags — add/remove tags on multiple talent pool entries
+// Body: { ids: string[], addTags?: string[], removeTags?: string[] }
+recruiterRoutes.post("/bulk/tags", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+	const addTags: string[] = Array.isArray(body.addTags) ? body.addTags : [];
+	const removeTags: string[] = Array.isArray(body.removeTags) ? body.removeTags : [];
+	if (!ids.length) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "ids is required" } }, 400);
 
+	const db = getDb();
+	const entries = await db
+		.select({ id: schema.talentPoolCandidates.id, tags: schema.talentPoolCandidates.tags })
+		.from(schema.talentPoolCandidates)
+		.where(and(inArray(schema.talentPoolCandidates.id, ids), eq(schema.talentPoolCandidates.recruiterId, user.sub)));
 
+	let updatedCount = 0;
+	for (const entry of entries) {
+		let tags: string[] = Array.isArray(entry.tags) ? (entry.tags as string[]) : [];
+		if (addTags.length) tags = Array.from(new Set([...tags, ...addTags]));
+		if (removeTags.length) tags = tags.filter((t) => !removeTags.includes(t));
+		await db.update(schema.talentPoolCandidates).set({ tags, updatedAt: new Date() } as any).where(eq(schema.talentPoolCandidates.id, entry.id));
+		updatedCount++;
+	}
+
+	return c.json(responseEnvelope({ updated: updatedCount }), 200);
+});
+
+// POST /bulk/status — update status on multiple talent pool entries
+// Body: { ids: string[], status: string }
+recruiterRoutes.post("/bulk/status", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+	const newStatus = typeof body.status === "string" ? body.status : null;
+	if (!ids.length || !newStatus) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "ids and status are required" } }, 400);
+
+	const db = getDb();
+	const result = await db
+		.update(schema.talentPoolCandidates)
+		.set({ status: newStatus, updatedAt: new Date() } as any)
+		.where(and(inArray(schema.talentPoolCandidates.id, ids), eq(schema.talentPoolCandidates.recruiterId, user.sub)))
+		.returning({ id: schema.talentPoolCandidates.id });
+
+	return c.json(responseEnvelope({ updated: result.length }), 200);
+});
+
+// DELETE /bulk/delete — remove multiple talent pool entries
+// Body: { ids: string[] }
+recruiterRoutes.delete("/bulk/delete", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+	if (!ids.length) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "ids is required" } }, 400);
+
+	const db = getDb();
+	const result = await db
+		.delete(schema.talentPoolCandidates)
+		.where(and(inArray(schema.talentPoolCandidates.id, ids), eq(schema.talentPoolCandidates.recruiterId, user.sub)))
+		.returning({ id: schema.talentPoolCandidates.id });
+
+	return c.json(responseEnvelope({ deleted: result.length }), 200);
+});

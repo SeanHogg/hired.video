@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -148,6 +148,53 @@ settingsRoutes.get("/security", async (c) => {
 
 settingsRoutes.put("/security", async (c) => c.json(success({ ...defaultSecuritySettings(), ...(await c.req.json().catch(() => ({}))) }), 200));
 
+/** GET /api/settings/security/sessions — list active sessions (non-revoked, non-expired refresh tokens) */
+settingsRoutes.get("/security/sessions", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const now = new Date();
+  const sessions = await db
+    .select({
+      id: schema.refreshTokens.id,
+      createdAt: schema.refreshTokens.createdAt,
+      expiresAt: schema.refreshTokens.expiresAt,
+    })
+    .from(schema.refreshTokens)
+    .where(
+      and(
+        eq(schema.refreshTokens.userId, uid),
+        eq(schema.refreshTokens.revoked, false),
+        gt(schema.refreshTokens.expiresAt, now),
+      ),
+    )
+    .orderBy(schema.refreshTokens.createdAt);
+
+  return c.json(success(sessions.map((s) => ({
+    id: s.id,
+    createdAt: new Date(s.createdAt).toISOString(),
+    expiresAt: new Date(s.expiresAt).toISOString(),
+    // Token value is never exposed — only the opaque session ID
+  }))), 200);
+});
+
+/** DELETE /api/settings/security/sessions/:id — revoke a specific session */
+settingsRoutes.delete("/security/sessions/:id", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const sessionId = c.req.param("id");
+  const db = getDb();
+
+  const [updated] = await db
+    .update(schema.refreshTokens)
+    .set({ revoked: true } as any)
+    .where(and(eq(schema.refreshTokens.id, sessionId), eq(schema.refreshTokens.userId, uid)))
+    .returning({ id: schema.refreshTokens.id });
+
+  if (!updated) return c.json(error("NOT_FOUND", "Session not found"), 404);
+  return c.json(success({ revoked: true }), 200);
+});
+
 settingsRoutes.post("/security/2fa/enable", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -201,7 +248,7 @@ settingsRoutes.get("/export", async (c) => {
     .where(eq(accountPreferences.userId, uid))
     .limit(1);
 
-  return c.json(success({
+  const data = {
     exportedAt: new Date().toISOString(),
     account: user ?? null,
     profile: profile ?? null,
@@ -209,7 +256,44 @@ settingsRoutes.get("/export", async (c) => {
     resumes,
     jobApplications: applications,
     savedJobs: savedJobsList,
-  }), 200);
+  };
+
+  const format = c.req.query("format");
+  if (format === "csv") {
+    const escapeCell = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const toRows = (header: string[], rows: Record<string, unknown>[]) =>
+      [header.join(","), ...rows.map((r) => header.map((h) => escapeCell(r[h])).join(","))].join("\n");
+
+    const sections: string[] = [];
+    if (user) sections.push("# Account\n" + toRows(["email","name","role","createdAt","lastLoginAt"], [user as any]));
+    if (resumes.length) sections.push("\n# Resumes\n" + toRows(["id","title","status","createdAt"], resumes as any[]));
+    if (applications.length) sections.push("\n# Job Applications\n" + toRows(Object.keys(applications[0] as object), applications as any[]));
+
+    const date = new Date().toISOString().slice(0, 10);
+    return new Response(sections.join("\n"), {
+      status: 200,
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="account-export-${date}.csv"` },
+    });
+  }
+
+  return c.json(success(data), 200);
+});
+
+// GET /api/export/csv and /api/export/excel — legacy standalone export routes
+// mounted at /api/settings in app.ts so path here is /export/csv etc.
+settingsRoutes.get("/export/csv", async (c) => {
+  // Redirect to the canonical export endpoint with format=csv
+  return c.redirect(`/api/settings/export?format=csv`, 302);
+});
+settingsRoutes.get("/export/excel", async (c) => {
+  // Excel not natively supported without a library; return CSV with xlsx mime type
+  // as a reasonable fallback until an xlsx library is added
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  return c.redirect(`/api/settings/export?format=csv`, 302);
 });
 
 settingsRoutes.all("*", (c) => c.json({ error: { code: "NOT_FOUND", message: "Settings endpoint not found" } }, 404));

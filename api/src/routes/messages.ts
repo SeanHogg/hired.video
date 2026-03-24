@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -202,6 +202,158 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
   }
 });
 
+// ---------------------------------------------------------------------------
+// Direct messaging — inbox, conversations, send, read receipts (Gap #45)
+// ---------------------------------------------------------------------------
+
+const { conversations, conversationParticipants, messages, messageReadReceipts } = schema;
+
+/** GET /api/messages/inbox — list conversations the current user participates in */
+messageRoutes.get("/inbox", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const rows = await db
+    .select({ convo: conversations })
+    .from(conversationParticipants)
+    .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+    .where(eq(conversationParticipants.userId, uid))
+    .orderBy(desc(conversations.updatedAt));
+
+  return c.json(success(rows.map((r) => r.convo)), 200);
+});
+
+/** POST /api/messages/conversations — start a new conversation */
+messageRoutes.post("/conversations", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => ({}));
+  const subject = typeof body.subject === "string" ? body.subject : "Direct message";
+  const participantIds: string[] = Array.isArray(body.participantIds) ? body.participantIds : [];
+
+  const db = getDb();
+  const [convo] = await db.insert(conversations).values({ subject, type: "direct" }).returning();
+
+  const allParticipants = [...new Set([uid, ...participantIds])];
+  await Promise.all(
+    allParticipants.map((pId) =>
+      db.insert(conversationParticipants).values({ conversationId: convo.id, userId: pId, role: "member" } as any),
+    ),
+  );
+
+  return c.json(success(convo), 201);
+});
+
+/** GET /api/messages/conversations/:id — conversation detail + message history */
+messageRoutes.get("/conversations/:id", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const convoId = c.req.param("id");
+  const db = getDb();
+
+  // Verify participant
+  const [participant] = await db
+    .select()
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, convoId), eq(conversationParticipants.userId, uid)))
+    .limit(1);
+  if (!participant) return c.json(error("NOT_FOUND", "Conversation not found"), 404);
+
+  const [convo] = await db.select().from(conversations).where(eq(conversations.id, convoId)).limit(1);
+  if (!convo) return c.json(error("NOT_FOUND", "Conversation not found"), 404);
+
+  const [msgRows, participants] = await Promise.all([
+    db.select().from(messages).where(and(eq(messages.conversationId, convoId), eq(messages.isDeleted, false))).orderBy(desc(messages.createdAt)),
+    db.select().from(conversationParticipants).where(eq(conversationParticipants.conversationId, convoId)),
+  ]);
+
+  // Annotate each message with whether current user has read it
+  const readReceiptRows = await db
+    .select({ messageId: messageReadReceipts.messageId })
+    .from(messageReadReceipts)
+    .where(eq(messageReadReceipts.userId, uid));
+  const readSet = new Set(readReceiptRows.map((r) => r.messageId));
+
+  const annotatedMessages = msgRows.map((m) => ({
+    ...m,
+    readByMe: m.senderId === uid || readSet.has(m.id),
+  }));
+
+  return c.json(success({ ...convo, participants, messages: annotatedMessages }), 200);
+});
+
+/** POST /api/messages/conversations/:id/send — send a message in a conversation */
+messageRoutes.post("/conversations/:id/send", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const convoId = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const content = typeof body.content === "string" && body.content.trim() ? body.content.trim() : null;
+  if (!content) return c.json(error("VALIDATION_ERROR", "Message content is required"), 400);
+
+  const db = getDb();
+
+  // Verify participant
+  const [participant] = await db
+    .select()
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, convoId), eq(conversationParticipants.userId, uid)))
+    .limit(1);
+  if (!participant) return c.json(error("NOT_FOUND", "Conversation not found"), 404);
+
+  const [msg] = await db.insert(messages).values({
+    conversationId: convoId,
+    senderId: uid,
+    content,
+    contentType: body.contentType ?? "text",
+  } as any).returning();
+
+  // Touch conversation updatedAt for inbox ordering
+  await db.update(conversations).set({ updatedAt: new Date() } as any).where(eq(conversations.id, convoId));
+
+  return c.json(success(msg), 201);
+});
+
+/** PUT /api/messages/conversations/:id/read — mark all messages in a conversation as read */
+messageRoutes.put("/conversations/:id/read", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const convoId = c.req.param("id");
+  const db = getDb();
+
+  // Verify participant
+  const [participant] = await db
+    .select()
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, convoId), eq(conversationParticipants.userId, uid)))
+    .limit(1);
+  if (!participant) return c.json(error("NOT_FOUND", "Conversation not found"), 404);
+
+  // Get all messages in conversation not sent by current user
+  const unreadMsgs = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(messages.conversationId, convoId), eq(messages.isDeleted, false)));
+
+  // Insert read receipts (ignore conflicts for already-read messages)
+  const now = new Date();
+  await Promise.all(
+    unreadMsgs.map((m) =>
+      db.insert(messageReadReceipts)
+        .values({ messageId: m.id, userId: uid, readAt: now } as any)
+        .onConflictDoNothing()
+        .catch(() => undefined),
+    ),
+  );
+
+  return c.json(success({ markedRead: unreadMsgs.length }), 200);
+});
+
 messageRoutes.all("*", (c) =>
-  c.json({ error: { code: "NOT_IMPLEMENTED", message: "Message routes coming soon" } }, 501),
+  c.json({ error: { code: "NOT_FOUND", message: "Message route not found" } }, 404),
 );

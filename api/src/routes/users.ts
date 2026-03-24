@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, lte } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 
-const { users, userProfiles, userConnections, tasks, boards } = schema;
+const { users, userProfiles, userConnections, tasks } = schema;
 
 /** Map frontend PascalCase role to DB snake_case role */
 function normalizeRole(role: string): string | null {
@@ -583,9 +583,34 @@ userRoutes.get("/:id/stats", async (c) => {
   );
 });
 
-/** GET /api/users/:id/resumes */
+/** GET /api/users/:id/resumes — return public resumes for a user (privacyLevel=0) */
 userRoutes.get("/:id/resumes", async (c) => {
-  return c.json(success([]), 200);
+  const id = c.req.param("id");
+  const caller = c.var.user;
+  const db = getDb();
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  let targetUserId: string | undefined;
+  if (isUUID) {
+    targetUserId = id;
+  } else {
+    const [p] = await db.select({ userId: schema.userProfiles.userId }).from(schema.userProfiles).where(eq(schema.userProfiles.customUrlSlug, id)).limit(1);
+    targetUserId = p?.userId;
+  }
+  if (!targetUserId) return c.json(success([]), 200);
+
+  const isOwner = caller?.sub === targetUserId;
+  // Owners see all their resumes; others see only public ones (privacyLevel=0)
+  const rows = await db
+    .select({ id: schema.resumeInformation.id, title: schema.resumeInformation.title, status: schema.resumeInformation.status, privacyLevel: schema.resumeInformation.privacyLevel, createdAt: schema.resumeInformation.createdAt, updatedAt: schema.resumeInformation.updatedAt })
+    .from(schema.resumeInformation)
+    .where(
+      isOwner
+        ? eq(schema.resumeInformation.userId, targetUserId)
+        : and(eq(schema.resumeInformation.userId, targetUserId), lte(schema.resumeInformation.privacyLevel, 0)),
+    );
+
+  return c.json(success(rows), 200);
 });
 
 /** PATCH /api/users/slug — update the authenticated user's custom URL slug */
@@ -685,7 +710,69 @@ userRoutes.get("/:id", async (c) => {
     return c.json(error("UNAUTHORIZED", "Authentication required to view this profile"), 401);
   }
 
-  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
+  // Enrich with public resume and video counts for "Hire Me" profile page
+  const [publicResumes, publicVideos] = await Promise.all([
+    db.select({ id: schema.resumeInformation.id })
+      .from(schema.resumeInformation)
+      .where(and(eq(schema.resumeInformation.userId, me.id), lte(schema.resumeInformation.privacyLevel, 0))),
+    db.select({ id: schema.videos.id, title: schema.videos.title, thumbnailUrl: schema.videos.thumbnailUrl, youtubeUrl: schema.videos.youtubeUrl, createdAt: schema.videos.createdAt })
+      .from(schema.videos)
+      .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.isPublic, true))),
+  ]);
+
+  return c.json(success({
+    ...toUserProfileDto(me, profile ?? null),
+    publicResumeCount: publicResumes.length,
+    publicVideos,
+  }), 200);
+});
+
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+/** POST /api/users/me/avatar — upload a new avatar (5MB, jpg/png/gif/webp only) */
+userRoutes.post("/me/avatar", async (c) => {
+  const user = c.var.user;
+  const form = await c.req.formData().catch(() => null);
+  const part = (form?.get("avatar") ?? form?.get("file")) as File | null;
+
+  if (!part || typeof part.arrayBuffer !== "function") {
+    return c.json(error("VALIDATION_ERROR", "Missing avatar file in form field 'avatar'"), 400);
+  }
+
+  const contentType = part.type || "application/octet-stream";
+  if (!AVATAR_ALLOWED_TYPES.has(contentType)) {
+    return c.json(error("VALIDATION_ERROR", `Only jpg, png, gif, and webp images are allowed. Got: ${contentType}`), 415);
+  }
+
+  const bytes = await part.arrayBuffer();
+  if (bytes.byteLength > AVATAR_MAX_BYTES) {
+    return c.json(error("PAYLOAD_TOO_LARGE", `Avatar must be under 5 MB. File is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB`), 413);
+  }
+
+  const ext = part.name?.split(".").pop()?.toLowerCase() ?? "jpg";
+  const key = `uploads/${user.sub}/avatars/${crypto.randomUUID()}.${ext}`;
+
+  const bucket: any = (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) {
+    // No bucket configured (local dev) — return a data URL stub
+    const db = getDb();
+    const stubUrl = `https://cdn.hired.video/${key}`;
+    await db.insert(userProfiles)
+      .values({ userId: user.sub, avatarUrl: stubUrl, createdAt: new Date(), updatedAt: new Date() } as any)
+      .onConflictDoUpdate({ target: userProfiles.userId, set: { avatarUrl: stubUrl, updatedAt: new Date() } as any });
+    return c.json(success({ avatarUrl: stubUrl }), 200);
+  }
+
+  await bucket.put(key, bytes, { httpMetadata: { contentType } });
+  const avatarUrl = `https://cdn.hired.video/${key}`;
+
+  const db = getDb();
+  await db.insert(userProfiles)
+    .values({ userId: user.sub, avatarUrl, createdAt: new Date(), updatedAt: new Date() } as any)
+    .onConflictDoUpdate({ target: userProfiles.userId, set: { avatarUrl, updatedAt: new Date() } as any });
+
+  return c.json(success({ avatarUrl }), 200);
 });
 
 /** DELETE /api/users/account — permanently delete the authenticated user's account */

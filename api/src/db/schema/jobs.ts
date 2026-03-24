@@ -27,6 +27,10 @@ export const jobItems = pgTable("job_items", {
   isRemote: boolean("is_remote").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // Sponsored job listings — paid employer promotion
+  sponsored: boolean("sponsored").default(false).notNull(),
+  sponsoredUntil: timestamp("sponsored_until", { withTimezone: true }),
+  sponsoredRankBoost: integer("sponsored_rank_boost").default(0).notNull(), // added to relevance score
   sourceUrl: text("source_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

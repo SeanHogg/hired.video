@@ -123,6 +123,7 @@ export function createApp() {
   const PUBLIC_PREFIXES = [
     "/api/auth",
     "/api/auth/oauth",
+    "/api/auth/magic-link",
     "/api/search/public",
     "/api/users/public",
     "/api/jobs/public",
@@ -246,6 +247,7 @@ export function createApp() {
   app.route("/api/affiliates", affiliateRoutes);
   app.route("/api/marketing", marketingRoutes);
   app.route("/api/settings", settingsRoutes);
+  app.route("/api/export", settingsRoutes); // legacy export alias — /api/export/csv maps to /api/settings/export/csv
   app.route("/api/featureflag", featureFlagRoutes);
   app.route("/api/task", taskRoutes);
   app.route("/api/upload", uploadRoutes);

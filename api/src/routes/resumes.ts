@@ -563,4 +563,60 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
 
+// GET /:id/diff — compare this resume against its parent or another variation
+// Returns a field-level diff of the two content objects.
+resumeRoutes.get("/:id/diff", async (c) => {
+  const id = c.req.param("id");
+  const user = c.var.user;
+  const db = getDb();
+
+  const [resume] = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .limit(1);
+
+  if (!resume) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+
+  // Compare against parentId if provided, otherwise compare against the master
+  const compareId = c.req.query("compareId") ?? (resume as any).parentId;
+  if (!compareId) {
+    return c.json(ok({ message: "No parent or compareId to diff against", changes: [] }), 200);
+  }
+
+  const [other] = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.id, compareId), eq(resumes.userId, user.sub)))
+    .limit(1);
+
+  if (!other) return c.json(fail("NOT_FOUND", "Comparison resume not found"), 404);
+
+  // Simple field-level diff on content objects
+  const aContent = (resume.content ?? {}) as Record<string, unknown>;
+  const bContent = (other.content ?? {}) as Record<string, unknown>;
+  const allKeys = new Set([...Object.keys(aContent), ...Object.keys(bContent)]);
+
+  const changes: Array<{ field: string; type: "added" | "removed" | "changed"; before: unknown; after: unknown }> = [];
+  for (const key of allKeys) {
+    const before = bContent[key];
+    const after = aContent[key];
+    const beforeStr = JSON.stringify(before);
+    const afterStr = JSON.stringify(after);
+    if (beforeStr === afterStr) continue;
+    if (before === undefined) changes.push({ field: key, type: "added", before: null, after });
+    else if (after === undefined) changes.push({ field: key, type: "removed", before, after: null });
+    else changes.push({ field: key, type: "changed", before, after });
+  }
+
+  return c.json(ok({
+    resumeId: resume.id,
+    compareId: other.id,
+    resumeTitle: resume.title,
+    compareTitle: other.title,
+    changes,
+    summary: { total: changes.length, added: changes.filter((c) => c.type === "added").length, removed: changes.filter((c) => c.type === "removed").length, changed: changes.filter((c) => c.type === "changed").length },
+  }), 200);
+});
+
 resumeRoutes.all("*", (c) => c.json(fail("NOT_IMPLEMENTED", "Resume route not implemented"), 501));

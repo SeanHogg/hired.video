@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
 
 export const featureFlagRoutes = new Hono<{ Variables: Variables }>();
 
@@ -7,34 +9,106 @@ function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
 }
 
-const flags = [
-  {
-    key: "new_dashboard",
-    name: "New dashboard",
-    description: "Enable redesigned dashboard experience",
-    enabled: false,
-    rolloutPercentage: 0,
-    conditions: {},
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
+// Seed default flags if the table is empty (idempotent on subsequent calls).
+const DEFAULT_FLAGS = [
+  { key: "new_dashboard", name: "New Dashboard", description: "Enable redesigned dashboard experience", enabled: false, rolloutPercentage: 0 },
+  { key: "ai_copilot", name: "AI Career Copilot", description: "Surface AI-generated career action plan on dashboard", enabled: false, rolloutPercentage: 0 },
+  { key: "magic_links", name: "Magic Link Login", description: "Allow passwordless login via email magic links", enabled: true, rolloutPercentage: 100 },
+  { key: "sponsored_jobs", name: "Sponsored Job Listings", description: "Show sponsored/boosted jobs at top of listings", enabled: false, rolloutPercentage: 0 },
+  { key: "featured_profiles", name: "Featured Candidate Profiles", description: "Allow job seekers to pay to boost profile visibility", enabled: false, rolloutPercentage: 0 },
+  { key: "smart_notifications", name: "Smart Notification Ranking", description: "AI-ranked notification feed for Premium users", enabled: true, rolloutPercentage: 100 },
 ];
 
-featureFlagRoutes.get("/", (c) =>
-  c.json(
-    ok({
-      flags,
-      userFlags: {
-        new_dashboard: false,
-      },
-    }),
-    200,
-  ),
-);
+async function ensureSeedFlags() {
+  const db = getDb();
+  try {
+    const existing = await db.select({ key: schema.featureFlags.key }).from(schema.featureFlags);
+    const existingKeys = new Set(existing.map((f) => f.key));
+    const toInsert = DEFAULT_FLAGS.filter((f) => !existingKeys.has(f.key));
+    if (toInsert.length) {
+      await db.insert(schema.featureFlags).values(toInsert as any[]);
+    }
+  } catch {
+    // Table may not exist yet (pre-migration) — fall back gracefully
+  }
+}
+
+// Evaluate whether a flag is active for a given user.
+// Rollout is deterministic: hash(userId + flagKey) % 100 < rolloutPercentage
+function isEnabledForUser(flag: { enabled: boolean; rolloutPercentage: number }, userId: string, flagKey: string): boolean {
+  if (!flag.enabled) return false;
+  if (flag.rolloutPercentage >= 100) return true;
+  if (flag.rolloutPercentage <= 0) return false;
+  // Simple deterministic hash
+  let hash = 0;
+  const input = `${userId}:${flagKey}`;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return (Math.abs(hash) % 100) < flag.rolloutPercentage;
+}
+
+// GET /featureflag — list all flags and per-user evaluation
+featureFlagRoutes.get("/", async (c) => {
+  const userId = c.var.user?.sub ?? "anonymous";
+  await ensureSeedFlags();
+  const db = getDb();
+
+  let flags: typeof schema.featureFlags.$inferSelect[] = [];
+  try {
+    flags = await db.select().from(schema.featureFlags).orderBy(schema.featureFlags.key);
+  } catch {
+    flags = DEFAULT_FLAGS.map((f) => ({
+      ...f,
+      id: crypto.randomUUID(),
+      conditions: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+  }
+
+  const userFlags: Record<string, boolean> = {};
+  for (const flag of flags) {
+    userFlags[flag.key] = isEnabledForUser(flag, userId, flag.key);
+  }
+
+  return c.json(ok({ flags, userFlags }), 200);
+});
+
+// GET /featureflag/:key — evaluate a single flag for the current user
+featureFlagRoutes.get("/:key", async (c) => {
+  const flagKey = c.req.param("key");
+  const userId = c.var.user?.sub ?? "anonymous";
+  const db = getDb();
+
+  const [flag] = await db.select().from(schema.featureFlags).where(eq(schema.featureFlags.key, flagKey)).limit(1);
+  if (!flag) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Flag not found" } }, 404);
+
+  const enabled = isEnabledForUser(flag, userId, flag.key);
+  return c.json(ok({ ...flag, enabledForUser: enabled }), 200);
+});
+
+// PATCH /featureflag/:key — update a flag (admin only in a real implementation; open here for now)
+featureFlagRoutes.patch("/:key", async (c) => {
+  const flagKey = c.req.param("key");
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof body.enabled === "boolean") updates.enabled = body.enabled;
+  if (typeof body.rolloutPercentage === "number") updates.rolloutPercentage = Math.min(100, Math.max(0, body.rolloutPercentage));
+  if (body.conditions !== undefined) updates.conditions = body.conditions;
+
+  const [updated] = await db
+    .update(schema.featureFlags)
+    .set(updates as any)
+    .where(eq(schema.featureFlags.key, flagKey))
+    .returning();
+
+  if (!updated) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Flag not found" } }, 404);
+  return c.json(ok(updated), 200);
+});
 
 featureFlagRoutes.all("*", (c) =>
-  c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Feature flag route not implemented" }, timestamp: new Date().toISOString() },
-    501,
-  ),
+  c.json({ success: false, error: { code: "NOT_FOUND", message: "Feature flag route not found" }, timestamp: new Date().toISOString() }, 404),
 );
