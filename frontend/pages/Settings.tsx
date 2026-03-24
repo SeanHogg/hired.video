@@ -1560,7 +1560,7 @@ function SettingsContent() {
                       <p className="text-sm text-muted-foreground mb-4">
                         Change your password to keep your account secure.
                       </p>
-                      <Button variant="outline" className="gap-2">
+                      <Button variant="outline" className="gap-2" onClick={() => window.open('https://hired.video/forgot-password', '_blank')}>
                         <RefreshCw className="h-4 w-4" />
                         Change Password
                       </Button>

@@ -11,6 +11,7 @@ import {
   sendPasswordResetEmail,
   sendTwoFactorEmail,
 } from "../services/email.js";
+import { seedOnboardingTasks } from "../lib/onboarding.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
 
@@ -220,11 +221,16 @@ authRoutes.post("/register", async (c) => {
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
   });
 
-  // Send verification email — use waitUntil so the Worker stays alive for the async fetch
+  // Seed onboarding tasks for the new user and send verification email in parallel
   c.executionCtx.waitUntil(
-    sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
-      console.error("[register] Failed to send verification email:", err),
-    ),
+    Promise.all([
+      sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
+        console.error("[register] Failed to send verification email:", err),
+      ),
+      seedOnboardingTasks(user.id, user.role ?? "job_seeker").catch((err) =>
+        console.error("[register] Failed to seed onboarding tasks:", err),
+      ),
+    ]),
   );
 
   const isDev = process.env.NODE_ENV !== "production";

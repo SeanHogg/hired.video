@@ -5,6 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/email.js";
+import { seedOnboardingTasks } from "../lib/onboarding.js";
 
 const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens } = schema;
 
@@ -308,6 +309,12 @@ oauthRoutes.get("/:provider/callback", async (c) => {
 
       if (!newUser) return c.redirect(`${base}/login?error=auth_failed`);
       userId = newUser.id;
+      // Seed onboarding tasks for the new user (fire-and-forget)
+      c.executionCtx.waitUntil(
+        seedOnboardingTasks(userId, "job_seeker").catch((err) =>
+          console.error("[oauth] Failed to seed onboarding tasks:", err),
+        ),
+      );
     }
 
     await db.insert(oauthAccounts).values({
