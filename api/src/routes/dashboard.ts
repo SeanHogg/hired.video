@@ -1,11 +1,13 @@
 import { Hono } from "hono";
 import { and, count, eq, gte, lt, sql, sum, desc } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
 import { getSubscription } from "../services/billing.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePremium, checkAIUsage } from "../middleware/tierEnforcement.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
 
@@ -439,6 +441,109 @@ dashboardRoutes.post("/profile-view", (c) => c.json(success({ success: true }), 
 dashboardRoutes.post("/activity", (c) => c.json(success({ success: true }), 200));
 dashboardRoutes.post("/engagement", (c) => c.json(success({ success: true }), 200));
 dashboardRoutes.post("/refresh", (c) => c.json(success({ success: true }), 200));
+
+// ---------------------------------------------------------------------------
+// POST /api/dashboard/ai-insights — AI narrative insights for Premium (#27)
+// Summarises the user's funnel metrics and generates actionable hiring advice.
+// ---------------------------------------------------------------------------
+const InsightsPromptSchema = z.object({
+  role: z.enum(["job_seeker", "recruiter", "employer"]).default("job_seeker"),
+});
+
+const AiInsightsResponseSchema = z.object({
+  headline: z.string(),
+  insights: z.array(z.string()),
+  recommendations: z.array(z.string()),
+  riskFlags: z.array(z.string()),
+});
+
+dashboardRoutes.post("/ai-insights", requirePremium("AI Dashboard Insights"), async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
+  const userId = c.var.user.sub;
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = InsightsPromptSchema.safeParse(body);
+  const role = parsed.success ? parsed.data.role : "job_seeker";
+
+  const db = getDb();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  // Gather funnel metrics for the LLM prompt
+  const [applications, interviews, offers, savedJobs] = await Promise.all([
+    db.select({ status: schema.jobApplications.status })
+      .from(schema.jobApplications)
+      .where(and(eq(schema.jobApplications.userId, userId), gte(schema.jobApplications.appliedAt, thirtyDaysAgo))),
+    db.select({ n: count() }).from(schema.jobApplications)
+      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "interview"))),
+    db.select({ n: count() }).from(schema.jobApplications)
+      .where(and(eq(schema.jobApplications.userId, userId), eq(schema.jobApplications.status, "offer"))),
+    db.select({ n: count() }).from(schema.savedJobs).where(eq(schema.savedJobs.userId, userId)),
+  ]);
+
+  const statusCounts = applications.reduce<Record<string, number>>((acc, a) => {
+    acc[a.status] = (acc[a.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const interviewRate = applications.length > 0 ? Math.round((interviews[0].n / applications.length) * 100) : 0;
+  const offerRate = interviews[0].n > 0 ? Math.round(((offers[0].n) / interviews[0].n) * 100) : 0;
+
+  const apiKey = getApiKey((c.env as any) ?? {});
+  if (!apiKey) {
+    return c.json(success({
+      headline: "Keep up the momentum — consistency is key in your job search.",
+      insights: [
+        `You have ${applications.length} applications in the last 30 days.`,
+        `Interview conversion rate: ${interviewRate}%.`,
+        `${savedJobs[0].n} saved jobs — make sure to apply before they close.`,
+      ],
+      recommendations: [
+        "Aim for at least 5 applications per week to maintain pipeline.",
+        "Personalise each cover letter to the role to improve callback rates.",
+        "Follow up with recruiters 5–7 days after applying.",
+      ],
+      riskFlags: interviewRate < 10 ? ["Low interview conversion — review your resume and application quality."] : [],
+    }), 200);
+  }
+
+  try {
+    const result = await callLLMJson(
+      apiKey,
+      {
+        systemPrompt: "You are a career analytics AI. Analyse the user's hiring funnel metrics and provide concise, data-driven insights and recommendations. Return valid JSON only.",
+        userMessage: `Role: ${role}
+Applications (last 30d): ${applications.length}
+Status breakdown: ${JSON.stringify(statusCounts)}
+Interview rate: ${interviewRate}%
+Offer rate (from interviews): ${offerRate}%
+Saved jobs: ${savedJobs[0].n}
+
+Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observations>"], "recommendations": ["<3-4 actionable next steps>"], "riskFlags": ["<any red flags, empty array if none>"] }`,
+        responseFormat: "json_object",
+        temperature: 0.5,
+      },
+      AiInsightsResponseSchema,
+    );
+
+    await db.insert(schema.aiUsageRecords).values({
+      userId,
+      model: "google/gemini-flash-1.5",
+      featureKey: "dashboard_insights",
+      promptTokens: 200,
+      completionTokens: 150,
+      totalTokens: 350,
+    });
+
+    return c.json(success(result), 200);
+  } catch {
+    return c.json(success({
+      headline: "Your pipeline is active — here are ways to improve your outcomes.",
+      insights: [`${applications.length} applications submitted this month.`, `${interviewRate}% interview conversion rate.`],
+      recommendations: ["Follow up on pending applications.", "Update your profile to attract recruiters."],
+      riskFlags: [],
+    }), 200);
+  }
+});
 
 dashboardRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_IMPLEMENTED", message: "Dashboard route not found" } }, 404),

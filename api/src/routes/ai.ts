@@ -47,6 +47,8 @@ function generateMockResponse(input: string): { message: string; usage: { prompt
 // POST /api/ai/context — legacy context-aware assistant (mock)
 // ---------------------------------------------------------------------------
 aiRoutes.post("/context", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
   const body = await c.req.json().catch(() => ({}));
   const userMessage = typeof body?.message === "string" ? body.message : "";
   const response = generateMockResponse(userMessage);

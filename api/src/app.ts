@@ -56,6 +56,9 @@ import { performanceRoutes } from "./routes/performance.js";
 import { calendarRoutes } from "./routes/calendar.js";
 import { exclusiveBoardRoutes } from "./routes/exclusive-boards.js";
 import { communityRoutes } from "./routes/community.js";
+import { analyticsRoutes } from "./routes/analytics.js";
+import { callLLM, getApiKey } from "./services/ai.js";
+import { logger } from "./lib/logger.js";
 export function createApp() {
   const app = new Hono();
 
@@ -124,6 +127,9 @@ export function createApp() {
     "/api/auth",
     "/api/auth/oauth",
     "/api/auth/magic-link",
+    "/api/chat/visitor",
+    "/api/analytics/beacon",
+    "/api/analytics/ads/impression",
     "/api/search/public",
     "/api/users/public",
     "/api/jobs/public",
@@ -274,6 +280,48 @@ export function createApp() {
   app.route("/api/calendar", calendarRoutes);
   app.route("/api/boards", exclusiveBoardRoutes);
   app.route("/api/community", communityRoutes);
+  app.route("/api/analytics", analyticsRoutes);
+
+  // ---------------------------------------------------------------------------
+  // POST /api/chat/visitor — AI prospect chat widget (#54)
+  // Public (no auth). Answers questions about the platform, pricing, and
+  // features. Optionally captures an email lead into marketingLeads.
+  // ---------------------------------------------------------------------------
+  app.post("/api/chat/visitor", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+    if (!message) return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: "message is required" } }, 400);
+
+    const VISITOR_SYSTEM_PROMPT = `You are a helpful assistant for hired.video — an AI-powered hiring platform that lets job seekers create video resumes, get AI career coaching, and connect with recruiters, while helping recruiters source and manage talent faster.
+
+Keep responses concise (2–4 sentences). Answer questions about features, pricing, and how the platform works. If asked about pricing, mention: Free tier (basic features), Premium for job seekers ($15–20/mo), and Recruiter/Employer plans. Encourage signing up to try the platform. Do not invent features that don't exist.`;
+
+    const apiKey = getApiKey((c.env as any) ?? {});
+    let reply = "Thanks for your interest in hired.video! We help job seekers land their dream role faster with AI-powered video resumes, career coaching, and direct connections to recruiters. Sign up free to get started — no credit card required.";
+
+    if (apiKey) {
+      try {
+        reply = await callLLM(apiKey, {
+          systemPrompt: VISITOR_SYSTEM_PROMPT,
+          userMessage: message,
+          temperature: 0.6,
+          maxTokens: 200,
+        });
+      } catch { /* fall through to default reply */ }
+    }
+
+    // Capture lead if email provided
+    if (typeof body.email === "string" && body.email.includes("@")) {
+      const { getDb, schema } = await import("./db/index.js");
+      const db = getDb();
+      await db.insert(schema.marketingLeads)
+        .values({ email: body.email, source: "visitor_chat", metadata: { firstMessage: message } } as any)
+        .onConflictDoNothing()
+        .catch(() => undefined);
+    }
+
+    return c.json({ success: true, reply }, 200);
+  });
 
   // Legacy frontend service currently requests /FeatureFlag without /api prefix.
   app.route("/featureflag", featureFlagRoutes);
@@ -285,6 +333,11 @@ export function createApp() {
   // Wrap globalErrorHandler to ensure CORS headers are present on error responses.
   // Hono's onError creates a fresh response that bypasses middleware-set headers.
   app.onError((err, c) => {
+    logger.error("unhandled request error", {
+      message: err.message,
+      path: c.req.path,
+      method: c.req.method,
+    });
     const origin = c.req.header("origin") ?? "";
     if (origin && (getAllowedOrigins().includes(origin) || isLocalhostOrigin(origin))) {
       c.header("Access-Control-Allow-Origin", origin);
