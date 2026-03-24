@@ -5,6 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
+import { checkAIUsage, requirePremium } from "../middleware/tierEnforcement.js";
 
 export const matchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -148,6 +149,9 @@ matchRoutes.post("/analyze", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = AnalyzeSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
@@ -223,6 +227,9 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
 matchRoutes.post("/tailor", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
   const parsed = TailorSchema.safeParse(body);
@@ -313,6 +320,9 @@ matchRoutes.post("/byid", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = MatchByIdSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "jobId and resumeId are required"), 400);
@@ -370,6 +380,9 @@ matchRoutes.post("/bycontent", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = MatchByContentSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "jobContent and resumeContent are required"), 400);
@@ -399,6 +412,100 @@ matchRoutes.post("/bycontent", async (c) => {
   const resumeWords = resumeContent.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
   const score = Math.min(100, Math.round((resumeWords.filter((w) => jobWords.has(w)).length / Math.max(jobWords.size, 1)) * 150));
   return c.json(success({ score, summaryRecommendations: `Keyword match score: ${score}/100` }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/match/insights — deep career insights (Premium only)
+//
+// Goes beyond a pass/fail score to provide:
+//  - Skill gap breakdown (missing skills by category)
+//  - Career trajectory analysis (seniority fit, growth path)
+//  - Interview preparation tips specific to the role
+//  - Suggested learning resources / certifications
+// Free users get a 402 upgrade prompt; Premium users get full analysis.
+// ---------------------------------------------------------------------------
+
+const InsightsSchema = z.object({
+  jobHtml: z.string().min(1),
+  resumeId: z.string().uuid().optional(),
+});
+
+const InsightsResponseSchema = z.object({
+  overallFit: z.enum(["strong", "good", "fair", "weak"]),
+  seniorityFit: z.string(),
+  missingSkills: z.array(z.object({ skill: z.string(), category: z.string(), importance: z.enum(["critical", "important", "nice-to-have"]) })),
+  careerTrajectory: z.string(),
+  interviewTips: z.array(z.string()),
+  suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
+  estimatedRampTime: z.string(),
+});
+
+matchRoutes.post("/insights", requirePremium("Career Insights"), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = InsightsSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+
+  const resume = await resolveResume(userId, parsed.data.resumeId);
+  if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
+
+  const jobText = htmlToText(parsed.data.jobHtml);
+  const resumeText = resumeContentToText(resume.content);
+  const apiKey = getApiKey((c.env as any) ?? {});
+
+  if (apiKey) {
+    try {
+      const result = await callLLMJson(
+        apiKey,
+        {
+          systemPrompt: `You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.`,
+          userMessage: `Analyse this candidate's fit for the role and return a comprehensive JSON insights report.
+
+Job Description:
+${jobText}
+
+---
+
+Candidate Resume:
+${resumeText}
+
+---
+
+Return JSON matching this structure exactly:
+{
+  "overallFit": "strong|good|fair|weak",
+  "seniorityFit": "<1-2 sentences on whether the candidate is under/over/well-qualified>",
+  "missingSkills": [{"skill": "<skill name>", "category": "<technical|soft|domain|tool>", "importance": "critical|important|nice-to-have"}],
+  "careerTrajectory": "<2-3 sentences on how this role fits the candidate's career arc>",
+  "interviewTips": ["<specific tip 1>", "<specific tip 2>", "<specific tip 3>"],
+  "suggestedCertifications": [{"name": "<cert/course name>", "reason": "<why it would help>"}],
+  "estimatedRampTime": "<e.g. '2-4 weeks' to be fully productive in this role>"
+}`,
+          responseFormat: "json_object",
+          temperature: 0.4,
+        },
+        InsightsResponseSchema,
+      );
+
+      const db = getDb();
+      await db.insert(schema.aiUsageRecords).values({
+        userId,
+        model: "google/gemini-flash-1.5",
+        featureKey: "match_insights",
+        promptTokens: Math.round((jobText.length + resumeText.length) / 4),
+        completionTokens: Math.round(JSON.stringify(result).length / 4),
+        totalTokens: Math.round((jobText.length + resumeText.length + JSON.stringify(result).length) / 4),
+      });
+
+      return c.json(success({ ...result, resumeId: resume.id }), 200);
+    } catch {
+      return c.json(error("AI_ERROR", "Failed to generate insights. Please try again."), 500);
+    }
+  }
+
+  return c.json(error("AI_ERROR", "AI service not configured. Please contact support."), 503);
 });
 
 matchRoutes.all("*", (c) =>

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Variables: Variables }>();
 
@@ -28,12 +29,22 @@ function buildOptimizationResult() {
 }
 
 resumeOptimizerRoutes.post("/optimize", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
   const result = buildOptimizationResult();
   return c.json(ok({ result: JSON.stringify(result) }), 200);
 });
 
-resumeOptimizerRoutes.post("/ats-analysis", async (c) => c.json(ok({ score: 82, issues: [] }), 200));
-resumeOptimizerRoutes.post("/keyword-suggestions", async (c) => c.json(ok(["leadership", "automation", "cross-functional"]), 200));
+resumeOptimizerRoutes.post("/ats-analysis", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+  return c.json(ok({ score: 82, issues: [] }), 200);
+});
+resumeOptimizerRoutes.post("/keyword-suggestions", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+  return c.json(ok(["leadership", "automation", "cross-functional"]), 200);
+});
 
 resumeOptimizerRoutes.all("*", (c) =>
   c.json(

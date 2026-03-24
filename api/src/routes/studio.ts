@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
+import { getSubscription } from "../services/billing.js";
 
 const { studioProjects, videos, users, userProfiles } = schema;
 
@@ -283,6 +284,108 @@ interface VideoScript {
   scenes: Array<{ id: string; start: number; duration: number; type: "intro"|"achievement"|"skills"|"closing"; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[] }>
 }${jobBlock}`;
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/studio/templates — video template library (basic free, advanced Premium)
+// ---------------------------------------------------------------------------
+
+const BASIC_TEMPLATES = [
+  {
+    id: "professional-clean",
+    name: "Professional Clean",
+    description: "Minimalist corporate style with clean typography",
+    tier: "free",
+    style: { theme: "professional", color_palette: ["#0f172a", "#2563eb", "#f8fafc"], font_style: "Inter" },
+    motion: "minimal",
+    resolution: "720p",
+    previewUrl: null,
+  },
+  {
+    id: "modern-bold",
+    name: "Modern Bold",
+    description: "Bold headlines with strong contrast",
+    tier: "free",
+    style: { theme: "modern", color_palette: ["#111827", "#f59e0b", "#ffffff"], font_style: "Poppins" },
+    motion: "minimal",
+    resolution: "720p",
+    previewUrl: null,
+  },
+  {
+    id: "creative-gradient",
+    name: "Creative Gradient",
+    description: "Vibrant gradients for creative roles",
+    tier: "free",
+    style: { theme: "creative", color_palette: ["#6d28d9", "#ec4899", "#fef3c7"], font_style: "Nunito" },
+    motion: "minimal",
+    resolution: "720p",
+    previewUrl: null,
+  },
+];
+
+const PREMIUM_TEMPLATES = [
+  {
+    id: "executive-platinum",
+    name: "Executive Platinum",
+    description: "Cinematic executive presence with 1080p output and animated transitions",
+    tier: "premium",
+    style: { theme: "executive", color_palette: ["#0c0a09", "#d4af37", "#fafafa"], font_style: "Playfair Display" },
+    motion: "cinematic",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+  {
+    id: "tech-dark",
+    name: "Tech Dark",
+    description: "Dark mode with code-inspired motifs — ideal for engineering roles",
+    tier: "premium",
+    style: { theme: "tech", color_palette: ["#020617", "#22d3ee", "#a3e635"], font_style: "JetBrains Mono" },
+    motion: "moderate",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+  {
+    id: "corporate-brand",
+    name: "Corporate Brand",
+    description: "Customisable brand colours and logo placement for employer videos",
+    tier: "premium",
+    style: { theme: "corporate", color_palette: ["#1e3a5f", "#e8f4fd", "#ffffff"], font_style: "Roboto" },
+    motion: "moderate",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+  {
+    id: "cinematic-story",
+    name: "Cinematic Story",
+    description: "Narrative-driven format with full-motion transitions and scene depth",
+    tier: "premium",
+    style: { theme: "cinematic", color_palette: ["#1a1a2e", "#e94560", "#f5f5f5"], font_style: "Montserrat" },
+    motion: "cinematic",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+  {
+    id: "startup-energy",
+    name: "Startup Energy",
+    description: "Fast-paced, high-energy format for startup and growth-stage roles",
+    tier: "premium",
+    style: { theme: "startup", color_palette: ["#0ea5e9", "#8b5cf6", "#f0fdf4"], font_style: "DM Sans" },
+    motion: "cinematic",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+];
+
+studioRoutes.get("/templates", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const sub = await getSubscription(userId);
+  const templates = sub.isPremium
+    ? [...BASIC_TEMPLATES, ...PREMIUM_TEMPLATES]
+    : BASIC_TEMPLATES.map((t) => ({ ...t, lockedCount: PREMIUM_TEMPLATES.length }));
+
+  return c.json({ success: true, data: { templates, isPremium: sub.isPremium } }, 200);
+});
 
 studioRoutes.post("/storyboard", async (c) => {
   const user = c.var.user;

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
 
@@ -30,6 +31,8 @@ function buildScoreResult() {
 }
 
 resumeScorerRoutes.post("/score", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
   const result = buildScoreResult();
   return c.json(ok({ result: JSON.stringify(result) }), 200);
 });

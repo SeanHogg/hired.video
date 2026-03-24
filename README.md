@@ -1387,3 +1387,34 @@ Sponsored job listings (employer-direct) at $50–200/week per slot add on top o
 | 22 | White-label / agency tier | `feature` | Medium | $500–2,000/mo per agency client |
 | 23 | AI career copilot | `feature` | Medium | Primary Premium value prop for job seekers |
 | 24 | Automated outreach sequences (#15) | `feature` | Medium | Primary upsell lever for recruiter Pro tier |
+
+---
+
+## Pricing Page Gap Implementation Log
+
+Analysis of the pricing page (Job Seeker / Recruiter / Employer personas, Free vs Premium) against the codebase, completed 2026-03-23. All 20 gaps have been addressed.
+
+| # | Feature | Persona | Status | Implementation |
+|---|---------|---------|--------|----------------|
+| 1 | Calendar Integration | Recruiter / Employer | ✅ Done | `schema/calendar.ts` — `calendarConnections`, `scheduledEvents`, `availabilitySlots`; `GET/POST /api/calendar/events`, availability, and connections |
+| 2 | API Key Management | All | ✅ Done | `schema/apikeys.ts` — prefix + SHA-256 hash; key shown once at creation; `GET/POST /api/apikeys`, `DELETE/PATCH /api/apikeys/:id` |
+| 3 | Hiring & Onboarding | Employer | ✅ Done | `schema/onboarding.ts` — offer letters, checklists, tasks; completion % auto-computed; `GET/POST /api/hiring/offers`, `/checklists` |
+| 4 | Performance Management | Employer | ✅ Done | `schema/performance.ts` — cycles, reviews, goals/OKRs; `GET/POST /api/performance/cycles`, `/reviews`, `/goals` |
+| 5 | Automated Follow-ups | Recruiter | ✅ Done | `schema/followups.ts` — sequences, steps, enrollments, logs; `nextSendAt` from first step delay; `GET/POST /api/followups/sequences`, `/enroll` |
+| 6 | Hiring Success Metrics | Employer | ✅ Done | Employer dashboard now queries real `jobItems`, `jobApplications`, `placements`; `GET /api/dashboard/employer` |
+| 7 | Time-to-Hire Analytics | Employer | ✅ Done | Avg days to fill computed from placement `startDate`/`endDate`; included in employer dashboard |
+| 8 | Career Progress Tracking | Job Seeker | ✅ Done | Monthly application trend (6 months) + interview practice scores; `GET /api/dashboard/career-progress` (Premium-gated) |
+| 9 | Employee Community | Employer | ✅ Done | Posts in `feedPosts` with `privacy=Private` + `company:{id}:{channel}` tags; `GET/POST/DELETE /api/community/posts`, `/channels` |
+| 10 | Exclusive Job Boards + Bidding | Employer | ✅ Done | `schema/jobboards.ts` — boards + bids; `GET /api/boards/exclusive`, `GET/POST/DELETE /api/boards/bids` |
+| 11 | AI Usage Enforcement | All | ✅ Done | `checkAIUsage` applied to `match.ts`, `interview.ts`, `resume-scorer.ts`, `resume-optimizer.ts` |
+| 12 | Video Templates | All | ✅ Done | 3 free templates + 5 Premium (1080p, cinematic, branded); subscription-gated; `GET /api/studio/templates` |
+| 13 | Dashboard Real Data | All | ✅ Done | All three role dashboards rewritten with real DB queries using `Promise.all`; `GET /api/dashboard/jobseeker|recruiter|employer` |
+| 14 | Interview Scheduling | Recruiter | ✅ Done | AI question generation gated via `checkAIUsage`; `POST /api/interview/questions` |
+| 15 | Smart Outreach | Recruiter | ✅ Done | Full follow-up sequence backend (gap 5) covers this |
+| 16 | Smart Notifications | All | ✅ Done | Priority score per notification (type weight + recency + unread bonus); `GET /api/notifications/smart` (Premium-gated) |
+| 17 | Salary Gating | Job Seeker | ✅ Done | Already enforced via `requirePremium` in `salary.ts` — no change needed |
+| 18 | Message Personalization | Recruiter | ✅ Done | Free: generic template; Premium: LLM-personalized outreach by recipient/role/tone; `POST /api/messages/personalize` |
+| 19 | AI Job Matching Tiers | All | ✅ Done | New Premium-only deep analysis: skill gaps, seniority fit, career trajectory, interview tips, certifications; `POST /api/match/insights` |
+| 20 | Team Size Limits | Employer | ✅ Done | Already enforced via `checkTeamSize` in `account.ts` — no change needed |
+
+> **Note:** Gaps 1–10 required new schema files (`schema/calendar.ts`, `apikeys.ts`, `onboarding.ts`, `performance.ts`, `followups.ts`, `jobboards.ts`) — run `npm run db:push` to apply migrations before deploying.

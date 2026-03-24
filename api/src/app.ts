@@ -49,6 +49,13 @@ import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
+import { apiKeyRoutes } from "./routes/apikeys.js";
+import { followUpRoutes } from "./routes/followups.js";
+import { hiringOnboardingRoutes } from "./routes/onboarding-hiring.js";
+import { performanceRoutes } from "./routes/performance.js";
+import { calendarRoutes } from "./routes/calendar.js";
+import { exclusiveBoardRoutes } from "./routes/exclusive-boards.js";
+import { communityRoutes } from "./routes/community.js";
 export function createApp() {
   const app = new Hono();
 
@@ -258,6 +265,13 @@ export function createApp() {
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
   app.route("/api/ads", adsRoutes);
+  app.route("/api/apikeys", apiKeyRoutes);
+  app.route("/api/followups", followUpRoutes);
+  app.route("/api/hiring", hiringOnboardingRoutes);
+  app.route("/api/performance", performanceRoutes);
+  app.route("/api/calendar", calendarRoutes);
+  app.route("/api/boards", exclusiveBoardRoutes);
+  app.route("/api/community", communityRoutes);
 
   // Legacy frontend service currently requests /FeatureFlag without /api prefix.
   app.route("/featureflag", featureFlagRoutes);

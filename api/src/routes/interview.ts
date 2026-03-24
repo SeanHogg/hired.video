@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
+import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -174,6 +175,9 @@ function canUseObjectStorage(): boolean {
 // POST /api/interview/questions
 // Generate interview questions from a job description (no session created)
 interviewRoutes.post("/questions", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = GenerateQuestionsSchema.safeParse(body);
 
@@ -352,6 +356,9 @@ interviewRoutes.post("/sessions/:id/answers", async (c) => {
 // POST /api/interview/answers/:answerId/analyze
 // Run AI analysis on a single answer
 interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const user = c.var.user;
   const answerId = c.req.param("answerId");
   const db = getDb();
