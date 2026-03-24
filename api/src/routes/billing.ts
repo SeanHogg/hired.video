@@ -38,7 +38,7 @@ billingRoutes.get("/invoices", async (c) => {
 billingRoutes.get("/ai-usage/month", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  return c.json(ok(await billingService.getMonthlyAIUsage(userId)), 200);
+  return c.json(ok(await billingService.getAIUsageForUser(userId)), 200);
 });
 
 billingRoutes.post("/refund-request", async (c) => {

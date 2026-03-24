@@ -48,6 +48,7 @@ import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
 import { oauthRoutes } from "./routes/oauth.js";
+import { adsRoutes } from "./routes/ads.js";
 export function createApp() {
   const app = new Hono();
 
@@ -140,10 +141,14 @@ export function createApp() {
   // POST/PATCH/DELETE to these paths still require auth via the route handlers.
   const PUBLIC_LISTING_ROUTE = /^\/api\/(?:job|jobs|companies|compan(?:y|ies))(?:$|\/(?!me$|me\/))/i;
 
+  // Ad config is public (anonymous users see ads) but Premium check requires
+  // optional auth so logged-in Premium users get adsEnabled: false.
+  const ADS_CONFIG_ROUTE = /^\/api\/ads\/config$/;
+
   app.use("/api/*", async (c, next) => {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path))) {
+    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) {
       return optionalAuthMiddleware(c as any, next);
     }
     return authMiddleware(c as any, next);
@@ -157,7 +162,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path))) return next();
+    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
 
@@ -168,7 +173,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path))) return next();
+    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return passwordChangeMiddleware(c as any, next);
   });
 
@@ -252,6 +257,7 @@ export function createApp() {
   app.route("/api/valueproposition", valuePropositionRoutes);
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
+  app.route("/api/ads", adsRoutes);
 
   // Legacy frontend service currently requests /FeatureFlag without /api prefix.
   app.route("/featureflag", featureFlagRoutes);

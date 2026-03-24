@@ -119,6 +119,40 @@ export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO
   };
 }
 
+export async function getPremiumAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+  const db = getDb();
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const [row] = await db
+    .select({ used: sum(aiUsageRecords.totalTokens) })
+    .from(aiUsageRecords)
+    .where(
+      and(
+        eq(aiUsageRecords.userId, userId),
+        gte(aiUsageRecords.createdAt, periodStart),
+        lt(aiUsageRecords.createdAt, periodEnd),
+      ),
+    );
+
+  const used = Number(row?.used ?? 0);
+  return {
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth() + 1,
+    used,
+    limit: null,
+    remaining: null,
+    isUnlimited: true,
+  };
+}
+
+/** Returns correct usage DTO based on the user's subscription tier. */
+export async function getAIUsageForUser(userId: string): Promise<AIUsageMonthDTO> {
+  const sub = await getSubscription(userId);
+  return sub.isPremium ? getPremiumAIUsage(userId) : getMonthlyAIUsage(userId);
+}
+
 export async function deletePaymentMethod(userId: string, paymentMethodId: string): Promise<string> {
   const db = getDb();
   const [existing] = await db

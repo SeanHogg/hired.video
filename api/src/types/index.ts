@@ -22,6 +22,15 @@ export interface Env {
   HELCIM_ACCOUNT_ID?: string;
   HELCIM_API_TOKEN?: string;
   HELCIM_WEBHOOK_TOKEN?: string;
+  // Google AdSense
+  ADSENSE_PUBLISHER_ID?: string;        // ca-pub-XXXXXXXXXXXXXXXX
+  AD_SLOT_DASHBOARD_BANNER?: string;
+  AD_SLOT_DASHBOARD_SIDEBAR?: string;
+  AD_SLOT_JOBS_BANNER?: string;
+  AD_SLOT_JOBS_SIDEBAR?: string;
+  AD_SLOT_PEOPLE_BANNER?: string;
+  AD_SLOT_PROFILE_SIDEBAR?: string;
+  AD_SLOT_RESUME_BANNER?: string;
 }
 
 // ── Hono context variables ───────────────────────────────────────────────────

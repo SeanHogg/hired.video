@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { checkTeamSize } from "../middleware/tierEnforcement.js";
 import {
   acceptInvitation,
   bulkInviteUsers,
@@ -44,6 +45,8 @@ accountRoutes.get("/users", async (c) => {
 accountRoutes.post("/invite", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const limitError = await checkTeamSize(c as any);
+  if (limitError) return limitError;
   const request = await c.req.json();
   return c.json(await inviteAccountUser(request, userId), 200);
 });
@@ -114,6 +117,8 @@ accountRoutes.get("/analytics", async (c) => {
 accountRoutes.post("/bulk-invite", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const limitError = await checkTeamSize(c as any);
+  if (limitError) return limitError;
   return c.json(await bulkInviteUsers(userId, await c.req.json()), 200);
 });
 

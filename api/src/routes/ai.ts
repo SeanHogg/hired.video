@@ -4,6 +4,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
+import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
 
@@ -67,6 +68,9 @@ aiRoutes.post("/context", async (c) => {
 aiRoutes.post("/chat", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => ({}));
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";

@@ -167,8 +167,8 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 | `auth.ts` | ✅ Complete | JWT verification, sets `c.var.user` |
 | `errorHandler.ts` | ✅ Complete | AppError hierarchy, Zod formatting, Sentry |
 | `rateLimiter.ts` | ✅ Complete | In-memory, 100 req/60s per IP |
-| `emailVerified.ts` | ⚠️ Partial | Defined but not actively mounted on routes |
-| `passwordChange.ts` | ⚠️ Partial | Defined but not actively enforced |
+| `emailVerified.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
+| `passwordChange.ts` | ✅ Complete | Applied globally in `app.ts` to all authenticated routes |
 | `requestLogger.ts` | ✅ Complete | HTTP request/response logging |
 
 ### Routes
@@ -206,7 +206,7 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 |-----------|-----------|--------|-------|
 | `jobs.ts` | GET /, /:id, /public, /slug/:slug, /GetSummaryItems, /saved, /alerts, /applications, /user-jobs; POST /, /:id/apply, /:id/save, /createfromfile, /extract, /alerts; PUT /:id, /alerts/:id; DELETE /:id, /:id/save; PATCH /alerts/:id/toggle | ✅ Complete | Full job lifecycle + alerts |
 | `match.ts` | POST /, /analyze, /bycontent, /byid, /tailor | ✅ Complete | Resume-to-job matching |
-| `search.ts` | GET /public | ⚠️ Partial | Single endpoint; legacy has richer search |
+| `search.ts` | GET /public | ⚠️ Partial | Single endpoint; legacy has richer search — see Gap Register #10 |
 
 #### Companies
 
@@ -224,14 +224,14 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 
 | Route File | Endpoints | Status | Notes |
 |-----------|-----------|--------|-------|
-| `messages.ts` | POST /, /message | ⚠️ Partial | Minimal — direct messages only |
+| `messages.ts` | POST /, /message | ⚠️ Partial | Minimal — direct messages only; no conversation threading, read receipts, or history — see Gap Register #45 |
 | `communication.ts` | GET /conversations, /messages, /email-templates, /email-campaigns, /tracking, /stats, /job-boards, /external-contacts; POST /conversations, /messages, /messages/mark-read, /email-templates, /email-campaigns, /email-campaigns/:id/send, /tracking, /job-boards/post, /external-contacts, /follow-ups; PUT /email-templates/:id, /external-contacts/:id; DELETE /email-templates/:id, /external-contacts/:id, /job-boards/postings/:id | ✅ Complete | 318 lines |
 
 #### AI Features
 
 | Route File | Endpoints | Status | Notes |
 |-----------|-----------|--------|-------|
-| `ai.ts` | POST /context | ⚠️ Partial | Single context endpoint; chat/prompt engine not exposed |
+| `ai.ts` | POST /context, /chat, /chat/sessions, /chat/sessions/:id | ✅ Complete | Full AI chat with session persistence, history, usage tracking; `/chat` added after initial table |
 | `value-proposition.ts` | POST /generate/content, /generate/job-content-resume-id, /generate/job-id-resume-content, /generate/job-id-resume-id | ✅ Complete | 4 generation modes |
 | `salary.ts` | POST /analyze, /negotiation-tips | ✅ Complete | Salary calculator |
 | `interview.ts` | GET /sessions, /sessions/:id; POST /sessions, /sessions/:id/answers, /questions, /answers/:answerId/analyze; DELETE /sessions/:id; PATCH /sessions/:id/complete | ✅ Complete | 489 lines |
@@ -252,8 +252,8 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 
 | Route File | Endpoints | Status | Notes |
 |-----------|-----------|--------|-------|
-| `billing.ts` | GET /subscription, /payment-methods, /invoices, /ai-usage/month, /refund-policy, /refund-reasons, /refund-requests; POST /refund-request, /cancel-account | ⚠️ Partial | Routes exist; `billing.ts` service is a stub placeholder |
-| `payment.ts` | DELETE /payment-methods/:id; POST /create-setup-session | ⚠️ Partial | Minimal payment methods; Stripe integration incomplete |
+| `billing.ts` | GET /subscription, /payment-methods, /invoices, /ai-usage/month, /refund-policy, /refund-reasons, /refund-requests; POST /refund-request, /cancel-account | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
+| `payment.ts` | GET /public-key; POST /setup-intent, /save-payment-method, /stripe/webhook, /create-setup-session; DELETE /payment-methods/:id | ✅ Complete | Stripe fully wired — webhook verified, customer IDs persisted |
 
 #### Admin & Affiliates
 
@@ -268,13 +268,13 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 |-----------|-----------|--------|-------|
 | `upload.ts` | POST /, /image, /single, /video; DELETE /:key | ✅ Complete | S3/R2 upload handling |
 | `youtube.ts` | GET /account, /auth-url, /company/auth-url, /company/status; POST /callback, /disconnect, /publish/:videoId | ✅ Complete | YouTube OAuth + publishing |
-| `linkedin-post.ts` | POST /linkedin-post | ⚠️ Partial | Basic post endpoint; no OAuth flow |
+| `linkedin-post.ts` | POST /linkedin-post | ⚠️ Partial | Basic post endpoint; no OAuth flow — see Gap Register #9 |
 | `locations.ts` | GET /countries, /states, /cities, /search | ✅ Complete | Reference data |
 | `og.ts` | GET /v/:videoId | ✅ Complete | Open Graph metadata |
 | `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
-| `feature-flag.ts` / `featureflag.ts` | GET / | ⚠️ Duplicate | Two route files for same feature — consolidation needed |
-| `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ⚠️ Stub | SignalR-style stubs; no WebSocket implementation |
-| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ⚠️ Partial | Basic structure; no campaign execution |
+| `featureflag.ts` | GET / | ✅ Complete | Orphaned duplicate `feature-flag.ts` deleted; static flag evaluation |
+| `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ✅ Complete | SSE stream live; `POST /negotiate` returns transport descriptor |
+| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ⚠️ Stub | Basic structure only; no campaign execution or lead capture logic — see Gap Register #43 |
 
 ### Services
 
@@ -286,7 +286,7 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 | `job.ts` | 257 | ✅ Complete | Job management: create, update, archive, search |
 | `company.ts` | 84 | ✅ Complete | Company CRUD, follow/unfollow, trending |
 | `settings.ts` | 76 | ✅ Complete | User preference read/write |
-| `billing.ts` | 106 | ❌ Stub | Placeholder with no business logic implemented |
+| `billing.ts` | 106 | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
 
 ### Database Schema (73 tables in `/api/src/db/schema/`)
 
@@ -357,7 +357,7 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `GET /api/resume/GetResumesOwnedByAuthUser` | Master/variation hierarchy | ResumeInformation, MetaResume | ✅ |
 | | `POST /api/resume/Save` | Create/update resume JSON | ResumeInformation | ✅ |
 | | `POST /api/resume/Parse` | PDF/DOCX → structured JSON via AI | ResumeInformation | ✅ |
-| | `POST /api/resume/CreateFromFile` | Upload → parse → create + queue matching | ResumeInformation, QueueJobToResume | ⚠️ File parsing works; background queue not processed |
+| | `POST /api/resume/CreateFromFile` | Upload → parse → create + queue matching | ResumeInformation, QueueJobToResume | ⚠️ File parsing works; background queue not processed — see Gap Register #3 |
 | | `POST /api/resume/Summarize` | AI-generated summary via LLM | ResumeInformation | ✅ |
 | | `POST /api/resume/SentimentPrediction` | ML sentiment score | ResumeSentiment | ✅ (LLM-based instead of ML.NET) |
 | | `DELETE /api/resume/:id` | Owner-only delete | ResumeInformation | ✅ |
@@ -438,7 +438,7 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `PUT /api/users/connections/:id/accept` | Accept request | UserConnections | ✅ |
 | | `DELETE /api/users/connections/:id` | Reject/remove connection | UserConnections | ✅ |
 | | `GET /api/users/:id/resumes` | User's public resumes | ResumeInformation | ✅ |
-| | `POST /api/users/me/avatar` | Avatar upload (max 5MB, jpg/png/gif/webp) | UserProfiles | ⚠️ Upload route exists; avatar-specific validation not confirmed |
+| | `POST /api/users/me/avatar` | Avatar upload (max 5MB, jpg/png/gif/webp) | UserProfiles | ⚠️ Upload route exists; avatar-specific validation not confirmed — see Gap Register #46 |
 | **FeedController** | `GET /api/feed/posts` | Paginated feed | FeedPosts | ✅ `routes/feed.ts` |
 | | `POST /api/feed/posts` | Create post | FeedPosts | ✅ |
 | | `PUT /api/feed/posts/:id` | Edit post | FeedPosts | ✅ |
@@ -512,11 +512,11 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `POST /api/billing/refund-request` | Create refund request | RefundRequests | ✅ |
 | | `GET /api/billing/refund-requests` | List user's refunds | RefundRequests | ✅ |
 | | `POST /api/billing/cancel-account` | Account cancellation request | RefundRequests | ✅ |
-| **PaymentController** | `POST /api/payment/stripe/webhook` | Handle Stripe events (subscription updates, payment success/fail) | BillingEvents, Subscriptions | ❌ **Not implemented — critical for Stripe** |
-| | `GET /api/payment/public-key` | Return Stripe publishable key | — | ❌ Not implemented |
-| | `POST /api/payment/setup-intent` | Create Stripe SetupIntent | — | ❌ Not implemented |
-| | `POST /api/payment/save-payment-method` | Store Stripe payment method | PaymentMethods | ❌ Not implemented |
-| | `POST /api/payment/create-setup-session` | Stripe checkout setup session | — | ⚠️ Returns redirect URL; no real Stripe SDK call |
+| **PaymentController** | `POST /api/payment/stripe/webhook` | Handle Stripe events (subscription updates, payment success/fail) | BillingEvents, Subscriptions | ✅ `routes/payment.ts` — signature verified; handles subscription lifecycle, invoice sync, affiliate conversions, payouts |
+| | `GET /api/payment/public-key` | Return Stripe publishable key | — | ✅ Returns `STRIPE_PUBLISHABLE_KEY` env var |
+| | `POST /api/payment/setup-intent` | Create Stripe SetupIntent | — | ✅ Creates SetupIntent, returns `clientSecret` |
+| | `POST /api/payment/save-payment-method` | Store Stripe payment method | PaymentMethods | ✅ Attaches PM to customer, upserts to DB, sets default |
+| | `POST /api/payment/create-setup-session` | Stripe checkout setup session | — | ✅ Stripe checkout session with redirect URLs |
 | | `DELETE /api/payment/payment-methods/:id` | Delete payment method | PaymentMethods | ✅ DB-delete with ownership check |
 
 ### AI Features
@@ -544,8 +544,8 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `POST /api/userdashboard/profile-view` | Track profile view | ProfileViews | ✅ |
 | | `POST /api/userdashboard/activity` | Log user activity | ActivityLogs | ✅ |
 | | `GET /api/userdashboard/engagement` | Engagement metrics | UserEngagementMetrics | ✅ |
-| **ProductDashboardController** | `GET /api/productdashboard/saas-metrics` | MRR, churn, ARR | Subscriptions, Invoices | ⚠️ Admin routes exist; SaaS metrics calculation not confirmed |
-| | `GET /api/productdashboard/time-series/:metric` | Time-series analytics | ActivityLogs | ⚠️ Not confirmed implemented |
+| **ProductDashboardController** | `GET /api/productdashboard/saas-metrics` | MRR, churn, ARR | Subscriptions, Invoices | ⚠️ Admin routes exist; SaaS metrics calculation not confirmed — see Gap Register #39 |
+| | `GET /api/productdashboard/time-series/:metric` | Time-series analytics | ActivityLogs | ⚠️ Not confirmed implemented — see Gap Register #39 |
 | | `POST /api/productdashboard/refund-requests/:id/approve` | Admin approve refund | RefundRequests | ✅ `routes/admin.ts` |
 | | `POST /api/productdashboard/cancellation-requests/:id/approve` | Admin approve cancellation | RefundRequests | ✅ |
 | **AffiliateController** | `GET /api/affiliate/profile` | Affiliate profile | AffiliateProfiles | ✅ `routes/affiliates.ts` |
@@ -566,8 +566,8 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `POST /api/passwordmanagement/force-change` | Admin force reset | Users | ✅ |
 | **TaskController** | Task CRUD | Create/update/delete tasks | Tasks | ✅ `routes/task.ts` |
 | **UploadController** | File uploads | S3/R2 upload with validation | — | ✅ `routes/upload.ts` |
-| **MarketingController** | `GET /api/marketing/campaigns` | Campaign listing | — | ⚠️ Stub in TS API |
-| | `POST /api/marketing/leads` | Capture lead | — | ⚠️ Stub in TS API |
+| **MarketingController** | `GET /api/marketing/campaigns` | Campaign listing | — | ⚠️ Stub in TS API — see Gap Register #38 |
+| | `POST /api/marketing/leads` | Capture lead | — | ⚠️ Stub in TS API — see Gap Register #38 |
 | **FeatureFlagController** | `GET /api/featureflag` | Feature flag states | — | ✅ `routes/featureflag.ts` (static) |
 | **SearchController** | `GET /api/search/public` | Multi-entity search | ResumeInformation, Jobs, UserProfiles, CompanyProfiles | ✅ `routes/search.ts` |
 | **YouTubeController** | YouTube OAuth + publish | YouTube API integration | YoutubeAccounts | ✅ `routes/youtube.ts` |
@@ -598,20 +598,20 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 
 **Short answer: Not yet — Stripe is the blocker.**
 
-The TypeScript API covers ~89% of the legacy surface area. A re-verification confirms the following gaps still exist:
+The TypeScript API covers ~89% of the legacy surface area. All remaining legacy-parity gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) (`legacy-parity` type). The Stripe blocker items below have since been resolved.
 
-| Missing | Risk | Workaround / Status |
-|---------|------|---------------------|
-| `POST /payment/stripe/webhook` | **🔴 High** — subscriptions won't update on payment events | Must implement before removing legacy |
-| `GET /payment/public-key` | **🔴 High** — Stripe.js can't initialise without publishable key | Must implement before removing legacy |
-| `POST /payment/setup-intent` | **🔴 High** — card enrollment UI is broken | Must implement before removing legacy |
-| `POST /payment/save-payment-method` | **🔴 High** — can't attach cards to customers | Must implement before removing legacy |
-| `GET /api/export/csv` + `GET /api/export/excel` | 🟡 Medium | JSON export available at `/api/settings/export`; add CSV serialisation |
-| Recruiter bulk ops (`bulk/tags`, `bulk/status`, `bulk/delete`) | 🟡 Medium | Per-record operations work; bulk is a UX convenience |
-| `GET /api/recruiter/talent-pool/export` | 🟢 Low | Easy to add |
-| `POST /api/passwordmanagement/validate-history` | 🟢 Low | Schema has `passwordHistories` table; straightforward add |
-| `GET /api/passwordmanagement/is-expired` | 🟢 Low | Straightforward add |
-| `GET /api/resume/:id/diff` | 🟢 Low | Nice-to-have for variation workflow |
+| Missing | Risk | Status |
+|---------|------|--------|
+| `POST /payment/stripe/webhook` | **🔴 High** | ✅ Implemented |
+| `GET /payment/public-key` | **🔴 High** | ✅ Implemented |
+| `POST /payment/setup-intent` | **🔴 High** | ✅ Implemented |
+| `POST /payment/save-payment-method` | **🔴 High** | ✅ Implemented |
+| `GET /api/export/csv` + `GET /api/export/excel` | 🟡 Medium | Open — see Gap Register #31 |
+| Recruiter bulk ops (`bulk/tags`, `bulk/status`, `bulk/delete`) | 🟡 Medium | Open — see Gap Register #32 |
+| `GET /api/recruiter/talent-pool/export` | 🟢 Low | Open — see Gap Register #33 |
+| `POST /api/passwordmanagement/validate-history` | 🟢 Low | Open — see Gap Register #34 |
+| `GET /api/passwordmanagement/is-expired` | 🟢 Low | Open — see Gap Register #35 |
+| `GET /api/resume/:id/diff` | 🟢 Low | Open — see Gap Register #36 |
 | Chrome extension endpoints (`ChromeController`) | ✅ None — marked `[Obsolete]` in legacy | Fully replaced by `/api/match/*` |
 | OData endpoints (ApplicationUsers/Roles) | ✅ None | Not needed for edge runtime |
 
@@ -662,7 +662,7 @@ interface PaymentProvider {
 | File | Provider | Status |
 |------|----------|--------|
 | `api/src/services/payment/stripe.ts` | Stripe | ✅ Full implementation |
-| `api/src/services/payment/helcim.ts` | Helcim | ⚠️ Stub — API calls documented; card deletion unavailable via Helcim v2 API |
+| `api/src/services/payment/helcim.ts` | Helcim | ⚠️ Stub — API calls documented; card deletion unavailable via Helcim v2 API — see Gap Register #47 |
 
 ### Switching Providers
 
@@ -703,6 +703,8 @@ Provider-specific event strings are mapped to generic `NormalizedEventType` valu
 
 ## Gap Analysis vs. Legacy API
 
+Open gaps identified in this section are tracked in the [Consolidated Gap Register](#consolidated-gap-register) at the bottom of this document.
+
 ### Architecture & Cross-Cutting Concerns
 
 | Concern | Legacy (.NET) | Current (TypeScript/Hono) | Gap |
@@ -723,32 +725,7 @@ Provider-specific event strings are mapped to generic `NormalizedEventType` valu
 | **Email Verification Guard** | ✅ Enforced middleware | ✅ `emailVerifiedMiddleware` applied to all authenticated routes | Low |
 | **Password Change Enforcement** | ✅ Enforced on first login | ✅ `passwordChangeMiddleware` applied to all authenticated routes | Low |
 
-### Feature-Level Gaps
-
-| Feature | Legacy | Current | Gap |
-|---------|--------|---------|-----|
-| **Search** | Multi-entity search (Elasticsearch implied) | Single `/search/public` endpoint | **High** — Full-text/faceted search not implemented |
-| **Billing / Stripe** | ✅ Stripe.NET full integration | ⚠️ DB-backed service (subscription, invoices, payment methods, refunds); Stripe SDK not wired | Medium — Data layer complete; payment processing needs Stripe keys |
-| **LinkedIn OAuth** | ✅ Full OAuth flow | ⚠️ Single `POST /linkedin-post`; no OAuth | **High** |
-| **Chrome Extension API** | ✅ `ChromeController` (deprecated) | ✅ `POST /api/match/analyze`, `POST /api/match/tailor`, `GET /api/resume/mastergroups`, `POST /api/resume/:id/createvariation`, `GET /api/resume/:id/export` | Low — all extension-facing routes implemented |
-| **AI Chat / Prompt Engine** | ✅ `ChatController`, `PromptController` | ✅ `POST /api/ai/chat` with session tracking, history, usage recording; `GET /sessions`, `GET /sessions/:id`, `DELETE /sessions/:id` | Low |
-| **ML Sentiment** | ✅ Dedicated ML.NET model (`Microsoft.ML`) | ✅ LLM-based via OpenRouter | Low — Different approach, same outcome |
-| **Data Export** | ✅ Excel export via `DocumentFormat.OpenXml` | ✅ `GET /api/settings/export` returns JSON export of account, profile, resumes, applications, saved jobs | Low — JSON vs Excel; exportable data complete |
-| **OData Queries** | ✅ Microsoft.AspNetCore.OData | ❌ Not applicable (Hono/REST only) | Low — Not needed for edge runtime |
-
-### Code Quality Issues (Current API)
-
-| Issue | Location | Status |
-|-------|----------|--------|
-| ~~Duplicate feature flag routes~~ | ~~`routes/feature-flag.ts` + `routes/featureflag.ts`~~ | ✅ Resolved — orphaned `feature-flag.ts` deleted |
-| ~~Case-inconsistent endpoint naming~~ | ~~`GetSummaryItems` vs `getsummaryitems` in `jobs.ts`~~ | ✅ Resolved — shared handler, both aliases preserved for compat |
-| ~~`billing.ts` service is entirely stubbed~~ | ~~`services/billing.ts`~~ | ✅ Resolved — real DB queries for subscriptions, invoices, payment methods, AI usage |
-| ~~Email verification not enforced~~ | ~~`middleware/emailVerified.ts` unused~~ | ✅ Resolved — applied globally in `app.ts` |
-| ~~Password change not enforced~~ | ~~`middleware/passwordChange.ts` unused~~ | ✅ Resolved — applied globally in `app.ts` |
-| Business logic in route handlers | Most route files — should be in service layer | Open — Medium |
-| No repository abstraction | Drizzle queries scattered across routes and services | Open — Medium |
-| No OpenAPI/Swagger documentation | Entire API | Open — **High** |
-| Zero automated tests | Entire API | Open — **High** |
+Open feature and quality gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) at the bottom of this document.
 
 ---
 
@@ -1060,14 +1037,7 @@ The frontend is a static SPA deployable to any CDN (Cloudflare Pages, Vercel, Ne
 
 ## Known Issues & Priorities
 
-### Open (not yet addressed)
-
-1. **No tests** — Zero automated test coverage. The legacy `.NET` project has a dedicated test suite that should inform a Vitest/hono-test setup.
-2. **No OpenAPI/Swagger** — Consider `@hono/swagger-ui` + `zod-openapi`; the existing Zod schemas can generate specs with minimal effort.
-3. **Stripe payment processing** — `services/billing.ts` now queries the DB for subscriptions and invoices, but `createSetupSession` and payment method sync still need the Stripe SDK wired up.
-4. **Business logic in route handlers** — Most domain logic is inlined in route files. Extracting to service functions would improve testability and DRY compliance.
-5. **No background workers** — Queue tables (`queueJobToResume`, `queueJobToProcess`) exist in schema but nothing processes them. Video generation may depend on this.
-6. **LinkedIn OAuth** — Only `POST /linkedin-post` exists. Full OAuth callback flow needed to match legacy.
+Open gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) at the bottom of this document.
 
 ### Recently Fixed
 
@@ -1177,36 +1147,243 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 ---
 
-## Roadmap: Pricing Page Feature Gaps
+## Consolidated Gap Register
 
-The following items are listed on the pricing page but are not yet (or only partially) implemented. They are grouped by severity: **Not Implemented** (❌) are blockers to honest pricing representation; **Partial** (⚠️) are implemented at surface level but lack tier enforcement, AI uplift, or advanced functionality.
+All known gaps across architecture, code quality, features, billing enforcement, and legacy parity in one place. De-duplicated from the sections above.
 
-### ❌ Not Implemented — Hard Gaps
+| # | Gap | Type | Severity | Notes |
+|---|-----|------|----------|-------|
+| 1 | **No automated tests** | `arch` | 🔴 High | Zero coverage across API and frontend. Legacy `.NET` project has a test suite that should inform a Vitest/hono-test setup. |
+| 2 | **No OpenAPI / Swagger** | `arch` | 🔴 High | No developer portal, no spec. `@hono/swagger-ui` + `zod-openapi` can auto-generate from existing Zod schemas with minimal effort. |
+| 3 | **No background job workers** | `arch` | 🔴 High | `queueJobToResume` and `queueJobToProcess` tables exist in schema; nothing processes them. Video generation and async tasks depend on this. |
+| 4 | **Business logic in route handlers** | `quality` | 🟡 Medium | Most domain logic is inlined in route files instead of extracted to service functions, reducing testability and DRY compliance. |
+| 5 | **No repository abstraction** | `arch` | 🟡 Medium | Drizzle queries are scattered directly across route and service files. A formal data-access layer would improve testability and consistency. |
+| 6 | **Structured logging** | `arch` | 🟡 Medium | Only `console.*` + Sentry. Legacy used Serilog with file, DB, and NewRelic sinks. A structured log pipeline (e.g. Workers Logpush → Datadog/Logtail) is absent. |
+| 7 | **Dynamic feature flags** | `arch` | 🟡 Medium | A static stub route exists. Legacy used Split.io for runtime flag evaluation. No dynamic flag evaluation is implemented. |
+| 8 | **Caching layer** | `arch` | 🟡 Medium | Stateless edge workers have no shared cache. Legacy used HybridCache (in-memory + distributed). Cache-aside for expensive queries (search, matching) is missing. |
+| 9 | **LinkedIn OAuth** | `feature` | 🔴 High | Only `POST /api/linkedin-post` exists. The full OAuth callback flow (token exchange, profile fetch, account link) required to match legacy is not implemented. |
+| 10 | **Full-text / faceted search** | `feature` | 🔴 High | Legacy implied Elasticsearch-level multi-entity search. Current API has only a single `/api/search/public` endpoint with no full-text or faceted filtering. |
+| 11 | **Calendar integration** | `feature` | 🔴 High | Google Calendar / Outlook / Calendly sync for interview scheduling — availability slots, booking links, calendar event creation. No schema or routes exist. |
+| 12 | **API key management** | `feature` | 🔴 High | User-facing API key generation, revocation, and scoped permissions. Developer portal / documentation for external integrations not built. |
+| 13 | **Hiring & onboarding offers** | `feature` | 🔴 High | Offer letter creation, e-signature flow, onboarding task checklist. Requires new schema tables and routes. |
+| 14 | **Performance management** | `feature` | 🟡 Medium | Employee performance reviews, OKR goal-setting, 1:1 notes, review cycles. No schema or routes exist. |
+| 15 | **Automated outreach follow-ups** | `feature` | 🟡 Medium | Drip/sequence logic for recruiter outreach — trigger follow-up emails based on elapsed time or recipient behaviour (open, click, no reply). |
+| 16 | **Hiring success metrics** | `feature` | 🟡 Medium | Dashboard analytics for offer acceptance rate, pipeline-stage conversion, source-of-hire breakdown, and fill rate. |
+| 17 | **Time-to-hire analytics** | `feature` | 🟡 Medium | Track and visualise elapsed time from job open → application → interview → offer → placement per role and team. |
+| 18 | **Career progress tracking** | `feature` | 🟡 Medium | Goal-setting and milestone tracking for job seekers — target roles, skills to acquire, application targets, interview conversion rates over time. |
+| 19 | **Employer internal community** | `feature` | 🟡 Medium | Employer-gated internal community with structured channels (announcements, engagement). The existing social feed is public/professional, not employer-scoped. |
+| 20 | **Exclusive job boards + bidding** | `feature` | 🟡 Medium | Marketplace of exclusive job boards with bid/slot-based posting. `jobBoards` tables support basic posting only — no exclusivity or auction logic. |
+| 21 | **Subscription tier enforcement** | `billing` | 🔴 High | `usageRecords` and `subscriptionPlans` exist and AI usage is tracked, but hard Free-tier limits (request caps, applicant caps, team size caps) are not applied consistently at route level. |
+| 22 | **Salary calculator gated to Premium** | `billing` | 🟡 Medium | `salary.ts` routes are open to all users. Per pricing page, the Salary Calculator is Premium-only — Free users should see a paywall prompt. |
+| 23 | **AI message personalisation tiers** | `billing` | 🟡 Medium | Personalisation endpoints exist but Basic vs Advanced split is not enforced. Rate limits and capability differences must be applied per subscription tier. |
+| 24 | **Priority / AI-enhanced job matching** | `billing` | 🟡 Medium | All users receive identical matching logic. Premium tier should use a deeper analysis pass with re-ranking and explanations; Free gets a lighter version. |
+| 25 | **Team size / admin user limits** | `billing` | 🟡 Medium | Invitation system works but no hard cap at route level. Free accounts should be blocked from inviting a 3rd+ team member without upgrading. |
+| 26 | **Advanced video templates** | `billing` | 🟡 Medium | Storyboard generation is open to all users. A Premium-exclusive styled template library needs to be built and gated behind a subscription check. |
+| 27 | **Advanced dashboard analytics + AI insights** | `billing` | 🟡 Medium | All users see the same dashboard data. Premium should surface AI-generated narrative insights; Free sees raw metrics only. |
+| 28 | **Advanced interview scheduling + automation** | `billing` | 🟡 Medium | AI interview practice works. Missing: calendar-based scheduling of real interviews (slot selection, invitations, reminders, rescheduling) gated to Premium. |
+| 29 | **Smart outreach campaigns** | `billing` | 🟡 Medium | Email campaigns are implemented. "Smart" means behaviour-triggered sequences (follow up if no open in 3 days, personalise from candidate data). This automation layer is absent. |
+| 30 | **AI-powered smart notifications** | `billing` | 🟢 Low | SSE stream is live. Premium should AI-rank and prioritise notifications. Currently all notifications are treated equally. |
+| 31 | **CSV / Excel export** | `legacy-parity` | 🟡 Medium | JSON export available at `/api/settings/export`. Needs CSV serialisation added to match legacy `GET /api/export/csv` and `GET /api/export/excel`. |
+| 32 | **Recruiter bulk operations** | `legacy-parity` | 🟡 Medium | Per-record operations work. Bulk tag, status, and delete (`bulk/tags`, `bulk/status`, `bulk/delete`) are not implemented. |
+| 33 | **Recruiter talent-pool export** | `legacy-parity` | 🟢 Low | `GET /api/recruiter/talent-pool/export` is missing. Straightforward to add. |
+| 34 | **Password history validation** | `legacy-parity` | 🟢 Low | `passwordHistories` table exists in schema. `POST /api/passwordmanagement/validate-history` endpoint not implemented. |
+| 35 | **Password expiry check** | `legacy-parity` | 🟢 Low | `GET /api/passwordmanagement/is-expired` endpoint not implemented. Straightforward add. |
+| 36 | **Resume diff / variation compare** | `legacy-parity` | 🟢 Low | `GET /api/resume/:id/diff` not implemented. Nice-to-have for the resume variation workflow. |
+| 37 | **Salary calculator `/industries` endpoint** | `legacy-parity` | 🟢 Low | `GET /api/salarycalculator/industries` exists in legacy but is missing from the TS API. The other salary endpoints are implemented. |
+| 38 | **Marketing routes (campaigns + leads)** | `quality` | 🟢 Low | `marketing.ts` routes exist but are stubs — no campaign execution logic, no real lead capture. Needs business logic wired. |
+| 39 | **ProductDashboard SaaS metrics** | `quality` | 🟡 Medium | `GET /api/productdashboard/saas-metrics` (MRR, churn, ARR) and time-series analytics routes exist under `admin.ts` but the underlying calculation logic has not been verified as implemented. |
+| 40 | **Shareable "Hire Me" public profiles** | `feature` | 🔴 High | Public profile page per user surfacing video, resume, and skills. The data exists in DB; the public-facing route and page are not built. Primary viral distribution vector. |
+| 41 | **Real-time chat (recruiter ↔ candidate)** | `feature` | 🔴 High | SSE notifications are live but recruiter/candidate direct messaging requires chat room creation, message persistence, and a chat UI. |
+| 42 | **OAuth / Social Login (Google + LinkedIn)** | `feature` | 🔴 High | Users strongly prefer one-click auth. Requires new `oauth_accounts` table, `/api/auth/oauth/:provider` + callback routes, and account-linking logic (merge on matching email). LinkedIn is critical for this platform. |
+| 43 | **Magic links (passwordless email login)** | `feature` | 🟡 Medium | One-time login link. `magic_link_tokens` table pattern exists. Needs `POST /api/auth/magic-link` and `GET /api/auth/magic-link/verify?token=` endpoints. |
+| 44 | **Security settings tab** | `feature` | 🟡 Medium | UI and routes to manage connected OAuth accounts, change/add password (for OAuth-only users), 2FA enable/disable, and active session list with per-session revocation. |
+| 45 | **Direct messaging (`messages.ts`) incomplete** | `quality` | 🟡 Medium | `messages.ts` only exposes `POST /` and `POST /message`. No conversation threading, read receipts, message history, or inbox endpoint. `communication.ts` has a fuller conversation model but the simpler messages route is still exposed and incomplete. |
+| 46 | **Avatar upload validation unconfirmed** | `quality` | 🟢 Low | `POST /api/users/me/avatar` route exists but avatar-specific validation (5MB cap, jpg/png/gif/webp restriction) has not been verified as enforced at the route level. |
+| 47 | **Helcim payment provider stub** | `quality` | 🟢 Low | `services/payment/helcim.ts` has documented API calls but is not fully implemented. Card deletion is unavailable via Helcim v2 API. Helcim cannot be used as a production payment provider until the stub is completed. |
+| 48 | **Ad slot components — free tier** | `feature` | 🔴 High | Reusable `<AdSlot>` React component that renders programmatic ads (Google AdSense) for free-tier users and renders nothing for Premium. Free users become revenue-generating from day one without any subscription. |
+| 49 | **Ad-free enforcement for Premium** | `billing` | 🔴 High | API/session must expose an `adsEnabled` flag derived from the user's active subscription. Frontend reads this flag to suppress all ad slots. "No ads" becomes the clearest, most visceral reason to upgrade on the pricing page. |
+| 50 | **Sponsored job listings** | `feature` | 🟡 Medium | Add `sponsored: boolean`, `sponsored_until: timestamp`, and `sponsored_rank_boost` to the jobs schema. Sponsored jobs pin to the top of search and the job feed. Flat-rate or weekly fee paid by employers via existing Stripe flow — direct employer revenue independent of subscriber count. |
+| 51 | **Featured candidate profiles** | `feature` | 🟡 Medium | Add `featured_until: timestamp` to `userProfiles`. Job seekers pay a one-off fee via the existing Stripe setup-intent flow to be highlighted in recruiter search results for 7/14/30 days. One-off purchase with no subscription required. |
+| 52 | **Ad revenue reporting (internal dashboard)** | `quality` | 🟢 Low | Track ad impressions, clicks, and estimated revenue from AdSense in the internal admin dashboard alongside subscription MRR. Required to optimise ad placement and balance revenue against user experience. |
 
-| # | Feature | Persona(s) | Tier | What Needs to Be Built |
-|---|---------|-----------|------|------------------------|
-| 1 | **Calendar Integration** | Job Seeker, Recruiter, Employer | Premium | Google Calendar / Outlook / Calendly sync for interview scheduling. Availability slots, booking links, and calendar event creation. |
-| 2 | **API Access / API Key Management** | Job Seeker, Recruiter, Employer | Premium | User-facing API key generation, revocation, and scoped permissions. Developer portal or documentation for external integrations. |
-| 3 | **Hiring & Onboarding (Offers)** | Recruiter, Employer | Premium | Offer letter creation, e-signature flow, onboarding task checklist. New schema tables and routes required. |
-| 4 | **Performance Management** | Recruiter, Employer | Premium | Employee performance reviews, goal setting (OKRs), 1:1 notes, review cycles. No schema or routes exist. |
-| 5 | **Automated Follow-ups** | Recruiter | Premium | Drip/sequence logic for outreach — trigger follow-up emails based on time elapsed or recipient behaviour (open, click, no reply). |
-| 6 | **Hiring Success Metrics** | Recruiter, Employer | Premium | Dashboard analytics for offer acceptance rate, pipeline-stage conversion rates, source-of-hire breakdown, and fill rate. |
-| 7 | **Time-to-hire Analytics** | Recruiter, Employer | Premium | Track and visualise elapsed time from job open → application → interview → offer → placement per role and team. |
-| 8 | **Career Progress Tracking** | Job Seeker | Premium | Goal-setting and milestone tracking for job seekers: target roles, skills to acquire, application targets, interview conversion rates over time. |
-| 9 | **Employee Community (Engage / Inform / Inspire)** | Employer | Premium | Structured internal community with employer-controlled channels (announcements, engagement, inspiration). The existing social feed is public/professional — not an employer-gated internal community. |
-| 10 | **Exclusive Job Boards + Bidding** | Recruiter | Premium | Marketplace of exclusive job boards with a bid/slot-based posting mechanism. Current `jobBoards` tables support basic posting only — no exclusivity or auction logic. |
+---
 
-### ⚠️ Partial — Implemented but Incomplete or Ungated
+## Revenue Prioritisation — CEO View
 
-| # | Feature | Persona(s) | Tier | What Needs to Be Fixed |
-|---|---------|-----------|------|------------------------|
-| 11 | **Subscription Tier Enforcement** | All | Free + Premium | `usageRecords` and `subscriptionPlans` exist in schema and AI usage is tracked, but hard enforcement of Free-tier limits (10 AI requests/mo, applicant/contact caps, team size caps) is not applied consistently across feature routes. Each route needs to check the user's active subscription before serving Premium-only or over-quota requests. |
-| 12 | **Advanced Video Templates** | All | Premium | Storyboard generation works for all users. A Premium-exclusive template library with styled layouts and branded themes needs to be built and gated behind subscription check. |
-| 13 | **Advanced Dashboard Analytics + AI Insights** | All | Premium | Role dashboards exist but all users see the same data regardless of tier. Premium should surface AI-generated narrative insights (trend explanations, recommendations) while Free sees raw metrics only. |
-| 14 | **Advanced Interview Scheduling + Automation** | All | Premium | AI interview practice sessions work. Missing: calendar-based scheduling of real interviews (slot selection, invitations, reminders, rescheduling), with automation gated to Premium. |
-| 15 | **Smart Outreach Campaigns** | Recruiter | Free + Premium | Email campaigns and templates are implemented. "Smart" means behaviour-triggered sequences (follow up if no open in 3 days, personalise based on candidate data). This automation layer does not exist. |
-| 16 | **AI-Powered Smart Notifications** | All | Premium | SSE notification stream is live. Premium should deliver AI-ranked, prioritised notifications (e.g. surface the most actionable alert first). Currently all notifications are treated equally. |
-| 17 | **Salary Calculator gated to Premium** | All | Free restriction | `salary.ts` routes are accessible to all users. Per the pricing page, the Salary Calculator is a Premium-only feature — Free users should see a paywall/upsell prompt. |
-| 18 | **AI Message Personalization (tier differentiation)** | All | Free + Premium | Personalization endpoints exist but Basic (limited) vs Advanced (unlimited) tier split is not enforced. Rate limiting and capability differences need to be applied based on subscription. |
-| 19 | **Priority / AI-Enhanced Job Matching** | All | Premium | All users currently receive identical matching logic. Premium "AI-Enhanced" matching should use a deeper analysis pass (more context, re-ranking, explanations) while Free gets a lighter-weight version. |
-| 20 | **Team Size / Admin User Limits** | Recruiter, Employer | Free (≤2 members) | Invitation system works but there is no hard cap enforced at the route level. Free accounts should be blocked from inviting a 3rd+ team member without upgrading to Premium. |
+### The Unit Economics Reality
+
+The platform has three personas with very different revenue potential:
+
+| Persona | Realistic ARPU | Paying users needed for $15k MRR |
+|---------|---------------|----------------------------------|
+| Job Seeker (individual) | $15–20 / mo | ~850 |
+| Recruiter (individual) | $50–99 / mo | ~200 |
+| Employer (team) | $200–500 / mo | ~40 |
+
+**The implication is brutal:** one employer account is worth 10–25 job seekers. Every product decision should be evaluated against whether it moves employers and recruiters toward paying — not just job seeker signups.
+
+The current product has all three personas but is structurally optimised for job seekers. The gaps, sorted by revenue impact, tell a different story.
+
+---
+
+### Phase 0 — Stop Giving Away the Product (Week 1–2)
+
+Nothing else matters if paying users get the same product as free users. These are **revenue leaks**, not feature gaps.
+
+| Priority | Gap # | What to Build | Revenue Impact |
+|----------|--------|---------------|----------------|
+| 🔴 P0.1 | #21 | **Enforce subscription tiers at the API level** | Every Premium feature is currently free. No enforcement = zero upgrade incentive. This is the single highest-leverage change in the entire codebase. |
+| 🔴 P0.2 | #22 | **Gate Salary Calculator to Premium** | One of the most-used standalone tools. Paywalling with a visible upsell prompt is the fastest A/B-testable conversion lever. |
+| 🔴 P0.3 | #25 | **Enforce team size limits (≤2 free)** | Every recruiter and employer team beyond 2 members is a free rider. Hard-capping and prompting upgrade converts team admins — your highest-ARPU users. |
+| 🔴 P0.4 | **NEW** | **In-product upgrade prompts + usage meters** | Users need to see what they're missing. Add visible "X of 10 AI requests used", "Upgrade for unlimited matching", and feature-locked UI states. Without this, even enforced limits don't convert — users just stop using the feature. |
+| 🔴 P0.5 | **NEW** | **Annual billing option (20% discount)** | Annual plans improve cash flow, reduce monthly churn, and are psychologically sticky. A user who paid $180 upfront will not cancel in month 3. |
+
+---
+
+### Phase 1 — Fill the Funnel (Week 2–6)
+
+You cannot enforce tiers on users who never signed up. These gaps cap acquisition.
+
+| Priority | Gap # | What to Build | Revenue Impact |
+|----------|--------|---------------|----------------|
+| 🟠 P1.1 | #42 | **Google + LinkedIn OAuth** | Password/email signup has 60–70% drop-off vs OAuth. Every friction point here is a lost conversion. LinkedIn is table-stakes for a hiring platform — recruiters will not create a new password account. |
+| 🟠 P1.2 | #40 | **Shareable "Hire Me" public profiles** | Each profile is a free SEO page and a viral distribution loop. Job seekers share their URL; recruiters click it; recruiters convert. This is how you grow to 850+ paying job seekers without spending on ads. |
+| 🟠 P1.3 | #9 | **LinkedIn OAuth full flow** | Covered partially by P1.1, but specifically: importing LinkedIn profile data on signup fills in the job seeker's profile instantly. A complete profile on day 1 dramatically improves activation and reduces churn. |
+| 🟠 P1.4 | **NEW** | **Freemium activation sequence (onboarding email drip)** | New signups need to hit an "aha moment" within 72 hours. A 3-email sequence — (1) profile completion prompt, (2) first job match, (3) Premium feature showcase — can double 30-day retention and conversion rates. |
+| 🟠 P1.5 | **NEW** | **Resume/profile AI score (free preview, full detail Premium)** | Give every job seeker a score out of 100 for free. Show what's dragging it down only on Premium. This is the single most effective freemium hook in the career space — LinkedIn Premium and Resume.io both use this pattern. |
+
+---
+
+### Phase 2 — Unlock B2B Revenue (Month 1–3)
+
+Employers and recruiters pay 5–25× more than job seekers. The current product does not give them enough value to justify a team subscription.
+
+| Priority | Gap # | What to Build | Revenue Impact |
+|----------|--------|---------------|----------------|
+| 🟡 P2.1 | #10 | **Full-text + faceted candidate search** | This is the core recruiter product. If a recruiter cannot search "React developer, London, 5 years, open to work" and get a ranked list, the entire recruiter plan has no value proposition. No search = no B2B. |
+| 🟡 P2.2 | #16 | **Hiring success metrics dashboard** | Employers and finance teams need to justify the subscription to their CFO. "We filled 8 roles in 45 days at $1,200 per hire vs $8,000 market rate" is the ROI story that renews contracts. Without metrics, you are selling on faith. |
+| 🟡 P2.3 | #17 | **Time-to-hire analytics** | Companion to P2.2. The KPI every recruiter is measured on. Surface it natively and you embed the product into their weekly reporting workflow — the definition of sticky. |
+| 🟡 P2.4 | #11 | **Calendar integration (Google + Outlook)** | Recruiters schedule 5–20 interviews per week. If they have to copy/paste between hired.video and their calendar, they stop using hired.video. Calendar sync is a retention requirement, not a nice-to-have. |
+| 🟡 P2.5 | #41 | **Recruiter ↔ candidate direct messaging** | Outreach that stays inside the platform creates data, enables automation, and makes switching costs real. A recruiter who has sent 200 messages on-platform will not migrate to a competitor. |
+| 🟡 P2.6 | **NEW** | **Employer branding pages** | Companies pay separately for branding. A dedicated company page with custom video, culture content, and job listings — distinct from a plain company profile — is a paid add-on that justifies a higher-tier plan. |
+| 🟡 P2.7 | **NEW** | **ATS integrations (Greenhouse, Lever, Workday)** | Enterprise employers will not abandon their existing ATS. A two-way sync that pushes candidates from hired.video into their ATS removes the biggest objection in an enterprise sales call. This is required to close deals above $500/mo. |
+| 🟡 P2.8 | #13 | **Hiring & onboarding offers** | Closing a hire inside the platform (offer letter, e-signature, onboarding tasks) extends the revenue-generating lifecycle per seat and creates natural upsell moments. |
+
+---
+
+### Phase 3 — Defend and Expand (Month 3–6)
+
+At this point you have revenue. The job is to protect it (reduce churn) and expand it (upsell, cross-sell).
+
+| Priority | Gap # | What to Build | Revenue Impact |
+|----------|--------|---------------|----------------|
+| 🟢 P3.1 | #15 | **Automated recruiter outreach sequences** | Time-based and behaviour-triggered follow-ups are the difference between a $50/mo recruiter plan and a $150/mo "Recruiter Pro" plan. This is the primary upsell lever for the recruiter persona. |
+| 🟢 P3.2 | #18 | **Career progress tracking (job seekers)** | Job seekers who track goals and see progress have dramatically lower churn. A paying job seeker who cancelled is gone — acquire them again costs money. |
+| 🟢 P3.3 | #14 | **Performance management** | Unlocks a "retain employees" use case beyond hiring. Employers who use the platform throughout the employee lifecycle (hire → performance → offboard) are churning from an operating system, not a hiring tool — churn rate drops to near zero. |
+| 🟢 P3.4 | **NEW** | **White-label / agency tier** | Staffing agencies and RPO firms want the product under their own brand to sell to clients. A white-label tier at $500–2,000/mo with 5–20 agency clients is $2,500–$40,000 MRR from a single product SKU change. |
+| 🟢 P3.5 | **NEW** | **Candidate assessments / skills tests** | Premium job seekers and employers both want verified skills. A short skills test (timed, AI-graded) attached to a profile commands higher recruiter attention and justifies a higher plan tier. Codility and HackerRank charge separately for this — bundling it is a competitive advantage. |
+| 🟢 P3.6 | **NEW** | **AI career copilot ("What should I do next?")** | A weekly AI-generated action plan based on the job seeker's activity, matches, and market signals. This single feature can be the primary value justification for the Premium individual plan — without it, Premium is "more of the same". |
+| 🟢 P3.7 | #19 | **Exclusive job boards + bidding** | A marketplace where employers bid for placement creates platform-side revenue (take rate) independent of subscriptions. At scale this becomes the dominant revenue line. |
+| 🟢 P3.8 | #3 | **Background job workers** | Video generation is likely broken. A platform called hired.**video** that cannot generate video reliably will not retain job seekers or convince recruiters the product is serious. |
+
+---
+
+### Features Missing Entirely — Required for Profitability
+
+These do not appear in any existing gap or roadmap entry but are required to operate a profitable SaaS business in this category:
+
+| # | Feature | Why Required |
+|---|---------|-------------|
+| A | **Paywall / upgrade UI components** | No upgrade flow = no conversions regardless of what you gate. Every locked feature needs a modal, a tooltip, and a CTA that routes to checkout. |
+| B | **Trial period (7 or 14 days)** | Premium features need to be experienced before users pay. A time-limited trial with credit card capture converts 3–5× better than a cold paywall. |
+| C | **Usage meters visible to users** | "8 of 10 AI requests used this month" shown in the UI is the most effective passive upsell prompt in SaaS. Users who can see the limit approaching convert at the moment of friction, not after hitting a hard block. |
+| D | **Churn / cancellation flow** | When a user cancels, show them what they lose, offer a pause option, and offer a downgrade. Well-designed cancellation flows save 15–25% of would-be churns. |
+| E | **Referral programme UI** | The affiliate backend exists. A simple "Give a friend 1 month free, get 1 month free" in-product referral loop is the lowest-CAC acquisition channel available. |
+| F | **Employer seat-based billing** | Employers need to add/remove team members and pay per seat. A flat company plan does not scale with the employer and leaves revenue on the table as teams grow. |
+| G | **In-app notifications for billing events** | "Your trial ends in 3 days", "Payment failed — update your card", "You've used 90% of your AI credits". Without these, users churn passively without ever being asked to stay. |
+| H | **Admin revenue dashboard (internal)** | MRR, churn rate, trial-to-paid conversion, ARPU by persona. Without this you cannot make product decisions based on what is actually driving revenue. Gap #39 (ProductDashboard SaaS metrics) partially covers this but needs verification. |
+| I | **"Apply with hired.video" embeddable button** | A one-click button that job boards and company career pages can embed. Every click is a new user acquisition. This is distribution infrastructure, not a feature. |
+| J | **Recruiter talent sourcing / Boolean search** | Recruiters who pay $50–100/mo expect LinkedIn Recruiter-level search. Boolean operators, location radius, skill filters, and saved searches. Without this, the recruiter plan cannot be sold to serious agency recruiters. |
+
+---
+
+### Advertising as a Revenue Stream
+
+Advertising transforms the free tier from a pure cost centre into a direct revenue line. On a hiring platform the audience is exceptionally high-intent — active job seekers, recruiters with open roles, employers with hiring budgets — which commands CPMs 3–5× higher than general consumer audiences. Used correctly, ads make the free tier profitable on its own while simultaneously strengthening the upgrade argument: **"Go Premium to remove ads"** is the oldest, clearest value proposition in consumer software.
+
+#### Ad Revenue Models Available
+
+| Model | Description | Who Pays | Effort |
+|-------|-------------|----------|--------|
+| **Display ads (programmatic)** | Google AdSense / Prebid on free-tier pages. Banner, sidebar, and in-feed placements. Toggle off for Premium users. | Ad networks (CPM) | Low — integrate AdSense or a header-bidding wrapper |
+| **Sponsored job listings** | Employers pay to pin their job to the top of search results and the job feed. Distinct from a Premium subscription — a per-post or weekly/monthly fee. | Employers | Medium — add `sponsored` flag + bidding/flat-rate to job schema |
+| **Featured candidate profiles** | Job seekers pay a one-off fee (or use Premium credits) to be highlighted in recruiter search results for 7/14/30 days. | Job seekers | Medium — add `featured_until` to profile schema |
+| **Recruiter spotlight** | Recruiters pay to appear at the top of the "recruiters near you" or "recruiters hiring for X" surfaces. | Recruiters | Medium |
+| **Email newsletter ads** | If an outbound email sequence is introduced (Phase 1 drip), a "Sponsored by [Company]" slot in free-tier emails is passive revenue with zero additional engineering. | Advertisers / employers | Low |
+| **Video ad pre-rolls** | For free-tier users viewing other users' video resumes, a short 5-second employer-branded pre-roll. Premium users see none. | Employers | High — requires ad serving, video ad infrastructure |
+
+#### Ad-Free as a Conversion Lever
+
+"No ads" must be a visible, tangible benefit on the pricing page — not buried in a feature list. The conversion psychology:
+
+1. Free user encounters an ad mid-workflow (e.g. reviewing a job match)
+2. A dismissible banner appears: *"Upgrade to Premium — no ads, unlimited AI, priority matching"*
+3. One click to a checkout with 14-day trial
+
+The ad experience on free should be **noticeable but not hostile** — intrusive enough to motivate upgrade, non-intrusive enough that users do not immediately abandon the product. Mid-page banners and sponsored content work; interstitials and pop-ups destroy retention.
+
+#### What Needs to Be Built
+
+| # | Feature | Type | Effort | Notes |
+|---|---------|------|--------|-------|
+| K | **Ad slot components (frontend)** | `feature` | Low | Reusable `<AdSlot>` React component that renders when `user.plan === "free"` and renders nothing for Premium. Google AdSense publisher tag takes 10 minutes to integrate. |
+| L | **Premium ad-free flag enforcement (API)** | `billing` | Low | Extend the subscription enforcement work (#21) — the same middleware that gates features also sets an `adsEnabled` flag in the JWT/session. |
+| M | **Sponsored job listing schema + admin UI** | `feature` | Medium | Add `sponsored: boolean`, `sponsored_until: timestamp`, and `sponsored_rank_boost: int` to the jobs schema. Admin UI to approve/set sponsorship. Self-serve checkout for employers is Phase 2. |
+| N | **Featured profile schema + checkout** | `feature` | Medium | Add `featured_until: timestamp` to `userProfiles`. Job seeker can pay a one-off fee via the existing Stripe setup-intent flow to feature their profile for N days. |
+| O | **Ad revenue reporting (internal dashboard)** | `quality` | Low | Track impressions, clicks, and estimated revenue from AdSense in the internal admin dashboard alongside subscription MRR. Without this you cannot optimise placement or justify the trade-off with user experience. |
+
+#### Revenue Projection — Advertising
+
+Rough benchmarks for a hiring-focused audience:
+
+| Signal | Estimate |
+|--------|----------|
+| Programmatic CPM (career/hiring audience) | $8–15 |
+| Page views per free user per month | ~30 |
+| Ad impressions per page view | ~2 |
+| Monthly ad revenue per free user | ~$0.50–0.90 |
+| 5,000 free users | **$2,500–$4,500 / mo** |
+| 20,000 free users | **$10,000–$18,000 / mo** |
+
+Sponsored job listings (employer-direct) at $50–200/week per slot add on top of programmatic at near-100% margin. A platform with 20 sponsored slots filled consistently at $100/week generates **$8,000/mo from job posting revenue alone**, independent of subscriptions.
+
+---
+
+### Revenue Priority Summary (Ordered)
+
+| Rank | Item | Type | Effort | Revenue Lever |
+|------|------|------|--------|---------------|
+| 1 | Enforce subscription tiers (#21) | `billing` | Low | Immediately monetises existing user base |
+| 2 | Ad slot components — free tier (K) | `feature` | Low | Free users become revenue-generating from day one |
+| 3 | Ad-free flag in Premium (L) | `billing` | Low | "No ads" becomes the clearest upgrade reason on the pricing page |
+| 4 | Upgrade prompts + usage meters (A, C) | `feature` | Low | Converts free → paid passively |
+| 5 | Annual billing option | `feature` | Low | Improves cash flow, reduces churn |
+| 6 | Gate salary calculator (#22) | `billing` | Low | High-visibility upsell moment |
+| 7 | Enforce team size limits (#25) | `billing` | Low | Forces recruiter/employer upgrade |
+| 8 | Sponsored job listings (M) | `feature` | Medium | Direct employer revenue; zero dependency on subscriber count |
+| 9 | Google + LinkedIn OAuth (#42) | `feature` | Medium | Removes #1 acquisition blocker; more users = more ad impressions + subscribers |
+| 10 | Shareable "Hire Me" profiles (#40) | `feature` | Medium | Viral loop; SEO; zero-CAC acquisition |
+| 11 | Resume/profile AI score | `feature` | Medium | Highest-converting freemium hook in career space |
+| 12 | Featured candidate profiles (N) | `feature` | Medium | One-off job seeker purchases; no subscription required |
+| 13 | Full-text candidate search (#10) | `feature` | High | Core B2B value prop; without it recruiter plan is unsellable |
+| 14 | Hiring success metrics (#16, #17) | `feature` | Medium | ROI story that justifies employer renewal |
+| 15 | Calendar integration (#11) | `feature` | High | Retention requirement for recruiter persona |
+| 16 | Recruiter ↔ candidate messaging (#41) | `feature` | Medium | Platform stickiness; switching costs |
+| 17 | Trial period + cancellation flow (B, D) | `feature` | Low | 3–5× trial conversion; saves 15–25% churns |
+| 18 | Referral programme UI | `feature` | Low | Lowest-CAC acquisition channel available |
+| 19 | Background job workers (#3) | `arch` | High | Video generation reliability — core product promise |
+| 20 | ATS integrations | `feature` | High | Required to close enterprise deals |
+| 21 | Employer seat-based billing | `billing` | Medium | Scales revenue with team growth |
+| 22 | White-label / agency tier | `feature` | Medium | $500–2,000/mo per agency client |
+| 23 | AI career copilot | `feature` | Medium | Primary Premium value prop for job seekers |
+| 24 | Automated outreach sequences (#15) | `feature` | Medium | Primary upsell lever for recruiter Pro tier |
