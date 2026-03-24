@@ -18,11 +18,10 @@ export function useAdConfig(): AdConfig & { loading: boolean } {
   useEffect(() => {
     if (cache !== null) return;
     apiClient
-      .get<{ success: boolean; data: AdConfig }>("/api/ads/config")
+      .get<AdConfig>("/api/ads/config")
       .then((res) => {
-        const data = res.data;
-        cache = data;
-        setConfig(data);
+        cache = res.data;
+        setConfig(res.data);
       })
       .catch(() => {
         cache = DISABLED;
