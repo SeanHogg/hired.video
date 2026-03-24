@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type {
   ApplyJobDTO,
@@ -14,6 +14,12 @@ export interface JobQuery {
   limit?: number;
   search?: string;
   location?: string;
+  // Facet filters (#10)
+  employmentType?: string;
+  experienceLevel?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  isRemote?: boolean;
 }
 
 export interface JobEntity extends JobSummaryDTO {
@@ -68,6 +74,11 @@ export async function getPublicJobs(filters?: JobQuery): Promise<PaginatedJobsDT
         )
       : undefined,
     filters?.location ? ilike(jobItems.location, `%${filters.location}%`) : undefined,
+    filters?.employmentType ? eq(jobItems.jobType, filters.employmentType) : undefined,
+    filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,
+    filters?.isRemote !== undefined ? eq(jobItems.isRemote, filters.isRemote) : undefined,
+    filters?.salaryMin !== undefined ? gte(jobItems.salaryMin as any, String(filters.salaryMin)) : undefined,
+    filters?.salaryMax !== undefined ? lte(jobItems.salaryMax as any, String(filters.salaryMax)) : undefined,
   );
 
   const [rows, countResult] = await Promise.all([

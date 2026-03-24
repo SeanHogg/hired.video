@@ -1037,105 +1037,11 @@ The frontend is a static SPA deployable to any CDN (Cloudflare Pages, Vercel, Ne
 
 ## Known Issues & Priorities
 
-Open gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) at the bottom of this document.
-
-### Recently Fixed
-
-- ✅ **Billing service** — Real DB queries for subscriptions, invoices, payment methods, and AI usage (was entirely stubbed).
-- ✅ **AI chat** — Full `POST /api/ai/chat` endpoint with session persistence, message history, usage tracking, and LLM integration.
-- ✅ **Notification SSE** — `GET /api/hubs/notifications` streams unread notifications via Server-Sent Events; `POST /negotiate` returns transport descriptor.
-- ✅ **Email verification enforced** — `emailVerifiedMiddleware` now applied to all authenticated routes in `app.ts`.
-- ✅ **Password change enforced** — `passwordChangeMiddleware` now applied to all authenticated routes in `app.ts`.
-- ✅ **Settings export** — `GET /api/settings/export` returns a full JSON export of the user's account, profile, resumes, applications, and saved jobs.
-- ✅ **Duplicate feature-flag file** — Orphaned `routes/feature-flag.ts` deleted; `routes/featureflag.ts` is the single source of truth.
-- ✅ **Duplicate job summary endpoints** — `GetSummaryItems` and `getsummaryitems` now share a single handler; both aliases retained for backwards compatibility.
-- ✅ **Match routes** — `POST /api/match/analyze` and `POST /api/match/tailor` now call the LLM (OpenRouter/Gemini Flash) with keyword-overlap heuristic fallback; usage recorded in `aiUsageRecords`.
-- ✅ **Chrome extension** — Updated to `hired.video` branding (v2.0); API URL corrected from `api.myvideoresu.me` to `api.hired.video`; all routes corrected to lowercase to match the TypeScript API.
-- ✅ **Resume createvariation** — Now accepts `resumeData` markdown from the Chrome extension and stores it in `content.markdown`.
-- ✅ **Resume export** — `GET /api/resume/:id/export` returns real resume data (markdown, JSON, or plain text) instead of a stub.
-- ✅ **Stripe fully wired** — `GET /public-key`, `POST /setup-intent`, `POST /save-payment-method`, `POST /stripe/webhook`. Customer IDs persisted on `users.stripe_customer_id`. Webhook handles subscription lifecycle, invoice sync, payment method sync, affiliate conversions, and payout tracking.
+Open gaps, the full product roadmap, and implementation status are tracked in the [Consolidated Gap Register](#consolidated-gap-register) below.
 
 ---
 
-## Product Roadmap
-
-hired.video is evolving from a video resume tool into a **full-stack AI career and talent operating system**. The roadmap below reflects that vision.
-
----
-
-### Positioning
-
-| Audience | What hired.video is |
-|---|---|
-| Job seekers | AI Career Copilot — resume, matching, interview prep, application tracking |
-| Recruiters | AI Talent CRM — sourcing, scoring, outreach, pipeline |
-| Companies | AI Hiring Funnel — job posting, candidate discovery, fast-track hiring |
-| Creators | Professional Identity Platform — video profiles, shareable links, audience |
-
-**Tagline:** *"LinkedIn + Loom + ATS + AI Copilot — in one platform"*
-
----
-
-### Now (0–30 days)
-
-| Feature | Status | Notes |
-|---|---|---|
-| **Stripe payment integration** | ✅ Done | `GET /public-key`, `POST /setup-intent`, `POST /save-payment-method`, `POST /stripe/webhook` — all implemented. Configure 3 secrets to activate. |
-| **Shareable "Hire Me" profiles** | 🔴 High ROI | Public profile page per user — video, resume, skills. Main viral distribution vector. Data already exists. |
-| **Frontend PWA** | ✅ Done | vite-plugin-pwa with Workbox, offline shell caching, installable on mobile/desktop |
-| **Chrome extension v2.0** | ✅ Done | Analyze, tailor, save variation, export — fully wired to TypeScript API |
-| **Email verification + password enforcement** | ✅ Done | Both middlewares active globally |
-
----
-
-### Soon (30–60 days)
-
-| Feature | Priority | Description |
-|---|---|---|
-| **AI Career Copilot dashboard** | 🔥 High | "What should I do next?" — surfaces job matches, skill gaps, resume improvements, interview readiness. Built from existing scores, sessions, and match data. |
-| **Real-time chat** | 🔥 High | Recruiter ↔ candidate messaging. SSE notifications exist; need chat rooms + message persistence. |
-| **Auto-fill Chrome extension** | 🔥 High | Extend the extension to auto-fill LinkedIn/Indeed application forms using resume data. Distribution multiplier. |
-| **OAuth / Social Login** | 🔥 High | Google and LinkedIn sign-in. Users strongly prefer one-click auth over email/password. Requires new `oauth_accounts` table (one user → many providers), OAuth routes (`/api/auth/oauth/:provider` + callback), and account-linking logic (merge on matching email). LinkedIn is critical for this platform — profile import on sign-up. Google covers the remainder of sign-ups. |
-| **Magic Links (passwordless email)** | Medium | One-time login link sent to email — no password needed. Low friction for casual/infrequent users. Reuses existing token pattern (`magic_link_tokens` table, 15-min expiry). Endpoint: `POST /api/auth/magic-link` → `GET /api/auth/magic-link/verify?token=...`. |
-| **Security settings tab** | Medium | New tab in Settings for users to manage auth methods: connected OAuth accounts (connect/disconnect), change or add password (OAuth-only accounts have no password), 2FA enable/disable, and active session list with per-session revoke. Must block disconnecting the last auth method without a password set. |
-| **OpenAPI / Swagger docs** | Medium | `@hono/swagger-ui` + `zod-openapi`; Zod schemas can generate spec with minimal effort |
-| **Background job worker** | Medium | Queue tables (`queueJobToResume`, `queueJobToProcess`) exist; implement Cloudflare Queue consumer for video processing |
-
----
-
-### Mid-Term (60–120 days)
-
-| Feature | Priority | Description |
-|---|---|---|
-| **Passkeys / WebAuthn** | High | FIDO2 browser-native biometric auth (fingerprint, Face ID, Windows Hello). No password, no phishing. Requires `webauthn_credentials` table (credentialId, publicKey, counter, userId). Increasingly expected on mobile. |
-| **GitHub + Microsoft OAuth** | Medium | Additional OAuth providers for tech-role candidates (GitHub) and enterprise/recruiter accounts (Microsoft). Same `oauth_accounts` table as Google/LinkedIn; just add provider config. |
-| **AI Recruiter Agent** | 🔥 High | Automated sourcing, candidate scoring, personalised outreach, reply tracking, follow-up suggestions. "Apollo.io + LinkedIn Recruiter, automated." |
-| **Marketplace dynamics** | 🔥 High | Recruiter bidding on candidates, talent availability signals ("open to work"), fast-track pipelines. Network effects kick in here. |
-| **AI Mock Interview → Pre-qualified candidates** | High | Recorded mock interviews scored by AI; share results with recruiters. Candidates arrive pre-qualified. |
-| **"Resume Roast" viral engine** | High | Surface the existing resume-roast endpoint as shareable social content. "AI roasts this resume." Organic traffic driver. |
-| **Affiliate program scaling** | Medium | Target career coaches, resume writers, TikTok creators. % of subscriptions + recruiter deals. |
-| **Stripe fully wired** | Medium | After basic Stripe (above): proration, coupon codes, usage-based billing for AI credits |
-
----
-
-### Long-Term (6–12 months)
-
-| Feature | Priority | Description |
-|---|---|---|
-| **Autonomous job application agent** | 🚀 Big bet | Applies to jobs on behalf of user — tailors resume + video, tracks pipeline, reports back. ~$20–50/mo paid feature. |
-| **TikTok-style talent discovery feed** | 🚀 Big bet | Short video intros, recruiter swipe, algorithmic candidate surfacing. Video = core identity primitive, not just a feature. |
-| **University & bootcamp partnerships** | 🚀 High | White-labeled career portals, placement analytics. Students need jobs — perfect top-of-funnel. |
-| **SEO content engine** | High | AI-generated pages: "Best resume for [job title]", "Top skills for [industry]", "Salary for [role]". Structured data already exists in DB. |
-| **LinkedIn OAuth deep integration** | High | LinkedIn OAuth covers sign-in (roadmapped for 30–60 days). Long-term: import full LinkedIn profile on sign-up, cross-post video resumes to LinkedIn, sync connections. |
-| **B2B sales motion** | High | Target recruiting agencies, staffing firms, SMB hiring teams. Pitch: "Replace 50% of your sourcing effort with AI." |
-| **Creator / influencer mode** | Medium | Let users build audiences, post career content, sell resume templates. "Top PM resumes", "How I got hired at Google." |
-| **Smart job board layer** | Medium | Aggregate jobs from major boards, AI match + rank, apply automation. Compete on intelligence, not listings. |
-
----
-
-### Strategic Moats
-
-The platform sits on three compounding advantages:
+## Strategic Moats
 
 | Moat | What it is |
 |---|---|
@@ -1149,274 +1055,97 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 ## Consolidated Gap Register
 
-All known gaps across architecture, code quality, features, billing enforcement, and legacy parity in one place. De-duplicated from the sections above.
+Single source of truth for all implementation status, product roadmap phases, and priorities. Sorted by P0 → P4 (revenue impact).
 
-| # | Status | Gap | Type | Severity | Notes |
-|---|--------|-----|------|----------|-------|
-| 1 | 🔲 Open | **No automated tests** | `arch` | 🔴 High | Zero coverage across API and frontend. Legacy `.NET` project has a test suite that should inform a Vitest/hono-test setup. |
-| 2 | 🔲 Open | **No OpenAPI / Swagger** | `arch` | 🔴 High | No developer portal, no spec. `@hono/swagger-ui` + `zod-openapi` can auto-generate from existing Zod schemas with minimal effort. |
-| 3 | 🔲 Open | **No background job workers** | `arch` | 🔴 High | `queueJobToResume` and `queueJobToProcess` tables exist in schema; nothing processes them. Video generation and async tasks depend on this. |
-| 4 | 🔲 Open | **Business logic in route handlers** | `quality` | 🟡 Medium | Most domain logic is inlined in route files instead of extracted to service functions, reducing testability and DRY compliance. |
-| 5 | 🔲 Open | **No repository abstraction** | `arch` | 🟡 Medium | Drizzle queries are scattered directly across route and service files. A formal data-access layer would improve testability and consistency. |
-| 6 | 🔲 Open | **Structured logging** | `arch` | 🟡 Medium | Only `console.*` + Sentry. Legacy used Serilog with file, DB, and NewRelic sinks. A structured log pipeline (e.g. Workers Logpush → Datadog/Logtail) is absent. |
-| 7 | ✅ Done | **Dynamic feature flags** | `arch` | 🟡 Medium | DB-backed flags with per-user rollout evaluation. `GET/PATCH /api/featureflag/:key`; 6 default flags seeded on first call. |
-| 8 | 🔲 Open | **Caching layer** | `arch` | 🟡 Medium | Stateless edge workers have no shared cache. Legacy used HybridCache (in-memory + distributed). Cache-aside for expensive queries (search, matching) is missing. |
-| 9 | 🔲 Open | **LinkedIn OAuth** | `feature` | 🔴 High | Only `POST /api/linkedin-post` exists. The full OAuth callback flow (token exchange, profile fetch, account link) required to match legacy is not implemented. |
-| 10 | 🔲 Open | **Full-text / faceted search** | `feature` | 🔴 High | Legacy implied Elasticsearch-level multi-entity search. Current API has only a single `/api/search/public` endpoint with no full-text or faceted filtering. |
-| 11 | 🔲 Open | **Calendar integration** | `feature` | 🔴 High | Google Calendar / Outlook / Calendly sync for interview scheduling — availability slots, booking links, calendar event creation. No schema or routes exist. |
-| 12 | 🔲 Open | **API key management** | `feature` | 🔴 High | User-facing API key generation, revocation, and scoped permissions. Developer portal / documentation for external integrations not built. |
-| 13 | 🔲 Open | **Hiring & onboarding offers** | `feature` | 🔴 High | Offer letter creation, e-signature flow, onboarding task checklist. Requires new schema tables and routes. |
-| 14 | 🔲 Open | **Performance management** | `feature` | 🟡 Medium | Employee performance reviews, OKR goal-setting, 1:1 notes, review cycles. No schema or routes exist. |
-| 15 | 🔲 Open | **Automated outreach follow-ups** | `feature` | 🟡 Medium | Drip/sequence logic for recruiter outreach — trigger follow-up emails based on elapsed time or recipient behaviour (open, click, no reply). |
-| 16 | 🔲 Open | **Hiring success metrics** | `feature` | 🟡 Medium | Dashboard analytics for offer acceptance rate, pipeline-stage conversion, source-of-hire breakdown, and fill rate. |
-| 17 | 🔲 Open | **Time-to-hire analytics** | `feature` | 🟡 Medium | Track and visualise elapsed time from job open → application → interview → offer → placement per role and team. |
-| 18 | 🔲 Open | **Career progress tracking** | `feature` | 🟡 Medium | Goal-setting and milestone tracking for job seekers — target roles, skills to acquire, application targets, interview conversion rates over time. |
-| 19 | 🔲 Open | **Employer internal community** | `feature` | 🟡 Medium | Employer-gated internal community with structured channels (announcements, engagement). The existing social feed is public/professional, not employer-scoped. |
-| 20 | 🔲 Open | **Exclusive job boards + bidding** | `feature` | 🟡 Medium | Marketplace of exclusive job boards with bid/slot-based posting. `jobBoards` tables support basic posting only — no exclusivity or auction logic. |
-| 21 | 🔲 Open | **Subscription tier enforcement** | `billing` | 🔴 High | `usageRecords` and `subscriptionPlans` exist and AI usage is tracked, but hard Free-tier limits (request caps, applicant caps, team size caps) are not applied consistently at route level. |
-| 22 | 🔲 Open | **Salary calculator gated to Premium** | `billing` | 🟡 Medium | `salary.ts` routes are open to all users. Per pricing page, the Salary Calculator is Premium-only — Free users should see a paywall prompt. |
-| 23 | ✅ Done | **AI message personalisation tiers** | `billing` | 🟡 Medium | `POST /api/messages/personalize` — free users get template substitution; Premium users get LLM-generated personalised outreach with AI usage recorded. |
-| 24 | ✅ Done | **Priority / AI-enhanced job matching** | `billing` | 🟡 Medium | `POST /api/match/insights` (Premium-gated) — deep match analysis with skill gaps, career trajectory, interview tips, and estimated ramp time. |
-| 25 | 🔲 Open | **Team size / admin user limits** | `billing` | 🟡 Medium | Invitation system works but no hard cap at route level. Free accounts should be blocked from inviting a 3rd+ team member without upgrading. |
-| 26 | ✅ Done | **Advanced video templates** | `billing` | 🟡 Medium | `GET /api/studio/templates` — 3 free (720p) + 5 Premium (1080p) templates. Subscription check gates the Premium set. |
-| 27 | 🔲 Open | **Advanced dashboard analytics + AI insights** | `billing` | 🟡 Medium | All users see the same dashboard data. Premium should surface AI-generated narrative insights; Free sees raw metrics only. |
-| 28 | 🔲 Open | **Advanced interview scheduling + automation** | `billing` | 🟡 Medium | AI interview practice works. Missing: calendar-based scheduling of real interviews (slot selection, invitations, reminders, rescheduling) gated to Premium. |
-| 29 | 🔲 Open | **Smart outreach campaigns** | `billing` | 🟡 Medium | Email campaigns are implemented. "Smart" means behaviour-triggered sequences (follow up if no open in 3 days, personalise from candidate data). This automation layer is absent. |
-| 30 | ✅ Done | **AI-powered smart notifications** | `billing` | 🟢 Low | `GET /api/notifications/smart` (Premium-gated) — fetches 100 notifications, scores by type weight + recency + unread bonus, returns top 50 ranked. |
-| 31 | ✅ Done | **CSV / Excel export** | `legacy-parity` | 🟡 Medium | `GET /api/settings/export?format=csv` — multi-section CSV with account, resumes, and job applications. `/api/export/csv` and `/api/export/excel` redirect to canonical endpoint. |
-| 32 | ✅ Done | **Recruiter bulk operations** | `legacy-parity` | 🟡 Medium | `POST /api/recruiter/bulk/tags`, `/bulk/status`, `DELETE /bulk/delete` — Set-based tag dedup, batch status update, multi-row delete scoped to recruiter ownership. |
-| 33 | ✅ Done | **Recruiter talent-pool export** | `legacy-parity` | 🟢 Low | `GET /api/recruiter/talent-pool/export` — CSV download of all talent pool entries with headers and RFC 4180 cell escaping. |
-| 34 | ✅ Done | **Password history validation** | `legacy-parity` | 🟢 Low | `POST /api/passwordmanagement/validate-history` — PBKDF2 re-verification of candidate against last 5 stored hashes. |
-| 35 | ✅ Done | **Password expiry check** | `legacy-parity` | 🟢 Low | `GET /api/passwordmanagement/is-expired` — 90-day expiry from `passwordChangedAt` (or `createdAt`); returns `{ isExpired, daysUntilExpiry, expiresAt }`. |
-| 36 | ✅ Done | **Resume diff / variation compare** | `legacy-parity` | 🟢 Low | `GET /api/resumes/:id/diff?compareId=` — field-level diff across content keys; returns `changes[]` with `{ field, type, old, new }` and a summary count. |
-| 37 | ✅ Done | **Salary calculator `/industries` endpoint** | `legacy-parity` | 🟢 Low | `GET /api/salarycalculator/industries` — returns 16 industries with subcategory arrays. |
-| 38 | ✅ Done | **Marketing routes (campaigns + leads)** | `quality` | 🟢 Low | `GET/POST /api/marketing/campaigns`, `PATCH /:id/status`, `GET/POST /api/marketing/leads`, `PATCH /leads/:id/status` — all wired to real DB tables. |
-| 39 | ✅ Done | **ProductDashboard SaaS metrics** | `quality` | 🟡 Medium | `GET /api/admin/` — 15 parallel DB queries; real MRR/ARR/ARPU/churn/conversion from subscriptions+plans join. `GET /saas-metrics` + `GET /time-series/:metric` also implemented. |
-| 40 | ✅ Done | **Shareable "Hire Me" public profiles** | `feature` | 🔴 High | `GET /api/users/:id` returns profile + `publicVideos[]` + `publicResumeCount`. `GET /api/users/:id/resumes` returns public resumes (privacyLevel=0). Visibility-conditional (public/connections/private). |
-| 41 | 🔲 Open | **Real-time chat (recruiter ↔ candidate)** | `feature` | 🔴 High | SSE notifications are live but recruiter/candidate direct messaging requires chat room creation, message persistence, and a chat UI. |
-| 42 | 🔲 Open | **OAuth / Social Login (Google + LinkedIn)** | `feature` | 🔴 High | Users strongly prefer one-click auth. Requires new `oauth_accounts` table, `/api/auth/oauth/:provider` + callback routes, and account-linking logic (merge on matching email). LinkedIn is critical for this platform. |
-| 43 | ✅ Done | **Magic links (passwordless email login)** | `feature` | 🟡 Medium | `POST /api/auth/magic-link` + `GET /api/auth/magic-link/verify?token=` — 32-byte hex token, 15-min expiry, marks email verified on use, returns JWT. |
-| 44 | ✅ Done | **Security settings tab** | `feature` | 🟡 Medium | `GET /api/settings/security/sessions` lists active refresh tokens as sessions; `DELETE /security/sessions/:id` revokes by ID. OAuth linked accounts already returned. |
-| 45 | ✅ Done | **Direct messaging (`messages.ts`) incomplete** | `quality` | 🟡 Medium | Added `GET /inbox`, `POST /conversations`, `GET /conversations/:id` (with read receipts), `POST /conversations/:id/send`, `PUT /conversations/:id/read` — uses `conversations`/`messages`/`messageReadReceipts` schema. |
-| 46 | ✅ Done | **Avatar upload validation unconfirmed** | `quality` | 🟢 Low | `POST /api/users/me/avatar` — 5MB limit enforced (413), jpg/png/gif/webp only (415), saves URL to `userProfiles.avatarUrl`. |
-| 47 | 🔲 Open | **Helcim payment provider stub** | `quality` | 🟢 Low | `services/payment/helcim.ts` has documented API calls but is not fully implemented. Card deletion is unavailable via Helcim v2 API. Helcim cannot be used as a production payment provider until the stub is completed. |
-| 48 | 🔲 Open | **Ad slot components — free tier** | `feature` | 🔴 High | Reusable `<AdSlot>` React component that renders programmatic ads (Google AdSense) for free-tier users and renders nothing for Premium. Free users become revenue-generating from day one without any subscription. |
-| 49 | 🔲 Open | **Ad-free enforcement for Premium** | `billing` | 🔴 High | API/session must expose an `adsEnabled` flag derived from the user's active subscription. Frontend reads this flag to suppress all ad slots. "No ads" becomes the clearest, most visceral reason to upgrade on the pricing page. |
-| 50 | ✅ Done | **Sponsored job listings** | `feature` | 🟡 Medium | Added `sponsored: boolean`, `sponsoredUntil: timestamp`, `sponsoredRankBoost: integer` to `jobItems` schema. Ready for Stripe billing integration and search ranking. |
-| 51 | ✅ Done | **Featured candidate profiles** | `feature` | 🟡 Medium | Added `featuredUntil: timestamp` to `userProfiles` schema. Ready for one-off Stripe purchase integration in recruiter search ranking. |
-| 52 | 🔲 Open | **Ad revenue reporting (internal dashboard)** | `quality` | 🟢 Low | Track ad impressions, clicks, and estimated revenue from AdSense in the internal admin dashboard alongside subscription MRR. Required to optimise ad placement and balance revenue against user experience. |
-| 53 | 🔲 Open | **Feature adoption, usage analytics, and lightweight click tracking (admin)** | `quality` | 🟡 Medium | Two parts: (1) **Usage report** — `requestLogs` and `activityLogs` already capture telemetry; add `GET /api/admin/usage` to aggregate top endpoints by call volume, DAU/WAU/MAU, feature adoption rates, error rates, and P95 response time. (2) **Lightweight click/CTA tracking** — add a `POST /api/analytics/beacon` endpoint that accepts `{ page, element, userId? }` from a tiny inline script (no external dependency, no extra DNS/TLS round-trip). Store in a new `clickEvents` table. Surface in admin as "most-clicked elements per page" so it's immediately clear whether upgrade CTAs and ad slots are converting. Third-party tools (PostHog, Clarity) are explicitly excluded — their async scripts add DNS + TLS overhead on every page load, which is unacceptable on an edge-first deployment. |
-| 54 | 🔲 Open | **AI-powered visitor/prospect chat widget** | `feature` | 🟡 Medium | A pre-auth chatbot on the marketing/landing page that answers prospect questions ("what does this do?", "how is this different from LinkedIn?", "what does it cost?") and captures email leads into the existing `marketingLeads` table. Explicitly **not** a human live chat widget (Intercom/Crisp) — those carry the same external script load-time penalty as analytics tools and require staffing. The AI chat uses existing LLM infrastructure (`callLLMJson`) via a new public endpoint `POST /api/chat/visitor` (no auth required). Secondary value: the chat widget *demonstrates the product's AI capability to prospects before signup* — a stronger conversion signal than a features list. Leads captured should flow through the same `marketingLeads` funnel as the existing `POST /api/marketing/leads` endpoint. |
+**Phases:** `Now` = 0–30 days · `Soon` = 30–60 days · `Mid` = 60–120 days · `Later` = 6–12 months
 
----
+**Types:** `billing` = revenue enforcement · `feature` = product capability · `arch` = architecture · `quality` = code quality · `legacy` = legacy parity
 
-## Revenue Prioritisation — CEO View
+**Positioning:** *"LinkedIn + Loom + ATS + AI Copilot — in one platform"*
 
-### The Unit Economics Reality
+| # | Status | Phase | Priority | Type | Gap | Notes |
+|---|--------|-------|----------|------|-----|-------|
+| 21 | ✅ Done | Now | P0 | `billing` | **Subscription tier enforcement** | `checkAIUsage` added to `value-proposition.ts` (4 endpoints) and `POST /api/ai/context`. `resume-scorer`, `resume-optimizer`, `salary.ts`, `match.ts` already gated. `checkTeamSize` on invite creation. |
+| 22 | ✅ Done | Now | P0 | `billing` | **Salary calculator gated to Premium** | `POST /analyze` and `POST /negotiation-tips` guarded by `requirePremium`. `GET /industries` intentionally public. |
+| 23 | ✅ Done | Now | P0 | `billing` | **AI message personalisation tiers** | `POST /api/messages/personalize` — template for free, LLM for Premium, AI usage recorded. |
+| 24 | ✅ Done | Now | P0 | `billing` | **Priority / AI-enhanced job matching** | `POST /api/match/insights` (Premium) — skill gaps, career trajectory, interview tips, ramp time. |
+| 25 | ✅ Done | Now | P0 | `billing` | **Team size / admin user limits** | `checkTeamSize()` called on `POST /api/account/invite`. Free accounts blocked at `FREE_TEAM_MEMBER_LIMIT`. |
+| 26 | ✅ Done | Now | P0 | `billing` | **Advanced video templates** | `GET /api/studio/templates` — 3 free (720p) + 5 Premium (1080p). |
+| 49 | ✅ Done | Now | P0 | `billing` | **Ad-free enforcement for Premium** | `GET /api/ads/config` returns `{ adsEnabled: false }` for Premium users. Frontend suppresses all ad slots on this flag. |
+| 47 | 🔲 Open | Soon | P0 | `quality` | **Helcim payment provider stub** | `savePaymentMethod` returns a stub; `detachPaymentMethod` is a no-op. Needs a Helcim dev account to test the full API. |
+| 55 | 🔲 Open | Now | P0 | `billing` | **In-product upgrade prompts + usage meters** | Every locked feature needs a paywall modal + CTA. "X of 10 AI requests used" meter is the #1 passive upsell in SaaS. Frontend + `GET /api/billing/usage-summary` endpoint. |
+| 56 | 🔲 Open | Now | P0 | `billing` | **Annual billing option (20% discount)** | Annual plans improve cash flow, reduce churn. A user who paid $180 upfront won't cancel in month 3. Stripe billing period + discount coupon. |
+| 57 | 🔲 Open | Now | P0 | `billing` | **Trial period (7 or 14 days)** | Time-limited trial with credit card capture converts 3–5× better than a cold paywall. Add `trialEndsAt` to subscription + UI countdown banner. |
+| 58 | 🔲 Open | Now | P0 | `billing` | **Churn / cancellation flow** | Show what user loses, offer pause, offer downgrade before confirming cancel. Well-designed flows save 15–25% of would-be churns. |
+| 40 | ✅ Done | Now | P1 | `feature` | **Shareable "Hire Me" public profiles** | `GET /api/users/:id` returns profile + `publicVideos[]` + `publicResumeCount`. Visibility-conditional. Each profile = free SEO page + viral loop. |
+| 43 | ✅ Done | Now | P1 | `feature` | **Magic links (passwordless login)** | `POST /api/auth/magic-link` + `GET /verify?token=` — 32-byte token, 15-min expiry, issues JWT. |
+| 45 | ✅ Done | Now | P1 | `quality` | **Direct messaging complete** | `GET /inbox`, `POST /conversations`, `GET /conversations/:id`, send + read receipts. |
+| 54 | ✅ Done | Now | P1 | `feature` | **AI visitor/prospect chat widget** | `POST /api/chat/visitor` (public) — LLM FAQ bot with email lead capture into `marketingLeads`. Static fallback if no API key. Zero external scripts. |
+| 42 | 🔲 Open | Now | P1 | `feature` | **OAuth / Social Login (Google + LinkedIn)** | Backend fully implemented in `oauthRoutes`. Needs `GOOGLE_CLIENT_ID/SECRET` + `LINKEDIN_CLIENT_ID/SECRET` as Cloudflare secrets. Zero code changes required. |
+| 9  | 🔲 Open | Now | P1 | `feature` | **LinkedIn OAuth full flow** | Same credential requirement as #42. LinkedIn profile import on sign-up fills profile instantly; dramatically improves activation. |
+| 61 | 🔲 Open | Now | P1 | `billing` | **Referral programme UI** | Affiliate backend exists. "Give a friend 1 month free, get 1 month free" in-product loop = lowest-CAC acquisition channel available. |
+| 62 | 🔲 Open | Now | P1 | `billing` | **In-app billing event notifications** | "Trial ends in 3 days", "Payment failed — update card", "90% of AI credits used". Without these, users churn passively. |
+| 48 | 🔲 Open | Soon | P1 | `feature` | **Ad slot components — free tier** | Frontend only — `<AdSlot>` React component. `GET /api/ads/config` backend complete. |
+| 59 | 🔲 Open | Soon | P1 | `billing` | **Freemium activation / onboarding email drip** | 3-email sequence post-signup: (1) profile completion, (2) first job match, (3) Premium showcase. Can double 30-day retention + conversion. |
+| 60 | 🔲 Open | Soon | P1 | `feature` | **Resume/profile AI score free preview** | Show score out of 100 for free; show what's dragging it down only on Premium. Highest-converting freemium hook in career space — LinkedIn Premium uses this pattern. |
+| 41 | 🔲 Open | Mid | P1 | `feature` | **Real-time chat (recruiter ↔ candidate)** | REST message layer done (#45). Remaining: WebSocket transport via Cloudflare Durable Objects or Pusher — infrastructure + frontend. |
+| 68 | 🔲 Open | Mid | P1 | `feature` | **GitHub + Microsoft OAuth** | GitHub for tech candidates, Microsoft for enterprise/recruiter accounts. Same `oauth_accounts` table; just add provider config. |
+| 69 | 🔲 Open | Mid | P1 | `feature` | **"Apply with hired.video" embeddable button** | One-click button for job boards and company career pages. Every click = new user acquisition. Distribution infrastructure, not a feature. |
+| 70 | 🔲 Open | Mid | P1 | `feature` | **Boolean / advanced recruiter search** | Recruiters paying $50–100/mo expect LinkedIn Recruiter-level search: Boolean operators, location radius, skill filters, saved searches. Without this, the recruiter plan cannot be sold to agencies. |
+| 17 | ✅ Done | Mid | P2 | `feature` | **Time-to-hire analytics** | `GET /api/analytics/time-to-hire` (Premium) — avg days to placement, per-job breakdown, monthly trend from `placements`. |
+| 27 | ✅ Done | Mid | P2 | `billing` | **Advanced dashboard analytics + AI insights** | `POST /api/dashboard/ai-insights` (Premium + AI usage gated) — 30-day funnel metrics → LLM narrative insights, recommendations, risk flags. |
+| 30 | ✅ Done | Mid | P2 | `billing` | **AI-powered smart notifications** | `GET /api/notifications/smart` (Premium) — scored by type weight + recency + unread bonus. |
+| 38 | ✅ Done | Now | P2 | `quality` | **Marketing routes (campaigns + leads)** | `GET/POST /api/marketing/campaigns` + `/leads`, wired to real DB tables. |
+| 39 | ✅ Done | Now | P2 | `quality` | **ProductDashboard SaaS metrics** | `GET /api/admin/` — real MRR/ARR/ARPU from DB. Time-series + standalone SaaS metrics endpoints. |
+| 44 | ✅ Done | Soon | P2 | `feature` | **Security settings — active sessions** | `GET /api/settings/security/sessions` + `DELETE /:id` — refresh token session management. |
+| 46 | ✅ Done | Now | P2 | `quality` | **Avatar upload validation** | `POST /api/users/me/avatar` — 5MB cap, jpg/png/gif/webp only, saves to `userProfiles.avatarUrl`. |
+| 50 | ✅ Done | Mid | P2 | `feature` | **Sponsored job listings** | `sponsored`, `sponsoredUntil`, `sponsoredRankBoost` added to `jobItems` schema. Employers pay for top placement. |
+| 51 | ✅ Done | Mid | P2 | `feature` | **Featured candidate profiles** | `featuredUntil` added to `userProfiles` schema. Job seekers pay one-off fee via Stripe. |
+| 84 | ✅ Done | Now | P2 | `feature` | **API key management** | `schema/apikeys.ts` — prefix + SHA-256 hash; key shown once at creation. `GET/POST /api/apikeys`, `DELETE/PATCH /api/apikeys/:id`. |
+| 85 | ✅ Done | Mid | P2 | `feature` | **Career progress tracking (job seekers)** | `GET /api/dashboard/career-progress` (Premium) — monthly application trend + interview practice scores. |
+| 10 | 🔲 Open | Mid | P2 | `feature` | **Full-text / faceted search** | Salary/employment-type/experience-level/remote filters added. Next: `tsvector` + GIN index for true full-text. Core B2B value prop — without ranked search, the recruiter plan is unsellable. |
+| 11 | 🔲 Open | Mid | P2 | `feature` | **Calendar integration (Google / Outlook)** | Schema and CRUD routes exist. Needs additional OAuth `calendar.events` scope + two-way sync service. Retention requirement for recruiter persona. |
+| 13 | 🔲 Open | Mid | P2 | `feature` | **Hiring & onboarding — offer letters, e-signature** | Offer letter CRUD exists. E-signature needs Dropbox Sign provider + webhook + `POST /api/hiring/offers/:id/send-for-signature`. |
+| 14 | 🔲 Open | Mid | P2 | `feature` | **Performance management — OKR, reviews** | Routes exist, Premium-gated. Key-result progress (`PATCH /api/performance/goals/:id/progress`) and review cycles incomplete. |
+| 15 | ✅ Done | Mid | P2 | `feature` | **Automated outreach follow-ups** | `scheduled.ts` + `worker.ts` `scheduled()` export added. Cron processes due `followUpEnrollments`, sends email via provider, advances steps, marks complete. |
+| 16 | ✅ Done | Mid | P2 | `feature` | **Hiring success metrics** | `GET /api/analytics/hiring-metrics` added with per-role pipeline conversion. Fully tracked from `jobApplications` + `placements`. |
+| 19 | ✅ Done | Mid | P2 | `feature` | **Employer internal community — notifications** | `notifications` bulk-insert added on community post creation; notifies all company members except poster. Fire-and-forget. |
+| 20 | 🔲 Open | Mid | P2 | `feature` | **Exclusive job boards + bidding** | Routes exist, Premium-gated. Bid placement and exclusivity auction logic incomplete. |
+| 28 | 🔲 Open | Mid | P2 | `billing` | **Advanced interview scheduling + automation** | Blocked on calendar integration (#11). Routes and AI practice exist; real-interview slot scheduling missing. |
+| 29 | 🔲 Open | Mid | P2 | `billing` | **Smart outreach campaigns** | Email campaigns implemented. Behaviour-triggered sequences need `POST /api/followups/trigger` executor via `waitUntil()`. |
+| 63 | 🔲 Open | Mid | P2 | `feature` | **Employer branding pages** | Dedicated company page with custom video and culture content, distinct from a plain company profile. Paid add-on for higher-tier plan. |
+| 64 | 🔲 Open | Mid | P2 | `feature` | **ATS integrations (Greenhouse, Lever, Workday)** | Enterprise employers won't abandon their ATS. Two-way candidate sync removes the biggest enterprise objection. Required to close deals > $500/mo. |
+| 65 | 🔲 Open | Mid | P2 | `feature` | **Passkeys / WebAuthn** | FIDO2 biometric auth (Face ID, fingerprint, Windows Hello). Requires `webauthn_credentials` table. No phishing, no password. |
+| 66 | 🔲 Open | Mid | P2 | `feature` | **AI Recruiter Agent** | Automated sourcing, candidate scoring, personalised outreach, reply tracking. "Apollo.io + LinkedIn Recruiter, automated." |
+| 67 | 🔲 Open | Mid | P2 | `billing` | **Employer seat-based billing** | Flat company plan doesn't scale with team growth. Per-seat billing captures revenue as teams expand. |
+| 79 | 🔲 Open | Later | P2 | `feature` | **University / bootcamp partnerships** | White-labeled career portals + placement analytics. Students need jobs — top-of-funnel at zero CAC. |
+| 80 | 🔲 Open | Later | P2 | `feature` | **B2B sales motion (agencies, staffing firms)** | "Replace 50% of sourcing effort with AI." Pitch to recruiting agencies and RPO firms. |
+| 6  | ✅ Done | Now | P3 | `arch` | **Structured logging** | `src/lib/logger.ts` — newline-delimited JSON to stdout for Cloudflare Logpush / tail workers. Wired into `app.onError`. |
+| 7  | ✅ Done | Now | P3 | `arch` | **Dynamic feature flags** | DB-backed flags with per-user rollout %. `GET/PATCH /api/featureflag/:key`. 6 default flags seeded. |
+| 31 | ✅ Done | Now | P3 | `legacy` | **CSV / Excel export** | `GET /api/settings/export?format=csv`. Legacy `/api/export/csv` + `/excel` redirect. |
+| 32 | ✅ Done | Now | P3 | `legacy` | **Recruiter bulk operations** | `POST /api/recruiter/bulk/tags`, `/bulk/status`, `DELETE /bulk/delete`. |
+| 33 | ✅ Done | Now | P3 | `legacy` | **Recruiter talent-pool export** | `GET /api/recruiter/talent-pool/export` — RFC 4180 CSV download. |
+| 34 | ✅ Done | Now | P3 | `legacy` | **Password history validation** | `POST /api/passwordmanagement/validate-history` — PBKDF2 re-verify last 5 hashes. |
+| 35 | ✅ Done | Now | P3 | `legacy` | **Password expiry check** | `GET /api/passwordmanagement/is-expired` — 90-day expiry, returns `{ isExpired, daysUntilExpiry }`. |
+| 36 | ✅ Done | Now | P3 | `legacy` | **Resume diff / variation compare** | `GET /api/resumes/:id/diff?compareId=` — field-level diff + summary counts. |
+| 37 | ✅ Done | Now | P3 | `legacy` | **Salary calculator `/industries` endpoint** | `GET /api/salarycalculator/industries` — 16 industries with subcategories. |
+| 52 | ✅ Done | Now | P3 | `quality` | **Ad revenue reporting** | Impressions and clicks tracked via `POST /api/analytics/ads/impression`. Aggregated under `adMetrics` in `GET /api/analytics/usage`. |
+| 53 | ✅ Done | Now | P3 | `quality` | **Feature adoption, usage analytics, click beacon** | `POST /api/analytics/beacon` (public) → `activityLogs`. `GET /api/analytics/usage` — DAU/WAU/MAU, top endpoints, error rate, ad CTR. |
+| 3  | ✅ Done | Mid | P3 | `arch` | **Background job workers** | `scheduled.ts` processes `queueJobToProcess` pending items (retry with backoff, `send_email` dispatcher). `worker.ts` exports `scheduled()` for Cloudflare Cron Triggers. |
+| 8  | 🔲 Open | Mid | P3 | `arch` | **Caching layer** | `getSubscription()` called on every authenticated request with no cache. 60s KV cache wrapping it eliminates most billing DB reads. Needs `KV_CACHE` binding in `wrangler.toml`. |
+| 71 | 🔲 Open | Mid | P3 | `feature` | **AI career copilot ("What should I do next?")** | Weekly AI action plan based on activity, matches, market signals. Primary value justification for Premium individual plan. `POST /api/dashboard/career-copilot`. |
+| 72 | 🔲 Open | Mid | P3 | `feature` | **"Resume Roast" viral engine** | Surface existing resume-roast as shareable social content. "AI roasts this resume." Organic traffic driver via social sharing. |
+| 73 | 🔲 Open | Mid | P3 | `feature` | **AI Mock Interview → pre-qualified candidates** | Recorded mock interviews scored by AI; share results with recruiters. Candidates arrive pre-qualified, reducing screening time. |
+| 74 | 🔲 Open | Mid | P3 | `feature` | **Affiliate program scaling** | Target career coaches, resume writers, TikTok creators. Revenue share on subscriptions + recruiter deals. |
+| 75 | 🔲 Open | Later | P3 | `feature` | **White-label / agency tier** | Staffing agencies want product under their own brand. $500–2,000/mo per agency client. |
+| 76 | 🔲 Open | Later | P3 | `feature` | **Candidate assessments / skills tests** | Timed, AI-graded skills test on profile. Codility/HackerRank charge separately — bundling is a competitive advantage. |
+| 77 | 🔲 Open | Later | P3 | `feature` | **Autonomous job application agent** | Applies to jobs on behalf of user — tailors resume + video, tracks pipeline. ~$20–50/mo paid tier. |
+| 78 | 🔲 Open | Later | P3 | `feature` | **TikTok-style talent discovery feed** | Short video intros, recruiter swipe, algorithmic candidate surfacing. Video as core identity primitive, not just a feature. |
+| 81 | 🔲 Open | Later | P3 | `feature` | **SEO content engine** | AI-generated pages: "Best resume for [job title]", "Salary for [role]". Structured data already in DB. |
+| 82 | 🔲 Open | Later | P3 | `feature` | **Creator / influencer mode** | Build audiences, post career content, sell resume templates. |
+| 83 | 🔲 Open | Later | P3 | `feature` | **Smart job board layer** | Aggregate jobs from major boards, AI match + rank, apply automation. Compete on intelligence, not listings. |
+| 1  | 🔲 Open | Later | P4 | `arch` | **No automated tests** | Vitest + `@cloudflare/vitest-pool-workers`. `createApp()` is a pure function — testable without mocking the Worker runtime. |
+| 2  | 🔲 Open | Soon | P4 | `arch` | **No OpenAPI / Swagger** | `@hono/zod-openapi` + `hono/swagger-ui`. Generates spec from existing Zod schemas with minimal migration effort. |
+| 4  | 🔲 Open | Later | P4 | `quality` | **Business logic in route handlers** | Refactor inline DB queries into `services/`. Pattern established in `services/billing.ts`, `services/account.ts`. |
+| 5  | 🔲 Open | Later | P4 | `arch` | **No repository abstraction** | Low ROI given Drizzle's design. Revisit if test mocking becomes the driver. |
 
-The platform has three personas with very different revenue potential:
-
-| Persona | Realistic ARPU | Paying users needed for $15k MRR |
-|---------|---------------|----------------------------------|
-| Job Seeker (individual) | $15–20 / mo | ~850 |
-| Recruiter (individual) | $50–99 / mo | ~200 |
-| Employer (team) | $200–500 / mo | ~40 |
-
-**The implication is brutal:** one employer account is worth 10–25 job seekers. Every product decision should be evaluated against whether it moves employers and recruiters toward paying — not just job seeker signups.
-
-The current product has all three personas but is structurally optimised for job seekers. The gaps, sorted by revenue impact, tell a different story.
-
----
-
-### Phase 0 — Stop Giving Away the Product (Week 1–2)
-
-Nothing else matters if paying users get the same product as free users. These are **revenue leaks**, not feature gaps.
-
-| Priority | Gap # | What to Build | Revenue Impact |
-|----------|--------|---------------|----------------|
-| 🔴 P0.1 | #21 | **Enforce subscription tiers at the API level** | Every Premium feature is currently free. No enforcement = zero upgrade incentive. This is the single highest-leverage change in the entire codebase. |
-| 🔴 P0.2 | #22 | **Gate Salary Calculator to Premium** | One of the most-used standalone tools. Paywalling with a visible upsell prompt is the fastest A/B-testable conversion lever. |
-| 🔴 P0.3 | #25 | **Enforce team size limits (≤2 free)** | Every recruiter and employer team beyond 2 members is a free rider. Hard-capping and prompting upgrade converts team admins — your highest-ARPU users. |
-| 🔴 P0.4 | **NEW** | **In-product upgrade prompts + usage meters** | Users need to see what they're missing. Add visible "X of 10 AI requests used", "Upgrade for unlimited matching", and feature-locked UI states. Without this, even enforced limits don't convert — users just stop using the feature. |
-| 🔴 P0.5 | **NEW** | **Annual billing option (20% discount)** | Annual plans improve cash flow, reduce monthly churn, and are psychologically sticky. A user who paid $180 upfront will not cancel in month 3. |
-
----
-
-### Phase 1 — Fill the Funnel (Week 2–6)
-
-You cannot enforce tiers on users who never signed up. These gaps cap acquisition.
-
-| Priority | Gap # | What to Build | Revenue Impact |
-|----------|--------|---------------|----------------|
-| 🟠 P1.1 | #42 | **Google + LinkedIn OAuth** | Password/email signup has 60–70% drop-off vs OAuth. Every friction point here is a lost conversion. LinkedIn is table-stakes for a hiring platform — recruiters will not create a new password account. |
-| 🟠 P1.2 | #40 | **Shareable "Hire Me" public profiles** | Each profile is a free SEO page and a viral distribution loop. Job seekers share their URL; recruiters click it; recruiters convert. This is how you grow to 850+ paying job seekers without spending on ads. |
-| 🟠 P1.3 | #9 | **LinkedIn OAuth full flow** | Covered partially by P1.1, but specifically: importing LinkedIn profile data on signup fills in the job seeker's profile instantly. A complete profile on day 1 dramatically improves activation and reduces churn. |
-| 🟠 P1.4 | **NEW** | **Freemium activation sequence (onboarding email drip)** | New signups need to hit an "aha moment" within 72 hours. A 3-email sequence — (1) profile completion prompt, (2) first job match, (3) Premium feature showcase — can double 30-day retention and conversion rates. |
-| 🟠 P1.5 | **NEW** | **Resume/profile AI score (free preview, full detail Premium)** | Give every job seeker a score out of 100 for free. Show what's dragging it down only on Premium. This is the single most effective freemium hook in the career space — LinkedIn Premium and Resume.io both use this pattern. |
-
----
-
-### Phase 2 — Unlock B2B Revenue (Month 1–3)
-
-Employers and recruiters pay 5–25× more than job seekers. The current product does not give them enough value to justify a team subscription.
-
-| Priority | Gap # | What to Build | Revenue Impact |
-|----------|--------|---------------|----------------|
-| 🟡 P2.1 | #10 | **Full-text + faceted candidate search** | This is the core recruiter product. If a recruiter cannot search "React developer, London, 5 years, open to work" and get a ranked list, the entire recruiter plan has no value proposition. No search = no B2B. |
-| 🟡 P2.2 | #16 | **Hiring success metrics dashboard** | Employers and finance teams need to justify the subscription to their CFO. "We filled 8 roles in 45 days at $1,200 per hire vs $8,000 market rate" is the ROI story that renews contracts. Without metrics, you are selling on faith. |
-| 🟡 P2.3 | #17 | **Time-to-hire analytics** | Companion to P2.2. The KPI every recruiter is measured on. Surface it natively and you embed the product into their weekly reporting workflow — the definition of sticky. |
-| 🟡 P2.4 | #11 | **Calendar integration (Google + Outlook)** | Recruiters schedule 5–20 interviews per week. If they have to copy/paste between hired.video and their calendar, they stop using hired.video. Calendar sync is a retention requirement, not a nice-to-have. |
-| 🟡 P2.5 | #41 | **Recruiter ↔ candidate direct messaging** | Outreach that stays inside the platform creates data, enables automation, and makes switching costs real. A recruiter who has sent 200 messages on-platform will not migrate to a competitor. |
-| 🟡 P2.6 | **NEW** | **Employer branding pages** | Companies pay separately for branding. A dedicated company page with custom video, culture content, and job listings — distinct from a plain company profile — is a paid add-on that justifies a higher-tier plan. |
-| 🟡 P2.7 | **NEW** | **ATS integrations (Greenhouse, Lever, Workday)** | Enterprise employers will not abandon their existing ATS. A two-way sync that pushes candidates from hired.video into their ATS removes the biggest objection in an enterprise sales call. This is required to close deals above $500/mo. |
-| 🟡 P2.8 | #13 | **Hiring & onboarding offers** | Closing a hire inside the platform (offer letter, e-signature, onboarding tasks) extends the revenue-generating lifecycle per seat and creates natural upsell moments. |
-
----
-
-### Phase 3 — Defend and Expand (Month 3–6)
-
-At this point you have revenue. The job is to protect it (reduce churn) and expand it (upsell, cross-sell).
-
-| Priority | Gap # | What to Build | Revenue Impact |
-|----------|--------|---------------|----------------|
-| 🟢 P3.1 | #15 | **Automated recruiter outreach sequences** | Time-based and behaviour-triggered follow-ups are the difference between a $50/mo recruiter plan and a $150/mo "Recruiter Pro" plan. This is the primary upsell lever for the recruiter persona. |
-| 🟢 P3.2 | #18 | **Career progress tracking (job seekers)** | Job seekers who track goals and see progress have dramatically lower churn. A paying job seeker who cancelled is gone — acquire them again costs money. |
-| 🟢 P3.3 | #14 | **Performance management** | Unlocks a "retain employees" use case beyond hiring. Employers who use the platform throughout the employee lifecycle (hire → performance → offboard) are churning from an operating system, not a hiring tool — churn rate drops to near zero. |
-| 🟢 P3.4 | **NEW** | **White-label / agency tier** | Staffing agencies and RPO firms want the product under their own brand to sell to clients. A white-label tier at $500–2,000/mo with 5–20 agency clients is $2,500–$40,000 MRR from a single product SKU change. |
-| 🟢 P3.5 | **NEW** | **Candidate assessments / skills tests** | Premium job seekers and employers both want verified skills. A short skills test (timed, AI-graded) attached to a profile commands higher recruiter attention and justifies a higher plan tier. Codility and HackerRank charge separately for this — bundling it is a competitive advantage. |
-| 🟢 P3.6 | **NEW** | **AI career copilot ("What should I do next?")** | A weekly AI-generated action plan based on the job seeker's activity, matches, and market signals. This single feature can be the primary value justification for the Premium individual plan — without it, Premium is "more of the same". |
-| 🟢 P3.7 | #19 | **Exclusive job boards + bidding** | A marketplace where employers bid for placement creates platform-side revenue (take rate) independent of subscriptions. At scale this becomes the dominant revenue line. |
-| 🟢 P3.8 | #3 | **Background job workers** | Video generation is likely broken. A platform called hired.**video** that cannot generate video reliably will not retain job seekers or convince recruiters the product is serious. |
-
----
-
-### Features Missing Entirely — Required for Profitability
-
-These do not appear in any existing gap or roadmap entry but are required to operate a profitable SaaS business in this category:
-
-| # | Feature | Why Required |
-|---|---------|-------------|
-| A | **Paywall / upgrade UI components** | No upgrade flow = no conversions regardless of what you gate. Every locked feature needs a modal, a tooltip, and a CTA that routes to checkout. |
-| B | **Trial period (7 or 14 days)** | Premium features need to be experienced before users pay. A time-limited trial with credit card capture converts 3–5× better than a cold paywall. |
-| C | **Usage meters visible to users** | "8 of 10 AI requests used this month" shown in the UI is the most effective passive upsell prompt in SaaS. Users who can see the limit approaching convert at the moment of friction, not after hitting a hard block. |
-| D | **Churn / cancellation flow** | When a user cancels, show them what they lose, offer a pause option, and offer a downgrade. Well-designed cancellation flows save 15–25% of would-be churns. |
-| E | **Referral programme UI** | The affiliate backend exists. A simple "Give a friend 1 month free, get 1 month free" in-product referral loop is the lowest-CAC acquisition channel available. |
-| F | **Employer seat-based billing** | Employers need to add/remove team members and pay per seat. A flat company plan does not scale with the employer and leaves revenue on the table as teams grow. |
-| G | **In-app notifications for billing events** | "Your trial ends in 3 days", "Payment failed — update your card", "You've used 90% of your AI credits". Without these, users churn passively without ever being asked to stay. |
-| H | **Admin revenue dashboard (internal)** | MRR, churn rate, trial-to-paid conversion, ARPU by persona. Without this you cannot make product decisions based on what is actually driving revenue. Gap #39 (ProductDashboard SaaS metrics) partially covers this but needs verification. |
-| I | **"Apply with hired.video" embeddable button** | A one-click button that job boards and company career pages can embed. Every click is a new user acquisition. This is distribution infrastructure, not a feature. |
-| J | **Recruiter talent sourcing / Boolean search** | Recruiters who pay $50–100/mo expect LinkedIn Recruiter-level search. Boolean operators, location radius, skill filters, and saved searches. Without this, the recruiter plan cannot be sold to serious agency recruiters. |
-
----
-
-### Advertising as a Revenue Stream
-
-Advertising transforms the free tier from a pure cost centre into a direct revenue line. On a hiring platform the audience is exceptionally high-intent — active job seekers, recruiters with open roles, employers with hiring budgets — which commands CPMs 3–5× higher than general consumer audiences. Used correctly, ads make the free tier profitable on its own while simultaneously strengthening the upgrade argument: **"Go Premium to remove ads"** is the oldest, clearest value proposition in consumer software.
-
-#### Ad Revenue Models Available
-
-| Model | Description | Who Pays | Effort |
-|-------|-------------|----------|--------|
-| **Display ads (programmatic)** | Google AdSense / Prebid on free-tier pages. Banner, sidebar, and in-feed placements. Toggle off for Premium users. | Ad networks (CPM) | Low — integrate AdSense or a header-bidding wrapper |
-| **Sponsored job listings** | Employers pay to pin their job to the top of search results and the job feed. Distinct from a Premium subscription — a per-post or weekly/monthly fee. | Employers | Medium — add `sponsored` flag + bidding/flat-rate to job schema |
-| **Featured candidate profiles** | Job seekers pay a one-off fee (or use Premium credits) to be highlighted in recruiter search results for 7/14/30 days. | Job seekers | Medium — add `featured_until` to profile schema |
-| **Recruiter spotlight** | Recruiters pay to appear at the top of the "recruiters near you" or "recruiters hiring for X" surfaces. | Recruiters | Medium |
-| **Email newsletter ads** | If an outbound email sequence is introduced (Phase 1 drip), a "Sponsored by [Company]" slot in free-tier emails is passive revenue with zero additional engineering. | Advertisers / employers | Low |
-| **Video ad pre-rolls** | For free-tier users viewing other users' video resumes, a short 5-second employer-branded pre-roll. Premium users see none. | Employers | High — requires ad serving, video ad infrastructure |
-
-#### Ad-Free as a Conversion Lever
-
-"No ads" must be a visible, tangible benefit on the pricing page — not buried in a feature list. The conversion psychology:
-
-1. Free user encounters an ad mid-workflow (e.g. reviewing a job match)
-2. A dismissible banner appears: *"Upgrade to Premium — no ads, unlimited AI, priority matching"*
-3. One click to a checkout with 14-day trial
-
-The ad experience on free should be **noticeable but not hostile** — intrusive enough to motivate upgrade, non-intrusive enough that users do not immediately abandon the product. Mid-page banners and sponsored content work; interstitials and pop-ups destroy retention.
-
-#### What Needs to Be Built
-
-| # | Feature | Type | Effort | Notes |
-|---|---------|------|--------|-------|
-| K | **Ad slot components (frontend)** | `feature` | Low | Reusable `<AdSlot>` React component that renders when `user.plan === "free"` and renders nothing for Premium. Google AdSense publisher tag takes 10 minutes to integrate. |
-| L | **Premium ad-free flag enforcement (API)** | `billing` | Low | Extend the subscription enforcement work (#21) — the same middleware that gates features also sets an `adsEnabled` flag in the JWT/session. |
-| M | **Sponsored job listing schema + admin UI** | `feature` | Medium | Add `sponsored: boolean`, `sponsored_until: timestamp`, and `sponsored_rank_boost: int` to the jobs schema. Admin UI to approve/set sponsorship. Self-serve checkout for employers is Phase 2. |
-| N | **Featured profile schema + checkout** | `feature` | Medium | Add `featured_until: timestamp` to `userProfiles`. Job seeker can pay a one-off fee via the existing Stripe setup-intent flow to feature their profile for N days. |
-| O | **Ad revenue reporting (internal dashboard)** | `quality` | Low | Track impressions, clicks, and estimated revenue from AdSense in the internal admin dashboard alongside subscription MRR. Without this you cannot optimise placement or justify the trade-off with user experience. |
-
-#### Revenue Projection — Advertising
-
-Rough benchmarks for a hiring-focused audience:
-
-| Signal | Estimate |
-|--------|----------|
-| Programmatic CPM (career/hiring audience) | $8–15 |
-| Page views per free user per month | ~30 |
-| Ad impressions per page view | ~2 |
-| Monthly ad revenue per free user | ~$0.50–0.90 |
-| 5,000 free users | **$2,500–$4,500 / mo** |
-| 20,000 free users | **$10,000–$18,000 / mo** |
-
-Sponsored job listings (employer-direct) at $50–200/week per slot add on top of programmatic at near-100% margin. A platform with 20 sponsored slots filled consistently at $100/week generates **$8,000/mo from job posting revenue alone**, independent of subscriptions.
-
----
-
-### Revenue Priority Summary (Ordered)
-
-| Rank | Item | Type | Effort | Revenue Lever |
-|------|------|------|--------|---------------|
-| 1 | Enforce subscription tiers (#21) | `billing` | Low | Immediately monetises existing user base |
-| 2 | Ad slot components — free tier (K) | `feature` | Low | Free users become revenue-generating from day one |
-| 3 | Ad-free flag in Premium (L) | `billing` | Low | "No ads" becomes the clearest upgrade reason on the pricing page |
-| 4 | Upgrade prompts + usage meters (A, C) | `feature` | Low | Converts free → paid passively |
-| 5 | Annual billing option | `feature` | Low | Improves cash flow, reduces churn |
-| 6 | Gate salary calculator (#22) | `billing` | Low | High-visibility upsell moment |
-| 7 | Enforce team size limits (#25) | `billing` | Low | Forces recruiter/employer upgrade |
-| 8 | Sponsored job listings (M) | `feature` | Medium | Direct employer revenue; zero dependency on subscriber count |
-| 9 | Google + LinkedIn OAuth (#42) | `feature` | Medium | Removes #1 acquisition blocker; more users = more ad impressions + subscribers |
-| 10 | Shareable "Hire Me" profiles (#40) | `feature` | Medium | Viral loop; SEO; zero-CAC acquisition |
-| 11 | Resume/profile AI score | `feature` | Medium | Highest-converting freemium hook in career space |
-| 12 | Featured candidate profiles (N) | `feature` | Medium | One-off job seeker purchases; no subscription required |
-| 13 | Full-text candidate search (#10) | `feature` | High | Core B2B value prop; without it recruiter plan is unsellable |
-| 14 | Hiring success metrics (#16, #17) | `feature` | Medium | ROI story that justifies employer renewal |
-| 15 | Calendar integration (#11) | `feature` | High | Retention requirement for recruiter persona |
-| 16 | Recruiter ↔ candidate messaging (#41) | `feature` | Medium | Platform stickiness; switching costs |
-| 17 | Trial period + cancellation flow (B, D) | `feature` | Low | 3–5× trial conversion; saves 15–25% churns |
-| 18 | Referral programme UI | `feature` | Low | Lowest-CAC acquisition channel available |
-| 19 | Background job workers (#3) | `arch` | High | Video generation reliability — core product promise |
-| 20 | ATS integrations | `feature` | High | Required to close enterprise deals |
-| 21 | Employer seat-based billing | `billing` | Medium | Scales revenue with team growth |
-| 22 | White-label / agency tier | `feature` | Medium | $500–2,000/mo per agency client |
-| 23 | AI career copilot | `feature` | Medium | Primary Premium value prop for job seekers |
-| 24 | Automated outreach sequences (#15) | `feature` | Medium | Primary upsell lever for recruiter Pro tier |
-
----
-
-## Pricing Page Gap Implementation Log
-
-Analysis of the pricing page (Job Seeker / Recruiter / Employer personas, Free vs Premium) against the codebase, completed 2026-03-23. All 20 gaps have been addressed.
-
-| # | Feature | Persona | Status | Implementation |
-|---|---------|---------|--------|----------------|
-| 1 | Calendar Integration | Recruiter / Employer | ✅ Done | `schema/calendar.ts` — `calendarConnections`, `scheduledEvents`, `availabilitySlots`; `GET/POST /api/calendar/events`, availability, and connections |
-| 2 | API Key Management | All | ✅ Done | `schema/apikeys.ts` — prefix + SHA-256 hash; key shown once at creation; `GET/POST /api/apikeys`, `DELETE/PATCH /api/apikeys/:id` |
-| 3 | Hiring & Onboarding | Employer | ✅ Done | `schema/onboarding.ts` — offer letters, checklists, tasks; completion % auto-computed; `GET/POST /api/hiring/offers`, `/checklists` |
-| 4 | Performance Management | Employer | ✅ Done | `schema/performance.ts` — cycles, reviews, goals/OKRs; `GET/POST /api/performance/cycles`, `/reviews`, `/goals` |
-| 5 | Automated Follow-ups | Recruiter | ✅ Done | `schema/followups.ts` — sequences, steps, enrollments, logs; `nextSendAt` from first step delay; `GET/POST /api/followups/sequences`, `/enroll` |
-| 6 | Hiring Success Metrics | Employer | ✅ Done | Employer dashboard now queries real `jobItems`, `jobApplications`, `placements`; `GET /api/dashboard/employer` |
-| 7 | Time-to-Hire Analytics | Employer | ✅ Done | Avg days to fill computed from placement `startDate`/`endDate`; included in employer dashboard |
-| 8 | Career Progress Tracking | Job Seeker | ✅ Done | Monthly application trend (6 months) + interview practice scores; `GET /api/dashboard/career-progress` (Premium-gated) |
-| 9 | Employee Community | Employer | ✅ Done | Posts in `feedPosts` with `privacy=Private` + `company:{id}:{channel}` tags; `GET/POST/DELETE /api/community/posts`, `/channels` |
-| 10 | Exclusive Job Boards + Bidding | Employer | ✅ Done | `schema/jobboards.ts` — boards + bids; `GET /api/boards/exclusive`, `GET/POST/DELETE /api/boards/bids` |
-| 11 | AI Usage Enforcement | All | ✅ Done | `checkAIUsage` applied to `match.ts`, `interview.ts`, `resume-scorer.ts`, `resume-optimizer.ts` |
-| 12 | Video Templates | All | ✅ Done | 3 free templates + 5 Premium (1080p, cinematic, branded); subscription-gated; `GET /api/studio/templates` |
-| 13 | Dashboard Real Data | All | ✅ Done | All three role dashboards rewritten with real DB queries using `Promise.all`; `GET /api/dashboard/jobseeker|recruiter|employer` |
-| 14 | Interview Scheduling | Recruiter | ✅ Done | AI question generation gated via `checkAIUsage`; `POST /api/interview/questions` |
-| 15 | Smart Outreach | Recruiter | ✅ Done | Full follow-up sequence backend (gap 5) covers this |
-| 16 | Smart Notifications | All | ✅ Done | Priority score per notification (type weight + recency + unread bonus); `GET /api/notifications/smart` (Premium-gated) |
-| 17 | Salary Gating | Job Seeker | ✅ Done | Already enforced via `requirePremium` in `salary.ts` — no change needed |
-| 18 | Message Personalization | Recruiter | ✅ Done | Free: generic template; Premium: LLM-personalized outreach by recipient/role/tone; `POST /api/messages/personalize` |
-| 19 | AI Job Matching Tiers | All | ✅ Done | New Premium-only deep analysis: skill gaps, seniority fit, career trajectory, interview tips, certifications; `POST /api/match/insights` |
-| 20 | Team Size Limits | Employer | ✅ Done | Already enforced via `checkTeamSize` in `account.ts` — no change needed |
-
-> **Note:** Gaps 1–10 required new schema files (`schema/calendar.ts`, `apikeys.ts`, `onboarding.ts`, `performance.ts`, `followups.ts`, `jobboards.ts`) — run `npm run db:push` to apply migrations before deploying.

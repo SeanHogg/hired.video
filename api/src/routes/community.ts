@@ -104,6 +104,28 @@ communityRoutes.post("/posts", requirePremium("Employee Community"), async (c) =
     })
     .returning();
 
+  // Notify all company members except the poster (#19)
+  const members = await db
+    .select({ userId: schema.userCompanyRoleAssociations.userId })
+    .from(schema.userCompanyRoleAssociations)
+    .where(eq(schema.userCompanyRoleAssociations.companyId, parsed.data.companyId));
+
+  const recipientIds = members.map((m) => m.userId).filter((id) => id !== userId);
+  if (recipientIds.length > 0) {
+    await db
+      .insert(schema.notifications)
+      .values(
+        recipientIds.map((rid) => ({
+          userId: rid,
+          type: "community_post",
+          title: "New community post",
+          message: `A new post was shared in the ${parsed.data.channel} channel.`,
+          data: { postId: post.id, channel: parsed.data.channel, companyId: parsed.data.companyId } as any,
+        })),
+      )
+      .catch(() => undefined); // fire-and-forget
+  }
+
   return c.json(success(post), 201);
 });
 

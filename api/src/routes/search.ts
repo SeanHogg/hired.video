@@ -76,6 +76,12 @@ searchRoutes.get("/public", async (c) => {
   const page = Math.max(1, Number(c.req.query("page") ?? 1));
   const limit = Math.min(100, Math.max(1, Number(c.req.query("limit") ?? 20)));
   const location = String(c.req.query("location") ?? "").trim();
+  const employmentType = c.req.query("employmentType") || undefined;
+  const experienceLevel = c.req.query("experienceLevel") || undefined;
+  const isRemoteParam = c.req.query("isRemote");
+  const isRemote = isRemoteParam === "true" ? true : isRemoteParam === "false" ? false : undefined;
+  const salaryMin = c.req.query("salaryMin") ? Number(c.req.query("salaryMin")) : undefined;
+  const salaryMax = c.req.query("salaryMax") ? Number(c.req.query("salaryMax")) : undefined;
 
   const includeJobs = category === "all" || category === "jobs";
   const includeCompanies = category === "all" || category === "companies";
@@ -83,7 +89,17 @@ searchRoutes.get("/public", async (c) => {
   const includeResumes = category === "all" || category === "resumes";
 
   const jobsPromise = includeJobs
-    ? getPublicJobs({ page: 1, limit: 100, search: search || undefined, location: location || undefined })
+    ? getPublicJobs({
+        page: 1,
+        limit: 100,
+        search: search || undefined,
+        location: location || undefined,
+        employmentType,
+        experienceLevel,
+        isRemote,
+        salaryMin,
+        salaryMax,
+      })
     : Promise.resolve({ items: [], total: 0, page: 1, limit: 0, totalPages: 0, hasNext: false, hasPrev: false });
 
   const db = getDb();

@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { seedSuperAdminAndCompany } from "./seed.js";
+import { runScheduled } from "./scheduled.js";
 
 // NOTE: `wrangler dev` will inject env vars via `wrangler.toml` or your shell.
 // This file intentionally avoids bundling `dotenv` to keep the worker bundle small.
@@ -19,5 +20,13 @@ export default {
       console.error("Failed to seed superadmin/company:", err);
     });
     return app.fetch(request, env, ctx);
+  },
+
+  // Cloudflare Cron Trigger — configure in wrangler.toml:
+  //   [[triggers]]
+  //   crons = ["*/5 * * * *"]
+  async scheduled(event: any, env: any, ctx: any) {
+    (globalThis as any).__ENV = env;
+    ctx.waitUntil(runScheduled());
   },
 };

@@ -216,3 +216,120 @@ analyticsRoutes.get("/time-to-hire", requirePremium("Time-to-Hire Analytics"), a
 
   return c.json(success({ avgDays, totalPlacements: withDays.length, byJob, trend }), 200);
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/analytics/hiring-metrics — per-role pipeline conversion report (#16)
+// Requires Premium. Returns application-to-hire funnel per job role, pipeline
+// stage breakdown, and a monthly trend of hires.
+// ---------------------------------------------------------------------------
+analyticsRoutes.get("/hiring-metrics", requirePremium("Hiring Metrics"), async (c) => {
+  const uid = c.var.user.sub;
+  const from = c.req.query("from") ? new Date(c.req.query("from")!) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date();
+  const db = getDb();
+
+  // Applications to jobs posted by this user, within the date window
+  const applications = await db
+    .select({
+      id: schema.jobApplications.id,
+      jobId: schema.jobApplications.jobId,
+      status: schema.jobApplications.status,
+      appliedAt: schema.jobApplications.appliedAt,
+      jobTitle: schema.jobItems.title,
+    })
+    .from(schema.jobApplications)
+    .leftJoin(schema.jobItems, eq(schema.jobApplications.jobId, schema.jobItems.id))
+    .where(
+      and(
+        eq((schema.jobItems as any).postedByUserId, uid),
+        gte(schema.jobApplications.appliedAt, from),
+        lt(schema.jobApplications.appliedAt, to),
+      ),
+    );
+
+  // Placements (hires) within the date window
+  const hirePlacements = await db
+    .select({ jobId: schema.placements.jobId, jobTitle: schema.placements.jobTitle, createdAt: schema.placements.createdAt })
+    .from(schema.placements)
+    .where(
+      and(
+        eq(schema.placements.recruiterId, uid),
+        gte(schema.placements.createdAt, from),
+        lt(schema.placements.createdAt, to),
+      ),
+    );
+
+  // Aggregate pipeline by job role
+  const byRole: Record<string, {
+    jobId: string | null;
+    jobTitle: string | null;
+    applied: number;
+    reviewing: number;
+    interviewed: number;
+    offered: number;
+    hired: number;
+    rejected: number;
+  }> = {};
+
+  for (const app of applications) {
+    const key = app.jobId ?? "unknown";
+    if (!byRole[key]) {
+      byRole[key] = { jobId: app.jobId, jobTitle: app.jobTitle ?? "Unknown Role", applied: 0, reviewing: 0, interviewed: 0, offered: 0, hired: 0, rejected: 0 };
+    }
+    const status = (app.status ?? "applied").toLowerCase();
+    byRole[key].applied++;
+    if (status === "reviewing") byRole[key].reviewing++;
+    else if (status === "interviewed" || status === "interview") byRole[key].interviewed++;
+    else if (status === "offered") byRole[key].offered++;
+    else if (status === "hired" || status === "accepted") byRole[key].hired++;
+    else if (status === "rejected" || status === "declined") byRole[key].rejected++;
+  }
+
+  // Supplement hired counts from placements table
+  for (const p of hirePlacements) {
+    const key = p.jobId ?? "unknown";
+    if (!byRole[key]) {
+      byRole[key] = { jobId: p.jobId, jobTitle: p.jobTitle ?? "Unknown Role", applied: 0, reviewing: 0, interviewed: 0, offered: 0, hired: 0, rejected: 0 };
+    }
+    byRole[key].hired = Math.max(byRole[key].hired, (byRole[key].hired || 0) + 1);
+  }
+
+  const roles = Object.values(byRole).map((r) => ({
+    ...r,
+    conversionRate: r.applied > 0 ? Math.round((r.hired / r.applied) * 1000) / 10 : 0,
+  }));
+
+  // Overall funnel totals
+  const totals = roles.reduce(
+    (acc, r) => {
+      acc.applied += r.applied;
+      acc.reviewing += r.reviewing;
+      acc.interviewed += r.interviewed;
+      acc.offered += r.offered;
+      acc.hired += r.hired;
+      acc.rejected += r.rejected;
+      return acc;
+    },
+    { applied: 0, reviewing: 0, interviewed: 0, offered: 0, hired: 0, rejected: 0 },
+  );
+
+  // Monthly trend of hires (from placements)
+  const monthlyHires: Record<string, number> = {};
+  for (const p of hirePlacements) {
+    const month = new Date(p.createdAt).toISOString().slice(0, 7);
+    monthlyHires[month] = (monthlyHires[month] ?? 0) + 1;
+  }
+  const hireTrend = Object.entries(monthlyHires)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, hires]) => ({ month, hires }));
+
+  return c.json(
+    success({
+      period: { from: from.toISOString(), to: to.toISOString() },
+      funnel: totals,
+      byRole: roles.sort((a, b) => b.applied - a.applied),
+      hireTrend,
+    }),
+    200,
+  );
+});

@@ -119,7 +119,7 @@ function getEnv(key: string): string {
 
 let _provider: EmailProvider | null = null;
 
-function getEmailProvider(): EmailProvider | null {
+export function getEmailProvider(): EmailProvider | null {
   if (_provider) return _provider;
 
   const clientId = getEnv("EMAIL_CLIENTID");

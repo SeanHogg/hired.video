@@ -38,6 +38,11 @@ jobRoutes.get("/", async (c) => {
     limit: query.limit ? Number(query.limit) : 10,
     search: query.search,
     location: query.location,
+    employmentType: query.employmentType,
+    experienceLevel: query.experienceLevel,
+    isRemote: query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
+    salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
+    salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
   });
   return c.json(success(data));
 });
@@ -89,6 +94,11 @@ jobRoutes.get("/public", async (c) => {
     limit: query.limit ? Number(query.limit) : 10,
     search: query.search,
     location: query.location,
+    employmentType: query.employmentType,
+    experienceLevel: query.experienceLevel,
+    isRemote: query.isRemote === "true" ? true : query.isRemote === "false" ? false : undefined,
+    salaryMin: query.salaryMin ? Number(query.salaryMin) : undefined,
+    salaryMax: query.salaryMax ? Number(query.salaryMax) : undefined,
   });
   return c.json(success(data));
 });
