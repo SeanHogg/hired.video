@@ -494,3 +494,86 @@ interviewRoutes.delete("/sessions/:id", async (c) => {
 
   return c.json(ok({ deleted: true }));
 });
+
+// ─── POST /api/interview/sessions/:id/share ───────────────────────────────────
+// Generate a public share link for a completed interview session so candidates
+// can send pre-qualified results to recruiters.
+
+interviewRoutes.post("/sessions/:id/share", async (c) => {
+  const user = c.var.user;
+  const sessionId = c.req.param("id");
+  const db = getDb();
+
+  const [session] = await db
+    .select()
+    .from(interviewSessions)
+    .where(and(eq(interviewSessions.id, sessionId), eq(interviewSessions.userId, user.sub)))
+    .limit(1);
+
+  if (!session) return c.json(fail("NOT_FOUND", "Session not found"), 404);
+
+  // Reuse existing token if already shared
+  if (session.shareToken && (session.isShared as any)) {
+    const shareUrl = `/interview/shared/${session.shareToken}`;
+    return c.json(ok({ shareToken: session.shareToken, shareUrl }), 200);
+  }
+
+  // Generate a short random token (12 hex chars = 6 bytes = low collision for this use case)
+  const rawToken = crypto.getRandomValues(new Uint8Array(16));
+  const shareToken = Array.from(rawToken).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  await db
+    .update(interviewSessions)
+    .set({ shareToken, isShared: true, updatedAt: new Date() } as any)
+    .where(eq(interviewSessions.id, sessionId));
+
+  const shareUrl = `/interview/shared/${shareToken}`;
+  return c.json(ok({ shareToken, shareUrl }), 200);
+});
+
+// ─── GET /api/interview/public/:shareToken ────────────────────────────────────
+// Public endpoint — no auth required. Returns a sanitised summary of a shared
+// interview session for recruiters to review.
+
+interviewRoutes.get("/public/:shareToken", async (c) => {
+  const { shareToken } = c.req.param();
+  const db = getDb();
+
+  const [session] = await db
+    .select()
+    .from(interviewSessions)
+    .where(and(eq(interviewSessions.shareToken, shareToken), eq(interviewSessions.isShared, true as any)))
+    .limit(1);
+
+  if (!session) return c.json(fail("NOT_FOUND", "Session not found or not shared"), 404);
+
+  const answers = await db
+    .select({
+      question: interviewAnswers.question,
+      score: interviewAnswers.score,
+      feedback: interviewAnswers.feedback,
+    })
+    .from(interviewAnswers)
+    .where(eq(interviewAnswers.sessionId, session.id));
+
+  const scoredAnswers = answers.filter((a) => a.score !== null);
+  const avgScore = scoredAnswers.length > 0
+    ? Math.round(scoredAnswers.reduce((s, a) => s + parseFloat(a.score!), 0) / scoredAnswers.length * 10) / 10
+    : null;
+
+  // Return sanitised data — no user ID, no raw transcript, no video URLs
+  return c.json(ok({
+    id: session.id,
+    interviewType: session.interviewType,
+    questionCount: (session.questions as any[])?.length ?? 0,
+    answeredCount: answers.length,
+    overallScore: session.overallScore ?? (avgScore !== null ? String(avgScore) : null),
+    status: session.status,
+    completedAt: session.updatedAt,
+    answers: answers.map((a) => ({
+      question: a.question,
+      score: a.score,
+      feedbackSummary: (a.feedback as any)?.summary ?? null,
+    })),
+  }), 200);
+});

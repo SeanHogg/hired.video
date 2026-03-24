@@ -82,11 +82,12 @@ function Landing() {
             </span>
           </div>
           <h1 className="text-5xl font-bold mb-6">
-            Turn Your Resume Into a Shareable Video in 60 Seconds
+            AI Video Creation for Candidates, Recruiters &amp; Companies
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Paste your resume and our AI generates a polished, professional video that showcases
-            your skills and personality — no camera, no editing, no experience required.
+            Whether you're a job seeker building a video resume, a recruiter promoting an open role,
+            or a company showcasing your brand — our AI writes the script and creates a polished video
+            in 60 seconds. No camera, no editing, no experience required.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup">
@@ -175,8 +176,9 @@ function Landing() {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />One-click YouTube publishing</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Public shareable link</div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />LinkedIn post generator</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Public shareable link + embed code</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />AI LinkedIn post generator — hook, caption, hashtags</div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />One-click "Post to LinkedIn" intent</div>
                 </div>
               </CardContent>
             </Card>
@@ -201,6 +203,68 @@ function Landing() {
                 <p className="text-sm text-muted-foreground">{desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Use cases */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-center mb-12">One Studio, Every Use Case</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { emoji: "🎓", title: "Video Resume", desc: "Stand out from the stack with an AI-generated video that tells your story in 30 seconds." },
+              { emoji: "📢", title: "Job Ad", desc: "Promote open roles with a compelling 30-second video ad — higher click-through than text." },
+              { emoji: "🏢", title: "Company Promo", desc: "Showcase your culture, values, and brand story to attract top talent and customers." },
+              { emoji: "🎯", title: "Recruiter Brand", desc: "Build your personal brand as a recruiter with a polished video that showcases your track record." },
+            ].map((item) => (
+              <div key={item.title} className="p-5 rounded-xl border border-border hover:border-primary/30 transition-colors text-center">
+                <span className="text-4xl mb-3 block">{item.emoji}</span>
+                <h3 className="font-semibold mb-2">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Advertising extras */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-center mb-12">Built for Advertising, Not Just Resumes</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+              <CardHeader>
+                <Users className="h-10 w-10 text-brand-purple mb-4" />
+                <CardTitle>Brand Kits</CardTitle>
+                <CardDescription>
+                  Save your colours, logo, and font once. Every video automatically applies your brand identity.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+              <CardHeader>
+                <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
+                <CardTitle>Video Analytics</CardTitle>
+                <CardDescription>
+                  Track views and CTA clicks per video. Group into campaigns and measure performance across channels.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+              <CardHeader>
+                <Play className="h-10 w-10 text-primary mb-4" />
+                <CardTitle>Embed &amp; Share</CardTitle>
+                <CardDescription>
+                  Embed on your website or job posting, share via public link, or generate a QR code CTA.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <Card className="border-green-500/20 hover:border-green-500/40 transition-colors">
+              <CardHeader>
+                <Share2 className="h-10 w-10 text-green-600 mb-4" />
+                <CardTitle>LinkedIn Post AI</CardTitle>
+                <CardDescription>
+                  AI generates a hook, caption, and hashtags for your video. One click posts it to LinkedIn — ready in seconds.
+                </CardDescription>
+              </CardHeader>
+            </Card>
           </div>
         </div>
 

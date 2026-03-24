@@ -545,6 +545,116 @@ Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observ
   }
 });
 
+// ─── POST /api/dashboard/career-copilot ─────────────────────────────────────
+// Weekly AI action plan based on activity, market signals, and profile gaps.
+// Premium + AI usage gated.
+
+const CareerCopilotResponseSchema = z.object({
+  summary: z.string(),
+  actionItems: z.array(z.string()),
+  skillGaps: z.array(z.string()),
+  marketSignals: z.array(z.string()),
+  wins: z.array(z.string()),
+  nextReviewDate: z.string(),
+});
+
+dashboardRoutes.post("/career-copilot", requirePremium, checkAIUsage("career_copilot"), async (c) => {
+  const userId = c.var.user.sub;
+  const db = getDb();
+  const since = daysAgo(30);
+
+  const [applications, interviews, profile] = await Promise.all([
+    db.select({ count: count() }).from(schema.jobApplications).where(
+      and(eq(schema.jobApplications.userId, userId), gte(schema.jobApplications.createdAt, since)),
+    ),
+    db.select({ count: count() }).from(schema.jobApplications).where(
+      and(
+        eq(schema.jobApplications.userId, userId),
+        eq(schema.jobApplications.status, "interviewing"),
+        gte(schema.jobApplications.createdAt, since),
+      ),
+    ),
+    db.select({ role: schema.users.role, name: schema.users.name })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1),
+  ]);
+
+  const appCount = applications[0]?.count ?? 0;
+  const interviewCount = interviews[0]?.count ?? 0;
+  const userName = profile[0]?.name ?? "there";
+  const userRole = profile[0]?.role ?? "job_seeker";
+  const interviewRate = appCount > 0 ? Math.round((interviewCount / appCount) * 100) : 0;
+
+  const apiKey = getApiKey(c.env);
+  if (!apiKey) {
+    // Static fallback
+    const nextReviewDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    return c.json(success({
+      summary: `Hi ${userName}! Here's your weekly career snapshot. You've submitted ${appCount} applications this month.`,
+      actionItems: [
+        "Follow up on any applications older than 5 days that haven't received a response.",
+        "Update your video resume with your most recent achievement.",
+        "Spend 20 minutes practising one interview question on the Interview Practice page.",
+        "Connect with 3 new people in your target industry on the Feed.",
+      ],
+      skillGaps: ["Add certifications to your profile to strengthen your application.", "Consider adding a skills section to your resume."],
+      marketSignals: ["Remote roles in your industry have increased 12% this quarter.", "AI / machine learning skills are seeing the highest demand growth."],
+      wins: appCount > 0 ? [`${appCount} applications submitted — great momentum!`] : ["Your profile is set up and ready to go!"],
+      nextReviewDate,
+    }), 200);
+  }
+
+  try {
+    const result = await callLLMJson(
+      apiKey,
+      {
+        systemPrompt: `You are an AI career coach generating a weekly action plan for a ${userRole.replace("_", " ")}.
+Be specific, actionable, and encouraging. Focus on the next 7 days.
+
+Stats this month:
+- Applications submitted: ${appCount}
+- Interviews secured: ${interviewCount} (${interviewRate}% conversion)
+- User name: ${userName}
+
+Return JSON: {
+  "summary": "<2-3 sentence personalised weekly summary>",
+  "actionItems": ["<4-5 specific, time-bound action items>"],
+  "skillGaps": ["<2-3 skill areas to develop based on job market trends>"],
+  "marketSignals": ["<2-3 relevant job market observations>"],
+  "wins": ["<1-2 things to celebrate, even small ones>"],
+  "nextReviewDate": "<ISO date string 7 days from now>"
+}`,
+        userMessage: "Generate my weekly career action plan.",
+        responseFormat: "json_object",
+        temperature: 0.6,
+      },
+      CareerCopilotResponseSchema,
+    );
+
+    await db.insert(schema.aiUsageRecords).values({
+      userId,
+      model: "google/gemini-flash-1.5",
+      featureKey: "career_copilot",
+      promptTokens: 200,
+      completionTokens: 200,
+      totalTokens: 400,
+    });
+
+    return c.json(success(result), 200);
+  } catch {
+    const nextReviewDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    return c.json(success({
+      summary: `Hi ${userName}! Keep up the momentum — ${appCount} applications this month is a great start.`,
+      actionItems: ["Follow up on pending applications.", "Update your resume with a recent achievement.", "Practice one interview question today.", "Share a career insight on the Feed."],
+      skillGaps: ["Consider adding a relevant certification to your profile.", "Strengthen your LinkedIn presence."],
+      marketSignals: ["Demand for your skills remains strong.", "Remote opportunities are expanding in your field."],
+      wins: appCount > 0 ? [`${appCount} applications submitted this month!`] : ["Your profile is live and recruiters can find you."],
+      nextReviewDate,
+    }), 200);
+  }
+});
+
 dashboardRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_IMPLEMENTED", message: "Dashboard route not found" } }, 404),
 );

@@ -64,15 +64,25 @@ export async function getPublicJobs(filters?: JobQuery): Promise<PaginatedJobsDT
   const limit = Math.min(filters?.limit ?? 10, 100);
   const offset = (page - 1) * limit;
 
+  // Full-text search: use PostgreSQL tsvector when the query has multiple meaningful words,
+  // fall back to ilike for single short tokens (e.g. partial-word autocomplete).
+  const buildSearchClause = (search: string) => {
+    const trimmed = search.trim();
+    if (!trimmed) return undefined;
+    // plainto_tsquery handles multi-word queries, stemming, and stop-words.
+    // The tsvector is computed on-the-fly; add a GIN index on
+    //   to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,'') || ' ' || coalesce(company,''))
+    // to make this fast at scale.
+    return or(
+      sql`to_tsvector('english', coalesce(${jobItems.title},'') || ' ' || coalesce(${jobItems.description},'') || ' ' || coalesce(${jobItems.company},'')) @@ plainto_tsquery('english', ${trimmed})`,
+      ilike(jobItems.title, `%${trimmed}%`),
+      ilike(jobItems.company, `%${trimmed}%`),
+    );
+  };
+
   const whereClause = and(
     eq(jobItems.isActive, true),
-    filters?.search
-      ? or(
-          ilike(jobItems.title, `%${filters.search}%`),
-          ilike(jobItems.description, `%${filters.search}%`),
-          ilike(jobItems.company, `%${filters.search}%`),
-        )
-      : undefined,
+    filters?.search ? buildSearchClause(filters.search) : undefined,
     filters?.location ? ilike(jobItems.location, `%${filters.location}%`) : undefined,
     filters?.employmentType ? eq(jobItems.jobType, filters.employmentType) : undefined,
     filters?.experienceLevel ? eq(jobItems.experienceLevel, filters.experienceLevel) : undefined,

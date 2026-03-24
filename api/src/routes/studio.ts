@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
@@ -7,19 +7,32 @@ import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
 import { getSubscription } from "../services/billing.js";
 
-const { studioProjects, videos, users, userProfiles } = schema;
+const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
 export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+// All scene types — covers both job-seeker (resume) and advertising use cases
+const SCENE_TYPES = [
+  "intro", "achievement", "skills", "closing",
+  // Advertising / promotional scene types
+  "job-details", "company-culture", "cta", "testimonial",
+  "product-feature", "brand-story", "requirements", "benefits",
+] as const;
+type SceneType = typeof SCENE_TYPES[number];
+
 const StoryboardSceneSchema = z.object({
   duration: z.number(),
-  type: z.enum(["intro", "achievement", "skills", "closing"]),
+  type: z.enum(SCENE_TYPES),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   text: z.string().optional(),
   skills: z.array(z.string()).optional(),
   visual: z.string(),
   camera: z.string(),
+  // Advertising extras
+  ctaUrl: z.string().optional(),
+  ctaText: z.string().optional(),
+  logoUrl: z.string().optional(),
 });
 
 const StoryboardSchema = z.object({
@@ -32,7 +45,7 @@ const StoryboardSchema = z.object({
 });
 
 const GenerateStoryboardSchema = z.object({
-  resumeText: z.string().min(20),
+  resumeText: z.string().min(10),
   targetDuration: z.number().min(10).max(120).default(28),
   resumeId: z.string().uuid().optional(),
   prompt: z.string().max(500).optional(),
@@ -41,6 +54,13 @@ const GenerateStoryboardSchema = z.object({
   temperature: z.number().min(0).max(1).optional(),
   resolution: z.enum(["720p", "1080p"]).optional(),
   motion: z.enum(["minimal", "moderate", "cinematic"]).optional(),
+  // Advertising: set purpose to unlock ad-specific scene types + prompts
+  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch"]).default("resume"),
+  // Brand kit to inject into generated script
+  brandKitId: z.string().uuid().optional(),
+  // CTA for ad use cases
+  ctaUrl: z.string().url().optional(),
+  ctaText: z.string().max(100).optional(),
 });
 
 const PublishVideoSchema = z.object({
@@ -95,11 +115,7 @@ function normalizeStoryboard(input: unknown): z.infer<typeof StoryboardSchema> |
     },
     scenes: old.scenes.slice(0, 4).map((s, idx) => ({
       duration: s.duration ?? 8,
-      type: (idx === 0 ? "intro" : idx === old.scenes.length - 1 ? "closing" : idx % 2 === 0 ? "skills" : "achievement") as
-        | "intro"
-        | "achievement"
-        | "skills"
-        | "closing",
+      type: (idx === 0 ? "intro" : idx === old.scenes!.length - 1 ? "closing" : idx % 2 === 0 ? "skills" : "achievement") as SceneType,
       title: s.title,
       text: s.narration,
       visual: s.visuals ?? "Professional office background",
@@ -127,18 +143,28 @@ const VideoScriptSchema = z.object({
     }).passthrough(),
     // Preserve music selection and any other video-level fields
     audio: z.object({ track: z.string(), label: z.string(), volume: z.number() }).optional(),
+    // Brand kit / advertising overlays
+    logoUrl: z.string().optional(),
+    logoPosition: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).optional(),
+    // Purpose label stored in the script so renderers can optimise for ad vs. resume
+    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch"]).optional(),
   }).passthrough(),
   scenes: z.array(z.object({
     id: z.string(),
     start: z.number(),
     duration: z.number(),
-    type: z.enum(["intro", "achievement", "skills", "closing"]),
+    type: z.enum(SCENE_TYPES),
     title: z.string().optional(),
     subtitle: z.string().optional(),
     text: z.union([z.string(), z.array(z.string())]).optional(),
     items: z.array(z.string()).optional(),
     skills: z.array(z.string()).optional(),
     highlight: z.boolean().optional(),
+    // Advertising fields
+    ctaUrl: z.string().optional(),
+    ctaText: z.string().optional(),
+    ctaQrCode: z.boolean().optional(),   // generate QR from ctaUrl
+    logoUrl: z.string().optional(),
     // Preserve all user-set per-scene customisations
     accentColor: z.string().optional(),
     backgroundImage: z.string().optional(),
@@ -189,6 +215,66 @@ function storyboardToVideoScript(sb: z.infer<typeof StoryboardSchema>, targetDur
       },
     },
     scenes,
+  };
+}
+
+function buildMockAdVideoScript(
+  text: string,
+  targetDuration: number,
+  motion: "minimal" | "moderate" | "cinematic",
+  purpose: StudioPurpose,
+  ctaUrl?: string,
+  ctaText?: string,
+): VideoScript {
+  const perScene = Math.max(5, Math.round(targetDuration / 4));
+  const name = text.replace(/\s+/g, " ").trim().slice(0, 60) || "Company";
+  const cta = ctaText ?? "Learn More";
+  const ctaSubtitle = ctaUrl ?? "Visit our website";
+
+  const scenesByPurpose: Record<StudioPurpose, VideoScript["scenes"]> = {
+    resume: [], // handled by the existing resume path
+    job_ad: [
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",       title: name, subtitle: "We're Hiring", text: "Join a team that is changing the industry." },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "job-details", title: "About the Role", items: ["Own end-to-end delivery of key features", "Collaborate with cross-functional teams", "Drive measurable business outcomes"] },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "requirements", title: "What We're Looking For", items: ["3+ years of relevant experience", "Strong communication & problem-solving skills", "Passion for innovation and growth"] },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",          title: "Ready to Apply?", text: "Take the next step in your career journey.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+    ],
+    company_promo: [
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",          title: name, subtitle: "Who We Are", text: "Building products that matter." },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story",    title: "Our Story", items: ["Founded with a mission to make a difference", "Grown to a team of passionate professionals", "Recognised for innovation and culture"] },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "company-culture", title: "Why Join Us", items: ["Flexible remote-first environment", "Competitive compensation & benefits", "Clear growth & development pathways"] },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",            title: "Partner With Us", text: "Let's build the future together.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+    ],
+    recruiter_brand: [
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",        title: name, subtitle: "Talent Partner", text: "Connecting exceptional talent with great companies." },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story",  title: "My Approach", items: ["Consultative, candidate-first methodology", "Deep expertise in niche markets", "Long-term partnership over transactional placements"] },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "testimonial",  title: "Client Results", items: ["200+ successful placements", "Average 18-day time-to-fill", "94% 1-year retention rate"] },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",          title: "Let's Work Together", text: "Whether you're hiring or seeking your next role — reach out.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+    ],
+    product_launch: [
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",           title: name, subtitle: "Introducing Something New", text: "The solution your team has been waiting for." },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "product-feature", title: "Key Features", items: ["Blazing-fast performance from day one", "Seamless integrations with your existing stack", "AI-powered insights that save hours per week"] },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "benefits",        title: "Why It Matters", items: ["Reduce operational overhead by 40%", "Ship faster with fewer errors", "Delight your customers every time"] },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",             title: "Get Started Today", text: "Join thousands of teams already winning.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+    ],
+  };
+
+  return {
+    video: {
+      duration: perScene * 4,
+      fps: 30,
+      resolution: "720p",
+      aspect: "16:9",
+      purpose,
+      theme: {
+        colorPalette: ["#1e3a5f", "#e8f4fd", "#f59e0b", "#ffffff"],
+        fontFamily: "Inter",
+        motion,
+        transition: "fade",
+        background: "gradient",
+      },
+    },
+    scenes: scenesByPurpose[purpose] ?? scenesByPurpose.job_ad,
   };
 }
 
@@ -247,7 +333,111 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
   };
 }
 
-function buildStudioSystemPrompt(targetDuration: number, motion: string, jobDescription?: string): string {
+type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch";
+
+function buildStudioSystemPrompt(
+  targetDuration: number,
+  motion: string,
+  jobDescription?: string,
+  purpose: StudioPurpose = "resume",
+  ctaUrl?: string,
+  ctaText?: string,
+): string {
+  const ctaBlock = ctaUrl ? `\n- For the "cta" scene: ctaUrl: "${ctaUrl}", ctaText: "${ctaText ?? "Learn More"}"` : "";
+  const typeInterface = `"intro"|"achievement"|"skills"|"closing"|"job-details"|"company-culture"|"cta"|"testimonial"|"product-feature"|"brand-story"|"requirements"|"benefits"`;
+
+  const baseInterface = `TypeScript interface:
+interface VideoScript {
+  video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; purpose: string; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
+  scenes: Array<{ id: string; start: number; duration: number; type: ${typeInterface}; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[]; ctaUrl?: string; ctaText?: string }>
+}`;
+
+  if (purpose === "job_ad") {
+    const jd = (jobDescription ?? "").slice(0, 3000);
+    return `You are a recruitment advertising director. Produce a JSON VideoScript for a ${targetDuration}-second job advertisement.
+
+RULES:
+- Exactly 4 scenes: intro → job-details → requirements → cta
+- Scene durations must sum to exactly ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences.
+
+SCENE CONTENT (derived from the job description provided):
+1. "intro" scene: title = company name, subtitle = job title, text = one compelling hook sentence about the opportunity
+2. "job-details" scene: title = "About the Role", items = 3–4 key responsibilities as concise bullet points
+3. "requirements" scene: title = "What We're Looking For", items = 3–4 must-have qualifications/skills
+4. "cta" scene: title = "Ready to Apply?", text = brief encouraging CTA copy, subtitle = "Apply Now"${ctaBlock}
+
+${baseInterface}
+
+Job Description:
+${jd}`;
+  }
+
+  if (purpose === "company_promo") {
+    return `You are a corporate video director. Produce a JSON VideoScript for a ${targetDuration}-second company promotional video.
+
+RULES:
+- Exactly 4 scenes: intro → brand-story → company-culture → cta
+- Scene durations must sum to exactly ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences.
+
+SCENE CONTENT (derived from the company brief provided):
+1. "intro" scene: title = company name, subtitle = tagline or sector, text = 1–2 sentence mission statement
+2. "brand-story" scene: title = "Our Story", items = 3–4 key milestones or differentiators
+3. "company-culture" scene: title = "Why Join Us", items = 3–4 culture/benefit highlights
+4. "cta" scene: title = "Partner With Us" (or "Hire With Us"), text = brief engaging close, subtitle = website or contact${ctaBlock}
+
+${baseInterface}
+
+Company Brief:
+`;
+  }
+
+  if (purpose === "recruiter_brand") {
+    return `You are a personal-brand video director. Produce a JSON VideoScript for a ${targetDuration}-second recruiter brand video.
+
+RULES:
+- Exactly 4 scenes: intro → brand-story → testimonial → cta
+- Scene durations must sum to exactly ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences.
+
+SCENE CONTENT (derived from the bio/profile provided):
+1. "intro" scene: title = recruiter name, subtitle = specialisation (e.g. "Tech Recruiter · 10+ Years"), text = 1-sentence personal brand statement
+2. "brand-story" scene: title = "My Approach", items = 3–4 values or differentiators that define this recruiter
+3. "testimonial" scene: title = "Client Results", items = 3–4 quantified outcomes (placements made, time-to-fill improvements, retention rates)
+4. "cta" scene: title = "Let's Work Together", text = one warm closing line, subtitle = LinkedIn or email${ctaBlock}
+
+${baseInterface}
+
+Bio/Profile:
+`;
+  }
+
+  if (purpose === "product_launch") {
+    return `You are a product marketing director. Produce a JSON VideoScript for a ${targetDuration}-second product launch video.
+
+RULES:
+- Exactly 4 scenes: intro → product-feature → benefits → cta
+- Scene durations must sum to exactly ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences.
+
+SCENE CONTENT (derived from the product brief provided):
+1. "intro" scene: title = product name, subtitle = one-liner value proposition, text = the core problem this product solves
+2. "product-feature" scene: title = "Key Features", items = 3–4 standout features with concrete outcomes
+3. "benefits" scene: title = "Why It Matters", items = 3–4 tangible benefits for the target user
+4. "cta" scene: title = "Get Started Today", text = urgency-driven closing line, subtitle = "Try for free" or pricing anchor${ctaBlock}
+
+${baseInterface}
+
+Product Brief:
+`;
+  }
+
+  // Default: resume
   const jobBlock = jobDescription
     ? `\n\nPersonalise the intro scene for this role. Filter achievements and skills to only those relevant.\nJob Description:\n${jobDescription.slice(0, 3000)}`
     : "";
@@ -278,11 +468,7 @@ SCENE CONTENT — extract everything from the resume provided:
    - text: a memorable 1-sentence personal brand statement capturing what makes this candidate unique
    - subtitle: their LinkedIn URL or email from the resume, or "Connect on LinkedIn" if not found
 
-TypeScript interface:
-interface VideoScript {
-  video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
-  scenes: Array<{ id: string; start: number; duration: number; type: "intro"|"achievement"|"skills"|"closing"; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[] }>
-}${jobBlock}`;
+${baseInterface}${jobBlock}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,29 +582,77 @@ studioRoutes.post("/storyboard", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
+  const {
+    resumeText, prompt, jobDescription, model, temperature,
+    targetDuration = 28, motion = "moderate",
+    purpose = "resume", brandKitId, ctaUrl, ctaText,
+  } = parsed.data;
+
+  // Optionally load brand kit to inject colours into generated script
+  let brandKit: typeof studioBrandKits.$inferSelect | null = null;
+  if (brandKitId) {
+    const db = getDb();
+    const [kit] = await db
+      .select()
+      .from(studioBrandKits)
+      .where(and(eq(studioBrandKits.id, brandKitId), eq(studioBrandKits.userId, user.sub)))
+      .limit(1);
+    brandKit = kit ?? null;
+  }
+
   let script: VideoScript;
   const apiKey = getApiKey(c.env);
+  const systemPrompt = buildStudioSystemPrompt(targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText);
+  const defaultPrompt = purpose === "resume"
+    ? "Create a professional video resume"
+    : purpose === "job_ad" ? "Create a compelling job advertisement video"
+    : purpose === "company_promo" ? "Create an engaging company promotional video"
+    : purpose === "recruiter_brand" ? "Create a recruiter personal brand video"
+    : "Create a product launch video";
+
   if (apiKey) {
     try {
-      const { resumeText, prompt, jobDescription, model, temperature, targetDuration = 28, motion = "moderate" } = parsed.data;
       script = await callLLMJson(apiKey, {
         model: model ?? "google/gemini-flash-1.5",
         temperature: temperature ?? 0.7,
-        systemPrompt: buildStudioSystemPrompt(targetDuration, motion, jobDescription),
-        userMessage: `${prompt || "Create a professional video resume"}\n\nResume:\n${resumeText.slice(0, 6000)}`,
+        systemPrompt,
+        userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
       }, VideoScriptSchema);
     } catch (err) {
       console.error("[studio/storyboard] LLM call failed, using mock:", err);
-      script = buildMockVideoScript(parsed.data.resumeText, parsed.data.targetDuration, parsed.data.motion);
+      script = purpose === "resume"
+        ? buildMockVideoScript(resumeText, targetDuration, motion)
+        : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
     }
   } else {
-    script = buildMockVideoScript(parsed.data.resumeText, parsed.data.targetDuration, parsed.data.motion);
+    script = purpose === "resume"
+      ? buildMockVideoScript(resumeText, targetDuration, motion)
+      : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
+  }
+
+  // Inject brand kit colours/font if provided
+  if (brandKit) {
+    script = {
+      ...script,
+      video: {
+        ...script.video,
+        purpose,
+        logoUrl: brandKit.logoUrl ?? script.video.logoUrl,
+        theme: {
+          ...script.video.theme,
+          colorPalette: [brandKit.primaryColor, brandKit.secondaryColor, brandKit.accentColor, "#ffffff"],
+          fontFamily: brandKit.fontFamily,
+        },
+      },
+    };
+  } else {
+    script = { ...script, video: { ...script.video, purpose } };
   }
 
   const db = getDb();
   await db.insert(studioProjects).values({
     userId: user.sub,
-    resumeText: parsed.data.resumeText,
+    resumeText,
     resumeId: parsed.data.resumeId ?? null,
     storyboard: script as any,
     status: "storyboard_ready",
@@ -450,6 +684,7 @@ function canUseObjectStorage(): boolean {
 function toProjectDto(
   project: typeof studioProjects.$inferSelect,
   linkedVideo?: typeof videos.$inferSelect | null,
+  analytics?: { viewCount: number; ctaClickCount: number },
 ) {
   const storyboard = normalizeStoryboard(project.storyboard);
   // Use the _name stored inside the storyboard JSONB (set by save-draft) as the
@@ -474,6 +709,8 @@ function toProjectDto(
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
+    viewCount: analytics?.viewCount ?? 0,
+    ctaClickCount: analytics?.ctaClickCount ?? 0,
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
   };
@@ -805,12 +1042,34 @@ studioRoutes.get("/projects", async (c) => {
     .orderBy(studioProjects.updatedAt);
 
   const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));
-  const linkedVideos = videoIds.length
-    ? await db.select().from(videos).where(and(eq(videos.userId, user.sub), inArray(videos.id, videoIds)))
-    : [];
-  const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
 
-  return c.json(ok(projects.map((p) => toProjectDto(p, p.videoId ? videoById.get(p.videoId) ?? null : null))));
+  const [linkedVideos, analyticsRows] = await Promise.all([
+    videoIds.length
+      ? db.select().from(videos).where(and(eq(videos.userId, user.sub), inArray(videos.id, videoIds)))
+      : Promise.resolve([]),
+    videoIds.length
+      ? db
+          .select({
+            videoId: videoAnalytics.videoId,
+            viewCount: sql<number>`count(*) filter (where ${videoAnalytics.eventType} = 'view')::int`,
+            ctaClickCount: sql<number>`count(*) filter (where ${videoAnalytics.eventType} = 'cta_click')::int`,
+          })
+          .from(videoAnalytics)
+          .where(inArray(videoAnalytics.videoId, videoIds))
+          .groupBy(videoAnalytics.videoId)
+      : Promise.resolve([]),
+  ]);
+
+  const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
+  const analyticsById = new Map(
+    analyticsRows.map((a) => [a.videoId, { viewCount: a.viewCount, ctaClickCount: a.ctaClickCount }]),
+  );
+
+  return c.json(ok(projects.map((p) => toProjectDto(
+    p,
+    p.videoId ? videoById.get(p.videoId) ?? null : null,
+    p.videoId ? analyticsById.get(p.videoId) : undefined,
+  ))));
 });
 
 // ─── GET /videos/user/:userId ─────────────────────────────────────────────────
@@ -969,6 +1228,373 @@ studioRoutes.get("/public/:videoId", async (c) => {
     resumeId: v.resumeId,
     createdAt: asIso(v.createdAt),
   }));
+});
+
+// ─── Brand Kit CRUD ──────────────────────────────────────────────────────────
+// GET    /api/studio/brand-kits          — list user's brand kits
+// POST   /api/studio/brand-kits          — create brand kit
+// PATCH  /api/studio/brand-kits/:id      — update brand kit
+// DELETE /api/studio/brand-kits/:id      — delete brand kit
+
+const BrandKitSchema = z.object({
+  name:           z.string().min(1).max(100).default("My Brand"),
+  logoUrl:        z.string().url().optional().or(z.literal("")),
+  primaryColor:   z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563eb"),
+  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0f172a"),
+  accentColor:    z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#14b8a6"),
+  fontFamily:     z.string().max(100).default("Inter"),
+  isDefault:      z.boolean().default(false),
+});
+
+studioRoutes.get("/brand-kits", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const kits = await db
+    .select()
+    .from(studioBrandKits)
+    .where(eq(studioBrandKits.userId, userId))
+    .orderBy(desc(studioBrandKits.createdAt));
+  return c.json(ok(kits));
+});
+
+studioRoutes.post("/brand-kits", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => null);
+  const parsed = BrandKitSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  const db = getDb();
+  // If isDefault, clear existing defaults
+  if (parsed.data.isDefault) {
+    await db.update(studioBrandKits).set({ isDefault: false } as any).where(eq(studioBrandKits.userId, userId));
+  }
+  const [kit] = await db
+    .insert(studioBrandKits)
+    .values({ ...parsed.data, userId, logoUrl: parsed.data.logoUrl || null } as any)
+    .returning();
+  return c.json(ok(kit), 201);
+});
+
+studioRoutes.patch("/brand-kits/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof body.name === "string") updates.name = body.name;
+  if (typeof body.logoUrl === "string") updates.logoUrl = body.logoUrl || null;
+  if (typeof body.primaryColor === "string") updates.primaryColor = body.primaryColor;
+  if (typeof body.secondaryColor === "string") updates.secondaryColor = body.secondaryColor;
+  if (typeof body.accentColor === "string") updates.accentColor = body.accentColor;
+  if (typeof body.fontFamily === "string") updates.fontFamily = body.fontFamily;
+  if (typeof body.isDefault === "boolean") {
+    if (body.isDefault) {
+      await db.update(studioBrandKits).set({ isDefault: false } as any).where(eq(studioBrandKits.userId, userId));
+    }
+    updates.isDefault = body.isDefault;
+  }
+  const [updated] = await db
+    .update(studioBrandKits)
+    .set(updates as any)
+    .where(and(eq(studioBrandKits.id, c.req.param("id")), eq(studioBrandKits.userId, userId)))
+    .returning();
+  if (!updated) return c.json(fail("NOT_FOUND", "Brand kit not found"), 404);
+  return c.json(ok(updated));
+});
+
+studioRoutes.delete("/brand-kits/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  await db.delete(studioBrandKits).where(and(eq(studioBrandKits.id, c.req.param("id")), eq(studioBrandKits.userId, userId)));
+  return c.json(ok({ deleted: true }));
+});
+
+// ─── Clone project ────────────────────────────────────────────────────────────
+// POST /api/studio/projects/:projectId/clone
+studioRoutes.post("/projects/:projectId/clone", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [original] = await db
+    .select()
+    .from(studioProjects)
+    .where(and(eq(studioProjects.id, c.req.param("projectId")), eq(studioProjects.userId, userId)))
+    .limit(1);
+  if (!original) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  // Embed a "copy" suffix in the storyboard name metadata
+  const meta = (original.storyboard as Record<string, unknown> | null) ?? {};
+  const clonedStoryboard = { ...meta, _name: `${meta._name ?? "Project"} (Copy)` };
+  const [clone] = await db
+    .insert(studioProjects)
+    .values({
+      userId,
+      resumeText: original.resumeText,
+      resumeId: null,
+      storyboard: clonedStoryboard as any,
+      status: "draft",
+    } as any)
+    .returning();
+  return c.json(ok(toProjectDto(clone)), 201);
+});
+
+// ─── Video analytics ──────────────────────────────────────────────────────────
+// POST /api/studio/videos/:videoId/view       — record a view (public, no auth)
+// POST /api/studio/videos/:videoId/cta-click  — record a CTA click
+// GET  /api/studio/videos/:videoId/analytics  — owner analytics summary
+
+studioRoutes.post("/videos/:videoId/view", async (c) => {
+  const videoId = c.req.param("videoId");
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+  await db.insert(videoAnalytics).values({
+    videoId,
+    userId: c.var.user?.sub ?? null,
+    event: "view",
+    referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null,
+    campaignId: typeof body.campaignId === "string" ? body.campaignId : null,
+    metadata: body.metadata ?? null,
+  } as any);
+  return c.json(ok({ tracked: true }), 202);
+});
+
+studioRoutes.post("/videos/:videoId/cta-click", async (c) => {
+  const videoId = c.req.param("videoId");
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+  await db.insert(videoAnalytics).values({
+    videoId,
+    userId: c.var.user?.sub ?? null,
+    event: "cta_click",
+    referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null,
+    campaignId: typeof body.campaignId === "string" ? body.campaignId : null,
+    metadata: body.metadata ?? null,
+  } as any);
+  return c.json(ok({ tracked: true }), 202);
+});
+
+studioRoutes.get("/videos/:videoId/analytics", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const videoId = c.req.param("videoId");
+  const db = getDb();
+  // Verify ownership
+  const [vid] = await db.select({ id: videos.id }).from(videos).where(and(eq(videos.id, videoId), eq(videos.userId, userId))).limit(1);
+  if (!vid) return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  // Aggregate counts by event type
+  const rows = await db
+    .select({ event: videoAnalytics.event, total: count() })
+    .from(videoAnalytics)
+    .where(eq(videoAnalytics.videoId, videoId))
+    .groupBy(videoAnalytics.event);
+  const stats = Object.fromEntries(rows.map((r) => [r.event, Number(r.total)]));
+  return c.json(ok({
+    videoId,
+    views: stats["view"] ?? 0,
+    ctaClicks: stats["cta_click"] ?? 0,
+    shares: stats["share"] ?? 0,
+    clickThroughRate: stats["view"] ? Math.round(((stats["cta_click"] ?? 0) / stats["view"]) * 100) / 100 : 0,
+  }));
+});
+
+// ─── Embed code ───────────────────────────────────────────────────────────────
+// GET /api/studio/videos/:videoId/embed — returns HTML embed snippet
+studioRoutes.get("/videos/:videoId/embed", async (c) => {
+  const videoId = c.req.param("videoId");
+  const db = getDb();
+  const [vid] = await db
+    .select({ id: videos.id, title: videos.title, youtubeVideoId: videos.youtubeVideoId, r2Key: videos.r2Key, privacyStatus: videos.privacyStatus })
+    .from(videos)
+    .where(eq(videos.id, videoId))
+    .limit(1);
+  if (!vid || vid.privacyStatus !== "public") return c.json(fail("NOT_FOUND", "Video not found or not public"), 404);
+  const videoUrl = vid.youtubeVideoId
+    ? `https://www.youtube.com/embed/${vid.youtubeVideoId}`
+    : vid.r2Key
+    ? `https://cdn.hired.video/${vid.r2Key}`
+    : null;
+  if (!videoUrl) return c.json(fail("NOT_AVAILABLE", "Video not yet available for embed"), 404);
+  const title = vid.title ?? "Video";
+  const width = Number(c.req.query("width") ?? 640);
+  const height = Number(c.req.query("height") ?? 360);
+  const embedHtml = `<iframe width="${width}" height="${height}" src="${videoUrl}" title="${title.replace(/"/g, "&quot;")}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  const shareUrl = `https://hired.video/video/${videoId}`;
+  return c.json(ok({ embedHtml, shareUrl, videoUrl, width, height }));
+});
+
+// ─── Campaign management ──────────────────────────────────────────────────────
+// GET    /api/studio/campaigns           — list my campaigns
+// POST   /api/studio/campaigns           — create campaign
+// PATCH  /api/studio/campaigns/:id       — update campaign
+// DELETE /api/studio/campaigns/:id       — delete campaign
+// GET    /api/studio/campaigns/:id/stats — rollup analytics for campaign
+
+const CampaignSchema = z.object({
+  name:        z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  utmSource:   z.string().max(100).optional(),
+  utmMedium:   z.string().max(100).optional(),
+  utmCampaign: z.string().max(100).optional(),
+  videoIds:    z.array(z.string().uuid()).default([]),
+});
+
+studioRoutes.get("/campaigns", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const campaigns = await db
+    .select()
+    .from(videoCampaigns)
+    .where(and(eq(videoCampaigns.userId, userId), sql`${videoCampaigns.status} != 'archived'`))
+    .orderBy(desc(videoCampaigns.createdAt));
+  return c.json(ok(campaigns));
+});
+
+studioRoutes.post("/campaigns", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => null);
+  const parsed = CampaignSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  const db = getDb();
+  const [campaign] = await db
+    .insert(videoCampaigns)
+    .values({ ...parsed.data, userId, videoIds: parsed.data.videoIds } as any)
+    .returning();
+  return c.json(ok(campaign), 201);
+});
+
+studioRoutes.patch("/campaigns/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof body.name === "string") updates.name = body.name;
+  if (typeof body.description === "string") updates.description = body.description;
+  if (typeof body.utmSource === "string") updates.utmSource = body.utmSource;
+  if (typeof body.utmMedium === "string") updates.utmMedium = body.utmMedium;
+  if (typeof body.utmCampaign === "string") updates.utmCampaign = body.utmCampaign;
+  if (typeof body.status === "string") updates.status = body.status;
+  if (Array.isArray(body.videoIds)) updates.videoIds = body.videoIds;
+  const [updated] = await db
+    .update(videoCampaigns)
+    .set(updates as any)
+    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)))
+    .returning();
+  if (!updated) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
+  return c.json(ok(updated));
+});
+
+studioRoutes.delete("/campaigns/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  await db
+    .update(videoCampaigns)
+    .set({ status: "archived", updatedAt: new Date() } as any)
+    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)));
+  return c.json(ok({ archived: true }));
+});
+
+studioRoutes.get("/campaigns/:id/stats", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [campaign] = await db
+    .select()
+    .from(videoCampaigns)
+    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)))
+    .limit(1);
+  if (!campaign) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
+  const videoIds = (campaign.videoIds as string[]) ?? [];
+  if (videoIds.length === 0) return c.json(ok({ views: 0, ctaClicks: 0, shares: 0, videoCount: 0 }));
+  const rows = await db
+    .select({ event: videoAnalytics.event, total: count() })
+    .from(videoAnalytics)
+    .where(inArray(videoAnalytics.videoId, videoIds))
+    .groupBy(videoAnalytics.event);
+  const stats = Object.fromEntries(rows.map((r) => [r.event, Number(r.total)]));
+  return c.json(ok({
+    campaignId: campaign.id,
+    videoCount: videoIds.length,
+    views: stats["view"] ?? 0,
+    ctaClicks: stats["cta_click"] ?? 0,
+    shares: stats["share"] ?? 0,
+  }));
+});
+
+// ─── Ad-optimised templates (extends the existing template list) ───────────────
+
+const AD_TEMPLATES = [
+  {
+    id: "job-ad-bold",
+    name: "Job Ad — Bold",
+    description: "High-contrast job advertisement template with prominent CTA",
+    tier: "free",
+    purpose: "job_ad",
+    style: { theme: "bold", color_palette: ["#1e1b4b", "#7c3aed", "#fbbf24"], font_style: "Poppins" },
+    motion: "moderate",
+    resolution: "720p",
+    previewUrl: null,
+  },
+  {
+    id: "company-promo-clean",
+    name: "Company Promo — Clean",
+    description: "Professional brand video template for company promotions",
+    tier: "free",
+    purpose: "company_promo",
+    style: { theme: "corporate", color_palette: ["#1e3a5f", "#3b82f6", "#f8fafc"], font_style: "Inter" },
+    motion: "minimal",
+    resolution: "720p",
+    previewUrl: null,
+  },
+  {
+    id: "recruiter-brand-warm",
+    name: "Recruiter Brand — Warm",
+    description: "Personal brand template designed for recruiters and talent partners",
+    tier: "free",
+    purpose: "recruiter_brand",
+    style: { theme: "warm", color_palette: ["#7c2d12", "#fb923c", "#fef3c7"], font_style: "Nunito" },
+    motion: "moderate",
+    resolution: "720p",
+    previewUrl: null,
+  },
+  {
+    id: "product-launch-neon",
+    name: "Product Launch — Neon",
+    description: "Energetic neon-accented template for product and feature launches",
+    tier: "premium",
+    purpose: "product_launch",
+    style: { theme: "tech", color_palette: ["#030712", "#22d3ee", "#a3e635"], font_style: "JetBrains Mono" },
+    motion: "cinematic",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+  {
+    id: "testimonial-social",
+    name: "Testimonial — Social",
+    description: "9:16 vertical format optimised for social-first testimonial ads",
+    tier: "premium",
+    purpose: "company_promo",
+    style: { theme: "social", color_palette: ["#18181b", "#f472b6", "#fbbf24"], font_style: "DM Sans" },
+    motion: "cinematic",
+    resolution: "1080p",
+    previewUrl: null,
+  },
+];
+
+// Override the templates endpoint to include ad templates
+studioRoutes.get("/ad-templates", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+  const sub = await getSubscription(userId);
+  const purpose = c.req.query("purpose");
+  let filtered = AD_TEMPLATES;
+  if (purpose) filtered = filtered.filter((t) => t.purpose === purpose);
+  const available = sub.isPremium ? filtered : filtered.map((t) => ({ ...t, locked: t.tier === "premium" }));
+  return c.json(ok(available));
 });
 
 // ─── POST /edit-script ────────────────────────────────────────────────────────

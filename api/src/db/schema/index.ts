@@ -19,3 +19,7 @@ export * from "./onboarding.js";
 export * from "./performance.js";
 export * from "./calendar.js";
 export * from "./jobboards.js";
+export * from "./jobscraper.js";
+export * from "./studioadvertising.js";
+export * from "./webauthn.js";
+export * from "./assessments.js";

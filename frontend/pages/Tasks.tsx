@@ -652,7 +652,7 @@ export default function Tasks() {
 
           <div className="pt-16">
             <div className="max-w-6xl mx-auto px-4 py-16">
-              {/* Marketing content for non-authenticated users */}
+              {/* Hero */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
                   <div className="relative">
@@ -677,21 +677,137 @@ export default function Tasks() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Get Started
+                      Get Started Free
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="text-lg px-8"
-                    >
+                    <Button size="lg" variant="outline" className="text-lg px-8">
                       Sign In
                     </Button>
                   </Link>
                 </div>
               </div>
+
+              {/* Stats */}
+              <div className="grid md:grid-cols-4 gap-6 mb-16">
+                {[
+                  { stat: "10+", label: "Task types tailored to job seekers, recruiters & employers" },
+                  { stat: "3 views", label: "List, calendar, and table — work the way you think" },
+                  { stat: "Priorities", label: "Focus on what matters with high/medium/low priority" },
+                  { stat: "Roles", label: "Role-specific task types for every career path" },
+                ].map((s) => (
+                  <div key={s.stat} className="text-center">
+                    <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>
+                    <p className="text-sm text-muted-foreground">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Features */}
+              <div className="mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Every Career Move, Organized
+                </h2>
+                <div className="grid md:grid-cols-3 gap-8">
+                  <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                    <CardHeader>
+                      <Calendar className="h-10 w-10 text-brand-purple mb-4" />
+                      <CardTitle>Calendar & Timeline View</CardTitle>
+                      <CardDescription>
+                        See your interviews, follow-ups, and deadlines laid out on a calendar so you never double-book or miss a callback.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Month & week calendar views</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Drag-and-drop scheduling</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Deadline reminders</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                    <CardHeader>
+                      <Target className="h-10 w-10 text-brand-blue mb-4" />
+                      <CardTitle>Role-Specific Task Types</CardTitle>
+                      <CardDescription>
+                        Tasks adapt to your role. Job seekers get application tracking, interview prep, and networking tasks. Recruiters get sourcing, screening, and placement workflows.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Job applications & interviews</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Recruiter sourcing workflows</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Onboarding & team tasks</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                    <CardHeader>
+                      <TrendingUp className="h-10 w-10 text-primary mb-4" />
+                      <CardTitle>Progress Tracking</CardTitle>
+                      <CardDescription>
+                        Track task status from To-Do through In-Progress to Done. See your completion rate and identify bottlenecks in your job search pipeline.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />To-Do → In-Progress → Done</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Priority levels (High/Med/Low)</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Filter by status, type & date</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Task type showcase */}
+              <div className="mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">Built for Every Stage of Your Career</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="p-6 rounded-xl border border-border">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                      <Briefcase className="h-5 w-5 text-brand-purple" />
+                      For Job Seekers
+                    </h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Track job applications by company and status</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Schedule interview prep sessions</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Follow-up reminders after applications</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Networking outreach to-dos</li>
+                    </ul>
+                  </div>
+                  <div className="p-6 rounded-xl border border-border">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                      <Users className="h-5 w-5 text-brand-blue" />
+                      For Recruiters & Employers
+                    </h3>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Candidate sourcing and screening checklists</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Interview scheduling and coordination</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Offer letter and onboarding tasks</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Pipeline management across roles</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 rounded-2xl p-12">
+                <h2 className="text-3xl font-bold mb-4">Stop Losing Track of Opportunities</h2>
+                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  Join thousands of professionals who use hired.video to stay on top of their career moves.
+                </p>
+                <Link to="/signup">
+                  <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-10">
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
+
             </div>
             <Footer />
           </div>

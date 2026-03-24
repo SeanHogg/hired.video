@@ -197,3 +197,72 @@ export const queueJobToProcess = pgTable("queue_job_to_process", {
 
 export type QueueJobToProcess = typeof queueJobToProcess.$inferSelect;
 export type NewQueueJobToProcess = typeof queueJobToProcess.$inferInsert;
+
+// ─── Saved Searches (recruiter Boolean search persistence) ────────────────────
+
+export const savedSearches = pgTable("saved_searches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  query: text("query").notNull().default(""),
+  filters: jsonb("filters").default({}).$type<Record<string, unknown>>(),
+  searchType: varchar("search_type", { length: 50 }).default("recruiter").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SavedSearch = typeof savedSearches.$inferSelect;
+export type NewSavedSearch = typeof savedSearches.$inferInsert;
+
+// ─── AI Recruiter Agent ───────────────────────────────────────────────────────
+// Tracks automated sourcing runs: criteria → scored candidates → outreach drafts.
+
+export const recruiterAgentRuns = pgTable("recruiter_agent_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id"),
+  jobTitle: varchar("job_title", { length: 255 }),
+  // Search criteria (skills, location, experienceYears, etc.)
+  criteria: jsonb("criteria").default({}).$type<Record<string, unknown>>(),
+  status: varchar("status", { length: 50 }).default("pending").notNull(), // pending | running | completed | failed
+  candidatesFound: integer("candidates_found").default(0).notNull(),
+  candidatesScored: integer("candidates_scored").default(0).notNull(),
+  // Array of { candidateId, name, email, score, scoreReason, outreachDraft }
+  results: jsonb("results").default([]).$type<Array<{
+    candidateId: string;
+    name: string;
+    email?: string;
+    score: number;
+    scoreReason: string;
+    outreachDraft: string;
+  }>>(),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterAgentRun = typeof recruiterAgentRuns.$inferSelect;
+export type NewRecruiterAgentRun = typeof recruiterAgentRuns.$inferInsert;
+
+// ─── ATS Integration connections ─────────────────────────────────────────────
+// Stores OAuth tokens / API keys for Greenhouse, Lever, Workday, etc.
+
+export const atsConnections = pgTable("ats_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 50 }).notNull(), // "greenhouse" | "lever" | "workday"
+  // API key or OAuth access token (encrypted at rest by the hosting platform)
+  apiKey: text("api_key"),
+  webhookSecret: text("webhook_secret"),
+  // Provider-specific config (board token, subdomain, etc.)
+  config: jsonb("config").default({}).$type<Record<string, unknown>>(),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AtsConnection = typeof atsConnections.$inferSelect;
+export type NewAtsConnection = typeof atsConnections.$inferInsert;
+

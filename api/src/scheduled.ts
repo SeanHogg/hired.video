@@ -14,6 +14,7 @@
 import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { getEmailProvider } from "./services/email.js";
+import { scrapeAllActiveSources } from "./services/jobscraper.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -66,7 +67,7 @@ async function processFollowUps(): Promise<void> {
         // No more steps — mark enrollment complete
         await db
           .update(schema.followUpEnrollments)
-          .set({ status: "completed", completedAt: now, updatedAt: now })
+          .set({ status: "completed", completedAt: now, updatedAt: now } as any)
           .where(eq(schema.followUpEnrollments.id, enrollment.id));
         continue;
       }
@@ -108,7 +109,7 @@ async function processFollowUps(): Promise<void> {
         stepId: step.id,
         status: sendStatus,
         errorMessage: errorMessage ?? null,
-      });
+      } as any);
 
       if (sendStatus === "sent") {
         // Advance to the next step
@@ -135,7 +136,7 @@ async function processFollowUps(): Promise<void> {
             status: nextStep[0] ? "active" : "completed",
             completedAt: nextStep[0] ? undefined : now,
             updatedAt: now,
-          })
+          } as any)
           .where(eq(schema.followUpEnrollments.id, enrollment.id));
       }
     } catch (err) {
@@ -172,7 +173,7 @@ async function processJobQueue(): Promise<void> {
     // Mark as processing
     await db
       .update(schema.queueJobToProcess)
-      .set({ status: "processing", attempts: job.attempts + 1, lastAttemptAt: now, updatedAt: now })
+      .set({ status: "processing", attempts: job.attempts + 1, lastAttemptAt: now, updatedAt: now } as any)
       .where(eq(schema.queueJobToProcess.id, job.id));
 
     try {
@@ -180,7 +181,7 @@ async function processJobQueue(): Promise<void> {
 
       await db
         .update(schema.queueJobToProcess)
-        .set({ status: "completed", completedAt: now, updatedAt: now })
+        .set({ status: "completed", completedAt: now, updatedAt: now } as any)
         .where(eq(schema.queueJobToProcess.id, job.id));
     } catch (err: any) {
       const failed = job.attempts + 1 >= job.maxAttempts;
@@ -191,7 +192,7 @@ async function processJobQueue(): Promise<void> {
           error: String(err?.message ?? err),
           failedAt: failed ? now : undefined,
           updatedAt: now,
-        })
+        } as any)
         .where(eq(schema.queueJobToProcess.id, job.id));
     }
   }
@@ -223,5 +224,9 @@ async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelec
 // ---------------------------------------------------------------------------
 
 export async function runScheduled(): Promise<void> {
-  await Promise.allSettled([processFollowUps(), processJobQueue()]);
+  await Promise.allSettled([
+    processFollowUps(),
+    processJobQueue(),
+    scrapeAllActiveSources(),
+  ]);
 }

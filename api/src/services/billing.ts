@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sum } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type {
   AIUsageMonthDTO,
@@ -10,7 +10,54 @@ import { FREE_AI_MONTHLY_LIMIT } from "../../../shared/pricing.js";
 
 const { subscriptions, subscriptionPlans, paymentMethods, invoices, aiUsageRecords } = schema;
 
+// ---------------------------------------------------------------------------
+// Subscription cache (#8)
+// Two-layer: (1) in-process Map (survives within a Worker instance, ~seconds),
+// (2) Cloudflare KV when KV_CACHE binding is present (survives across instances, 60s TTL).
+// To enable KV: add [[kv_namespaces]] binding "KV_CACHE" in wrangler.toml.
+// ---------------------------------------------------------------------------
+const _subCache = new Map<string, { value: SubscriptionSummaryDTO; expiresAt: number }>();
+const SUB_CACHE_TTL_MS = 60_000; // 60 seconds
+
+function getCachedSubscription(userId: string): SubscriptionSummaryDTO | null {
+  const entry = _subCache.get(userId);
+  if (entry && Date.now() < entry.expiresAt) return entry.value;
+  _subCache.delete(userId);
+  return null;
+}
+
+function setCachedSubscription(userId: string, value: SubscriptionSummaryDTO): void {
+  _subCache.set(userId, { value, expiresAt: Date.now() + SUB_CACHE_TTL_MS });
+  // Also write to KV if binding is available
+  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
+  if (kv) {
+    kv.put(`sub:${userId}`, JSON.stringify(value), { expirationTtl: 60 }).catch(() => undefined);
+  }
+}
+
+/** Call this whenever a subscription changes (upgrade, cancel, trial start) to bust the cache. */
+export function invalidateSubscriptionCache(userId: string): void {
+  _subCache.delete(userId);
+  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
+  if (kv) {
+    kv.delete(`sub:${userId}`).catch(() => undefined);
+  }
+}
+
 export async function getSubscription(userId: string): Promise<SubscriptionSummaryDTO> {
+  // Check in-process cache first, then KV
+  const cached = getCachedSubscription(userId);
+  if (cached) return cached;
+
+  const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
+  if (kv) {
+    const kvVal = await kv.get(`sub:${userId}`, "json").catch(() => null) as SubscriptionSummaryDTO | null;
+    if (kvVal) {
+      setCachedSubscription(userId, kvVal); // warm in-process cache too
+      return kvVal;
+    }
+  }
+
   const db = getDb();
   const [row] = await db
     .select({
@@ -24,11 +71,11 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     })
     .from(subscriptions)
     .innerJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
-    .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, "active")))
+    .where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, ["active", "trialing"])))
     .limit(1);
 
   if (!row) {
-    return {
+    const freeResult: SubscriptionSummaryDTO = {
       planId: "free",
       planName: "Free",
       isPremium: false,
@@ -38,18 +85,22 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
       status: "active",
       cancelAtPeriodEnd: false,
     };
+    setCachedSubscription(userId, freeResult);
+    return freeResult;
   }
 
-  return {
+  const result: SubscriptionSummaryDTO = {
     planId: row.planSlug,
     planName: row.planName,
-    isPremium: row.planSlug !== "free",
+    isPremium: row.planSlug !== "free" || row.status === "trialing",
     price: Number(row.priceMonthly),
     currency: row.currency,
     interval: row.billingInterval === "yearly" ? "year" : "month",
     status: row.status as SubscriptionSummaryDTO["status"],
     cancelAtPeriodEnd: row.cancelAtPeriodEnd,
   };
+  setCachedSubscription(userId, result);
+  return result;
 }
 
 export async function getPaymentMethods(userId: string): Promise<PaymentMethodDTO[]> {

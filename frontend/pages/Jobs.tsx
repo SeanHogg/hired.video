@@ -93,6 +93,7 @@ import type { JobWithOwnership } from "@/types/job";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
 import CreateJobAlertButton from "@/components/CreateJobAlertButton";
+import AdSlot from "@/components/ads/AdSlot";
 
 // Schemas
 const JobApplicationSchema = z.object({
@@ -555,6 +556,10 @@ export default function Jobs() {
 
           <div className="pt-16 p-6">
             <div className="max-w-7xl mx-auto">
+              {/* Ad banner — free tier only */}
+              <div className="flex justify-center mb-4">
+                <AdSlot slot="jobs-banner" size="banner" />
+              </div>
               {/* Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>

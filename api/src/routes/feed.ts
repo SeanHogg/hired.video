@@ -1,10 +1,65 @@
 import { Hono } from "hono";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, ilike } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { feedPosts, feedPostLikes, feedPostComments, users, userProfiles } = schema;
+const { feedPosts, feedPostLikes, feedPostComments, users, userProfiles, notifications } = schema;
+
+// ─── Tag helpers ─────────────────────────────────────────────────────────────
+
+function extractHashtags(content: string): string[] {
+  const matches = content.match(/#([a-zA-Z0-9_]+)/g) ?? [];
+  return [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
+}
+
+function extractMentions(content: string): string[] {
+  const matches = content.match(/@([a-zA-Z0-9_.-]+)/g) ?? [];
+  return [...new Set(matches.map((m) => m.slice(1).toLowerCase()))];
+}
+
+function buildTagsField(content: string): Array<{
+  id: string; tagType: "Hashtag" | "Mention"; tagValue: string; position: number;
+}> {
+  const tags: Array<{ id: string; tagType: "Hashtag" | "Mention"; tagValue: string; position: number }> = [];
+  let idx = 0;
+  for (const match of content.matchAll(/#([a-zA-Z0-9_]+)/g)) {
+    tags.push({ id: crypto.randomUUID(), tagType: "Hashtag", tagValue: match[1].toLowerCase(), position: match.index ?? idx++ });
+  }
+  for (const match of content.matchAll(/@([a-zA-Z0-9_.-]+)/g)) {
+    tags.push({ id: crypto.randomUUID(), tagType: "Mention", tagValue: match[1].toLowerCase(), position: match.index ?? idx++ });
+  }
+  return tags;
+}
+
+async function createMentionNotifications(
+  content: string,
+  postId: string,
+  postAuthorId: string,
+  postAuthorName: string,
+  db: ReturnType<typeof getDb>,
+) {
+  const mentionedNames = extractMentions(content);
+  if (mentionedNames.length === 0) return;
+
+  const mentionedUsers = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(sql`lower(${users.name}) = ANY(ARRAY[${sql.join(mentionedNames.map((n) => sql`${n}`), sql`, `)}])`);
+
+  const toNotify = mentionedUsers.filter((u) => u.id !== postAuthorId);
+  if (toNotify.length === 0) return;
+
+  await db.insert(notifications).values(
+    toNotify.map((u) => ({
+      userId: u.id,
+      type: "feed_mention",
+      title: `${postAuthorName} mentioned you`,
+      message: `${postAuthorName} mentioned you in a post`,
+      data: { postId, authorId: postAuthorId },
+    })) as any,
+  );
+}
 
 export const feedRoutes = new Hono<{ Variables: Variables }>();
 
@@ -101,11 +156,16 @@ feedRoutes.get("/posts", async (c) => {
   const pageNumber = Math.max(1, Number(c.req.query("pageNumber") ?? "1") || 1);
   const pageSize = Math.min(50, Math.max(1, Number(c.req.query("pageSize") ?? "20") || 20));
   const offset = (pageNumber - 1) * pageSize;
+  const tag = c.req.query("tag")?.toLowerCase() ?? "";
   const db = getDb();
 
+  const whereClause = tag
+    ? sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${feedPosts.tags}) t WHERE lower(t->>'tagValue') = ${tag} AND t->>'tagType' = 'Hashtag')`
+    : undefined;
+
   const [totalRow, postRows] = await Promise.all([
-    db.select({ count: sql<number>`count(*)::int` }).from(feedPosts),
-    db.select().from(feedPosts).orderBy(desc(feedPosts.createdAt)).limit(pageSize).offset(offset),
+    db.select({ count: sql<number>`count(*)::int` }).from(feedPosts).where(whereClause),
+    db.select().from(feedPosts).where(whereClause).orderBy(desc(feedPosts.createdAt)).limit(pageSize).offset(offset),
   ]);
 
   const total = totalRow[0]?.count ?? 0;
@@ -142,12 +202,13 @@ feedRoutes.post("/posts", async (c) => {
   const userId = c.var.user.sub;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const db = getDb();
+  const content = typeof body.content === "string" ? body.content : "";
 
   const [post] = await db
     .insert(feedPosts)
     .values({
       userId,
-      content: typeof body.content === "string" ? body.content : "",
+      content,
       linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : null,
       privacy:
         body.privacy === "Private" || body.privacy === "Connections" ? String(body.privacy) : "Public",
@@ -161,9 +222,15 @@ feedRoutes.post("/posts", async (c) => {
             displayOrder: typeof m.displayOrder === "number" ? m.displayOrder : idx,
           }))
         : [],
-      tags: [],
+      tags: buildTagsField(content),
     } as any)
     .returning();
+
+  // Send mention notifications (fire-and-forget)
+  const [author] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
+  c.executionCtx?.waitUntil(
+    createMentionNotifications(content, post.id, userId, author?.name ?? "Someone", db),
+  );
 
   const [dto] = await fetchPostDtos([post], userId, db);
   return c.json(success(dto), 201);
@@ -180,14 +247,16 @@ feedRoutes.put("/posts/:postId", async (c) => {
   if (!existing) return c.json(error("NOT_FOUND", "Post not found"), 404);
   if (existing.userId !== userId) return c.json(error("FORBIDDEN", "Not your post"), 403);
 
+  const newContent = typeof body.content === "string" ? body.content : existing.content;
   const [updated] = await db
     .update(feedPosts)
     .set({
-      content: typeof body.content === "string" ? body.content : existing.content,
+      content: newContent,
       privacy:
         body.privacy === "Private" || body.privacy === "Connections" || body.privacy === "Public"
           ? String(body.privacy)
           : existing.privacy,
+      tags: buildTagsField(newContent),
       updatedAt: new Date(),
     } as any)
     .where(eq(feedPosts.id, postId))
@@ -365,7 +434,6 @@ feedRoutes.get("/search", async (c) => {
   const offset = (pageNumber - 1) * pageSize;
 
   const db = getDb();
-  const { ilike } = await import("drizzle-orm");
   const postRows = await db
     .select()
     .from(feedPosts)
@@ -376,6 +444,28 @@ feedRoutes.get("/search", async (c) => {
 
   const dtos = await fetchPostDtos(postRows, currentUserId, db);
   return c.json(success({ posts: dtos, totalCount: dtos.length, pageNumber, pageSize }), 200);
+});
+
+/** GET /api/feed/trending-tags — top hashtags by post frequency (last 30 days) */
+feedRoutes.get("/trending-tags", async (c) => {
+  const db = getDb();
+  const limit = Math.min(50, Number(c.req.query("limit") ?? "20") || 20);
+
+  // Unnest the tags JSONB array and count each hashtag
+  const rows = await db.execute(sql`
+    SELECT
+      lower(tag->>'tagValue') AS tag,
+      count(*)::int           AS post_count
+    FROM feed_posts,
+         jsonb_array_elements(tags) AS tag
+    WHERE tag->>'tagType' = 'Hashtag'
+      AND created_at > now() - interval '30 days'
+    GROUP BY lower(tag->>'tagValue')
+    ORDER BY post_count DESC
+    LIMIT ${limit}
+  `);
+
+  return c.json(success(rows.rows as Array<{ tag: string; post_count: number }>), 200);
 });
 
 /** POST /api/feed/link-preview */

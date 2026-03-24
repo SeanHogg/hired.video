@@ -57,6 +57,12 @@ import { calendarRoutes } from "./routes/calendar.js";
 import { exclusiveBoardRoutes } from "./routes/exclusive-boards.js";
 import { communityRoutes } from "./routes/community.js";
 import { analyticsRoutes } from "./routes/analytics.js";
+import { jobScraperAdminRoutes, jobScraperUserRoutes } from "./routes/jobscraper.js";
+import { applyButtonRoutes } from "./routes/apply-button.js";
+import { passkeyRoutes } from "./routes/passkeys.js";
+import { atsRoutes } from "./routes/ats.js";
+import { assessmentRoutes } from "./routes/assessments.js";
+import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { callLLM, getApiKey } from "./services/ai.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
@@ -143,6 +149,11 @@ export function createApp() {
     "/api/users/check-slug",
     "/api/resume/roast",
     "/api/og",
+    "/api/apply-button",
+    "/api/ats/webhook",
+    "/api/hiring/offers/webhook",
+    "/api/affiliates/click",
+    "/api/assessments/users",
     "/health",
     "/api/health",
   ];
@@ -159,9 +170,18 @@ export function createApp() {
   // optional auth so logged-in Premium users get adsEnabled: false.
   const ADS_CONFIG_ROUTE = /^\/api\/ads\/config$/;
 
+  // Studio analytics events (view, CTA click) and embed code are public.
+  // Route handlers use optional auth (c.var.user?.sub ?? null).
+  const STUDIO_PUBLIC_ROUTE = /^\/api\/studio\/videos\/[^/]+(\/view|\/cta-click|\/embed)$/;
+
+  // Public interview session share links — no auth required.
+  const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
+
   app.use("/api/*", async (c, next) => {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
+    if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
+    if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) {
       return optionalAuthMiddleware(c as any, next);
     }
@@ -176,6 +196,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
+    if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
@@ -187,6 +208,7 @@ export function createApp() {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
+    if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return passwordChangeMiddleware(c as any, next);
   });
@@ -224,6 +246,7 @@ export function createApp() {
   // (no business logic currently needed)
   app.get("/api/collab/:id", (c) => c.body(null, 204));
 
+  app.route("/api/auth/passkey", passkeyRoutes);
   app.route("/api/auth/oauth", oauthRoutes);
   app.route("/api/auth", authRoutes);
   app.route("/api/account", accountRoutes);
@@ -272,6 +295,7 @@ export function createApp() {
   app.route("/api/valueproposition", valuePropositionRoutes);
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
+  app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);
   app.route("/api/apikeys", apiKeyRoutes);
   app.route("/api/followups", followUpRoutes);
@@ -281,6 +305,11 @@ export function createApp() {
   app.route("/api/boards", exclusiveBoardRoutes);
   app.route("/api/community", communityRoutes);
   app.route("/api/analytics", analyticsRoutes);
+  app.route("/api/admin/job-sources", jobScraperAdminRoutes);
+  app.route("/api/job-sources", jobScraperUserRoutes);
+  app.route("/api/ats", atsRoutes);
+  app.route("/api/assessments", assessmentRoutes);
+  app.route("/api/auto-apply", autoApplyRoutes);
 
   // ---------------------------------------------------------------------------
   // POST /api/chat/visitor — AI prospect chat widget (#54)

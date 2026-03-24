@@ -119,6 +119,8 @@ export const StudioProjectSchema = z.object({
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
+  viewCount: z.number().optional().default(0),
+  ctaClickCount: z.number().optional().default(0),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
 });

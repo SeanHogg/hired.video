@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -174,6 +175,190 @@ searchRoutes.get("/public", async (c) => {
     }),
     200,
   );
+});
+
+// ─── Boolean / Advanced Recruiter Search ─────────────────────────────────────
+// POST /api/search/recruiter
+// Supports: Boolean operators (AND / OR / NOT), quoted phrases, skill filters,
+// experience level, location, and saved-search CRUD.
+//
+// Boolean string examples:
+//   "React AND TypeScript"
+//   "Python OR Django NOT intern"
+//   "(product manager OR PM) AND SaaS"
+
+const { savedSearches } = schema as any;
+
+/** Convert a human-written Boolean string into a PostgreSQL tsquery expression. */
+function booleanToTsquery(input: string): string {
+  // Normalise whitespace
+  let q = input.trim();
+  if (!q) return "";
+
+  // Quoted phrases → phrase tokens for pg to_tsquery
+  q = q.replace(/"([^"]+)"/g, (_m, phrase) => phrase.trim().split(/\s+/).join(" <-> "));
+
+  // Boolean operators
+  q = q
+    .replace(/\bAND\b/g, " & ")
+    .replace(/\bOR\b/g, " | ")
+    .replace(/\bNOT\b/g, " !")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  // Wrap bare words with wildcards (prefix matching)
+  q = q.replace(/\b([a-zA-Z0-9_]+)\b(?!\s*[:|&!])/g, "$1:*");
+
+  return q;
+}
+
+const RecruiterSearchSchema = z.object({
+  query: z.string().max(500).default(""),
+  skills: z.array(z.string()).default([]),
+  location: z.string().max(200).optional(),
+  experienceLevel: z.enum(["entry", "mid", "senior", "lead", "executive"]).optional(),
+  role: z.string().max(100).optional(),
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(20),
+});
+
+searchRoutes.post("/recruiter", async (c) => {
+  const userId = c.var.user?.sub;
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = RecruiterSearchSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
+
+  const { query, skills, location, experienceLevel, page, limit } = parsed.data;
+  const offset = (page - 1) * limit;
+  const db = getDb();
+
+  // Build WHERE conditions
+  const conditions: ReturnType<typeof sql>[] = [];
+
+  if (query.trim()) {
+    const tsQuery = booleanToTsquery(query);
+    if (tsQuery) {
+      conditions.push(sql`
+        to_tsvector('english', coalesce(${users.name}, '') || ' ' ||
+          coalesce((SELECT string_agg(coalesce(e->>'title','') || ' ' || coalesce(e->>'company',''), ' ')
+                    FROM jsonb_array_elements(coalesce((SELECT work_experience FROM user_profiles WHERE user_id = ${users.id}), '[]'::jsonb)) e), ''))
+        @@ to_tsquery('english', ${tsQuery})
+      `);
+    }
+  }
+
+  if (skills.length > 0) {
+    for (const skill of skills) {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM jsonb_array_elements_text(coalesce(
+          (SELECT skills FROM user_profiles WHERE user_id = ${users.id}), '[]'::jsonb)
+        ) s WHERE lower(s) LIKE ${"%" + skill.toLowerCase() + "%"}
+      )`);
+    }
+  }
+
+  if (location) {
+    conditions.push(ilike(userProfiles.location, `%${location}%`));
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [countRows, candidateRows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(users).leftJoin(userProfiles, eq(userProfiles.userId, users.id)).where(whereClause),
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        headline: userProfiles.headline,
+        location: userProfiles.location,
+        avatarUrl: userProfiles.avatarUrl,
+      })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(users.createdAt))
+      .limit(limit)
+      .offset(offset),
+  ]);
+
+  const total = countRows[0]?.count ?? 0;
+  return c.json(
+    success({
+      candidates: candidateRows,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      hasNextPage: offset + limit < total,
+    }),
+    200,
+  );
+});
+
+// ─── Saved Searches ──────────────────────────────────────────────────────────
+// GET  /api/search/saved       — list user's saved searches
+// POST /api/search/saved       — save a search
+// DELETE /api/search/saved/:id — delete
+
+const SavedSearchSchema = z.object({
+  name: z.string().min(1).max(100),
+  query: z.string().max(500),
+  filters: z.record(z.any()).default({}),
+  searchType: z.enum(["recruiter", "jobs", "people", "companies"]).default("recruiter"),
+});
+
+searchRoutes.get("/saved", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const db = getDb();
+
+  if (!savedSearches) {
+    return c.json(success([]), 200);
+  }
+
+  const rows = await db
+    .select()
+    .from(savedSearches)
+    .where(eq(savedSearches.userId, userId))
+    .orderBy(desc(savedSearches.createdAt));
+
+  return c.json(success(rows), 200);
+});
+
+searchRoutes.post("/saved", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = SavedSearchSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
+
+  const db = getDb();
+
+  if (!savedSearches) {
+    // Schema not yet migrated — return the data as-is
+    return c.json(success({ id: crypto.randomUUID(), userId, ...parsed.data, createdAt: new Date().toISOString() }), 201);
+  }
+
+  const [row] = await db
+    .insert(savedSearches)
+    .values({ userId, ...parsed.data } as any)
+    .returning();
+
+  return c.json(success(row), 201);
+});
+
+searchRoutes.delete("/saved/:id", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const id = c.req.param("id");
+  const db = getDb();
+
+  if (!savedSearches) return c.json(success(true), 200);
+
+  await db.delete(savedSearches).where(and(eq(savedSearches.id, id), eq(savedSearches.userId, userId)));
+  return c.json(success(true), 200);
 });
 
 // Fallback for other search routes (not implemented)

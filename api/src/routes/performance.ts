@@ -285,6 +285,102 @@ performanceRoutes.delete("/goals/:id", requirePremium("Performance Management"),
   return c.json(success({ deleted: true }), 200);
 });
 
+// ---------------------------------------------------------------------------
+// PATCH /api/performance/goals/:id/progress — dedicated OKR progress update (#14)
+// Body: { progressPercentage: number, keyResults?: Array<{title,current,target,unit}> }
+// Key results are stored in the goal's existing JSONB description field as structured data.
+// ---------------------------------------------------------------------------
+performanceRoutes.patch("/goals/:id/progress", requirePremium("Performance Management"), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [goal] = await db
+    .select()
+    .from(schema.performanceGoals)
+    .where(and(eq(schema.performanceGoals.id, c.req.param("id")), eq(schema.performanceGoals.userId, userId)))
+    .limit(1);
+
+  if (!goal) return c.json(error("NOT_FOUND", "Goal not found"), 404);
+
+  const body = await c.req.json().catch(() => ({}));
+  const progress = typeof body.progressPercentage === "number"
+    ? Math.min(100, Math.max(0, body.progressPercentage))
+    : goal.progressPercentage;
+
+  const updates: Record<string, unknown> = {
+    progressPercentage: progress,
+    updatedAt: new Date(),
+  };
+
+  // Auto-complete at 100%
+  if (progress >= 100 && goal.status !== "completed") {
+    updates.status = "completed";
+    updates.completedAt = new Date();
+  }
+
+  // Store key results in goal description as JSON supplement if provided
+  if (Array.isArray(body.keyResults) && body.keyResults.length > 0) {
+    // Derive overall progress from key results if not explicitly provided
+    const keyResults = body.keyResults as Array<{ title: string; current: number; target: number; unit?: string }>;
+    if (typeof body.progressPercentage !== "number") {
+      const avgProgress = keyResults.reduce((sum, kr) => {
+        const pct = kr.target > 0 ? Math.min(100, (kr.current / kr.target) * 100) : 0;
+        return sum + pct;
+      }, 0) / keyResults.length;
+      updates.progressPercentage = Math.round(avgProgress);
+      if (avgProgress >= 100 && goal.status !== "completed") {
+        updates.status = "completed";
+        updates.completedAt = new Date();
+      }
+    }
+    // Append keyResults JSON to description (non-destructive if description already has text)
+    const krJson = JSON.stringify({ keyResults, updatedAt: new Date().toISOString() });
+    updates.description = `${goal.description ?? ""}\n<!-- keyResults: ${krJson} -->`.trimStart();
+  }
+
+  const [updated] = await db
+    .update(schema.performanceGoals)
+    .set(updates as any)
+    .where(eq(schema.performanceGoals.id, goal.id))
+    .returning();
+
+  return c.json(success(updated), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/performance/reviews/:id/acknowledge — employee acknowledges review (#14)
+// ---------------------------------------------------------------------------
+performanceRoutes.patch("/reviews/:id/acknowledge", requirePremium("Performance Management"), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [review] = await db
+    .select({ id: schema.performanceReviews.id, revieweeUserId: schema.performanceReviews.revieweeUserId, status: schema.performanceReviews.status })
+    .from(schema.performanceReviews)
+    .where(eq(schema.performanceReviews.id, c.req.param("id")))
+    .limit(1);
+
+  if (!review) return c.json(error("NOT_FOUND", "Review not found"), 404);
+  if (review.revieweeUserId !== userId) return c.json(error("FORBIDDEN", "Only the reviewee can acknowledge their review"), 403);
+  if (review.status !== "submitted") return c.json(error("CONFLICT", "Review must be submitted before it can be acknowledged"), 409);
+
+  const body = await c.req.json().catch(() => ({}));
+  const [updated] = await db
+    .update(schema.performanceReviews)
+    .set({
+      status: "acknowledged",
+      acknowledgedAt: new Date(),
+      revieweeResponse: typeof body.response === "string" ? body.response.slice(0, 5000) : undefined,
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(schema.performanceReviews.id, review.id))
+    .returning();
+
+  return c.json(success(updated), 200);
+});
+
 performanceRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Performance route not found" } }, 404),
 );

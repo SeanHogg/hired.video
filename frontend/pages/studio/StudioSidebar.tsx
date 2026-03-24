@@ -1,7 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick } from "lucide-react";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -299,6 +299,11 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     title={p.title}
                   >
                     <span className="truncate flex-1">{p.title}</span>
+                    {(p.viewCount ?? 0) > 0 && (
+                      <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
+                        <Eye className="w-2.5 h-2.5" />{p.viewCount}
+                      </span>
+                    )}
                     <Badge className={`text-[10px] shrink-0 ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
                   </button>
                   {/* Pencil — rename (shown on active project or on hover) */}

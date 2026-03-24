@@ -10,6 +10,7 @@ import {
   numeric,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { companyProfiles } from "./companies.js";
 
 export const subscriptionPlans = pgTable("subscription_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -140,3 +141,30 @@ export const usageRecords = pgTable("usage_records", {
 
 export type UsageRecord = typeof usageRecords.$inferSelect;
 export type NewUsageRecord = typeof usageRecords.$inferInsert;
+
+// ─── Employer / company seat-based subscriptions ─────────────────────────────
+// One row per company plan. seatCount × pricePerSeatCents = monthly charge.
+// Synced with Stripe via stripeSubscriptionId.
+
+
+export const companySubscriptions = pgTable("company_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }).unique(),
+  // Plan tier: "starter" | "team" | "enterprise"
+  planTier: varchar("plan_tier", { length: 50 }).default("starter").notNull(),
+  seatCount: integer("seat_count").default(1).notNull(),
+  // Price in cents per seat per month (e.g. 4900 = $49)
+  pricePerSeatCents: integer("price_per_seat_cents").default(4900).notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  stripeCustomerId: text("stripe_customer_id"),
+  status: varchar("status", { length: 50 }).default("active").notNull(),
+  billingInterval: varchar("billing_interval", { length: 20 }).default("monthly").notNull(),
+  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CompanySubscription = typeof companySubscriptions.$inferSelect;
+export type NewCompanySubscription = typeof companySubscriptions.$inferInsert;

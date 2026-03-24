@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Flame, Upload, Download, Loader2 } from "lucide-react";
+import { Flame, Upload, Download, Loader2, Share2, Send } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth";
 import { z } from "zod";
 import RoastResultView from "@/components/RoastResult";
 import type { RoastResult } from "@/components/RoastResult";
@@ -37,12 +38,14 @@ export default function ResumeRoast() {
   const location = useLocation();
   useSEO(location.pathname);
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   const [resumeText, setResumeText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RoastResult | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const handleFileChange = useCallback(async (file: File) => {
     try {
@@ -81,6 +84,29 @@ export default function ResumeRoast() {
       setLoading(false);
     }
   }, [resumeText, toast]);
+
+  const handleShareToFeed = useCallback(async () => {
+    if (!result || !isAuthenticated) return;
+    setSharing(true);
+    try {
+      const grade = result.score >= 80 ? "A" : result.score >= 65 ? "B" : result.score >= 50 ? "C" : "D";
+      const content = `🔥 I just got my resume roasted by AI!\n\nScore: ${result.score}/100 (${grade})\n\n💪 Top strength: ${result.strengths[0] ?? "solid experience"}\n⚡ Biggest fix: ${result.fixes[0] ?? "add more metrics"}\n\n#ResumeRoast #CareerTips #JobSearch\n\nTry it free at hired.video → Resume Roast`;
+      await apiClient.post("/api/feed/posts", { content, privacy: "Public" }, null as any);
+      toast({ title: "Shared to Feed!", description: "Your roast score is now on the Feed." });
+    } catch {
+      toast({ title: "Share failed", description: "Please try again", variant: "destructive" });
+    } finally {
+      setSharing(false);
+    }
+  }, [result, isAuthenticated, toast]);
+
+  const handleShareToLinkedIn = useCallback(() => {
+    if (!result) return;
+    const grade = result.score >= 80 ? "A" : result.score >= 65 ? "B" : result.score >= 50 ? "C" : "D";
+    const post = `🔥 I just got my resume brutally roasted by AI — and it was humbling.\n\nScore: ${result.score}/100 (${grade})\n\n✅ Biggest strength: ${result.strengths[0] ?? "strong experience section"}\n🔧 Top fix: ${result.fixes[0] ?? "add more quantified achievements"}\n\nHonestly, every job seeker should try this. It took 30 seconds and I already know exactly what to improve.\n\nTry Resume Roast free → hired.video\n\n#ResumeRoast #CareerAdvice #JobSearch #AI`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hired.video/resume-roast")}&summary=${encodeURIComponent(post)}`;
+    window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
+  }, [result]);
 
   const handleDownloadCard = useCallback(async () => {
     if (!result) return;
@@ -165,7 +191,7 @@ export default function ResumeRoast() {
           {/* Result */}
           {result && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => { setResult(null); }}>
                   ← Try Again
                 </Button>
@@ -177,8 +203,29 @@ export default function ResumeRoast() {
                   disabled={downloading}
                 >
                   {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                  Download Score Card
+                  Download Card
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleShareToLinkedIn}
+                >
+                  <Share2 className="w-3 h-3" />
+                  Share on LinkedIn
+                </Button>
+                {isAuthenticated && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleShareToFeed}
+                    disabled={sharing}
+                  >
+                    {sharing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    Post to Feed
+                  </Button>
+                )}
               </div>
               <RoastResultView result={result} />
             </div>

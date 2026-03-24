@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -130,8 +130,120 @@ exclusiveBoardRoutes.delete("/bids/:id", requirePremium("Exclusive Job Boards"),
   if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
   if (bid.status !== "pending") return c.json(error("CONFLICT", "Only pending bids can be withdrawn"), 409);
 
-  await db.update(schema.boardBids).set({ status: "rejected", updatedAt: new Date() }).where(eq(schema.boardBids.id, bid.id));
+  await db.update(schema.boardBids).set({ status: "rejected", updatedAt: new Date() } as any).where(eq(schema.boardBids.id, bid.id));
   return c.json(success({ withdrawn: true }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/boards/bids/:id/accept — admin/board-owner accepts a bid (#20)
+// Activates the job posting on the exclusive board for the bid duration.
+// ---------------------------------------------------------------------------
+exclusiveBoardRoutes.patch("/bids/:id/accept", requirePremium("Exclusive Job Boards"), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [bid] = await db
+    .select()
+    .from(schema.boardBids)
+    .where(eq(schema.boardBids.id, c.req.param("id")))
+    .limit(1);
+
+  if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
+
+  // Only admins/superadmins can accept bids on system-managed boards
+  const [actor] = await db
+    .select({ role: schema.users.role })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  if (!actor || !["admin", "super_admin"].includes(actor.role ?? "")) {
+    return c.json(error("FORBIDDEN", "Only admins can accept bids"), 403);
+  }
+  if (bid.status !== "pending") return c.json(error("CONFLICT", "Only pending bids can be accepted"), 409);
+
+  const startsAt = new Date();
+  const expiresAt = new Date(startsAt.getTime() + (bid.durationDays ?? 30) * 24 * 60 * 60 * 1000);
+
+  // Accept the bid and create a job board posting
+  const [updatedBid] = await db
+    .update(schema.boardBids)
+    .set({ status: "accepted", updatedAt: new Date() } as any)
+    .where(eq(schema.boardBids.id, bid.id))
+    .returning() as any[];
+
+  // Activate the job posting on the board
+  if (bid.jobId) {
+    await db.insert(schema.jobBoardPostings).values({
+      boardId: bid.boardId,
+      jobId: bid.jobId,
+      postedByUserId: bid.bidderId,
+      bidId: bid.id,
+      status: "active",
+      startsAt,
+      expiresAt,
+      pricePaid: bid.bidAmount,
+      currency: bid.currency,
+    } as any).catch(() => undefined);
+  }
+
+  // Notify the bidder
+  await db.insert(schema.notifications).values({
+    userId: bid.bidderId,
+    type: "bid_accepted",
+    title: "Bid accepted",
+    message: `Your bid was accepted! Your job posting is now live on the exclusive board for ${bid.durationDays ?? 30} days.`,
+    data: { bidId: bid.id, boardId: bid.boardId } as any,
+  } as any).catch(() => undefined);
+
+  return c.json(success({ bid: updatedBid, expiresAt: expiresAt.toISOString() }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/boards/bids/:id/reject — board-owner rejects a bid (#20)
+// ---------------------------------------------------------------------------
+exclusiveBoardRoutes.patch("/bids/:id/reject", requirePremium("Exclusive Job Boards"), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+
+  const [bid] = await db
+    .select()
+    .from(schema.boardBids)
+    .where(eq(schema.boardBids.id, c.req.param("id")))
+    .limit(1);
+
+  if (!bid) return c.json(error("NOT_FOUND", "Bid not found"), 404);
+
+  const [actor] = await db
+    .select({ role: schema.users.role })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  if (!actor || !["admin", "super_admin"].includes(actor.role ?? "")) {
+    return c.json(error("FORBIDDEN", "Only admins can reject bids"), 403);
+  }
+  if (bid.status !== "pending") return c.json(error("CONFLICT", "Only pending bids can be rejected"), 409);
+
+  const body = await c.req.json().catch(() => ({}));
+  const [updatedBid] = await db
+    .update(schema.boardBids)
+    .set({ status: "rejected", updatedAt: new Date() } as any)
+    .where(eq(schema.boardBids.id, bid.id))
+    .returning();
+
+  // Notify the bidder
+  await db.insert(schema.notifications).values({
+    userId: bid.bidderId,
+    type: "bid_rejected",
+    title: "Bid not accepted",
+    message: typeof body.reason === "string" ? body.reason : "Your bid was not accepted for this exclusive board.",
+    data: { bidId: bid.id, boardId: bid.boardId } as any,
+  } as any).catch(() => undefined);
+
+  return c.json(success(updatedBid), 200);
 });
 
 exclusiveBoardRoutes.all("*", (c) =>

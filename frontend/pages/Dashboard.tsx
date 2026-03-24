@@ -29,6 +29,8 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import useDashboard from "@/hooks/dashboard/useDashboard";
+import ReferralBanner from "@/components/ReferralBanner";
+import AdSlot from "@/components/ads/AdSlot";
 
 // Role-specific dashboard components
 import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
@@ -110,6 +112,10 @@ export default function Dashboard() {
             />
           </div>
         </div>
+      </div>
+      <ReferralBanner />
+      <div className="flex justify-center mb-4">
+        <AdSlot slot="dashboard-banner" size="banner" />
       </div>
       {children}
     </div>

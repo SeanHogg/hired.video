@@ -13,6 +13,7 @@ import {
   sendMagicLinkEmail,
 } from "../services/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
+import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens } = schema;
 
@@ -230,6 +231,9 @@ authRoutes.post("/register", async (c) => {
       ),
       seedOnboardingTasks(user.id, user.role ?? "job_seeker").catch((err) =>
         console.error("[register] Failed to seed onboarding tasks:", err),
+      ),
+      triggerOnboardingDrip(user.id, user.email, user.name, user.role ?? "job_seeker").catch((err) =>
+        console.error("[register] Failed to trigger onboarding drip:", err),
       ),
     ]),
   );

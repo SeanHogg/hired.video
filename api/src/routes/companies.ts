@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { companyProfiles, companyFollowers, jobItems, userCompanyRoleAssociations } = schema;
+const { companyProfiles, companyFollowers, jobItems, userCompanyRoleAssociations, employerBrandingPages } = schema;
 
 export const companyRoutes = new Hono<{ Variables: Variables }>();
 
@@ -181,6 +182,78 @@ companyRoutes.delete("/:id", async (c) => {
   if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can delete this company"), 403);
   await db.delete(companyProfiles).where(eq(companyProfiles.id, c.req.param("id")));
   return c.json(success(null, "Company deleted"), 200);
+});
+
+// ─── Employer Branding Pages ──────────────────────────────────────────────────
+
+const BrandingPageSchema = z.object({
+  heroVideoUrl: z.string().url().optional().nullable(),
+  heroHeadline: z.string().max(200).optional().nullable(),
+  heroSubtitle: z.string().max(500).optional().nullable(),
+  cultureStatement: z.string().max(2000).optional().nullable(),
+  values: z.array(z.object({ title: z.string(), description: z.string(), emoji: z.string().optional() })).default([]),
+  perks: z.array(z.object({ title: z.string(), description: z.string(), icon: z.string().optional() })).default([]),
+  mediaGallery: z.array(z.object({ url: z.string(), type: z.enum(["image", "video"]), caption: z.string().optional() })).default([]),
+  teamHighlights: z.array(z.object({ name: z.string(), role: z.string(), quote: z.string(), avatarUrl: z.string().optional() })).default([]),
+  awardsAndRecognition: z.array(z.object({ title: z.string(), year: z.number().optional(), imageUrl: z.string().optional() })).default([]),
+  primaryColor: z.string().max(20).optional(),
+  isPublished: z.boolean().optional(),
+});
+
+/** GET /api/companies/:id/branding — public (no auth) */
+companyRoutes.get("/:id/branding", async (c) => {
+  const db = getDb();
+  const [page] = await db
+    .select()
+    .from(employerBrandingPages)
+    .where(eq(employerBrandingPages.companyId, c.req.param("id")))
+    .limit(1);
+  if (!page || !page.isPublished) return c.json(error("NOT_FOUND", "Branding page not found"), 404);
+  return c.json(success(page), 200);
+});
+
+/** PATCH /api/companies/:id/branding — owner only; upserts the branding page */
+companyRoutes.patch("/:id/branding", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const companyId = c.req.param("id");
+  const db = getDb();
+
+  const [company] = await db.select({ ownerId: companyProfiles.ownerId }).from(companyProfiles).where(eq(companyProfiles.id, companyId)).limit(1);
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  if (company.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the company owner can update branding"), 403);
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = BrandingPageSchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid branding data"), 400);
+
+  const data = parsed.data;
+  const [existing] = await db.select({ id: employerBrandingPages.id }).from(employerBrandingPages).where(eq(employerBrandingPages.companyId, companyId)).limit(1);
+
+  const now = new Date();
+  if (existing) {
+    const [updated] = await db
+      .update(employerBrandingPages)
+      .set({
+        ...data,
+        publishedAt: data.isPublished ? now : undefined,
+        updatedAt: now,
+      } as any)
+      .where(eq(employerBrandingPages.companyId, companyId))
+      .returning();
+    return c.json(success(updated), 200);
+  }
+
+  const [created] = await db
+    .insert(employerBrandingPages)
+    .values({
+      companyId,
+      ...data,
+      publishedAt: data.isPublished ? now : null,
+    } as any)
+    .returning();
+  return c.json(success(created), 201);
 });
 
 companyRoutes.all("*", (c) =>

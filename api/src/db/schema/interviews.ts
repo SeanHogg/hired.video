@@ -5,6 +5,7 @@ import {
   varchar,
   timestamp,
   jsonb,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
@@ -16,6 +17,8 @@ export const interviewSessions = pgTable("interview_sessions", {
   questions: jsonb("questions").notNull(),
   status: varchar("status", { length: 50 }).default("active"),
   overallScore: text("overall_score"),
+  shareToken: text("share_token").unique(),
+  isShared: boolean("is_shared").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
