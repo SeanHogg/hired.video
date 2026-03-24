@@ -4,8 +4,22 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { seedOnboardingTasks } from "../lib/onboarding.js";
 
-const { users, userProfiles, userConnections } = schema;
+const { users, userProfiles, userConnections, tasks, boards } = schema;
+
+/** Map frontend PascalCase role to DB snake_case role */
+function normalizeRole(role: string): string | null {
+  const map: Record<string, string> = {
+    jobseeker: "job_seeker",
+    job_seeker: "job_seeker",
+    recruiter: "recruiter",
+    employer: "employer",
+    affiliate: "affiliate",
+    admin: "admin",
+  };
+  return map[role.toLowerCase()] ?? null;
+}
 
 // ============================================================================
 // SCHEMAS
@@ -36,6 +50,7 @@ const UpdateProfileSchema = z.object({
   skills: z.array(z.string()).optional(),
   industries: z.array(z.string()).optional(),
   preferredRoles: z.array(z.string()).optional(),
+  role: z.string().optional(),
 });
 
 const SendConnectionRequestSchema = z.object({
@@ -328,14 +343,18 @@ userRoutes.put("/me", async (c) => {
   const lastName = d.lastName ?? "";
   const fullName = d.name ?? (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined);
 
-  // Update users table (name/email)
-  const userUpdates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
+  // Update users table (name/email/role)
+  const userUpdates: Partial<{ name: string; email: string; role: string; updatedAt: Date }> = { updatedAt: new Date() };
   if (fullName) userUpdates.name = fullName;
   if (d.email) userUpdates.email = d.email;
 
+  // Persist role change if provided
+  const newRole = d.role ? normalizeRole(d.role) : null;
+  if (newRole) userUpdates.role = newRole;
+
   const [updated] = await db
     .update(users)
-    .set(userUpdates)
+    .set(userUpdates as any)
     .where(eq(users.id, user.sub))
     .returning({
       id: users.id,
@@ -345,7 +364,6 @@ userRoutes.put("/me", async (c) => {
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
-
     });
 
   if (!updated) {
@@ -385,6 +403,32 @@ userRoutes.put("/me", async (c) => {
       set: profileData,
     })
     .returning();
+
+  // When the role changes, replace onboarding tasks for the new role (fire-and-forget)
+  if (newRole) {
+    c.executionCtx.waitUntil(
+      (async () => {
+        try {
+          // Delete existing onboarding tasks (taskType 10–19)
+          const existingTasks = await db.select({ id: tasks.id, metadata: tasks.metadata }).from(tasks).where(eq(tasks.userId, user.sub));
+          const onboardingIds = existingTasks
+            .filter((t) => {
+              const meta = (t.metadata ?? {}) as Record<string, unknown>;
+              const tt = typeof meta.taskType === "number" ? meta.taskType : -1;
+              return tt >= 10 && tt <= 19;
+            })
+            .map((t) => t.id);
+          for (const id of onboardingIds) {
+            await db.delete(tasks).where(eq(tasks.id, id));
+          }
+          // Re-seed for new role
+          await seedOnboardingTasks(user.sub, newRole);
+        } catch (err) {
+          console.error("[users/me] Failed to re-seed onboarding tasks:", err);
+        }
+      })(),
+    );
+  }
 
   return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
 });

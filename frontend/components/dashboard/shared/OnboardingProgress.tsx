@@ -137,7 +137,7 @@ export function OnboardingProgress({
           ))}
         </div>
         {remainingTasksCount > 0 && showAllTasksLink && (
-          <Link to="/onboarding">
+          <Link to="/tasks">
             <Button variant="link" className="mt-2 p-0">
               View all tasks ({remainingTasksCount} remaining)
             </Button>

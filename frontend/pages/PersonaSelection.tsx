@@ -1,5 +1,5 @@
 import { Users, Briefcase, Building2, ArrowRight, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -71,6 +71,14 @@ export default function PersonaSelection() {
 
   const { updateUserRole, user } = useAuth();
   const navigate = useNavigate();
+
+  // Pre-select the user's current role when the auth context loads
+  useEffect(() => {
+    if (user?.role) {
+      const match = personas.find((p) => p.id === user.role);
+      if (match) setSelectedPersona(match.id);
+    }
+  }, [user?.role]);
 
   const handleContinue = async () => {
     if (!selectedPersona) return;

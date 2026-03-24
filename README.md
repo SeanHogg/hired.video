@@ -1174,3 +1174,39 @@ The platform sits on three compounding advantages:
 | **Network** | Candidates + recruiters + companies on one platform — liquidity begets liquidity |
 
 Lean into distribution (Chrome extension + shareable links), automation (autonomous agent), and network effects (marketplace) to compound all three.
+
+---
+
+## Roadmap: Pricing Page Feature Gaps
+
+The following items are listed on the pricing page but are not yet (or only partially) implemented. They are grouped by severity: **Not Implemented** (❌) are blockers to honest pricing representation; **Partial** (⚠️) are implemented at surface level but lack tier enforcement, AI uplift, or advanced functionality.
+
+### ❌ Not Implemented — Hard Gaps
+
+| # | Feature | Persona(s) | Tier | What Needs to Be Built |
+|---|---------|-----------|------|------------------------|
+| 1 | **Calendar Integration** | Job Seeker, Recruiter, Employer | Premium | Google Calendar / Outlook / Calendly sync for interview scheduling. Availability slots, booking links, and calendar event creation. |
+| 2 | **API Access / API Key Management** | Job Seeker, Recruiter, Employer | Premium | User-facing API key generation, revocation, and scoped permissions. Developer portal or documentation for external integrations. |
+| 3 | **Hiring & Onboarding (Offers)** | Recruiter, Employer | Premium | Offer letter creation, e-signature flow, onboarding task checklist. New schema tables and routes required. |
+| 4 | **Performance Management** | Recruiter, Employer | Premium | Employee performance reviews, goal setting (OKRs), 1:1 notes, review cycles. No schema or routes exist. |
+| 5 | **Automated Follow-ups** | Recruiter | Premium | Drip/sequence logic for outreach — trigger follow-up emails based on time elapsed or recipient behaviour (open, click, no reply). |
+| 6 | **Hiring Success Metrics** | Recruiter, Employer | Premium | Dashboard analytics for offer acceptance rate, pipeline-stage conversion rates, source-of-hire breakdown, and fill rate. |
+| 7 | **Time-to-hire Analytics** | Recruiter, Employer | Premium | Track and visualise elapsed time from job open → application → interview → offer → placement per role and team. |
+| 8 | **Career Progress Tracking** | Job Seeker | Premium | Goal-setting and milestone tracking for job seekers: target roles, skills to acquire, application targets, interview conversion rates over time. |
+| 9 | **Employee Community (Engage / Inform / Inspire)** | Employer | Premium | Structured internal community with employer-controlled channels (announcements, engagement, inspiration). The existing social feed is public/professional — not an employer-gated internal community. |
+| 10 | **Exclusive Job Boards + Bidding** | Recruiter | Premium | Marketplace of exclusive job boards with a bid/slot-based posting mechanism. Current `jobBoards` tables support basic posting only — no exclusivity or auction logic. |
+
+### ⚠️ Partial — Implemented but Incomplete or Ungated
+
+| # | Feature | Persona(s) | Tier | What Needs to Be Fixed |
+|---|---------|-----------|------|------------------------|
+| 11 | **Subscription Tier Enforcement** | All | Free + Premium | `usageRecords` and `subscriptionPlans` exist in schema and AI usage is tracked, but hard enforcement of Free-tier limits (10 AI requests/mo, applicant/contact caps, team size caps) is not applied consistently across feature routes. Each route needs to check the user's active subscription before serving Premium-only or over-quota requests. |
+| 12 | **Advanced Video Templates** | All | Premium | Storyboard generation works for all users. A Premium-exclusive template library with styled layouts and branded themes needs to be built and gated behind subscription check. |
+| 13 | **Advanced Dashboard Analytics + AI Insights** | All | Premium | Role dashboards exist but all users see the same data regardless of tier. Premium should surface AI-generated narrative insights (trend explanations, recommendations) while Free sees raw metrics only. |
+| 14 | **Advanced Interview Scheduling + Automation** | All | Premium | AI interview practice sessions work. Missing: calendar-based scheduling of real interviews (slot selection, invitations, reminders, rescheduling), with automation gated to Premium. |
+| 15 | **Smart Outreach Campaigns** | Recruiter | Free + Premium | Email campaigns and templates are implemented. "Smart" means behaviour-triggered sequences (follow up if no open in 3 days, personalise based on candidate data). This automation layer does not exist. |
+| 16 | **AI-Powered Smart Notifications** | All | Premium | SSE notification stream is live. Premium should deliver AI-ranked, prioritised notifications (e.g. surface the most actionable alert first). Currently all notifications are treated equally. |
+| 17 | **Salary Calculator gated to Premium** | All | Free restriction | `salary.ts` routes are accessible to all users. Per the pricing page, the Salary Calculator is a Premium-only feature — Free users should see a paywall/upsell prompt. |
+| 18 | **AI Message Personalization (tier differentiation)** | All | Free + Premium | Personalization endpoints exist but Basic (limited) vs Advanced (unlimited) tier split is not enforced. Rate limiting and capability differences need to be applied based on subscription. |
+| 19 | **Priority / AI-Enhanced Job Matching** | All | Premium | All users currently receive identical matching logic. Premium "AI-Enhanced" matching should use a deeper analysis pass (more context, re-ranking, explanations) while Free gets a lighter-weight version. |
+| 20 | **Team Size / Admin User Limits** | Recruiter, Employer | Free (≤2 members) | Invitation system works but there is no hard cap enforced at the route level. Free accounts should be blocked from inviting a 3rd+ team member without upgrading to Premium. |

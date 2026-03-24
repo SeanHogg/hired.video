@@ -464,6 +464,9 @@ export class AuthService {
     // Years of experience
     if (anyUpdates.yearsOfExperience !== undefined) payload.yearsOfExperience = anyUpdates.yearsOfExperience;
 
+    // Role / persona
+    if (anyUpdates.role !== undefined) payload.role = anyUpdates.role;
+
     logger.info("authService.updateProfile: PUT /api/users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(
       "/api/users/me",

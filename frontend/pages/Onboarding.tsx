@@ -15,7 +15,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,23 +38,24 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+// Map normalized UserRole ("JobSeeker", "Recruiter", "Employer") → persona key
+function roleToPersona(role: string | undefined): "job_seeker" | "recruiter" | "employer" {
+  switch (role) {
+    case USER_ROLES.RECRUITER: return "recruiter";
+    case USER_ROLES.EMPLOYER:  return "employer";
+    default:                   return "job_seeker";
+  }
+}
+
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
 
-  // Mock user data
-  const [user] = useState({
-    id: "user123",
-    name: "Sarah Johnson",
-    email: "sarah@example.com",
-    persona: "recruiter" as "job_seeker" | "recruiter" | "employer",
-  });
+  const persona = roleToPersona(authUser?.role);
+  const displayName = authUser?.name || authUser?.firstName || "";
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [completedTasks, setCompletedTasks] = useState<string[]>([
-    "profile",
-    "preferences",
-    "verification",
-  ]);
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
 
   // Persona-specific onboarding tasks
   const getOnboardingSteps = () => {
@@ -84,7 +86,7 @@ export default function Onboarding() {
       },
     ];
 
-    switch (user.persona) {
+    switch (persona) {
       case "job_seeker":
         return [
           ...baseSteps,
@@ -215,11 +217,11 @@ export default function Onboarding() {
             <h1 className="text-3xl font-bold">Welcome to hired.video!</h1>
           </div>
           <p className="text-muted-foreground text-lg">
-            Let's get your {user.persona.replace("_", " ")} profile set up in
+            Let's get your {persona.replace("_", " ")} profile set up in
             just a few steps
           </p>
           <Badge variant="secondary" className="capitalize mt-2">
-            {user.persona.replace("_", " ")} Setup
+            {persona.replace("_", " ")} Setup
           </Badge>
         </div>
       </div>
@@ -321,7 +323,7 @@ export default function Onboarding() {
                 <CurrentStepComponent
                   onComplete={() => handleCompleteTask(steps[currentStep].id)}
                   isCompleted={steps[currentStep].completed}
-                  user={user}
+                  user={{ name: displayName }}
                 />
               </CardContent>
             </Card>
