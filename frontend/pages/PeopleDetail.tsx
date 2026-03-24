@@ -291,9 +291,9 @@ export default function PeopleDetail() {
     structuredData,
   });
 
-  // Track profile view when profile loads
+  // Track profile view when profile loads (only when authenticated — avoids 401 redirect)
   useEffect(() => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.id || !isAuthenticated) return;
 
     // Record profile view for analytics
     const recordView = async () => {
@@ -309,7 +309,7 @@ export default function PeopleDetail() {
     };
 
     recordView();
-  }, [userProfile?.id]);
+  }, [userProfile?.id, isAuthenticated]);
 
   // Check if person is in talent pool (for recruiters)
   useEffect(() => {
