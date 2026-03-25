@@ -8,6 +8,21 @@ import { seedOnboardingTasks } from "../lib/onboarding.js";
 
 const { users, userProfiles, userConnections, tasks } = schema;
 
+// Explicit column list for userProfiles — avoids SELECT * and protects against
+// schema columns that haven't been migrated to the DB yet.
+const profileCols = {
+  userId: userProfiles.userId, headline: userProfiles.headline, summary: userProfiles.summary,
+  location: userProfiles.location, website: userProfiles.website, phone: userProfiles.phone,
+  linkedIn: userProfiles.linkedIn, github: userProfiles.github, twitter: userProfiles.twitter,
+  currentRole: userProfiles.currentRole, currentCompany: userProfiles.currentCompany,
+  avatarUrl: userProfiles.avatarUrl, yearsOfExperience: userProfiles.yearsOfExperience,
+  openToWork: userProfiles.openToWork, openToRemote: userProfiles.openToRemote,
+  salaryCurrency: userProfiles.salaryCurrency, salaryExpectation: userProfiles.salaryExpectation,
+  skills: userProfiles.skills, industries: userProfiles.industries, preferredRoles: userProfiles.preferredRoles,
+  profileVisibility: userProfiles.profileVisibility, customUrlSlug: userProfiles.customUrlSlug,
+  updatedAt: userProfiles.updatedAt,
+} as const;
+
 /** Map frontend PascalCase role to DB snake_case role */
 function normalizeRole(role: string): string | null {
   const map: Record<string, string> = {
@@ -210,7 +225,7 @@ userRoutes.get("/me", async (c) => {
   }
 
   const [profile] = await db
-    .select()
+    .select(profileCols)
     .from(userProfiles)
     .where(eq(userProfiles.userId, user.sub))
     .limit(1);
@@ -243,7 +258,7 @@ userRoutes.get("/profile", async (c) => {
   }
 
   const [profile] = await db
-    .select()
+    .select(profileCols)
     .from(userProfiles)
     .where(eq(userProfiles.userId, user.sub))
     .limit(1);
@@ -676,12 +691,12 @@ userRoutes.get("/:id", async (c) => {
       .limit(1);
     me = row;
     if (me) {
-      const [p] = await db.select().from(userProfiles).where(eq(userProfiles.userId, me.id)).limit(1);
-      profile = p;
+      const [p] = await db.select(profileCols).from(userProfiles).where(eq(userProfiles.userId, me.id)).limit(1);
+      profile = p as any;
     }
   } else {
     // Slug lookup via userProfiles
-    const [p] = await db.select().from(userProfiles).where(eq(userProfiles.customUrlSlug, id)).limit(1);
+    const [p] = await db.select(profileCols).from(userProfiles).where(eq(userProfiles.customUrlSlug, id)).limit(1);
     profile = p;
     if (p) {
       const [row] = await db
