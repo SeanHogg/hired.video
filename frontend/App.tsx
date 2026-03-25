@@ -2,7 +2,7 @@ import "./global.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Suspense, lazy, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
@@ -39,6 +39,9 @@ import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
+const PostAJob = lazy(() => import("./pages/PostAJob"));
+const SalaryPage = lazy(() => import("./pages/seo/SalaryPage"));
+const ResumeGuidePage = lazy(() => import("./pages/seo/ResumeGuidePage"));
 const About = lazy(() => import("./pages/About"));
 const Careers = lazy(() => import("./pages/Careers"));
 const Checkout = lazy(() => import("./pages/Checkout"));
@@ -241,6 +244,42 @@ function ReferralCapture() {
   return null;
 }
 
+// Fires a GTM page_view event on every SPA route change.
+// Also captures UTM parameters into sessionStorage so they survive navigation.
+function GTMPageTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    try {
+      // Capture UTM params on first hit
+      const params = new URLSearchParams(location.search);
+      const utmKeys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+      utmKeys.forEach((key) => {
+        const val = params.get(key);
+        if (val) sessionStorage.setItem(key, val);
+      });
+
+      // Push page_view to GTM dataLayer
+      const w = window as any;
+      w.dataLayer = w.dataLayer || [];
+      w.dataLayer.push({
+        event: "page_view",
+        page_path: location.pathname + location.search,
+        page_title: document.title,
+        utm_source: sessionStorage.getItem("utm_source") || undefined,
+        utm_medium: sessionStorage.getItem("utm_medium") || undefined,
+        utm_campaign: sessionStorage.getItem("utm_campaign") || undefined,
+        utm_term: sessionStorage.getItem("utm_term") || undefined,
+        utm_content: sessionStorage.getItem("utm_content") || undefined,
+      });
+    } catch {
+      // no-op
+    }
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
 const App = () => (
   <ErrorBoundary
     level="critical"
@@ -267,6 +306,7 @@ const App = () => (
                 <PWAUpdatePrompt />
                 <BrowserRouter>
 	                  <ReferralCapture />
+                  <GTMPageTracker />
 
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
@@ -301,7 +341,7 @@ const App = () => (
                       />
                       <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
                       <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/feed" element={<RequireVerified><Feed /></RequireVerified>} />
+                      <Route path="/feed" element={<Feed />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"
@@ -326,6 +366,9 @@ const App = () => (
                       <Route path="/studio" element={<Studio />} />
                       <Route path="/interview" element={<InterviewPractice />} />
                       <Route path="/resume-roast" element={<ResumeRoast />} />
+                      <Route path="/post-a-job" element={<PostAJob />} />
+                      <Route path="/salary/:jobSlug" element={<SalaryPage />} />
+                      <Route path="/resume-guide/:jobSlug" element={<ResumeGuidePage />} />
                       <Route
                         path="/resumes/create/:id"
                         element={<ResumeCreatePage />}

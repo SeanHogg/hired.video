@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
+import { trackSignUp } from "@/lib/gtm";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL ?? "/api";
 
@@ -159,6 +160,7 @@ export default function Signup() {
     try {
       const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
       if (success) {
+        trackSignUp("email");
         // Redirect to success page with email confirmation instructions
         navigate(
           `/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`,

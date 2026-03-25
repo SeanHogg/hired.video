@@ -10,6 +10,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { toast } from "sonner";
+import { trackSubscription } from "@/lib/gtm";
 
 export default function CheckoutSuccess() {
   const {
@@ -37,7 +38,8 @@ export default function CheckoutSuccess() {
     if (isAuthenticated) {
       // Clear the cart since payment setup was successful
       clearCart();
-      
+      trackSubscription("premium", "monthly", 49);
+
       // Show success message
       toast.success("Payment successful! Welcome to Premium! 🎉");
       

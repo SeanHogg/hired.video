@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Flame, Upload, Download, Loader2, Share2, Send } from "lucide-react";
+import { Flame, Upload, Download, Loader2, Share2, Send, Mail, ArrowRight } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import Sidebar from "@/components/Sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
+import { gtmEvent } from "@/lib/gtm";
+import { Input } from "@/components/ui/input";
 import { z } from "zod";
 import RoastResultView from "@/components/RoastResult";
 import type { RoastResult } from "@/components/RoastResult";
@@ -46,6 +48,9 @@ export default function ResumeRoast() {
   const [result, setResult] = useState<RoastResult | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [captureEmail, setCaptureEmail] = useState("");
+  const [emailSaved, setEmailSaved] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   const handleFileChange = useCallback(async (file: File) => {
     try {
@@ -78,6 +83,7 @@ export default function ResumeRoast() {
     try {
       const res = await apiClient.post("/api/resume/roast", { resumeText }, RoastResponseSchema);
       setResult(res.data);
+      gtmEvent("resume_roast_completed", { score: res.data.score });
     } catch {
       toast({ title: "Roast failed", description: "Please try again in a moment", variant: "destructive" });
     } finally {
@@ -107,6 +113,21 @@ export default function ResumeRoast() {
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hired.video/resume-roast")}&summary=${encodeURIComponent(post)}`;
     window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
   }, [result]);
+
+  const handleSaveEmail = useCallback(async () => {
+    if (!captureEmail.includes("@") || !result) return;
+    setSavingEmail(true);
+    try {
+      await apiClient.post("/api/marketing/leads", { email: captureEmail, source: "resume_roast", notes: `Score: ${result.score}` }, null as any);
+      gtmEvent("roast_email_capture", { score: result.score });
+      setEmailSaved(true);
+    } catch {
+      // still show success to avoid blocking UX
+      setEmailSaved(true);
+    } finally {
+      setSavingEmail(false);
+    }
+  }, [captureEmail, result]);
 
   const handleDownloadCard = useCallback(async () => {
     if (!result) return;
@@ -228,6 +249,46 @@ export default function ResumeRoast() {
                 )}
               </div>
               <RoastResultView result={result} />
+
+              {/* Email capture for guests */}
+              {!isAuthenticated && (
+                <Card className="border-primary/30 bg-primary/5 mt-4">
+                  <CardContent className="pt-5">
+                    {emailSaved ? (
+                      <p className="text-sm text-center font-medium text-primary">
+                        ✓ Got it — we'll send your full report and job matches to {captureEmail}
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+                          <p className="text-sm font-medium">Save your roast report + get matched jobs</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            type="email"
+                            placeholder="your@email.com"
+                            value={captureEmail}
+                            onChange={(e) => setCaptureEmail(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSaveEmail()}
+                            className="flex-1 h-9 text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            className="gap-1.5 flex-shrink-0"
+                            onClick={handleSaveEmail}
+                            disabled={savingEmail || !captureEmail.includes("@")}
+                          >
+                            {savingEmail ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
+                            Save
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">No spam. Unsubscribe any time.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </main>

@@ -66,6 +66,7 @@ import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { openapiRoutes } from "./routes/openapi.js";
+import { sitemapRoutes } from "./routes/sitemap.js";
 import { callLLM, getApiKey } from "./services/ai.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
@@ -168,6 +169,7 @@ export function createApp() {
     "/api/whitelabel/roi-calculator",
     "/api/openapi.json",
     "/api/docs",
+    "/sitemap.xml",
     "/health",
     "/api/health",
   ];
@@ -327,6 +329,7 @@ export function createApp() {
   app.route("/api/discovery", discoveryRoutes);
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api", openapiRoutes);
+  app.route("/", sitemapRoutes);
 
   // ---------------------------------------------------------------------------
   // POST /api/chat/visitor — AI prospect chat widget (#54)
