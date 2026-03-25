@@ -419,6 +419,7 @@ const App = () => (
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />
                       <Route path="/tools" element={<Tools />} />
                       <Route path="/chat" element={<AICoach />} />
+                      <Route path="/ai-coach" element={<AICoach />} />
                       <Route
                         path="/Tools/SentimentAnalysis"
                         element={<SentimentAnalysis />}
