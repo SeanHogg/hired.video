@@ -79,11 +79,11 @@ hired.video/
 │   │   ├── app.ts                # Hono app factory, route mounting, CORS
 │   │   ├── worker.ts             # CF Worker fetch handler (production entry)
 │   │   ├── index.ts              # Node.js entry (local development)
-│   │   ├── routes/               # 40 route files — one per feature domain
-│   │   ├── services/             # Business logic services (7 files)
+│   │   ├── routes/               # 59 route files — one per feature domain
+│   │   ├── services/             # Business logic services (9 files + payment/ subfolder)
 │   │   ├── middleware/           # Auth, error handling, rate limiting, logging
 │   │   ├── db/
-│   │   │   ├── schema/           # Drizzle schema definitions (73 tables)
+│   │   │   ├── schema/           # Drizzle schema definitions (118 tables)
 │   │   │   └── index.ts          # DB connection
 │   │   └── types/                # Shared TypeScript types, response helpers
 │   ├── wrangler.toml             # Cloudflare Worker config + R2/KV bindings
@@ -114,7 +114,7 @@ hired.video/
 The dashboard system uses a **role-based component loader pattern**. The main container reads the user's `rolePermissions` and renders the appropriate role-specific component.
 
 ```
-/frontend/pages/Dashboard.tsx (main container — 323 lines)
+/frontend/pages/Dashboard.tsx (main container — 329 lines)
 /frontend/components/dashboard/
 ├── JobSeekerDashboard.tsx       # Profile stats, applications, job matches, interviews, messages, career progress
 ├── RecruiterDashboard.tsx       # Candidate pipeline, job posting stats, recruitment metrics, scheduled interviews
@@ -198,7 +198,7 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 | Route File | Endpoints | Status | Notes |
 |-----------|-----------|--------|-------|
 | `video.ts` | GET /:id, /:id/status, /resume/:resumeId, /resume/:resumeId/active, /resume/:resumeId/can-generate, /user/all; POST /generate, /:id/cancel, /enhance-summary; DELETE /:id | ✅ Complete | Video generation lifecycle |
-| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId; DELETE /projects/:projectId; PATCH /projects/:projectId/status | ✅ Complete | 929 lines — largest route file |
+| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload, /brand-kits, /campaigns, /videos/:id/view, /videos/:id/cta-click; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId, /brand-kits, /ad-templates, /campaigns, /videos/:id/embed, /videos/:id/analytics; DELETE /projects/:projectId; PATCH /projects/:projectId/status; POST /projects/:id/clone | ✅ Complete | 1,658 lines — largest route file |
 
 #### Jobs & Matching
 
@@ -274,41 +274,148 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 | `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
 | `featureflag.ts` | GET / | ✅ Complete | Orphaned duplicate `feature-flag.ts` deleted; static flag evaluation |
 | `hubs.ts` | GET/POST /notifications, POST /notifications/negotiate | ✅ Complete | SSE stream live; `POST /negotiate` returns transport descriptor |
-| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ⚠️ Stub | Basic structure only; no campaign execution or lead capture logic — see Gap Register #43 |
+| `marketing.ts` | GET /campaigns, /leads; POST /campaigns, /leads | ✅ Complete | Real DB tables wired — see Gap Register #38 |
+
+#### Auth Extensions
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `oauth.ts` | GET /:provider, /:provider/callback; POST /magic-link; GET /magic-link/verify, /linked-accounts, /sessions; DELETE /unlink/:provider, /sessions/:id, /sessions; POST /add-password | ✅ Complete | Google, LinkedIn, GitHub, Microsoft OIDC flows; magic links; session management |
+| `passkeys.ts` | POST /register/begin, /register/complete, /login/begin, /login/complete; GET /credentials; DELETE /credentials/:id | ✅ Complete | Full FIDO2/WebAuthn — CBOR parsing, DER→raw sig conversion, clone detection |
+
+#### Notifications & Real-time
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `notifications.ts` | GET /, /unread-count, /smart; POST /mark-all-read, /:id/mark-read; DELETE /:id | ✅ Complete | Smart priority ranking (Premium) via `GET /smart` |
+
+#### Calendar & Scheduling
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `calendar.ts` | GET /events, /events/:id, /availability, /connections, /connect/:provider, /connect/:provider/callback; POST /events, /availability, /sync, /interview-slots, /book-interview; PATCH /events/:id; DELETE /events/:id, /availability/:id, /connections/:id | ✅ Complete | Google + Outlook OAuth; two-way calendar sync; interview slot generation |
+
+#### Outreach & Follow-ups
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `followups.ts` | GET /sequences, /sequences/:id, /enrollments; POST /sequences, /enroll, /trigger; PATCH /enrollments/:id/:action; DELETE /sequences/:id | ✅ Complete | Multi-step outreach sequences; behaviour-triggered enrollment |
+
+#### Assessments
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `assessments.ts` | GET /, /:slug, /me/results, /users/:userId/badges; POST /:slug/start, /attempts/:attemptId/submit | ✅ Complete | Timed skill tests with AI grading; public badge display |
+
+#### ATS & Integrations
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ats.ts` | GET /connections; POST /connections, /sync/:connectionId, /webhook/:provider; DELETE /connections/:id | ⚠️ Partial | HMAC-verified webhook; provider API calls are stubs pending dev credentials |
+
+#### Performance Management
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `performance.ts` | GET /cycles, /cycles/:id, /reviews, /goals; POST /cycles, /reviews, /goals; PATCH /cycles/:id/complete, /reviews/:id/submit, /reviews/:id/acknowledge, /goals/:id, /goals/:id/progress; DELETE /goals/:id | ✅ Complete | OKRs, review cycles, employee sign-off |
+
+#### Onboarding & Hiring
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `onboarding-hiring.ts` | GET /offers, /offers/:id, /checklists, /checklists/:id; POST /offers, /offers/:id/send-for-signature, /offers/webhook/dropbox-sign; PATCH /offers/:id/send, /offers/:id/accept, /offers/:id/decline, /checklists/:id/tasks/:taskId/complete; DELETE /offers/:id | ✅ Complete | Offer letters + Dropbox Sign e-signature; HMAC-verified webhook |
+
+#### Discovery & Smart Job Board
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `discovery.ts` | GET /talent-feed, /talent-feed/:userId, /jobs, /jobs/:id/similar, /seo/resume-guide/:jobSlug, /seo/salary/:jobSlug, /creators/leaderboard, /creators/products; POST /creators/products | ✅ Complete | Algorithmic talent feed; NL job search; SEO content engine with 24h cache |
+
+#### White-label & B2B
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `whitelabel.ts` | GET /tenants, /tenants/:id, /portal/:subdomain, /tenants/:id/analytics, /roi-calculator; POST /tenants, /demo-request; PATCH /tenants/:id | ✅ Complete | Multi-tenant portals; ROI calculator; university/bootcamp tenant types |
+
+#### Ads & Analytics
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `ads.ts` | GET /config; POST /ads/impression | ✅ Complete | Ad-free flag for Premium; impression tracking |
+| `analytics.ts` | POST /beacon, /ads/impression; GET /usage, /time-to-hire, /hiring-metrics | ✅ Complete | DAU/WAU/MAU, feature adoption, ad CTR, time-to-hire (Premium) |
+
+#### API Keys & Exclusive Boards
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `apikeys.ts` | GET /; POST /; DELETE /:id; PATCH /:id | ✅ Complete | SHA-256 hashed keys shown once at creation; Premium tier |
+| `exclusive-boards.ts` | GET /exclusive, /exclusive/:id, /bids; POST /bids; DELETE /bids/:id; PATCH /bids/:id/accept, /bids/:id/reject | ✅ Complete | Premium exclusive job boards with bidding/auction |
+
+#### Auto-Apply & Job Scraper
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `auto-apply.ts` | POST /start; GET /matches | ✅ Complete | LLM tailors cover letter + resume per job; Premium-gated |
+| `jobscraper.ts` | Admin: GET /, POST /, PATCH /:id, DELETE /:id, POST /:id/sync, GET /:id/logs; User: GET /, POST /, PATCH /:id, DELETE /:id | ✅ Complete | RSS + JSON API sources; SHA-256 dedup; cron-driven sync |
+
+#### Apply Button & Community
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `apply-button.ts` | GET /snippet, /:jobId/meta; POST /track | ✅ Complete | Embeddable `<script>` tag; lead capture; public routes |
+| `community.ts` | GET /posts, /channels; POST /posts; DELETE /posts/:id | ✅ Complete | Company community feed with channel-based discussions |
+
+#### OpenAPI & Sitemap
+
+| Route File | Endpoints | Status | Notes |
+|-----------|-----------|--------|-------|
+| `openapi.ts` | GET /openapi.json, /docs | ✅ Complete | OpenAPI 3.1 spec; `/docs` redirects to Swagger UI |
+| `sitemap.ts` | GET /sitemap.xml | ✅ Complete | Dynamic XML sitemap for SEO |
 
 ### Services
 
 | Service | Lines | Status | Notes |
 |---------|-------|--------|-------|
-| `email.ts` | 518 | ✅ Complete | `EmailProvider` interface + SendPulse implementation; sends verification, reset, 2FA, resend emails |
-| `ai.ts` | 84 | ✅ Complete | `callLLM()` / `callLLMJson()` with Zod schema validation; OpenRouter wrapper |
-| `account.ts` | 363 | ✅ Complete | Organization/team management business logic |
-| `job.ts` | 257 | ✅ Complete | Job management: create, update, archive, search |
+| `email.ts` | 576 | ✅ Complete | `EmailProvider` interface + SendPulse implementation; sends verification, reset, 2FA, resend emails |
+| `ai.ts` | 83 | ✅ Complete | `callLLM()` / `callLLMJson()` with Zod schema validation; OpenRouter wrapper |
+| `account.ts` | 300 | ✅ Complete | Organization/team management business logic |
+| `job.ts` | 278 | ✅ Complete | Job management: create, update, archive, search |
 | `company.ts` | 84 | ✅ Complete | Company CRUD, follow/unfollow, trending |
 | `settings.ts` | 76 | ✅ Complete | User preference read/write |
-| `billing.ts` | 106 | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
+| `billing.ts` | 378 | ✅ Complete | Real DB queries for subscriptions, invoices, payment methods, AI usage |
+| `jobscraper.ts` | 231 | ✅ Complete | RSS + JSON API scraper, SHA-256 dedup, sync scheduling |
+| `stripe.ts` | 106 | ✅ Complete | Top-level Stripe helper used by payment routes |
+| `payment/` | — | ✅ Complete | Strategy pattern: `types.ts` interface + `stripe.ts` (full) + `helcim.ts` (⚠️ stub) + `index.ts` factory |
 
-### Database Schema (73 tables in `/api/src/db/schema/`)
+### Database Schema (118 tables in `/api/src/db/schema/`)
 
 All tables are defined and schema migrations managed via Drizzle Kit.
 
 | Domain | Tables |
 |--------|--------|
-| Users & Auth | `users`, `userProfiles`, `userRoles`, `roles`, `passwordHistory`, `twoFactorCodes`, `emailVerificationTokens`, `passwordResetTokens`, `refreshTokens`, `userConnections` |
-| Companies & Orgs | `companyProfiles`, `userCompanyRoleAssociations`, `companyFollowers`, `accountInvitations`, `accountPreferences` |
+| Users & Auth | `users`, `userProfiles`, `userRoles`, `roles`, `passwordHistory`, `twoFactorCodes`, `emailVerificationTokens`, `passwordResetTokens`, `refreshTokens`, `userConnections`, `magicLinkTokens`, `oauthAccounts`, `apiKeys` |
+| WebAuthn / Passkeys | `webauthnCredentials`, `webauthnChallenges` |
+| Companies & Orgs | `companyProfiles`, `userCompanyRoleAssociations`, `companyFollowers`, `accountInvitations`, `accountPreferences`, `companySubscriptions`, `employerBrandingPages` |
 | Resumes | `resumeInformation`, `resumeTemplates`, `watchedResumes`, `metaResumes` |
-| Jobs | `jobItems`, `jobPreferences`, `jobApplications`, `savedJobs`, `jobAlerts`, `jobWebsites` |
-| Video & Studio | `videos`, `videoResumes`, `studioProjects`, `youtubeAccounts` |
-| Recruiter | `recruiterTalentPools`, `talentPoolCandidates`, `candidateInteractions`, `candidateSubmissions`, `placements`, `jobBoards`, `jobBoardPostings` |
+| Jobs | `jobItems`, `jobPreferences`, `jobApplications`, `savedJobs`, `jobAlerts`, `jobWebsites`, `jobBoardSources`, `jobBoardSyncLog` |
+| Video & Studio | `videos`, `videoResumes`, `studioProjects`, `youtubeAccounts`, `studioBrandKits`, `videoAnalytics`, `videoCampaigns` |
+| Recruiter | `recruiterTalentPools`, `talentPoolCandidates`, `candidateInteractions`, `candidateSubmissions`, `placements`, `jobBoards`, `jobBoardPostings`, `recruiterAgentRuns`, `savedSearches`, `exclusiveBoards`, `boardBids` |
 | Messaging | `conversations`, `conversationParticipants`, `messages`, `messageReadReceipts`, `emailTemplates`, `emailCampaigns`, `emailCampaignRecipients`, `communicationTracking` |
+| Outreach & Follow-ups | `followUpSequences`, `followUpSteps`, `followUpEnrollments`, `followUpLogs` |
 | Social | `feedPosts`, `feedPostLikes`, `feedPostComments` |
 | Interviews | `interviewSessions`, `interviewAnswers`, `interviews`, `applicationNotes` |
-| Affiliate | `affiliateProfiles`, `affiliateReferrals`, `affiliateConversions`, `affiliatePayouts` |
+| Assessments | `skillAssessments`, `assessmentAttempts` |
+| Calendar & Scheduling | `calendarConnections`, `scheduledEvents`, `availabilitySlots` |
+| Onboarding & Hiring | `offerLetters`, `onboardingChecklists`, `onboardingTasks` |
+| Performance | `performanceCycles`, `performanceReviews`, `performanceGoals` |
+| ATS Integration | `atsConnections` |
+| Affiliate | `affiliateProfiles`, `affiliateReferrals`, `affiliateConversions`, `affiliatePayouts`, `affiliateTiers`, `affiliateLinkClicks` |
 | Billing | `subscriptionPlans`, `subscriptions`, `paymentMethods`, `invoices`, `invoiceLineItems`, `refundRequests`, `billingEvents`, `usageRecords` |
 | Analytics | `profileViews`, `activityLogs`, `requestLogs`, `dashboardMetrics`, `userEngagementMetrics`, `aiUsageRecords`, `aiChatSessions`, `aiChatMessages` |
 | Productivity | `tasks`, `boards`, `notifications`, `queueJobToResume`, `queueJobToProcess` |
 | Locations | `countries`, `stateProvinces`, `cities`, `postalZipCodes` |
-| System | `systemSettings` |
+| White-label | `whitelabelTenants` |
+| System | `systemSettings`, `marketingLeads`, `featureFlags` |
 
 ---
 
