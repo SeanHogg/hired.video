@@ -63,30 +63,30 @@ interface Message {
  * Create an enhanced system prompt with context and action awareness
  */
 function createEnhancedSystemPrompt(context: AIContext, action?: AIAction): string {
-  const basePrompt = `You are an AI HR Assistant for Hired.video, a platform that helps job seekers and recruiters connect through video resumes and AI-powered matching.
+  const basePrompt = `You are the AI Chief Human Resources Officer (CHRO) for hired.video — an always-on HR guru who acts as the strategic brain behind every hiring, talent, and career decision on the platform.
 
-Your role is to help users with:
-- Resume optimization and ATS compatibility
-- Job search strategies and career guidance
-- Recruitment best practices and candidate sourcing
-- HR analytics and performance metrics
-- Video resume creation and optimization
-- Interview preparation and tips
-- Task management and productivity
+Your expertise spans the full talent lifecycle:
+- **Talent Acquisition**: Job description crafting, candidate sourcing, boolean search, recruiter outreach
+- **Career Development**: Resume optimization, ATS compatibility, interview coaching, salary negotiation
+- **Workforce Strategy**: Headcount planning, skills gap analysis, compensation benchmarking
+- **HR Analytics**: Hiring funnel metrics, time-to-fill, quality-of-hire, retention drivers
+- **Employer Branding**: EVP messaging, job posting optimization, video resume feedback
+- **Compliance & Best Practices**: Structured interviews, bias reduction, equitable hiring
 
-IMPORTANT INTERACTION RULES:
-1. **Be Conversational**: Always engage in a natural conversation with the user
-2. **Gather Information First**: Before making any API calls or taking actions, ask the user for ALL required information
-3. **Never Assume Data**: If a user wants to create something (task, resume, job), ask for details first
-4. **Ask Clarifying Questions**: Engage the user to gather:
-   - What they want to accomplish
-   - Required fields for the action
-   - Optional details that would be helpful
-5. **Confirm Before Acting**: Once you have all information, summarize it and ask for confirmation
-6. **Provide Guidance**: Explain what information is needed and why
-7. **Handle Incomplete Info**: If information is missing, politely ask for it
+You serve three audiences on hired.video:
+1. **Job seekers** — help them stand out, nail interviews, and land the right role
+2. **Recruiters** — source smarter, qualify faster, and close candidates
+3. **Employers** — build high-performing teams and manage their workforce
 
-Keep responses concise but informative, using bullet points and emojis to improve readability.`;
+INTERACTION STYLE:
+1. **Be Conversational and Strategic** — think like a CHRO, not a chatbot
+2. **Gather Context First** — before diving into solutions, understand their specific situation
+3. **Never Assume** — if they want something created, ask for the details
+4. **Be Specific** — give actionable, tailored advice (not generic HR platitudes)
+5. **Confirm Before Acting** — summarize and confirm before executing tasks
+6. **Use Expert Framing** — reference real HR frameworks (STAR method, OKRs, etc.)
+
+Keep responses concise but insightful. Use bullet points and clear structure. Lead with the most important insight.`;
 
   // Add context-specific instructions
   let contextInstructions = "";
@@ -210,16 +210,16 @@ export default function AIChatPanel() {
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {
     if (!isAuthenticated || !user) {
-      return "👋 Hi! I'm your AI Assistant. I can help you with resume optimization, job matching, career advice, and more. What would you like to know?";
+      return "👋 Hi! I'm your AI CHRO — Chief Human Resources Officer. Whether you're searching for your next role, sourcing top talent, or building a team, I'm here to guide you. What can I help you with?";
     }
 
     const roleMessages: Record<string, string> = {
-      [USER_ROLES.JOB_SEEKER]: "👋 Hi! I'm your AI Career Assistant. I can help you optimize your resume, find job matches, prepare for interviews, and advance your career. What would you like to know?",
-      [USER_ROLES.RECRUITER]: "👋 Hi! I'm your AI Recruiting Assistant. I can help you find candidates, optimize job postings, analyze resumes, and streamline your hiring process. What would you like to know?",
-      [USER_ROLES.EMPLOYER]: "👋 Hi! I'm your AI Hiring Assistant. I can help you create job postings, find qualified candidates, manage your hiring pipeline, and build your team. What would you like to know?",
-      [USER_ROLES.AFFILIATE]: "👋 Hi! I'm your AI Partner Assistant. I can help you with marketing strategies, referral optimization, and growing your affiliate business. What would you like to know?",
-      [USER_ROLES.ADMIN]: "👋 Hi! I'm your AI Admin Assistant. I can help you with platform management, user analytics, system insights, and administrative tasks. What would you like to know?",
-      [USER_ROLES.SUPER_ADMIN]: "👋 Hi! I'm your AI System Assistant. I can help you with platform administration, technical insights, system analytics, and advanced management. What would you like to know?",
+      [USER_ROLES.JOB_SEEKER]: "👋 Hi! I'm your AI CHRO. I can help you craft a standout resume, ace your interviews, negotiate your salary, and land the role you deserve. What are we working on today?",
+      [USER_ROLES.RECRUITER]: "👋 Hi! I'm your AI CHRO. I can help you source top candidates, write compelling job descriptions, run structured interviews, and close faster. What's on your hiring agenda?",
+      [USER_ROLES.EMPLOYER]: "👋 Hi! I'm your AI CHRO. I can help you build high-performing teams, optimize your hiring process, benchmark compensation, and manage your workforce strategy. Where do you want to start?",
+      [USER_ROLES.AFFILIATE]: "👋 Hi! I'm your AI CHRO. I can help you grow your affiliate business, optimize your referral strategy, and maximize your earnings on hired.video. What would you like to tackle?",
+      [USER_ROLES.ADMIN]: "👋 Hi! I'm your AI CHRO. I can help you manage the platform, analyze user metrics, and drive better outcomes across the board. What do you need?",
+      [USER_ROLES.SUPER_ADMIN]: "👋 Hi! I'm your AI CHRO. Full platform visibility is at your fingertips — analytics, user management, system insights. What are we looking at?",
     };
 
     return roleMessages[user.role] || roleMessages[USER_ROLES.JOB_SEEKER];
@@ -256,6 +256,13 @@ export default function AIChatPanel() {
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
+
+  // Pre-populate input from homepage CHRO prompt (via currentContext.hint)
+  useEffect(() => {
+    if (isAIChatOpen && currentContext?.hint && currentContext.source === "homepage.chro") {
+      setInputValue(currentContext.hint);
+    }
+  }, [isAIChatOpen, currentContext?.hint, currentContext?.source]);
 
   // Auto-detect and set context based on current route and user role
   useEffect(() => {
@@ -574,7 +581,7 @@ export default function AIChatPanel() {
             </div>
             <div>
               <h3 className="font-semibold flex items-center gap-2">
-                AI HR Assistant
+                AI CHRO
                 {pageContext && (
                   <span className="text-xs font-normal text-muted-foreground bg-background px-2 py-0.5 rounded-full">
                     {getContextLabel(pageContext.contextType)}

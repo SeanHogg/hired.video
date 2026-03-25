@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import FloatingAIButton from "@/components/FloatingAIButton";
 
 export default function AICoach() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -24,20 +25,29 @@ export default function AICoach() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated } = useAuth();
-  const { openAIChat, isAIChatOpen } = useAI();
+  const { openAIChat, openAIWithContext, isAIChatOpen } = useAI();
 
   // SEO for AI Coach page
   useSEO(location.pathname);
 
-  // Auto-open AI chat when page loads
+  // Auto-open AI chat when page loads; pre-fill from ?q= param if present
   useEffect(() => {
     if (isAuthenticated && !isAIChatOpen) {
-      // Small delay to ensure page is loaded
+      const initialQuery = searchParams.get("q");
       setTimeout(() => {
-        openAIChat();
+        if (initialQuery) {
+          openAIWithContext({
+            source: "homepage.chro",
+            task: "answer_question",
+            hint: initialQuery,
+          });
+        } else {
+          openAIChat();
+        }
       }, 500);
     }
-  }, [isAuthenticated, isAIChatOpen, openAIChat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const showAuthOverlay = !isAuthenticated;
 
@@ -109,18 +119,18 @@ export default function AICoach() {
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    AI Career Coach
+                    AI CHRO
                   </h1>
                   <p className="text-xl text-muted-foreground mt-2">
-                    Your personal AI assistant for career success
+                    Your Chief Human Resources Officer, powered by AI
                   </p>
                 </div>
               </div>
-              
+
               {isAuthenticated && (
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Sparkles className="h-4 w-4" />
-                  <span>AI Chat is {isAIChatOpen ? "open" : "available"} - Click the AI button to start</span>
+                  <span>AI Chat is {isAIChatOpen ? "open" : "available"} — click the AI button to start</span>
                 </div>
               )}
             </div>

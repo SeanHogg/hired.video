@@ -23,3 +23,4 @@ export * from "./jobscraper.js";
 export * from "./studioadvertising.js";
 export * from "./webauthn.js";
 export * from "./assessments.js";
+export * from "./whitelabel.js";

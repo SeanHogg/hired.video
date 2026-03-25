@@ -8,6 +8,12 @@ import {
   List,
   Eye,
   Play,
+  Sparkles,
+  ArrowRight,
+  Brain,
+  Users,
+  BarChart3,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -15,41 +21,24 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
-import HeroCarousel from "@/components/HeroCarousel";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import VideoCard from "@/components/VideoCard";
-import MediaCard from "@/components/MediaCard";
-import PeopleCard from "@/components/PeopleCard";
 import SearchBar from "@/components/SearchBar";
 
 import Pagination, { usePagination } from "@/components/Pagination";
-import ContentSection from "@/components/ui/ContentSection";
 import { useCardRenderer } from "@/lib/card-factory";
 import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { companyService } from "@/lib/services/company-service";
 import {
-  dashboardService,
-  type DashboardStats,
-  type HomepageContent,
-} from "@/lib/services/dashboard-service";
-import {
   searchService,
   type SearchResponse,
   type SearchFilters,
 } from "@/lib/services/search-service";
-import { jobService } from "@/lib/services/job-service";
-import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import type { CompanyWithOwnership } from "@/types/company";
@@ -78,6 +67,9 @@ export default function Index() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // AI CHRO prompt state
+  const [chroQuery, setChroQuery] = useState("");
 
   // Company-specific state for interactive features
   // Legacy company state removed; unified search provides companies
@@ -640,13 +632,85 @@ export default function Index() {
         />
 
         {/* Page H1 for semantic SEO */}
-        <h1 className="sr-only">hired.video — Discover Jobs, Companies, People, and Resumes</h1>
+        <h1 className="sr-only">hired.video — Your AI Chief Human Resources Officer</h1>
 
-        {/* Hero Carousel */}
-        <HeroCarousel
-          totalViews={formatTotalViews(totalViews)}
-          totalItems={contentItems.length}
-        />
+        {/* AI CHRO Hero */}
+        <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-10 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
+          {/* Subtle background glow */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-[400px] w-[800px] rounded-full bg-primary/5 blur-3xl" />
+          </div>
+
+          <div className="relative max-w-3xl mx-auto text-center">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
+              <Brain className="w-3.5 h-3.5" />
+              AI Chief Human Resources Officer
+            </div>
+
+            {/* Headline */}
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
+              Your AI CHRO,{" "}
+              <span className="text-primary">always on.</span>
+            </h2>
+            <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
+              Hire smarter, grow your career, and manage talent — powered by an AI that thinks like your best HR leader.
+            </p>
+
+            {/* Prompt Input */}
+            <div className="relative bg-card border border-border rounded-2xl shadow-lg p-3">
+              <Textarea
+                value={chroQuery}
+                onChange={(e) => setChroQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && chroQuery.trim()) {
+                    e.preventDefault();
+                    navigate(`/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`);
+                  }
+                }}
+                placeholder={`Ask your AI CHRO anything… "Help me write a job description for a senior engineer" or "What skills should I add to my resume?"`}
+                className="min-h-[80px] resize-none border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
+              />
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">Press Enter to ask · Shift+Enter for new line</p>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  disabled={!chroQuery.trim()}
+                  onClick={() => {
+                    if (chroQuery.trim()) {
+                      navigate(`/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`);
+                    }
+                  }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Ask CHRO
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick-action chips */}
+            <div className="flex flex-wrap gap-2 justify-center mt-5">
+              {[
+                { icon: FileText, label: "Optimize my resume", q: "Help me optimize my resume for ATS and improve my chances of getting noticed" },
+                { icon: Briefcase, label: "Write a job description", q: "Write a compelling job description for a role I need to fill" },
+                { icon: Users, label: "Source candidates", q: "Help me source and evaluate candidates for an open position" },
+                { icon: BarChart3, label: "Salary benchmarking", q: "What is the market salary range for this role and location?" },
+                { icon: Brain, label: "Interview prep", q: "Help me prepare for my upcoming job interview" },
+              ].map(({ icon: Icon, label, q }) => (
+                <button
+                  key={label}
+                  onClick={() => navigate(`/ai-coach?q=${encodeURIComponent(q)}`)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted hover:border-primary/40 transition-colors px-3 py-1.5 text-xs font-medium text-foreground"
+                >
+                  <Icon className="w-3.5 h-3.5 text-primary" />
+                  {label}
+                  <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* Search and Filters */}
         <section className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">

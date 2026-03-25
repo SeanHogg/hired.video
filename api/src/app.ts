@@ -63,6 +63,9 @@ import { passkeyRoutes } from "./routes/passkeys.js";
 import { atsRoutes } from "./routes/ats.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
+import { discoveryRoutes } from "./routes/discovery.js";
+import { whitelabelRoutes } from "./routes/whitelabel.js";
+import { openapiRoutes } from "./routes/openapi.js";
 import { callLLM, getApiKey } from "./services/ai.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
@@ -154,6 +157,17 @@ export function createApp() {
     "/api/hiring/offers/webhook",
     "/api/affiliates/click",
     "/api/assessments/users",
+    "/api/calendar/connect",
+    "/api/discovery/seo",
+    "/api/discovery/jobs",
+    "/api/discovery/talent-feed",
+    "/api/discovery/creators/leaderboard",
+    "/api/discovery/creators/products",
+    "/api/whitelabel/portal",
+    "/api/whitelabel/demo-request",
+    "/api/whitelabel/roi-calculator",
+    "/api/openapi.json",
+    "/api/docs",
     "/health",
     "/api/health",
   ];
@@ -310,6 +324,9 @@ export function createApp() {
   app.route("/api/ats", atsRoutes);
   app.route("/api/assessments", assessmentRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
+  app.route("/api/discovery", discoveryRoutes);
+  app.route("/api/whitelabel", whitelabelRoutes);
+  app.route("/api", openapiRoutes);
 
   // ---------------------------------------------------------------------------
   // POST /api/chat/visitor — AI prospect chat widget (#54)
