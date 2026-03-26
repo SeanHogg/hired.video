@@ -359,7 +359,13 @@ export default function StudioLayout() {
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [videoHeight, setVideoHeight] = useState(160);
+  const [videoHeight, setVideoHeight] = useState(() => {
+    const saved = localStorage.getItem("studio_video_height");
+    return saved ? Math.max(80, parseInt(saved, 10)) : 160;
+  });
+  const [onboardingStep, setOnboardingStep] = useState<number>(() => {
+    return localStorage.getItem("studio_onboarded") ? -1 : 0;
+  });
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ y: 0, height: 0 });
 
@@ -368,7 +374,9 @@ export default function StudioLayout() {
     function onMouseMove(e: MouseEvent) {
       if (!isDraggingRef.current) return;
       const delta = e.clientY - dragStartRef.current.y;
-      setVideoHeight(Math.max(80, dragStartRef.current.height + delta));
+      const newHeight = Math.max(80, dragStartRef.current.height + delta);
+      setVideoHeight(newHeight);
+      localStorage.setItem("studio_video_height", String(newHeight));
     }
     function onMouseUp() {
       isDraggingRef.current = false;
@@ -963,6 +971,84 @@ export default function StudioLayout() {
           onClose={() => setLinkedInOpen(false)}
         />
       )}
+
+      {/* First-time onboarding overlay */}
+      {onboardingStep >= 0 && (() => {
+        const steps = [
+          {
+            title: "Welcome to Video Studio!",
+            body: "Create a professional video resume in minutes. Start by pasting your resume or job description in the Prompt tab.",
+            icon: <Sparkles className="h-8 w-8 text-primary" />,
+          },
+          {
+            title: "Generate Your Script",
+            body: "Click 'Generate Script' on the right panel. Our AI will write a compelling script tailored to your background and target role.",
+            icon: <Zap className="h-8 w-8 text-primary" />,
+          },
+          {
+            title: "Preview & Customise",
+            body: "Your video preview updates live. Drag the divider below the video to resize it. Switch to the Storyboard tab to edit individual scenes.",
+            icon: <Play className="h-8 w-8 text-primary" />,
+          },
+          {
+            title: "Export & Share",
+            body: "When happy with your video, export as MP4 or publish directly to your profile. You can also post to LinkedIn or YouTube.",
+            icon: <Share2 className="h-8 w-8 text-primary" />,
+          },
+        ];
+        const step = steps[onboardingStep];
+        const isLast = onboardingStep === steps.length - 1;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-background rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 space-y-4">
+              <div className="flex flex-col items-center text-center gap-3">
+                {step.icon}
+                <h2 className="text-2xl font-bold">{step.title}</h2>
+                <p className="text-muted-foreground">{step.body}</p>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-1.5">
+                  {steps.map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "w-2 h-2 rounded-full transition-colors",
+                        i === onboardingStep ? "bg-primary" : "bg-muted-foreground/30"
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.setItem("studio_onboarded", "1");
+                      setOnboardingStep(-1);
+                    }}
+                  >
+                    Skip
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (isLast) {
+                        localStorage.setItem("studio_onboarded", "1");
+                        setOnboardingStep(-1);
+                      } else {
+                        setOnboardingStep((s) => s + 1);
+                      }
+                    }}
+                  >
+                    {isLast ? "Get Started" : "Next"}
+                    {!isLast && <ChevronRight className="ml-1 h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

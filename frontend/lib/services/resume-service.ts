@@ -716,7 +716,13 @@ export class ResumeService {
         confidence: 0.8, // Default confidence score
       };
     } catch (parseError) {
-      throw new Error(`Failed to parse resume data: ${parseError}`);
+      console.warn("Resume parse failed, returning empty data:", parseError);
+      const emptyData: ResumeData = {
+        Basics: { Name: "", Label: "", Image: "", Email: "", Phone: "", Url: "", Summary: "", Location: null },
+        Work: [], Volunteer: [], Education: [], Awards: [], Certificates: [],
+        Publications: [], Skills: [], Languages: [], Interests: [], References: [], Projects: [],
+      };
+      return { data: emptyData, confidence: 0 };
     }
   }
 

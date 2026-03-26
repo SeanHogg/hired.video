@@ -3,6 +3,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { callLLM, getApiKey } from "../services/ai.js";
 
 const { resumeInformation: resumes, watchedResumes } = schema;
 
@@ -261,20 +262,62 @@ resumeRoutes.post("/save", async (c) => {
 resumeRoutes.post("/parse", async (c) => {
   const contentType = c.req.header("Content-Type") ?? "";
 
-  // Multipart path used by tool pages
+  let resumeText = "";
+
+  // Multipart path — file upload
   if (contentType.includes("multipart/form-data")) {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
-    const text = file ? await file.text().catch(() => "") : "";
-    return c.json(ok({ result: text || "" }), 200);
+    resumeText = file ? await file.text().catch(() => "") : "";
+  } else {
+    // JSON path
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.content === "string") {
+      resumeText = body.content;
+    } else if (typeof body?.text === "string") {
+      resumeText = body.text;
+    }
   }
 
-  // JSON path used by resume service parse helpers
-  const body = await c.req.json().catch(() => ({}));
-  if (typeof body?.content === "string") {
-    return c.json(ok({ title: "Parsed Resume", summary: body.content.slice(0, 240) }), 200);
+  if (!resumeText) {
+    return c.json(ok({ result: "{}" }), 200);
   }
-  return c.json(ok({ result: JSON.stringify(body ?? {}) }), 200);
+
+  // Try AI parsing if API key is available
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  if (apiKey) {
+    try {
+      const systemPrompt = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
+{
+  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },
+  "work": [{ "name": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],
+  "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],
+  "skills": [{ "name": "", "level": "", "keywords": [] }],
+  "volunteer": [],
+  "awards": [],
+  "certificates": [],
+  "publications": [],
+  "languages": [],
+  "interests": [],
+  "references": [],
+  "projects": []
+}
+Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
+
+      const result = await callLLM(apiKey, {
+        systemPrompt,
+        userMessage: resumeText.slice(0, 12000), // Limit input size
+        responseFormat: "json_object",
+      });
+
+      return c.json(ok({ result }), 200);
+    } catch {
+      // Fall through to raw text fallback
+    }
+  }
+
+  // Fallback: return raw text wrapped so frontend can detect it
+  return c.json(ok({ result: JSON.stringify({ basics: { summary: resumeText.slice(0, 2000) } }) }), 200);
 });
 
 resumeRoutes.post("/createfromfile", async (c) => {

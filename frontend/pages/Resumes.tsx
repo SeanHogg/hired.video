@@ -34,7 +34,7 @@ import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import ResumeBuilder from "@/components/ResumeBuilder";
-import ResumeUpload from "@/components/ResumeUpload";
+import ResumeUploadSheet from "@/components/ResumeUploadSheet";
 import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -115,9 +115,8 @@ export default function Resumes() {
   const navigate = useNavigate();
 
   // State management
-  const [view, setView] = useState<"list" | "upload" | "builder" | "viewer">(
-    "list",
-  );
+  const [view, setView] = useState<"list" | "builder" | "viewer">("list");
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
   const [masterResumeGroups, setMasterResumeGroups] = useState<MasterResumeGroup[]>([]);
@@ -327,10 +326,8 @@ export default function Resumes() {
   };
 
   const handleUploadSuccess = (response: ResumeUploadResponse) => {
-    setSuccessMessage("Resume uploaded successfully!");
-    setView("list");
-    loadResumes();
-    setTimeout(() => setSuccessMessage(null), 5000);
+    // Navigate directly to edit mode after upload
+    navigate(`/resumes/edit/${response.id}`);
   };
 
   const handleCreateResume = async (request: CreateResumeRequest) => {
@@ -1171,22 +1168,6 @@ export default function Resumes() {
               </Alert>
             )}
 
-            {/* Upload View */}
-            {view === "upload" && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-3xl font-bold">Upload Resume</h1>
-                  <Button variant="outline" onClick={() => setView("list")}>
-                    Back to Resumes
-                  </Button>
-                </div>
-                <ResumeUpload
-                  onUploadSuccess={handleUploadSuccess}
-                  onCancel={() => setView("list")}
-                />
-              </div>
-            )}
-
             {/* Builder View */}
             {view === "builder" && (
               <div className="space-y-4 sm:space-y-6">
@@ -1277,7 +1258,7 @@ export default function Resumes() {
                   {user?.role === "JobSeeker" && (
                     <div className="flex items-center gap-2">
                       <Button
-                        onClick={() => navigate("/resumes/upload")}
+                        onClick={() => setUploadSheetOpen(true)}
                         variant="outline"
                       >
                         <Upload className="h-4 w-4 mr-2" />
@@ -1616,7 +1597,7 @@ export default function Resumes() {
                         {user?.role === "JobSeeker" && (
                           <>
                             <Button
-                              onClick={() => navigate("/resumes/upload")}
+                              onClick={() => setUploadSheetOpen(true)}
                               variant="outline"
                             >
                               <Upload className="h-4 w-4 mr-2" />
@@ -1772,6 +1753,13 @@ export default function Resumes() {
         resumeId={metadataModal.resumeId || ""}
         initialMetadata={metadataModal.initialMetadata}
         onSave={handleSaveMetadata}
+      />
+
+      {/* Upload Sheet — slide-out panel, replaces the standalone /resumes/upload page */}
+      <ResumeUploadSheet
+        open={uploadSheetOpen}
+        onOpenChange={setUploadSheetOpen}
+        onSuccess={handleUploadSuccess}
       />
     </div>
   );

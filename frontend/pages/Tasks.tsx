@@ -257,6 +257,16 @@ export default function Tasks() {
                 </span>
               </div>
             )}
+            {selectedTask.url && (
+              <div className="pt-2">
+                <Link to={selectedTask.url} onClick={() => setTaskPanelOpen(false)}>
+                  <Button className="w-full" size="sm">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Go to {selectedTask.title}
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -535,6 +545,7 @@ export default function Tasks() {
             updatedAt: dto.updateDateTime,
             assignedTo: dto.assignedToUser,
             createdBy: dto.createdByUser,
+            url: dto.url,
           };
         });
 
@@ -845,6 +856,7 @@ export default function Tasks() {
       updatedAt: dto.updateDateTime
         ? new Date(dto.updateDateTime).toISOString()
         : undefined,
+      url: dto.url,
     };
   };
 

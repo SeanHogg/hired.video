@@ -24,6 +24,8 @@ import type {
 interface ResumeUploadProps {
   onUploadSuccess: (response: ResumeUploadResponse) => void;
   onCancel: () => void;
+  /** When true, renders without the Card wrapper (for use inside sheets/modals) */
+  compact?: boolean;
 }
 
 // Helper function to create empty resume data
@@ -54,6 +56,7 @@ const getEmptyResumeData = (): ResumeData => ({
 export default function ResumeUpload({
   onUploadSuccess,
   onCancel,
+  compact = false,
 }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -252,15 +255,8 @@ export default function ResumeUpload({
     return "📄";
   };
 
-  return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          Upload Resume
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+  const content = (
+    <div className="space-y-6">
         {/* File Upload Area */}
         <div className="space-y-4">
           <Label>Resume File</Label>
@@ -420,7 +416,20 @@ export default function ResumeUpload({
             Cancel
           </Button>
         </div>
-      </CardContent>
+    </div>
+  );
+
+  if (compact) return content;
+
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Resume
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
     </Card>
   );
 }

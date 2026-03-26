@@ -90,6 +90,7 @@ export interface TaskDTO extends TaskItem {
   createdByUser?: UserProfile;
   assignedToUser?: UserProfile;
   boardId?: string;
+  url?: string;
 }
 
 // Request/Response types for API calls
@@ -161,6 +162,7 @@ export interface TaskUIState {
   updatedAt?: string;
   assignedTo?: UserProfile;
   createdBy?: UserProfile;
+  url?: string;
 }
 
 // Utility functions for type conversion

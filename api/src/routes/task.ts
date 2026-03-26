@@ -26,6 +26,7 @@ type TaskDto = {
   createdByUserId?: string;
   creationDateTime: string;
   updateDateTime: string;
+  url?: string;
 };
 
 /** Map DB task row → legacy TaskDTO */
@@ -45,6 +46,7 @@ function toTaskDto(row: typeof tasks.$inferSelect): TaskDto {
     createdByUserId: row.userId,
     creationDateTime: new Date(row.createdAt).toISOString(),
     updateDateTime: new Date(row.updatedAt).toISOString(),
+    url: typeof meta.url === "string" ? meta.url : undefined,
   };
 }
 
