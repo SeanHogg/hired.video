@@ -242,11 +242,12 @@ export function createApp() {
         // Fallback to a simple table query (existing behavior).
         await db.select().from(schema.users).limit(1);
       }
-      return c.json({ status: "ok", timestamp: new Date().toISOString() });
+      return c.json({ status: "ok", version: "2026-03-27.3", timestamp: new Date().toISOString() });
     } catch (error: any) {
       return c.json(
         {
           status: "error",
+          version: "2026-03-27.3",
           timestamp: new Date().toISOString(),
           error: String(error?.message ?? error),
         },

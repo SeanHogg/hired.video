@@ -133,14 +133,14 @@ async function parseBodyToContent(c: any): Promise<Record<string, unknown>> {
 }
 
 // Modern plural endpoints
-resumeRoutes.get("/", async (c) => {
+const listResumesHandler = async (c: any) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub)).orderBy(resumes.updatedAt);
   return c.json(ok(rows.map(rowToLegacyResume)), 200);
-});
+};
 
-resumeRoutes.post("/", async (c) => {
+const createResumeHandler = async (c: any) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = CreateResumeSchema.safeParse(body);
@@ -161,7 +161,13 @@ resumeRoutes.post("/", async (c) => {
     .returning();
 
   return c.json(ok(rowToLegacyResume(created)), 201);
-});
+};
+
+// Register at both "" and "/" — Hono sub-router path stripping can vary
+resumeRoutes.get("", listResumesHandler);
+resumeRoutes.get("/", listResumesHandler);
+resumeRoutes.post("", createResumeHandler);
+resumeRoutes.post("/", createResumeHandler);
 
 // Legacy resume endpoints used by frontend services
 resumeRoutes.get("/public", async (c) => {
@@ -268,7 +274,33 @@ resumeRoutes.post("/parse", async (c) => {
   if (contentType.includes("multipart/form-data")) {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
-    resumeText = file ? await file.text().catch(() => "") : "";
+    if (file) {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        // PDFs are binary — file.text() returns garbage. Try to extract readable text
+        // by scanning the binary for ASCII text sequences (works for non-compressed PDFs).
+        const bytes = await file.arrayBuffer().catch(() => null);
+        if (bytes) {
+          const raw = new Uint8Array(bytes);
+          let extracted = "";
+          let run = "";
+          for (let i = 0; i < raw.length; i++) {
+            const b = raw[i];
+            if (b >= 32 && b <= 126) {
+              run += String.fromCharCode(b);
+            } else {
+              if (run.length >= 4) extracted += run + " ";
+              run = "";
+            }
+          }
+          if (run.length >= 4) extracted += run;
+          // Strip PDF internals that aren't human text
+          resumeText = extracted.replace(/\b(obj|endobj|stream|endstream|xref|trailer|startxref|<<|>>)\b/g, " ").replace(/\s{2,}/g, " ").trim();
+        }
+      } else {
+        resumeText = await file.text().catch(() => "");
+      }
+    }
   } else {
     // JSON path
     const body = await c.req.json().catch(() => ({}));
