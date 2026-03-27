@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
@@ -88,3 +88,61 @@ export async function updateModule(
   return { ok: true, mod: updated };
 }
 
+// ── User ↔ Module assignment ──────────────────────────────────────────────────
+
+export async function assignModuleToUser(
+  adminId: string,
+  userId: string,
+  moduleId: string,
+): Promise<{ ok: true; moduleName: string } | { ok: false; code: "NOT_FOUND" }> {
+  const db = getDb();
+  const [mod] = await db.select().from(schema.modules).where(eq(schema.modules.id, moduleId)).limit(1);
+  if (!mod) return { ok: false, code: "NOT_FOUND" };
+
+  await db
+    .insert(schema.userModuleAssignments)
+    .values({ userId, moduleId, assignedBy: adminId })
+    .onConflictDoNothing();
+
+  const permissions = (mod.permissions as string[] | null) ?? [];
+  if (permissions.length > 0) {
+    await db
+      .insert(schema.userPermissionOverrides)
+      .values(
+        permissions.map((permKey) => ({
+          userId,
+          permissionKey: permKey,
+          granted: true,
+          source: `module:${moduleId}`,
+          grantedBy: adminId,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.MODULE_ASSIGNED,
+    targetType: "user",
+    targetId: userId,
+    metadata: { moduleId, moduleName: mod.name },
+  });
+
+  return { ok: true, moduleName: mod.name };
+}
+
+export async function removeModuleFromUser(adminId: string, userId: string, moduleId: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(schema.userModuleAssignments)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(schema.userModuleAssignments.userId, userId), eq(schema.userModuleAssignments.moduleId, moduleId)));
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.MODULE_REMOVED,
+    targetType: "user",
+    targetId: userId,
+    metadata: { moduleId },
+  });
+}
