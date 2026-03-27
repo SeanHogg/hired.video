@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { ZodError } from "zod";
 import {
   MessageSquare,
   Heart,
@@ -353,7 +354,7 @@ export default function Feed() {
       setHasMore(response.hasNextPage);
       setPageNumber(page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load feed posts");
+      setError(err instanceof ZodError ? "Failed to load feed" : err instanceof Error ? err.message : "Failed to load feed posts");
     } finally {
       setLoading(false);
     }

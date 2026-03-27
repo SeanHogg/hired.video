@@ -181,7 +181,12 @@ export async function getFeedPosts(request: GetFeedPostsRequest = {}): Promise<F
     `/api/feed/posts?${params.toString()}`
   );
 
-  return FeedPostsResponseSchema.parse(response.data);
+  const parsed = FeedPostsResponseSchema.safeParse(response.data);
+  if (!parsed.success) {
+    console.warn("[feed] Response validation warning:", parsed.error.issues);
+    return response.data as unknown as FeedPostsResponse;
+  }
+  return parsed.data;
 }
 
 /**
@@ -301,7 +306,12 @@ export async function searchFeedPosts(
     `/api/feed/search?${params.toString()}`
   );
 
-  return FeedPostsResponseSchema.parse(response.data);
+  const parsed = FeedPostsResponseSchema.safeParse(response.data);
+  if (!parsed.success) {
+    console.warn("[feed] Search response validation warning:", parsed.error.issues);
+    return response.data as unknown as FeedPostsResponse;
+  }
+  return parsed.data;
 }
 
 /**
