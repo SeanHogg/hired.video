@@ -109,6 +109,9 @@ function mapServerRole(role: string | number | undefined | null): string {
     return USER_ROLES.JOB_SEEKER;
   if (r === "recruiter") return USER_ROLES.RECRUITER;
   if (r === "employer") return USER_ROLES.EMPLOYER;
+  if (r === "admin") return USER_ROLES.ADMIN;
+  if (r === "superadmin" || r === "super_admin") return USER_ROLES.SUPER_ADMIN;
+  if (r === "affiliate") return USER_ROLES.AFFILIATE;
   // If it's numeric-like string, coerce to number mapping
   const num = Number(r);
   if (!Number.isNaN(num)) return mapServerRole(num);

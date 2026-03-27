@@ -97,7 +97,7 @@ export const FeedPostsResponseSchema = z.object({
 });
 
 export const CreateFeedPostRequestSchema = z.object({
-  content: z.string().min(1, "Content is required"),
+  content: z.string(),
   linkUrl: z.string().url().optional(),
   privacy: z.enum(["Public", "Private", "Connections"]),
   media: z.array(z.object({
@@ -107,6 +107,9 @@ export const CreateFeedPostRequestSchema = z.object({
     altText: z.string().optional(),
     displayOrder: z.number(),
   })),
+}).refine((d) => d.content.trim().length > 0 || d.media.length > 0, {
+  message: "Add some content or attach media before posting",
+  path: ["content"],
 });
 
 export const UpdateFeedPostRequestSchema = z.object({

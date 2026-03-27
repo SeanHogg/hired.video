@@ -5,8 +5,8 @@
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0;
 
--- Seed the first SuperAdmin (update email as needed)
--- UPDATE users SET is_super_admin = TRUE WHERE email = 'seanhogg@gmail.com';
+-- Seed the first SuperAdmin
+UPDATE users SET is_super_admin = TRUE, role = 'SuperAdmin' WHERE email = 'seanhogg@gmail.com';
 
 -- ── 2. Impersonation sessions ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS impersonation_sessions (

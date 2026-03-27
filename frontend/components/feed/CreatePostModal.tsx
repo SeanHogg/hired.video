@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { ZodError } from "zod";
 import {
   X,
   Globe,
@@ -156,7 +157,7 @@ export default function CreatePostModal({
       onPostCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create post");
+      setError(err instanceof ZodError ? err.issues[0].message : err instanceof Error ? err.message : "Failed to create post");
     } finally {
       setLoading(false);
     }
