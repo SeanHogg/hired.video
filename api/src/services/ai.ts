@@ -79,5 +79,9 @@ export async function callLLMJson<T>(
  * Returns undefined when not configured (routes fall back to mock).
  */
 export function getApiKey(env: { OPENROUTER_API_KEY?: string }): string | undefined {
-  return env.OPENROUTER_API_KEY || undefined;
+  const key =
+    env?.OPENROUTER_API_KEY ||
+    (globalThis as any).__ENV?.OPENROUTER_API_KEY ||
+    undefined;
+  return key && key.trim() ? key.trim() : undefined;
 }

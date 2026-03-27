@@ -1370,7 +1370,7 @@ export default function Resumes() {
                         onDeleteResume={(resumeId) => {
                           const resume = displayResumes.find(r => r.id === resumeId);
                           if (resume) {
-                            setDeleteDialog({ open: true, target: resume });
+                            setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0);
                           }
                         }}
                         onTrackResume={(resumeId) => {
@@ -1474,7 +1474,7 @@ export default function Resumes() {
                                           Set as Active
                                         </DropdownMenuItem>
                                       )}
-                                      <DropdownMenuItem onClick={() => setDeleteDialog({ open: true, target: resume })} className="text-red-600">
+                                      <DropdownMenuItem onClick={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)} className="text-red-600">
                                         Delete Resume
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -1649,7 +1649,7 @@ export default function Resumes() {
         onShare={() => actionsModal.item && handleShare(actionsModal.item)}
         onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
         onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
-        onDelete={() => actionsModal.item && setDeleteDialog({ open: true, target: actionsModal.item })}
+        onDelete={() => actionsModal.item && setTimeout(() => setDeleteDialog({ open: true, target: actionsModal.item! }), 0)}
         onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
         onChangePrivacy={(p) => handleChangePrivacy(p)}
         onPromoteToMaster={async () => {
@@ -1688,7 +1688,6 @@ export default function Resumes() {
                 if (deleteDialog.target) {
                   await handleDelete(deleteDialog.target);
                 }
-                setDeleteDialog({ open: false, target: null });
               }}
             >
               Delete

@@ -132,6 +132,75 @@ async function parseBodyToContent(c: any): Promise<Record<string, unknown>> {
   return {};
 }
 
+/**
+ * Extract human-readable text from a PDF by decompressing FlateDecode streams
+ * and parsing BT...ET text blocks. Works with Google Docs, Word-exported, and
+ * most standard PDFs. Uses the Web Streams DecompressionStream API available
+ * in Cloudflare Workers.
+ */
+async function extractPdfText(pdfBytes: Uint8Array): Promise<string> {
+  // Decode as latin1 so byte values map 1:1 to char codes
+  const pdfStr = new TextDecoder("latin1").decode(pdfBytes);
+  const texts: string[] = [];
+
+  // Find every stream...endstream block
+  const streamRe = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = streamRe.exec(pdfStr)) !== null) {
+    const before = pdfStr.slice(Math.max(0, m.index - 300), m.index);
+    const isFlateDecode = /\/FlateDecode/.test(before);
+    let content = m[1];
+
+    if (isFlateDecode) {
+      try {
+        // Convert latin1 string back to raw bytes
+        const streamBytes = new Uint8Array(content.length);
+        for (let i = 0; i < content.length; i++) streamBytes[i] = content.charCodeAt(i) & 0xff;
+
+        // Decompress using zlib (PDF FlateDecode = zlib format with 2-byte header)
+        const ds = new DecompressionStream("deflate");
+        const writer = ds.writable.getWriter();
+        const reader = ds.readable.getReader();
+        writer.write(streamBytes);
+        writer.close();
+
+        const chunks: Uint8Array[] = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+        let off = 0;
+        for (const c of chunks) { out.set(c, off); off += c.length; }
+        content = new TextDecoder("latin1").decode(out);
+      } catch {
+        continue; // skip streams that fail to decompress
+      }
+    }
+
+    // Extract text from BT...ET blocks
+    const btRe = /BT([\s\S]*?)ET/g;
+    let bt: RegExpExecArray | null;
+    while ((bt = btRe.exec(content)) !== null) {
+      // Match (string) Tj/TJ and [(string)] TJ operators
+      const ops = bt[1].match(/\((?:[^\\)]|\\.)*\)\s*Tj|\[(?:[^\]])*\]\s*TJ/g) ?? [];
+      for (const op of ops) {
+        const parens = op.match(/\((?:[^\\)]|\\.)*\)/g) ?? [];
+        for (const p of parens) {
+          const text = p.slice(1, -1)
+            .replace(/\\n/g, "\n").replace(/\\r/g, "").replace(/\\t/g, " ")
+            .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\");
+          if (text.trim()) texts.push(text.trim());
+        }
+      }
+    }
+  }
+
+  return texts.join(" ").replace(/\s{2,}/g, " ").trim();
+}
+
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
 // (Hono sub-router root "/" never matches when mounted with app.route(prefix, router))
 export const listResumesHandler = async (c: any) => {
@@ -278,25 +347,9 @@ resumeRoutes.post("/parse", async (c) => {
     if (file) {
       const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
       if (isPdf) {
-        // PDFs are binary — file.text() returns garbage. Try to extract readable text
-        // by scanning the binary for ASCII text sequences (works for non-compressed PDFs).
         const bytes = await file.arrayBuffer().catch(() => null);
         if (bytes) {
-          const raw = new Uint8Array(bytes);
-          let extracted = "";
-          let run = "";
-          for (let i = 0; i < raw.length; i++) {
-            const b = raw[i];
-            if (b >= 32 && b <= 126) {
-              run += String.fromCharCode(b);
-            } else {
-              if (run.length >= 4) extracted += run + " ";
-              run = "";
-            }
-          }
-          if (run.length >= 4) extracted += run;
-          // Strip PDF internals that aren't human text
-          resumeText = extracted.replace(/\b(obj|endobj|stream|endstream|xref|trailer|startxref|<<|>>)\b/g, " ").replace(/\s{2,}/g, " ").trim();
+          resumeText = await extractPdfText(new Uint8Array(bytes));
         }
       } else {
         resumeText = await file.text().catch(() => "");
@@ -316,41 +369,52 @@ resumeRoutes.post("/parse", async (c) => {
     return c.json(ok({ result: "{}" }), 200);
   }
 
-  // Try AI parsing if API key is available
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  if (apiKey) {
-    try {
-      const systemPrompt = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
+  const systemPrompt = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
 {
   "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },
   "work": [{ "name": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],
   "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],
   "skills": [{ "name": "", "level": "", "keywords": [] }],
-  "volunteer": [],
-  "awards": [],
-  "certificates": [],
-  "publications": [],
-  "languages": [],
-  "interests": [],
-  "references": [],
-  "projects": []
+  "volunteer": [], "awards": [], "certificates": [], "publications": [],
+  "languages": [], "interests": [], "references": [], "projects": []
 }
 Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
 
-      const result = await callLLM(apiKey, {
-        systemPrompt,
-        userMessage: resumeText.slice(0, 12000), // Limit input size
-        responseFormat: "json_object",
+  // Primary: Cloudflare Workers AI (no external API key needed, already bound)
+  const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
+  if (cfAi) {
+    try {
+      const aiResponse = await (cfAi as any).run("@cf/meta/llama-3.1-8b-instruct", {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: resumeText.slice(0, 6000) },
+        ],
       });
-
+      const result = typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
       return c.json(ok({ result }), 200);
-    } catch {
-      // Fall through to raw text fallback
+    } catch (cfErr) {
+      console.error("[parse] CF AI error:", cfErr instanceof Error ? cfErr.message : String(cfErr));
+      // fall through to OpenRouter
     }
   }
 
-  // Fallback: return raw text wrapped so frontend can detect it
-  return c.json(ok({ result: JSON.stringify({ basics: { summary: resumeText.slice(0, 2000) } }) }), 200);
+  // Fallback: OpenRouter
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  if (apiKey) {
+    try {
+      const result = await callLLM(apiKey, {
+        systemPrompt,
+        userMessage: resumeText.slice(0, 12000),
+        responseFormat: "text",
+      });
+      return c.json(ok({ result }), 200);
+    } catch (llmErr) {
+      console.error("[parse] OpenRouter error:", llmErr instanceof Error ? llmErr.message : String(llmErr));
+    }
+  }
+
+  // Last resort: empty structure so upload still completes
+  return c.json(ok({ result: JSON.stringify({ basics: { name: "", summary: "" } }) }), 200);
 });
 
 resumeRoutes.post("/createfromfile", async (c) => {
