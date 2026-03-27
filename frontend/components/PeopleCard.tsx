@@ -15,11 +15,22 @@ import {
   X,
   Star,
   UserCog,
+  Send,
 } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -48,7 +59,7 @@ interface PeopleCardProps {
   itemOwnership?: ItemOwnership;
   onTrack?: (personId: string) => void;
   onUntrack?: (personId: string) => void;
-  onConnect?: (personId: string) => void;
+  onConnect?: (personId: string, message?: string) => void;
   onMessage?: (personId: string) => void;
   onAcceptConnection?: (personId: string) => void;
   onRejectConnection?: (personId: string) => void;
@@ -77,11 +88,19 @@ export default function PeopleCard({
   isInTalentPool = false,
 }: PeopleCardProps) {
   const { user } = useAuth();
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const [connectMessage, setConnectMessage] = useState("");
 
   // Early return if person is undefined
   if (!person) {
     return null;
   }
+
+  const handleSendConnect = () => {
+    onConnect?.(person.id, connectMessage);
+    setShowConnectDialog(false);
+    setConnectMessage("");
+  };
 
   const ownership = "ownership" in person ? person.ownership : undefined;
   const isTracked = ownership === "tracked";
@@ -358,14 +377,39 @@ export default function PeopleCard({
                   Message
                 </Button>
               ) : (
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => onConnect?.(person.id)}
-                >
-                  <UserPlus className="h-3 w-3 mr-1" />
-                  Connect
-                </Button>
+                <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="flex-1">
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Connect
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Send Connection Request</DialogTitle>
+                      <DialogDescription>
+                        Add a personal message to your connection request to {displayFullName}.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="I'd love to connect and expand my professional network..."
+                        value={connectMessage}
+                        onChange={(e) => setConnectMessage(e.target.value)}
+                        rows={3}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSendConnect}>
+                          <Send className="h-3 w-3 mr-2" />
+                          Send Request
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
 
               {/* Track/Untrack */}

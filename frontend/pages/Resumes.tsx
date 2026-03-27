@@ -18,7 +18,6 @@ import {
   Grid,
   List,
   Copy,
-  MoreHorizontal,
   ChevronDown,
   ChevronRight,
   Calendar,
@@ -61,6 +60,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
@@ -1453,32 +1453,17 @@ export default function Resumes() {
                                       </div>
                                     </div>
                                   </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => handleResumeView(resume.id)}>
-                                        View Resume
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => navigate(`/resumes/edit/${resume.id}`)}>
-                                        Edit Resume
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handleAddMedia(resume)}>
-                                        Add Media
-                                      </DropdownMenuItem>
-                                      {!resume.isActive && (
-                                        <DropdownMenuItem onClick={() => handleSetActiveResume(resume.id)}>
-                                          Set as Active
-                                        </DropdownMenuItem>
-                                      )}
-                                      <DropdownMenuItem onClick={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)} className="text-red-600">
-                                        Delete Resume
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <ResumeActionsMenu
+                                    isOwner
+                                    isActive={resume.isActive}
+                                    onView={() => handleResumeView(resume.id)}
+                                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                                    onAddMedia={() => handleAddMedia(resume)}
+                                    onCreateVariation={() => handleCreateVariation(resume.id)}
+                                    onSetActive={() => handleSetActiveResume(resume.id)}
+                                    onShare={() => handleShare(resume)}
+                                    onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                                  />
                                 </div>
                               </div>
                             ))}
@@ -1544,21 +1529,12 @@ export default function Resumes() {
                                       </div>
                                     </div>
                                   </div>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => handleResumeView(resume.id)}>
-                                        View Resume
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => handleTrack(resume)}>
-                                        {resume.ownership === "tracked" ? "Untrack Resume" : "Track Resume"}
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                  <ResumeActionsMenu
+                                    isOwner={false}
+                                    isTracked={resume.ownership === "tracked"}
+                                    onView={() => handleResumeView(resume.id)}
+                                    onTrack={() => handleTrack(resume)}
+                                  />
                                 </div>
                               </div>
                             ))}

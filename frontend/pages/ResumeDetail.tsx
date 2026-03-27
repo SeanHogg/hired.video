@@ -1,7 +1,5 @@
 import {
   ArrowLeft,
-  Edit,
-
   Calendar,
   Mail,
   Phone,
@@ -10,7 +8,6 @@ import {
   GraduationCap,
   Heart,
   Award,
-  Share2,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -25,7 +22,6 @@ import {
   UserCheck,
   FolderOpen,
   Trophy,
-  MoreHorizontal,
   Play,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
@@ -38,13 +34,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
+import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -457,35 +447,14 @@ export default function ResumeDetail() {
                     </Badge>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isOwner && (
-                        <>
-                          <DropdownMenuItem onClick={() => navigate(`/resumes/edit/${resume.id}`)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Resume
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleAddMedia}>
-                            <Share2 className="w-4 h-4 mr-2" />
-                            Add Media
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                      <DropdownMenuItem>
-                        <Share2 className="w-4 h-4 mr-2" />
-                        Share
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <ResumeActionsMenu
+                    isOwner={isOwner}
+                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onAddMedia={handleAddMedia}
+                    onShare={() => navigator.share?.({ title: resume.title, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href)}
+                    triggerVariant="secondary"
+                    triggerClassName="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
+                  />
                 </div>
               </div>
 

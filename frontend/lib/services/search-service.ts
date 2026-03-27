@@ -120,7 +120,7 @@ export class SearchService {
       const UnifiedSearchItemSchema = z.object({
         id: z.string(),
         type: z.string(),
-        title: z.string(),
+        title: z.string().optional().nullable(),
         name: z.string().optional().nullable(),
         summary: z.string().optional().nullable(),
         description: z.string().optional().nullable(),

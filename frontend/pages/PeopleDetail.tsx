@@ -125,23 +125,26 @@ export default function PeopleDetail() {
         setIsLoading(true);
         setError(null);
 
+        // Strip "person-" prefix added by search result items
+        const cleanId = id.startsWith("person-") ? id.slice("person-".length) : id;
+
         // Try to determine if the ID is a UUID or a slug
         const isUUID =
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            id,
+            cleanId,
           );
 
         let profile: UserProfile;
         if (isUUID) {
           // Use getUserById for UUIDs
-          profile = await userService.getUserById(id);
+          profile = await userService.getUserById(cleanId);
         } else {
           // Try getUserBySlug for non-UUID strings, fallback to getUserById
           try {
-            profile = await userService.getUserBySlug(id);
+            profile = await userService.getUserBySlug(cleanId);
           } catch (slugError) {
             // If slug lookup fails, try as ID (API might accept both)
-            profile = await userService.getUserById(id);
+            profile = await userService.getUserById(cleanId);
           }
         }
 

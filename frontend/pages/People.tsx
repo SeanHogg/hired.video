@@ -399,10 +399,10 @@ export default function People() {
     }
   };
 
-  const handleConnect = async (personId: string) => {
+  const handleConnect = async (personId: string, message?: string) => {
     if (user) {
       try {
-        await userService.sendConnectionRequest({ toUserId: personId });
+        await userService.sendConnectionRequest({ toUserId: personId, message });
         // Refresh people to show updated connection status
         await fetchPeople();
       } catch (error) {
