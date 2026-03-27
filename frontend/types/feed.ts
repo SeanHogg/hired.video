@@ -2,37 +2,37 @@
 
 export interface FeedPostMedia {
   id: string;
-  feedPostId: string;
+  feedPostId?: string;
   mediaType: 'Image' | 'Video';
   mediaUrl: string;
   thumbnailUrl?: string;
   altText?: string;
   displayOrder: number;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface FeedPostTag {
   id: string;
-  feedPostId: string;
+  feedPostId?: string;
   tagType: 'Hashtag' | 'Mention';
   tagValue: string;
   mentionedUserId?: string;
-  position: number;
-  createdAt: string;
+  position?: number;
+  createdAt?: string;
 }
 
 export interface FeedPostLike {
   id: string;
-  feedPostId: string;
+  feedPostId?: string;
   userId: string;
   userName: string;
   userAvatar?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface FeedPostComment {
   id: string;
-  feedPostId: string;
+  feedPostId?: string;
   userId: string;
   userName: string;
   userAvatar?: string;

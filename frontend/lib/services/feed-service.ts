@@ -26,37 +26,37 @@ import type {
 
 export const FeedPostMediaSchema = z.object({
   id: z.string(),
-  feedPostId: z.string(),
+  feedPostId: z.string().optional(),
   mediaType: z.enum(["Image", "Video"]),
   mediaUrl: z.string(),
   thumbnailUrl: z.string().optional(),
   altText: z.string().optional(),
   displayOrder: z.number(),
-  createdAt: z.string(),
+  createdAt: z.string().optional(),
 });
 
 export const FeedPostTagSchema = z.object({
   id: z.string(),
-  feedPostId: z.string(),
+  feedPostId: z.string().optional(),
   tagType: z.enum(["Hashtag", "Mention"]),
   tagValue: z.string(),
   mentionedUserId: z.string().optional(),
-  position: z.number(),
-  createdAt: z.string(),
+  position: z.number().optional(),
+  createdAt: z.string().optional(),
 });
 
 export const FeedPostLikeSchema = z.object({
   id: z.string(),
-  feedPostId: z.string(),
+  feedPostId: z.string().optional(),
   userId: z.string(),
   userName: z.string(),
   userAvatar: z.string().optional(),
-  createdAt: z.string(),
+  createdAt: z.string().optional(),
 });
 
 export const FeedPostCommentSchema = z.object({
   id: z.string(),
-  feedPostId: z.string(),
+  feedPostId: z.string().optional(),
   userId: z.string(),
   userName: z.string(),
   userAvatar: z.string().optional(),
