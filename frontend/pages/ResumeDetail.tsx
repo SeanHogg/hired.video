@@ -451,7 +451,7 @@ export default function ResumeDetail() {
                     isOwner={isOwner}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                     onAddMedia={handleAddMedia}
-                    onShare={() => navigator.share?.({ title: resume.title, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href)}
+                    onShare={() => navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href)}
                     triggerVariant="secondary"
                     triggerClassName="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
                   />

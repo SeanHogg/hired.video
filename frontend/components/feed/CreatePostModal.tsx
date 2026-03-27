@@ -1,34 +1,28 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   X,
-  Image,
-  Link,
   Globe,
   Lock,
   Users,
-  Upload,
   Loader2,
   AlertCircle,
+  Video,
+  Image,
+  FileText,
+  Smile,
+  Calendar,
+  MoreHorizontal,
+  ChevronDown,
 } from "lucide-react";
 
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
 import { createFeedPost, getLinkPreview } from "@/lib/services/feed-service";
@@ -39,88 +33,97 @@ import type {
   CreateFeedPostMediaRequest,
 } from "@/types/feed";
 
+type PostMode = "text" | "video" | "photo" | "article";
+type Privacy = "Public" | "Connections" | "Private";
+
 interface CreatePostModalProps {
   open: boolean;
   onClose: () => void;
   onPostCreated: () => void;
+  initialMode?: PostMode;
 }
+
+const PRIVACY_OPTIONS: { value: Privacy; label: string; icon: React.ReactNode }[] = [
+  { value: "Public", label: "Anyone", icon: <Globe className="h-3.5 w-3.5" /> },
+  { value: "Connections", label: "Connections", icon: <Users className="h-3.5 w-3.5" /> },
+  { value: "Private", label: "Only me", icon: <Lock className="h-3.5 w-3.5" /> },
+];
 
 export default function CreatePostModal({
   open,
   onClose,
   onPostCreated,
+  initialMode = "text",
 }: CreatePostModalProps) {
   const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Form state
+  const [mode, setMode] = useState<PostMode>(initialMode);
   const [content, setContent] = useState("");
-  const [privacy, setPrivacy] = useState<'Public' | 'Private' | 'Connections'>('Public');
-  const [linkUrl, setLinkUrl] = useState("");
+  const [privacy, setPrivacy] = useState<Privacy>("Public");
+  const [showPrivacyMenu, setShowPrivacyMenu] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
-
-  // Link preview state
   const [linkPreview, setLinkPreview] = useState<LinkPreviewResponse | null>(null);
   const [linkPreviewLoading, setLinkPreviewLoading] = useState(false);
 
-  // Handle content change with hashtag/mention extraction
-  const handleContentChange = useCallback((value: string) => {
+  const initials = (user?.name || user?.email || "?")
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const avatar = (user as any)?.avatar ?? "";
+
+  // Detect URLs in content for link preview
+  const handleContentChange = useCallback(async (value: string) => {
     setContent(value);
-  }, []);
 
-  // Handle link URL change and preview generation
-  const handleLinkUrlChange = useCallback(async (url: string) => {
-    setLinkUrl(url);
-
-    if (!url.trim()) {
-      setLinkPreview(null);
-      return;
-    }
-
-    // Basic URL validation
-    try {
-      new URL(url);
-      setLinkPreviewLoading(true);
+    // Auto-detect URL for link preview
+    const urlMatch = value.match(/https?:\/\/[^\s]+/);
+    if (urlMatch && !linkPreview) {
+      const url = urlMatch[0];
       try {
-        const preview = await getLinkPreview({ url });
-        setLinkPreview(preview);
-      } catch (error) {
-        console.warn('Failed to get link preview:', error);
-        setLinkPreview(null);
-      } finally {
-        setLinkPreviewLoading(false);
+        new URL(url);
+        setLinkPreviewLoading(true);
+        try {
+          const preview = await getLinkPreview({ url });
+          setLinkPreview(preview);
+        } catch {
+          // silently fail
+        } finally {
+          setLinkPreviewLoading(false);
+        }
+      } catch {
+        // invalid URL
       }
-    } catch {
-      // Invalid URL, clear preview
+    } else if (!urlMatch) {
       setLinkPreview(null);
     }
-  }, []);
+  }, [linkPreview]);
 
-  // Handle media file selection
   const handleMediaSelect = useCallback((files: FileList | null) => {
     if (!files) return;
-
     const newFiles = Array.from(files);
-    // Limit to 4 files total
-    const totalFiles = [...mediaFiles, ...newFiles].slice(0, 4);
-    setMediaFiles(totalFiles);
-  }, [mediaFiles]);
-
-  // Remove media file
-  const removeMediaFile = useCallback((index: number) => {
-    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+    setMediaFiles((prev) => [...prev, ...newFiles].slice(0, 4));
   }, []);
 
-  // Handle form submission
+  const removeMediaFile = useCallback((index: number) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const currentPrivacy = PRIVACY_OPTIONS.find((p) => p.value === privacy)!;
+
   const handleSubmit = useCallback(async () => {
-    if (!content.trim() && mediaFiles.length === 0 && !linkUrl.trim()) {
-      setError("Please add some content, media, or a link to your post");
+    if (!content.trim() && mediaFiles.length === 0) {
+      setError("Add some content before posting");
       return;
     }
-
     if (!user) {
-      setError("You must be logged in to create a post");
+      setError("You must be logged in to post");
       return;
     }
 
@@ -128,30 +131,27 @@ export default function CreatePostModal({
     setError(null);
 
     try {
-      // Prepare media data (in a real app, you'd upload files first)
       const media: CreateFeedPostMediaRequest[] = mediaFiles.map((file, index) => ({
-        mediaType: file.type.startsWith('image/') ? 'Image' : 'Video',
-        mediaUrl: URL.createObjectURL(file), // Temporary URL for demo
-        thumbnailUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-        altText: `Uploaded ${file.type.startsWith('image/') ? 'image' : 'video'}`,
+        mediaType: file.type.startsWith("image/") ? "Image" : "Video",
+        mediaUrl: URL.createObjectURL(file),
+        thumbnailUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+        altText: `Uploaded ${file.type.startsWith("image/") ? "image" : "video"}`,
         displayOrder: index,
       }));
 
       const request: CreateFeedPostRequest = {
         content: content.trim(),
         privacy,
-        linkUrl: linkUrl.trim() || undefined,
         media,
       };
 
       await createFeedPost(request);
 
-      // Reset form
       setContent("");
-      setPrivacy('Public');
-      setLinkUrl("");
+      setPrivacy("Public");
       setMediaFiles([]);
       setLinkPreview(null);
+      setMode("text");
 
       onPostCreated();
       onClose();
@@ -160,245 +160,248 @@ export default function CreatePostModal({
     } finally {
       setLoading(false);
     }
-  }, [content, privacy, linkUrl, mediaFiles, user, onPostCreated, onClose]);
+  }, [content, privacy, mediaFiles, user, onPostCreated, onClose]);
 
-  // Handle modal close
   const handleClose = useCallback(() => {
     if (!loading) {
       setContent("");
-      setPrivacy('Public');
-      setLinkUrl("");
+      setPrivacy("Public");
       setMediaFiles([]);
       setLinkPreview(null);
       setError(null);
+      setMode("text");
       onClose();
     }
   }, [loading, onClose]);
 
-  // Extract hashtags and mentions for preview
-  const extractTags = useCallback((text: string) => {
-    const hashtags = text.match(/(?<!\w)#(\w+)/g) || [];
-    const mentions = text.match(/(?<!\w)@(\w+)/g) || [];
-    return { hashtags, mentions };
-  }, []);
+  const extractTags = (text: string) => ({
+    hashtags: text.match(/(?<!\w)#(\w+)/g) || [],
+    mentions: text.match(/(?<!\w)@(\w+)/g) || [],
+  });
 
   const { hashtags, mentions } = extractTags(content);
+  const canPost = !loading && (content.trim().length > 0 || mediaFiles.length > 0);
+
+  const placeholder =
+    mode === "article"
+      ? "Write your article here..."
+      : mode === "video"
+        ? "Add a caption for your video..."
+        : "What do you want to talk about?";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Image className="h-5 w-5" />
-            Create Post
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent
+        className="max-w-lg p-0 gap-0 overflow-hidden [&>button.absolute]:hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-11 h-11">
+              <AvatarImage src={avatar} alt={user?.name ?? ""} />
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-sm leading-tight">{user?.name ?? user?.email}</p>
+              {/* Privacy picker */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyMenu((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground border rounded-full px-2 py-0.5 mt-1 hover:bg-muted transition-colors"
+                >
+                  {currentPrivacy.icon}
+                  Post to {currentPrivacy.label}
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                {showPrivacyMenu && (
+                  <div className="absolute top-full left-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                    {PRIVACY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setPrivacy(opt.value); setShowPrivacyMenu(false); }}
+                        className={`flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted transition-colors ${privacy === opt.value ? "text-primary font-medium" : ""}`}
+                      >
+                        {opt.icon}
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-full p-1.5 hover:bg-muted transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-        <div className="space-y-6">
-          {/* Error Alert */}
+        {/* Body */}
+        <div className="px-5 py-4 min-h-[200px]">
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="mb-3">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* Content */}
-          <div>
-            <Label htmlFor="content">What's on your mind?</Label>
-            <Textarea
-              id="content"
-              placeholder="Share your thoughts, achievements, or questions..."
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              className="min-h-[120px] mt-2"
-              disabled={loading}
-            />
-            {(hashtags.length > 0 || mentions.length > 0) && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {hashtags.map((tag, index) => (
-                  <Badge key={`hashtag-${index}`} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-                {mentions.map((mention, index) => (
-                  <Badge key={`mention-${index}`} variant="outline" className="text-xs">
-                    {mention}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
+          <Textarea
+            placeholder={placeholder}
+            value={content}
+            onChange={(e) => handleContentChange(e.target.value)}
+            className="border-0 resize-none p-0 text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 min-h-[140px]"
+            disabled={loading}
+            autoFocus
+          />
 
-          {/* Link URL */}
-          <div>
-            <Label htmlFor="linkUrl">Link (optional)</Label>
-            <div className="relative mt-2">
-              <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                id="linkUrl"
-                type="url"
-                placeholder="https://example.com"
-                value={linkUrl}
-                onChange={(e) => handleLinkUrlChange(e.target.value)}
-                className="pl-10"
-                disabled={loading}
-              />
-              {linkPreviewLoading && (
-                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />
-              )}
+          {/* Tags preview */}
+          {(hashtags.length > 0 || mentions.length > 0) && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {hashtags.map((tag, i) => (
+                <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+              ))}
+              {mentions.map((m, i) => (
+                <Badge key={i} variant="outline" className="text-xs">{m}</Badge>
+              ))}
             </div>
+          )}
 
-            {/* Link Preview */}
-            {linkPreview && (
-              <div className="mt-3 p-3 border rounded-lg bg-muted/50">
-                <div className="flex items-start gap-3">
-                  {linkPreview.imageUrl && (
+          {/* Link Preview */}
+          {linkPreviewLoading && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading preview...
+            </div>
+          )}
+          {linkPreview && (
+            <div className="mt-3 border rounded-lg overflow-hidden">
+              {linkPreview.imageUrl && (
+                <img src={linkPreview.imageUrl} alt={linkPreview.title} className="w-full h-32 object-cover" />
+              )}
+              <div className="p-3 bg-muted/30">
+                <p className="text-xs font-medium line-clamp-2">{linkPreview.title}</p>
+                {linkPreview.description && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{linkPreview.description}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Media preview grid */}
+          {mediaFiles.length > 0 && (
+            <div className={`mt-3 grid gap-1.5 ${mediaFiles.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+              {mediaFiles.map((file, i) => (
+                <div key={i} className="relative group rounded-lg overflow-hidden">
+                  {file.type.startsWith("image/") ? (
                     <img
-                      src={linkPreview.imageUrl}
-                      alt={linkPreview.title}
-                      className="w-16 h-16 object-cover rounded"
+                      src={URL.createObjectURL(file)}
+                      alt=""
+                      className="w-full h-40 object-cover"
                     />
+                  ) : (
+                    <video src={URL.createObjectURL(file)} className="w-full h-40 object-cover" />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm line-clamp-2">
-                      {linkPreview.title}
-                    </h4>
-                    {linkPreview.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {linkPreview.description}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {linkPreview.siteName || new URL(linkPreview.url).hostname}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => removeMediaFile(i)}
+                    className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Media Upload */}
-          <div>
-            <Label>Media (optional)</Label>
-            <div className="mt-2">
-              <input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                onChange={(e) => handleMediaSelect(e.target.files)}
-                className="hidden"
-                id="media-upload"
-                disabled={loading || mediaFiles.length >= 4}
-              />
-              <Label
-                htmlFor="media-upload"
-                className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                  mediaFiles.length >= 4
-                    ? 'border-muted-foreground/50 cursor-not-allowed'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-                }`}
-              >
-                <div className="text-center">
-                  <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {mediaFiles.length >= 4
-                      ? 'Maximum 4 files reached'
-                      : 'Click to upload images or videos'
-                    }
-                  </p>
-                </div>
-              </Label>
+              ))}
             </div>
+          )}
+        </div>
 
-            {/* Media Preview */}
-            {mediaFiles.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {mediaFiles.map((file, index) => (
-                  <div key={index} className="relative group">
-                    {file.type.startsWith('image/') ? (
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt={`Upload ${index + 1}`}
-                        className="w-full h-20 object-cover rounded"
-                      />
-                    ) : (
-                      <video
-                        src={URL.createObjectURL(file)}
-                        className="w-full h-20 object-cover rounded"
-                      />
-                    )}
-                    <button
-                      onClick={() => removeMediaFile(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      disabled={loading}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Bottom toolbar */}
+        <div className="px-5 py-3 border-t flex items-center justify-between">
+          {/* Left tools */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              title="Add emoji"
+              className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <Smile className="h-5 w-5" />
+            </button>
+
+            {/* Photo */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleMediaSelect(e.target.files)}
+            />
+            <button
+              type="button"
+              title="Add photo"
+              onClick={() => { setMode("photo"); fileInputRef.current?.click(); }}
+              className={`p-2 rounded-full hover:bg-muted transition-colors ${mode === "photo" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <Image className="h-5 w-5" />
+            </button>
+
+            {/* Video */}
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => handleMediaSelect(e.target.files)}
+            />
+            <button
+              type="button"
+              title="Add video"
+              onClick={() => { setMode("video"); videoInputRef.current?.click(); }}
+              className={`p-2 rounded-full hover:bg-muted transition-colors ${mode === "video" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <Video className="h-5 w-5" />
+            </button>
+
+            {/* Article */}
+            <button
+              type="button"
+              title="Write article"
+              onClick={() => setMode("article")}
+              className={`p-2 rounded-full hover:bg-muted transition-colors ${mode === "article" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <FileText className="h-5 w-5" />
+            </button>
+
+            {/* Event */}
+            <button
+              type="button"
+              title="Add event"
+              className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <Calendar className="h-5 w-5" />
+            </button>
+
+            <button
+              type="button"
+              className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
           </div>
 
-          {/* Privacy Settings */}
-          <div>
-            <Label>Privacy</Label>
-            <Select
-              value={privacy}
-              onValueChange={(value: 'Public' | 'Private' | 'Connections') => setPrivacy(value)}
-              disabled={loading}
-            >
-              <SelectTrigger className="mt-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Public">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" />
-                    Public
-                  </div>
-                </SelectItem>
-                <SelectItem value="Connections">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Connections only
-                  </div>
-                </SelectItem>
-                <SelectItem value="Private">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Private
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={loading || (!content.trim() && mediaFiles.length === 0 && !linkUrl.trim())}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:opacity-90"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Post"
-              )}
-            </Button>
-          </div>
+          {/* Post button */}
+          <Button
+            onClick={handleSubmit}
+            disabled={!canPost}
+            className="rounded-full px-5 font-semibold"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

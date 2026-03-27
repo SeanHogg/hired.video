@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Video, ExternalLink, Play, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { ResumeSectionMeta, MetaType, Resume } from "@/types/resume";
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService, StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
 import { useToast } from "@/hooks/use-toast";
 
 interface MetadataModalProps {
@@ -43,18 +46,24 @@ export default function MetadataModal({
   const [resume, setResume] = useState<Resume | null>(null);
   const [loadingResume, setLoadingResume] = useState(false);
 
-  const tryUuid = () => (typeof crypto !== "undefined" && 'randomUUID' in crypto ? (crypto).randomUUID() : `${Math.random().toString(16).slice(2)}-${Date.now()}`);
+  // Studio picker state
+  const [studioPickerOpen, setStudioPickerOpen] = useState(false);
+  const [studioPickerTarget, setStudioPickerTarget] = useState<number | null>(null);
+  const [studioProjects, setStudioProjects] = useState<StudioProject[]>([]);
+  const [loadingStudio, setLoadingStudio] = useState(false);
 
-  // Reset metadata and resume when modal opens with new data
+  const tryUuid = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? (crypto as any).randomUUID()
+      : `${Math.random().toString(16).slice(2)}-${Date.now()}`;
+
   useEffect(() => {
     if (open) {
       setMetaData(initialMetadata);
-      // Reset resume state when modal opens to force refetch
       setResume(null);
     }
   }, [open, initialMetadata]);
 
-  // Fetch resume data when modal opens
   useEffect(() => {
     const fetchResume = async () => {
       if (open && resumeId && !resume) {
@@ -62,113 +71,112 @@ export default function MetadataModal({
         try {
           const resumeData = await resumeService.getResumeById(resumeId);
           setResume(resumeData);
-        } catch (error) {
-          console.error("Failed to fetch resume data:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load resume sections. Please try again.",
-            variant: "destructive",
-          });
+        } catch {
+          toast({ title: "Error", description: "Failed to load resume sections.", variant: "destructive" });
         } finally {
           setLoadingResume(false);
         }
       }
     };
-
     fetchResume();
   }, [open, resumeId, resume, toast]);
 
+  const openStudioPicker = async (index: number) => {
+    setStudioPickerTarget(index);
+    setStudioPickerOpen(true);
+    if (studioProjects.length === 0) {
+      setLoadingStudio(true);
+      try {
+        const res = await studioService.getProjects();
+        setStudioProjects(res.data ?? []);
+      } catch {
+        toast({ title: "Error", description: "Failed to load Studio projects.", variant: "destructive" });
+      } finally {
+        setLoadingStudio(false);
+      }
+    }
+  };
+
+  const pickStudioProject = (project: StudioProject) => {
+    if (studioPickerTarget === null) return;
+
+    const youtubeUrl = project.youtubeVideoId
+      ? `https://www.youtube.com/watch?v=${project.youtubeVideoId}`
+      : null;
+    const url = youtubeUrl ?? project.videoUrl ?? "";
+    const metaType = youtubeUrl
+      ? MetaType.YouTube
+      : project.videoUrl?.endsWith(".webm")
+        ? MetaType.VideoWebM
+        : MetaType.VideoMP4;
+
+    setMetaData((prev) =>
+      prev.map((m, i) =>
+        i === studioPickerTarget
+          ? {
+              ...m,
+              url,
+              metaType,
+              name: m.name || project.title,
+            }
+          : m,
+      ),
+    );
+    setStudioPickerOpen(false);
+    setStudioPickerTarget(null);
+  };
+
   const addMeta = () => {
-    const newMeta: ResumeSectionMeta = {
-      id: tryUuid(),
-      userId: "", // Will be set by the backend
-      referenceId: "", // User will select this
-      name: "",
-      metaType: MetaType.Hyperlink,
-      url: "",
-      description: "",
-    };
-    setMetaData(prev => [...prev, newMeta]);
+    setMetaData((prev) => [
+      ...prev,
+      {
+        id: tryUuid(),
+        userId: "",
+        referenceId: "",
+        name: "",
+        metaType: MetaType.Hyperlink,
+        url: "",
+        description: "",
+      },
+    ]);
   };
 
   const updateMeta = (index: number, field: keyof ResumeSectionMeta, value: string | number) => {
-    setMetaData(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } as ResumeSectionMeta : m));
+    setMetaData((prev) =>
+      prev.map((m, i) => (i === index ? ({ ...m, [field]: value } as ResumeSectionMeta) : m)),
+    );
   };
 
   const removeMeta = (index: number) => {
-    setMetaData(prev => prev.filter((_, i) => i !== index));
+    setMetaData((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Generate section options from actual resume data
   const getSectionOptions = () => {
     const options: { value: string; label: string; group: string }[] = [];
+    if (!resume?.data) return options;
 
-    if (!resume?.data) {
-      return options;
-    }
+    if (resume.data.Basics?.Id)
+      options.push({ value: resume.data.Basics.Id, label: `${resume.data.Basics.Name || "Profile"} (Basics)`, group: "Profile" });
 
-    // Basics section
-    if (resume.data.Basics?.Id) {
-      options.push({
-        value: resume.data.Basics.Id,
-        label: `${resume.data.Basics.Name || 'Profile'} (Basics)`,
-        group: 'Profile'
-      });
-    }
-
-    // Work Experience
-    resume.data?.Work?.forEach((work, index) => {
-      if (work.Id) {
-        options.push({
-          value: work.Id,
-          label: `${work.Position || `Work ${index + 1}`} at ${work.Name || 'Company'}`,
-          group: 'Work Experience'
-        });
-      }
+    resume.data?.Work?.forEach((work, i) => {
+      if (work.Id)
+        options.push({ value: work.Id, label: `${work.Position || `Work ${i + 1}`} at ${work.Name || "Company"}`, group: "Work Experience" });
     });
-
-    // Education
-    resume.data?.Education?.forEach((edu, index) => {
-      if (edu.Id) {
-        options.push({
-          value: edu.Id,
-          label: `${edu.StudyType || 'Degree'} at ${edu.Institution || `Education ${index + 1}`}`,
-          group: 'Education'
-        });
-      }
+    resume.data?.Education?.forEach((edu, i) => {
+      if (edu.Id)
+        options.push({ value: edu.Id, label: `${edu.StudyType || "Degree"} at ${edu.Institution || `Education ${i + 1}`}`, group: "Education" });
     });
-
-    // Projects
-    resume.data?.Projects?.forEach((project, index) => {
-      if (project.Id) {
-        options.push({
-          value: project.Id,
-          label: project.Name || `Project ${index + 1}`,
-          group: 'Projects'
-        });
-      }
+    resume.data?.Projects?.forEach((project, i) => {
+      if (project.Id)
+        options.push({ value: project.Id, label: project.Name || `Project ${i + 1}`, group: "Projects" });
     });
-
-    // Skills
-    resume.data?.Skills?.forEach((skill, index) => {
-      if (skill.Id) {
-        options.push({
-          value: skill.Id,
-          label: skill.Name || `Skill ${index + 1}`,
-          group: 'Skills'
-        });
-      }
+    resume.data?.Skills?.forEach((skill, i) => {
+      if (skill.Id)
+        options.push({ value: skill.Id, label: skill.Name || `Skill ${i + 1}`, group: "Skills" });
     });
-
-    // Volunteer
-    resume.data?.Volunteer?.forEach((volunteer, index) => {
-      if (volunteer.Id) {
-        options.push({
-          value: volunteer.Id,
-          label: `${volunteer.Position || 'Volunteer'} at ${volunteer.Organization || `Organization ${index + 1}`}`,
-          group: 'Volunteer'
-        });
-      }
+    resume.data?.Volunteer?.forEach((v, i) => {
+      if (v.Id)
+        options.push({ value: v.Id, label: `${v.Position || "Volunteer"} at ${v.Organization || `Organization ${i + 1}`}`, group: "Volunteer" });
     });
 
     return options;
@@ -181,156 +189,252 @@ export default function MetadataModal({
     try {
       await onSave(metaData);
       onOpenChange(false);
-    } catch (error) {
-      console.error("Failed to save metadata:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save resume media. Please try again.",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Failed to save resume media.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    setMetaData(initialMetadata); // Reset to initial state
-    onOpenChange(false);
-  };
+  const publishedProjects = studioProjects.filter(
+    (p) => p.status === StudioProjectStatus.Published || p.status === StudioProjectStatus.Completed,
+  );
+  const otherProjects = studioProjects.filter(
+    (p) => p.status !== StudioProjectStatus.Published && p.status !== StudioProjectStatus.Completed,
+  );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">Manage Resume Media</DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            Add videos, images, and links to enhance your resume sections.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Manage Resume Media</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Add videos, images, and links to enhance your resume sections.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addMeta}
-              className="min-h-[44px]"
-            >
-              Add Media
-            </Button>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Button type="button" variant="outline" size="sm" onClick={addMeta} className="min-h-[44px]">
+                Add Media
+              </Button>
+            </div>
+
+            {metaData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No media added yet. Click "Add Media" to associate links, images, or videos with your resume.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {metaData.map((m, i) => (
+                  <div key={m.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 border rounded-lg p-3 sm:p-4">
+                    <div className="sm:col-span-1 lg:col-span-2">
+                      <Label className="text-sm">Label</Label>
+                      <Input
+                        value={m.name}
+                        onChange={(e) => updateMeta(i, "name", e.target.value)}
+                        placeholder="e.g., Demo Reel"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                    <div className="sm:col-span-1 lg:col-span-2">
+                      <Label className="text-sm">URL</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={m.url}
+                          onChange={(e) => updateMeta(i, "url", e.target.value)}
+                          placeholder="https://..."
+                          className="min-h-[44px]"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[44px] px-3 shrink-0 gap-1.5"
+                          onClick={() => openStudioPicker(i)}
+                          title="Pick from Studio"
+                        >
+                          <Video className="h-4 w-4" />
+                          Studio
+                        </Button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Type</Label>
+                      <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={String(MetaType.Hyperlink)}>Link</SelectItem>
+                          <SelectItem value={String(MetaType.Image)}>Image</SelectItem>
+                          <SelectItem value={String(MetaType.YouTube)}>YouTube</SelectItem>
+                          <SelectItem value={String(MetaType.VideoMP4)}>Video (MP4)</SelectItem>
+                          <SelectItem value={String(MetaType.VideoWebM)}>Video (WebM)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Section</Label>
+                      <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sectionOptions.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              {loadingResume ? "Loading sections..." : "No sections available"}
+                            </SelectItem>
+                          ) : (
+                            Object.entries(
+                              sectionOptions.reduce(
+                                (groups, option) => {
+                                  if (!groups[option.group]) groups[option.group] = [];
+                                  groups[option.group].push(option);
+                                  return groups;
+                                },
+                                {} as Record<string, typeof sectionOptions>,
+                              ),
+                            ).map(([group, options]) => (
+                              <div key={group}>
+                                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{group}</div>
+                                {options.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </div>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-6">
+                      <Label>Description</Label>
+                      <Textarea
+                        rows={2}
+                        value={m.description || ""}
+                        onChange={(e) => updateMeta(i, "description", e.target.value)}
+                        placeholder="Optional description for this media item"
+                      />
+                    </div>
+                    <div className="md:col-span-6 flex justify-end">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeMeta(i)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {metaData.length === 0 ? (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setMetaData(initialMetadata); onOpenChange(false); }} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Media"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Studio Picker Dialog */}
+      <Dialog open={studioPickerOpen} onOpenChange={setStudioPickerOpen}>
+        <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pick from Studio</DialogTitle>
+            <DialogDescription>
+              Select a video from your Studio projects to attach to this resume section.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingStudio ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : studioProjects.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No media added yet. Click "Add Media" to associate links, images, or videos with your resume.
+              No Studio projects found. Create a video in the Studio first.
             </p>
           ) : (
             <div className="space-y-4">
-              {metaData.map((m, i) => (
-                <div key={m.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 border rounded-lg p-3 sm:p-4">
-                  <div className="sm:col-span-1 lg:col-span-2">
-                    <Label className="text-sm">Label</Label>
-                    <Input
-                      value={m.name}
-                      onChange={(e) => updateMeta(i, "name", e.target.value)}
-                      placeholder="e.g., Demo Reel"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div className="sm:col-span-1 lg:col-span-2">
-                    <Label className="text-sm">URL</Label>
-                    <Input
-                      value={m.url}
-                      onChange={(e) => updateMeta(i, "url", e.target.value)}
-                      placeholder="https://..."
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div>
-                    <Label>Type</Label>
-                    <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={String(MetaType.Hyperlink)}>Link</SelectItem>
-                        <SelectItem value={String(MetaType.Image)}>Image</SelectItem>
-                        <SelectItem value={String(MetaType.YouTube)}>YouTube</SelectItem>
-                        <SelectItem value={String(MetaType.VideoMP4)}>Video (MP4)</SelectItem>
-                        <SelectItem value={String(MetaType.VideoWebM)}>Video (WebM)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Section</Label>
-                    <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose section" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sectionOptions.length === 0 ? (
-                          <SelectItem value="none" disabled>
-                            {loadingResume ? "Loading sections..." : "No sections available"}
-                          </SelectItem>
-                        ) : (
-                          // Group options by section type
-                          Object.entries(
-                            sectionOptions.reduce((groups, option) => {
-                              if (!groups[option.group]) groups[option.group] = [];
-                              groups[option.group].push(option);
-                              return groups;
-                            }, {} as Record<string, typeof sectionOptions>)
-                          ).map(([group, options]) => (
-                            <div key={group}>
-                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                {group}
-                              </div>
-                              {options.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </div>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="md:col-span-6">
-                    <Label>Description</Label>
-                    <Textarea 
-                      rows={2} 
-                      value={m.description || ""} 
-                      onChange={(e) => updateMeta(i, "description", e.target.value)} 
-                      placeholder="Optional description for this media item" 
-                    />
-                  </div>
-                  <div className="md:col-span-6 flex justify-end">
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => removeMeta(i)}
-                    >
-                      Remove
-                    </Button>
+              {publishedProjects.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Published</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {publishedProjects.map((project) => (
+                      <StudioProjectCard key={project.id} project={project} onSelect={pickStudioProject} />
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+              {otherProjects.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other Projects</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {otherProjects.map((project) => (
+                      <StudioProjectCard key={project.id} project={project} onSelect={pickStudioProject} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save Media"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+function StudioProjectCard({
+  project,
+  onSelect,
+}: {
+  project: StudioProject;
+  onSelect: (project: StudioProject) => void;
+}) {
+  const hasVideo = project.youtubeVideoId || project.videoUrl;
+  const statusColor =
+    project.status === StudioProjectStatus.Published || project.status === StudioProjectStatus.Completed
+      ? "bg-green-100 text-green-800"
+      : project.status === StudioProjectStatus.Processing || project.status === StudioProjectStatus.Publishing
+        ? "bg-blue-100 text-blue-800"
+        : "bg-gray-100 text-gray-700";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(project)}
+      disabled={!hasVideo}
+      className="flex items-start gap-3 border rounded-lg p-3 text-left hover:border-primary hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full"
+    >
+      {/* Thumbnail */}
+      <div className="w-16 h-12 rounded bg-muted shrink-0 overflow-hidden flex items-center justify-center">
+        {project.thumbnailUrl ? (
+          <img src={project.thumbnailUrl} alt={project.title} className="w-full h-full object-cover" />
+        ) : (
+          <Play className="h-5 w-5 text-muted-foreground" />
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{project.title}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge variant="secondary" className={`text-xs ${statusColor}`}>
+            {project.status}
+          </Badge>
+          {project.youtubeVideoId && (
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          )}
+        </div>
+        {!hasVideo && (
+          <p className="text-xs text-muted-foreground mt-1">No video URL yet</p>
+        )}
+      </div>
+    </button>
   );
 }
