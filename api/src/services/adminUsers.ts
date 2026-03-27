@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 
@@ -17,7 +17,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const safeLimit = Math.min(limit, 100);
   const offset = (page - 1) * safeLimit;
 
-  const conditions = [];
+  const conditions: SQL[] = [];
   if (search) conditions.push(or(ilike(schema.users.email, `%${search}%`), ilike(schema.users.name, `%${search}%`)));
   if (role) conditions.push(eq(schema.users.role, role));
   if (status === "active") conditions.push(eq(schema.users.isActive, true));

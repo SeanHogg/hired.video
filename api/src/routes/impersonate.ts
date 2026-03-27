@@ -22,8 +22,8 @@ import {
   listModules,
   createModule,
   updateModule,
-  listAuditLog,
 } from "../services/adminModules.js";
+import { listAuditLog } from "../utils/audit.js";
 
 export const impersonateRoutes = new Hono<{ Variables: Variables }>();
 

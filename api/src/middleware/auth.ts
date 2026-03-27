@@ -1,7 +1,7 @@
 import { jwtVerify } from "jose";
 import type { MiddlewareHandler } from "hono";
 import type { Variables, JwtPayload } from "../types/index.js";
-import { getJwtSecret } from "../utils/jwt.js";
+import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -34,7 +34,10 @@ function parseJwtPayload(payload: Record<string, unknown>): JwtPayload {
  * with the emulated user's claims.
  */
 export const optionalAuthMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
-  const secretKey = new TextEncoder().encode(getJwtSecret());
+  const rawSecret = getJwtSecretOptional();
+  if (!rawSecret) return next(); // Not configured — skip auth, treat as anonymous
+
+  const secretKey = new TextEncoder().encode(rawSecret);
 
   // Resolve the primary user from Authorization header
   const authHeader = c.req.header("Authorization");

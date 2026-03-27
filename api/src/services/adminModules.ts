@@ -1,6 +1,9 @@
-import { count, desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
+
+type Module = InferSelectModel<typeof schema.modules>;
 
 export async function listModules() {
   const db = getDb();
@@ -55,7 +58,7 @@ export async function updateModule(
   adminId: string,
   moduleId: string,
   input: UpdateModuleInput,
-): Promise<{ ok: true; mod: unknown } | { ok: false; code: "NOT_FOUND" }> {
+): Promise<{ ok: true; mod: Module } | { ok: false; code: "NOT_FOUND" }> {
   const db = getDb();
   const [existing] = await db.select().from(schema.modules).where(eq(schema.modules.id, moduleId)).limit(1);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
@@ -85,20 +88,3 @@ export async function updateModule(
   return { ok: true, mod: updated };
 }
 
-export async function listAuditLog(page: number, limit: number) {
-  const db = getDb();
-  const safeLimit = Math.min(limit, 200);
-  const offset = (page - 1) * safeLimit;
-
-  const [logs, [{ total }]] = await Promise.all([
-    db
-      .select()
-      .from(schema.adminAuditLog)
-      .orderBy(desc(schema.adminAuditLog.createdAt))
-      .limit(safeLimit)
-      .offset(offset),
-    db.select({ total: count() }).from(schema.adminAuditLog),
-  ]);
-
-  return { logs, total, page, limit: safeLimit };
-}

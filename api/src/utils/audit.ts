@@ -1,3 +1,4 @@
+import { count, desc } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 /** Typed constants for all admin audit actions. */
@@ -24,7 +25,32 @@ interface AuditEntry {
   impersonationSessionId?: string;
 }
 
-/** Fire-and-forget audit log insertion. Errors are swallowed to never block the calling route. */
+export async function listAuditLog(page: number, limit: number) {
+  const db = getDb();
+  const safeLimit = Math.min(limit, 200);
+  const offset = (page - 1) * safeLimit;
+
+  const [logs, [{ total }]] = await Promise.all([
+    db
+      .select()
+      .from(schema.adminAuditLog)
+      .orderBy(desc(schema.adminAuditLog.createdAt))
+      .limit(safeLimit)
+      .offset(offset),
+    db.select({ total: count() }).from(schema.adminAuditLog),
+  ]);
+
+  return { logs, total, page, limit: safeLimit };
+}
+
+/**
+ * Writes an audit log entry.
+ *
+ * NOTE: Errors are logged but not re-thrown so a failed audit write never
+ * blocks the originating operation. If your compliance requirements demand
+ * transactional audit guarantees, change this to throw and wrap callers in
+ * a transaction.
+ */
 export async function auditLog(entry: AuditEntry): Promise<void> {
   try {
     const db = getDb();
