@@ -12,7 +12,7 @@ import { studioRoutes } from "./routes/studio.js";
 import { authRoutes } from "./routes/auth.js";
 import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
-import { resumeRoutes } from "./routes/resumes.js";
+import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
@@ -268,6 +268,12 @@ export function createApp() {
   app.route("/api/auth", authRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);
+  // Hono sub-router root path workaround: sub-router handlers registered at "/"
+  // are never matched when mounted via app.route(prefix, router). Register explicitly.
+  app.get("/api/resumes", listResumesHandler);
+  app.get("/api/resumes/", listResumesHandler);
+  app.post("/api/resumes", createResumeHandler);
+  app.post("/api/resumes/", createResumeHandler);
   app.route("/api/resumes", resumeRoutes);
   app.route("/api/resume", resumeRoastRoutes); // roast must be before catch-all in resumeRoutes
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints

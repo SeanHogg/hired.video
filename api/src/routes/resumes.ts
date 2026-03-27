@@ -132,15 +132,16 @@ async function parseBodyToContent(c: any): Promise<Record<string, unknown>> {
   return {};
 }
 
-// Modern plural endpoints
-const listResumesHandler = async (c: any) => {
+// Modern plural endpoints — also exported so app.ts can register them at the mount root
+// (Hono sub-router root "/" never matches when mounted with app.route(prefix, router))
+export const listResumesHandler = async (c: any) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub)).orderBy(resumes.updatedAt);
   return c.json(ok(rows.map(rowToLegacyResume)), 200);
 };
 
-const createResumeHandler = async (c: any) => {
+export const createResumeHandler = async (c: any) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = CreateResumeSchema.safeParse(body);
