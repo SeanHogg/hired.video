@@ -24,3 +24,4 @@ export * from "./studioadvertising.js";
 export * from "./webauthn.js";
 export * from "./assessments.js";
 export * from "./whitelabel.js";
+export * from "./admin.js";

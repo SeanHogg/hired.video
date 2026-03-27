@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { count, eq, gte, sql, sum } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { superAdminMiddleware } from "../middleware/superAdmin.js";
+import { ok } from "../utils/response.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 
-function ok<T>(data: T) {
-	return { success: true as const, data, timestamp: new Date().toISOString() };
-}
+// All admin routes require SuperAdmin
+adminRoutes.use("*", superAdminMiddleware);
 
 const refundReasons = {
 	reasons: [

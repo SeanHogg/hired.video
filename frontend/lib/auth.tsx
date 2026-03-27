@@ -29,8 +29,27 @@ interface EmailVerificationChallengeUI {
   email?: string;
 }
 
+// ── Impersonation session state ───────────────────────────────────────────────
+export interface ImpersonationSession {
+  sessionId: string;
+  token: string;           // emulation JWT — stored in memory only, never localStorage
+  targetUser: { id: string; email: string; name: string };
+  role: string;
+  startedAt: string;
+  expiresAt: string;
+  debuggerEnabled: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
+  isSuperAdmin: boolean;
+  // Impersonation
+  impersonationSession: ImpersonationSession | null;
+  isImpersonating: boolean;
+  startImpersonation: (targetUserId: string, reason: string, enableDebugger?: boolean) => Promise<ImpersonationSession>;
+  endImpersonation: () => Promise<void>;
+  switchImpersonationRole: (role: string) => Promise<void>;
+  // Auth
   login: (
     email: string,
     password: string,
@@ -64,16 +83,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Helper function to convert UserProfile to User
 function userProfileToUser(profile: UserProfile): User {
-  // Check if superadmin has an active persona override
-  let effectiveRole = profile.role as UserRole;
-  const isSuperAdmin = profile.email === "seanhogg@gmail.com" || profile.role === "SuperAdmin";
-
-  if (isSuperAdmin) {
-    const activePersona = localStorage.getItem("superadmin_active_persona");
-    if (activePersona) {
-      effectiveRole = activePersona as UserRole;
-    }
-  }
+  const effectiveRole = profile.role as UserRole;
 
   return {
     id: profile.id,
@@ -117,6 +127,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser || null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
+  // Impersonation session — stored in memory only (never localStorage)
+  const [impersonationSession, setImpersonationSession] = useState<ImpersonationSession | null>(null);
 
   // Check auth consistency on every render - if we have a user but no auth token, clear the user
   useEffect(() => {
@@ -453,9 +465,76 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
+  // ── Impersonation ─────────────────────────────────────────────────────────
+
+  const isSuperAdmin = user?.role === USER_ROLES.SUPER_ADMIN;
+
+  const startImpersonation = async (targetUserId: string, reason: string, enableDebugger = false): Promise<ImpersonationSession> => {
+    const token = authService.getToken();
+    const response = await fetch("/api/admin/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ targetUserId, reason, enableDebugger }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.error?.message ?? "Failed to start impersonation");
+    }
+    const { data } = await response.json();
+    const session: ImpersonationSession = {
+      sessionId: data.sessionId,
+      token: data.token,
+      targetUser: data.user,
+      role: data.role,
+      startedAt: data.startedAt,
+      expiresAt: data.expiresAt,
+      debuggerEnabled: enableDebugger,
+    };
+    setImpersonationSession(session);
+    return session;
+  };
+
+  const endImpersonation = async (): Promise<void> => {
+    if (!impersonationSession) return;
+    const token = authService.getToken();
+    try {
+      await fetch(`/api/admin/impersonate/${impersonationSession.sessionId}/end`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error("endImpersonation: failed to notify server", err);
+    } finally {
+      setImpersonationSession(null);
+    }
+  };
+
+  const switchImpersonationRole = async (role: string): Promise<void> => {
+    if (!impersonationSession) return;
+    const token = authService.getToken();
+    const response = await fetch(`/api/admin/impersonate/${impersonationSession.sessionId}/switch-role`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ role }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.error?.message ?? "Failed to switch role");
+    }
+    const { data } = await response.json();
+    setImpersonationSession((prev) =>
+      prev ? { ...prev, token: data.token, role: data.role } : null,
+    );
+  };
 
   const value: AuthContextType = {
     user,
+    isSuperAdmin,
+    impersonationSession,
+    isImpersonating: impersonationSession !== null,
+    startImpersonation,
+    endImpersonation,
+    switchImpersonationRole,
     login,
     verifyTwoFactor,
     resendTwoFactorCode,

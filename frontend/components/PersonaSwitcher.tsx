@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react"; // useEffect kept for role sync
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -25,52 +25,24 @@ export function PersonaSwitcher({
   showBadge = true,
   onPersonaChange,
 }: PersonaSwitcherProps) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [selectedPersona, setSelectedPersona] = useState<string>(user?.role || "JobSeeker");
 
-  // Check if user is superadmin
-  const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "SuperAdmin";
-
-  // Load active persona from localStorage on mount
   useEffect(() => {
-    if (user?.role) {
-      if (isSuperAdmin) {
-        const activePersona = localStorage.getItem("superadmin_active_persona");
-        setSelectedPersona(activePersona || user.role);
-      } else {
-        setSelectedPersona(user.role);
-      }
-    }
-  }, [user?.role, isSuperAdmin]);
+    if (user?.role) setSelectedPersona(user.role);
+  }, [user?.role]);
 
-  // Handle persona switching for superadmin
   const handlePersonaSwitch = (newPersona: string) => {
     try {
       setSelectedPersona(newPersona);
-
-      // Store the active persona in localStorage
-      localStorage.setItem("superadmin_active_persona", newPersona);
-
-      // Call optional callback
       onPersonaChange?.(newPersona);
-
       toast({
-        title: "Persona Switched",
-        description: `You are now viewing as ${getRoleDisplayLabel(newPersona)}. Page will reload.`,
+        title: "Persona Preview",
+        description: `Previewing as ${getRoleDisplayLabel(newPersona)}.`,
       });
-
-      // Reload the page to refresh all role-based UI with the new persona
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (error) {
       console.error("Failed to switch persona", error);
-      toast({
-        title: "Failed to switch persona",
-        variant: "destructive",
-      });
-      // Revert to previous persona
       setSelectedPersona(user?.role || "JobSeeker");
     }
   };

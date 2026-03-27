@@ -11,6 +11,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvider";
+import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
+import { PermissionDebuggerPanel } from "@/components/PermissionDebuggerPanel";
 import { CartProvider } from "@/lib/cart-context";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
@@ -298,9 +301,11 @@ const App = () => (
   >
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CartProvider>
-          <AIProvider>
-            <TooltipProvider>
+        <PersonaPreviewProvider>
+        <PermissionDebuggerProvider>
+          <CartProvider>
+            <AIProvider>
+              <TooltipProvider>
                 <Toaster />
                 <Sonner />
                 <PWAUpdatePrompt />
@@ -573,6 +578,9 @@ const App = () => (
               </TooltipProvider>
             </AIProvider>
           </CartProvider>
+          <PermissionDebuggerPanel />
+        </PermissionDebuggerProvider>
+        </PersonaPreviewProvider>
       </AuthProvider>
     </QueryClientProvider>
   </ErrorBoundary>

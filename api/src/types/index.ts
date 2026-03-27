@@ -52,6 +52,13 @@ export interface JwtPayload {
   emailVerified: boolean;
   mustChangePassword: boolean;
   companyId?: string;
+  isSuperAdmin?: boolean;
+  // Emulation claims (present only on impersonation tokens)
+  emu?: boolean;         // true = this is an impersonation token
+  emuBy?: string;        // superadmin userId
+  emuSid?: string;       // impersonation session id
+  emuReadonly?: boolean; // true = block all mutating verbs
+  jti?: string;          // token id (for revocation lookup)
   iat?: number;
   exp?: number;
 }

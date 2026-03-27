@@ -18,6 +18,8 @@ export const users = pgTable("users", {
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isSuspended: boolean("is_suspended").default(false).notNull(),
+  isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
+  sessionVersion: integer("session_version").default(0).notNull(),
   mustChangePassword: boolean("must_change_password").default(false).notNull(),
   mfaEnabled: boolean("mfa_enabled").default(false).notNull(),
   mfaSecret: text("mfa_secret"),

@@ -33,6 +33,7 @@ import { ogRoutes } from "./routes/og.js";
 import { linkedInPostRoutes } from "./routes/linkedin-post.js";
 import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
+import { impersonateRoutes } from "./routes/impersonate.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { youtubeRoutes } from "./routes/youtube.js";
 import { communicationRoutes } from "./routes/communication.js";
@@ -121,7 +122,7 @@ export function createApp() {
         // Return a non-matching literal origin to effectively deny browser CORS.
         return "null";
       },
-      allowHeaders: ["Content-Type", "Authorization"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Emulation-Token"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),
@@ -309,6 +310,8 @@ export function createApp() {
   app.route("/api/passwordmanagement", passwordManagementRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
+  // SuperAdmin management portal — impersonation, user management, modules, audit
+  app.route("/api/admin/impersonate", impersonateRoutes);
   app.route("/api/studio", studioRoutes);
   app.route("/api/studio", linkedInPostRoutes);
   app.route("/api/og", ogRoutes);

@@ -18,6 +18,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
 import { Badge } from "@/components/ui/badge";
+import { EmulationBar } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,7 @@ export default function Navigation({
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+      <EmulationBar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
