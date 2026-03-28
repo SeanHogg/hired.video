@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
 import {
   AlertCircle,
   RefreshCw,
@@ -13,7 +13,6 @@ import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import PersonaSwitcher from "@/components/PersonaSwitcher";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,6 +27,7 @@ import {
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
+import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
 import AdSlot from "@/components/ads/AdSlot";
@@ -49,10 +49,8 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated, isLoading } = useAuth();
-
-  // State to trigger re-render when persona changes
-  const [personaKey, setPersonaKey] = useState(0);
+  const { user, isAuthenticated, isLoading, impersonationSession, isImpersonating } = useAuth();
+  const { personaPreview } = usePersonaPreview();
 
   // Use custom dashboard hook for data management
   const {
@@ -63,28 +61,9 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // Get role permissions for routing (use active persona for SuperAdmin)
-  const getActiveRole = () => {
-    if (!user?.role) return null;
-
-    const isSuperAdmin = user.email === "seanhogg@gmail.com" || user.role === "SuperAdmin";
-    if (isSuperAdmin) {
-      const activePersona = localStorage.getItem("superadmin_active_persona");
-      return activePersona || user.role;
-    }
-
-    return user.role;
-  };
-
-  const rolePermissions = createRolePermissions(getActiveRole());
-
-  // Handle persona change callback
-  const handlePersonaChange = useCallback((newPersona: string) => {
-    // Trigger re-render by updating key
-    setPersonaKey(prev => prev + 1);
-    // Refresh dashboard data for new persona
-    refreshDashboard();
-  }, [refreshDashboard]);
+  // Effective role: impersonation > persona preview > actual role
+  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
+  const rolePermissions = createRolePermissions(effectiveRole);
 
   // Dashboard wrapper component
   const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({
@@ -101,15 +80,6 @@ export default function Dashboard() {
                 Last updated: {lastRefresh.toLocaleString()}
               </p>
             )}
-          </div>
-
-          {/* Persona Switcher for SuperAdmin */}
-          <div className="flex-shrink-0">
-            <PersonaSwitcher
-              variant="compact"
-              onPersonaChange={handlePersonaChange}
-              key={personaKey}
-            />
           </div>
         </div>
       </div>
@@ -130,8 +100,9 @@ export default function Dashboard() {
       onRefresh: refreshDashboard,
     };
 
-    // SuperAdmin gets the Product Dashboard with SaaS metrics
-    if (rolePermissions.isSuperAdmin) return <ProductDashboard />;
+    // SuperAdmin with no active preview/impersonation gets the Product Dashboard
+    const isEmulating = isImpersonating || personaPreview !== null;
+    if (rolePermissions.isSuperAdmin && !isEmulating) return <ProductDashboard />;
 
     // Other role-based dashboards
     if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
