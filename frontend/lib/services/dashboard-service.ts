@@ -107,8 +107,8 @@ export const ApplicationStatsSchema = z.object({
 
 // Job seeker dashboard schema
 export const JobSeekerDashboardSchema = BaseDashboardSchema.extend({
-  profileStats: ProfileStatsSchema,
-  applicationStats: ApplicationStatsSchema,
+  profileStats: ProfileStatsSchema.optional(),
+  applicationStats: ApplicationStatsSchema.optional(),
   jobMatches: z.array(
     z.object({
       jobId: z.string(),
@@ -508,9 +508,14 @@ export class DashboardService {
       const response = (await apiClient.get(
         "/api/userdashboard/jobseeker",
       )) as { data: any };
-      const dashboard = JobSeekerDashboardSchema.parse(response.data);
 
-      return { success: true, data: dashboard };
+      const parsed = JobSeekerDashboardSchema.safeParse(response.data);
+      if (!parsed.success) {
+        console.warn("[dashboard] JobSeeker schema validation warning:", parsed.error.issues);
+        return { success: true, data: response.data as unknown as JobSeekerDashboard };
+      }
+
+      return { success: true, data: parsed.data };
     } catch (error) {
       console.error("Error creating job seeker dashboard:", error);
       return {

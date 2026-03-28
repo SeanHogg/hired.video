@@ -88,37 +88,37 @@ export function JobSeekerDashboard({
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
               <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
                 <div className="text-lg sm:text-2xl font-bold text-primary">
-                  {dashboardData.profileStats.totalViews}
+                  {dashboardData.profileStats?.totalViews ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">Total Views</div>
               </div>
               <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
                 <div className="text-lg sm:text-2xl font-bold text-blue-600">
-                  {dashboardData.profileStats.viewsThisWeek}
+                  {dashboardData.profileStats?.viewsThisWeek ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">This Week</div>
               </div>
               <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
                 <div className="text-lg sm:text-2xl font-bold text-green-600">
-                  {dashboardData.profileStats.viewsThisMonth}
+                  {dashboardData.profileStats?.viewsThisMonth ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">This Month</div>
               </div>
               <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
                 <div
-                  className={`text-lg sm:text-2xl font-bold ${dashboardData.profileStats.viewsChangePercentage >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-lg sm:text-2xl font-bold ${(dashboardData.profileStats?.viewsChangePercentage ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {dashboardData.profileStats.viewsChangePercentage >= 0
+                  {(dashboardData.profileStats?.viewsChangePercentage ?? 0) >= 0
                     ? "+"
                     : ""}
-                  {dashboardData.profileStats.viewsChangePercentage}%
+                  {dashboardData.profileStats?.viewsChangePercentage ?? 0}%
                 </div>
                 <div className="text-xs text-muted-foreground">Change</div>
               </div>
             </div>
 
             {/* Recent Viewers */}
-            {dashboardData.profileStats.recentViewers &&
+            {dashboardData.profileStats?.recentViewers &&
               dashboardData.profileStats.recentViewers.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-muted-foreground">
@@ -163,7 +163,7 @@ export function JobSeekerDashboard({
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="text-center p-3 bg-muted/30 rounded-lg">
                 <div className="text-2xl font-bold text-primary">
-                  {dashboardData.applicationStats.totalApplications}
+                  {dashboardData.applicationStats?.totalApplications ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Total Applications
@@ -171,19 +171,19 @@ export function JobSeekerDashboard({
               </div>
               <div className="text-center p-3 bg-muted/30 rounded-lg">
                 <div className="text-2xl font-bold text-yellow-600">
-                  {dashboardData.applicationStats.pendingApplications}
+                  {dashboardData.applicationStats?.pendingApplications ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">Pending</div>
               </div>
               <div className="text-center p-3 bg-muted/30 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
-                  {dashboardData.applicationStats.interviewRequests}
+                  {dashboardData.applicationStats?.interviewRequests ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">Interviews</div>
               </div>
               <div className="text-center p-3 bg-muted/30 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
-                  {dashboardData.applicationStats.successRate}%
+                  {dashboardData.applicationStats?.successRate ?? 0}%
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Success Rate
@@ -192,7 +192,7 @@ export function JobSeekerDashboard({
             </div>
 
             {/* Recent Applications */}
-            {dashboardData.applicationStats.recentApplications &&
+            {dashboardData.applicationStats?.recentApplications &&
               dashboardData.applicationStats.recentApplications.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-muted-foreground">
@@ -457,7 +457,7 @@ export function JobSeekerDashboard({
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {dashboardData.profileStats.totalViews}
+                  {dashboardData.profileStats?.totalViews ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Profile Views
