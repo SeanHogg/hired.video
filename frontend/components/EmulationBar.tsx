@@ -61,8 +61,58 @@ function useExpiryWarning(expiresAt: string | null, onExpired: () => void) {
   }, [expiresAt, onExpired, toast]);
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-export function EmulationBar() {
+// ── Inline header controls (SuperAdmin badge + Preview role + Debug) ──────────
+// Renders nothing if not SuperAdmin. No wrapper bg/border — sits inside the header row.
+export function EmulationInlineControls() {
+  const { isSuperAdmin } = useAuth();
+  const { debugMode, toggleDebugMode } = usePermissionDebugger();
+  const { personaPreview, setPersonaPreview } = usePersonaPreview();
+
+  if (!isSuperAdmin) return null;
+
+  return (
+    <div className="flex items-center gap-1">
+      <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+            <Eye className="h-3 w-3" />
+            {personaPreview ? getRoleDisplayLabel(personaPreview) : "Preview role"}
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {personaPreview && (
+            <DropdownMenuItem onSelect={() => setPersonaPreview(null)}>
+              ✕ Clear preview
+            </DropdownMenuItem>
+          )}
+          {ROLES.map((r) => (
+            <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
+              {getRoleDisplayLabel(r)} {r === personaPreview && "✓"}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button
+        variant={debugMode ? "secondary" : "ghost"}
+        size="sm"
+        className="h-7 text-xs gap-1 px-2"
+        onClick={toggleDebugMode}
+        title="Toggle permission debugger (Ctrl+Shift+P)"
+      >
+        <Bug className="h-3 w-3" />
+        Debug
+      </Button>
+    </div>
+  );
+}
+
+// ── Active session banner (only shown during impersonation or preview) ────────
+// Renders as a full-width strip below the header row when a session is active.
+export function EmulationActiveBanner() {
   const { user, isSuperAdmin, impersonationSession, isImpersonating, endImpersonation, switchImpersonationRole } = useAuth();
   const { debugMode, toggleDebugMode, checks } = usePermissionDebugger();
   const { toast } = useToast();
@@ -74,37 +124,7 @@ export function EmulationBar() {
   if (!isSuperAdmin) return null;
 
   const isPreviewMode = !isImpersonating && personaPreview !== null;
-  if (!isImpersonating && !isPreviewMode) {
-    // Collapsed state — just a thin strip
-    return (
-      <div className="flex items-center gap-2 px-3 py-1 text-xs bg-muted border-b">
-        <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-6 text-xs gap-1">
-              <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {ROLES.map((r) => (
-              <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
-                {getRoleDisplayLabel(r)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-xs gap-1"
-          onClick={toggleDebugMode}
-        >
-          <Bug className="h-3 w-3" />
-          {debugMode ? "Debug ON" : "Debug"}
-        </Button>
-      </div>
-    );
-  }
+  if (!isImpersonating && !isPreviewMode) return null;
 
   const barBg = isImpersonating ? "bg-amber-50 border-amber-300" : "bg-blue-50 border-blue-300";
   const badgeBg = isImpersonating ? "bg-amber-500 text-white" : "bg-blue-500 text-white";
@@ -215,4 +235,10 @@ export function EmulationBar() {
       </Button>
     </div>
   );
+}
+
+// ── Legacy export (kept for any other import sites) ───────────────────────────
+/** @deprecated Use EmulationInlineControls + EmulationActiveBanner instead */
+export function EmulationBar() {
+  return null;
 }
