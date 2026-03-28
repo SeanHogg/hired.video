@@ -18,7 +18,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
 import { Badge } from "@/components/ui/badge";
-import { EmulationInlineControls, EmulationActiveBanner } from "@/components/EmulationBar";
+import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ export default function Navigation({
 }: NavigationProps) {
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
   const { isAuthenticated, user } = useAuth();
+  const emulationStyle = useEmulationStyle();
   const location = useLocation();
   const featuresRef = useRef<HTMLDivElement>(null);
 
@@ -124,8 +125,17 @@ export default function Navigation({
     };
   }, []);
 
+  const navCls = cn(
+    "fixed top-0 left-0 right-0 z-50 border-b transition-colors duration-200",
+    emulationStyle === "amber"
+      ? "bg-amber-50/95 border-amber-300"
+      : emulationStyle === "blue"
+      ? "bg-blue-50/95 border-blue-300"
+      : "bg-background/80 backdrop-blur-md border-border",
+  );
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <nav className={navCls}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
@@ -254,8 +264,8 @@ export default function Navigation({
 
           {/* Right side: SuperAdmin controls + Shopping Cart + Desktop CTA Buttons */}
           <div className="flex items-center space-x-4">
-            {/* SuperAdmin inline controls */}
-            <EmulationInlineControls />
+            {/* SuperAdmin controls (idle or active) */}
+            <EmulationHeaderControls />
 
             {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />
@@ -297,7 +307,6 @@ export default function Navigation({
           </div>
         </div>
       </div>
-      <EmulationActiveBanner />
     </nav>
   );
 }

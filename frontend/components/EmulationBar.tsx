@@ -51,69 +51,37 @@ function useExpiryWarning(expiresAt: string | null, onExpired: () => void) {
     const expMs = new Date(expiresAt).getTime();
     const now = Date.now();
     const t10 = expMs - 10 * 60 * 1000 - now;
-    const t5 = expMs - 5 * 60 * 1000 - now;
-    const t0 = expMs - now;
+    const t5  = expMs - 5  * 60 * 1000 - now;
+    const t0  = expMs - now;
     const timers: ReturnType<typeof setTimeout>[] = [];
     if (t10 > 0) timers.push(setTimeout(() => toast({ title: "Impersonation expiring soon", description: "Session expires in 10 minutes." }), t10));
-    if (t5 > 0) timers.push(setTimeout(() => toast({ title: "Impersonation expiring soon", description: "Session expires in 5 minutes.", variant: "destructive" }), t5));
-    if (t0 > 0) timers.push(setTimeout(() => { toast({ title: "Impersonation session expired", variant: "destructive" }); onExpired(); }, t0));
+    if (t5  > 0) timers.push(setTimeout(() => toast({ title: "Impersonation expiring soon", description: "Session expires in 5 minutes.", variant: "destructive" }), t5));
+    if (t0  > 0) timers.push(setTimeout(() => { toast({ title: "Impersonation session expired", variant: "destructive" }); onExpired(); }, t0));
     return () => timers.forEach(clearTimeout);
   }, [expiresAt, onExpired, toast]);
 }
 
-// ── Inline header controls (SuperAdmin badge + Preview role + Debug) ──────────
-// Renders nothing if not SuperAdmin. No wrapper bg/border — sits inside the header row.
-export function EmulationInlineControls() {
-  const { isSuperAdmin } = useAuth();
-  const { debugMode, toggleDebugMode } = usePermissionDebugger();
-  const { personaPreview, setPersonaPreview } = usePersonaPreview();
+// ── Hook: exposes active-emulation state for Nav background styling ───────────
+export function useEmulationStyle() {
+  const { isSuperAdmin, isImpersonating } = useAuth();
+  const { personaPreview } = usePersonaPreview();
 
   if (!isSuperAdmin) return null;
-
-  return (
-    <div className="flex items-center gap-1">
-      <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
-            <Eye className="h-3 w-3" />
-            {personaPreview ? getRoleDisplayLabel(personaPreview) : "Preview role"}
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {personaPreview && (
-            <DropdownMenuItem onSelect={() => setPersonaPreview(null)}>
-              ✕ Clear preview
-            </DropdownMenuItem>
-          )}
-          {ROLES.map((r) => (
-            <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
-              {getRoleDisplayLabel(r)} {r === personaPreview && "✓"}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Button
-        variant={debugMode ? "secondary" : "ghost"}
-        size="sm"
-        className="h-7 text-xs gap-1 px-2"
-        onClick={toggleDebugMode}
-        title="Toggle permission debugger (Ctrl+Shift+P)"
-      >
-        <Bug className="h-3 w-3" />
-        Debug
-      </Button>
-    </div>
-  );
+  if (isImpersonating) return "amber" as const;
+  if (personaPreview !== null) return "blue" as const;
+  return null;
 }
 
-// ── Active session banner (only shown during impersonation or preview) ────────
-// Renders as a full-width strip below the header row when a session is active.
-export function EmulationActiveBanner() {
-  const { user, isSuperAdmin, impersonationSession, isImpersonating, endImpersonation, switchImpersonationRole } = useAuth();
+// ── Unified header controls ───────────────────────────────────────────────────
+// Renders inside the header row for all SuperAdmin states.
+// Idle  → SuperAdmin badge + Preview role dropdown + Debug toggle.
+// Active → status badge + role switcher + permissions + copy + exit (all inline).
+export function EmulationHeaderControls() {
+  const {
+    user, isSuperAdmin,
+    impersonationSession, isImpersonating,
+    endImpersonation, switchImpersonationRole,
+  } = useAuth();
   const { debugMode, toggleDebugMode, checks } = usePermissionDebugger();
   const { toast } = useToast();
   const { personaPreview, setPersonaPreview } = usePersonaPreview();
@@ -124,13 +92,45 @@ export function EmulationActiveBanner() {
   if (!isSuperAdmin) return null;
 
   const isPreviewMode = !isImpersonating && personaPreview !== null;
-  if (!isImpersonating && !isPreviewMode) return null;
 
-  const barBg = isImpersonating ? "bg-amber-50 border-amber-300" : "bg-blue-50 border-blue-300";
-  const badgeBg = isImpersonating ? "bg-amber-500 text-white" : "bg-blue-500 text-white";
+  // ── Idle: no active session ──────────────────────────────────────────────
+  if (!isImpersonating && !isPreviewMode) {
+    return (
+      <div className="flex items-center gap-1">
+        <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
 
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+              <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {ROLES.map((r) => (
+              <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
+                {getRoleDisplayLabel(r)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          variant={debugMode ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 text-xs gap-1 px-2"
+          onClick={toggleDebugMode}
+          title="Toggle permission debugger (Ctrl+Shift+P)"
+        >
+          <Bug className="h-3 w-3" />Debug
+        </Button>
+      </div>
+    );
+  }
+
+  // ── Active: impersonating or role preview ────────────────────────────────
   const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? "";
   const permCount = checks.size;
+  const isAmber = isImpersonating;
 
   const handleCopyContext = async () => {
     const ctx = {
@@ -155,36 +155,38 @@ export function EmulationActiveBanner() {
     }
   };
 
-  const minutesElapsed = Math.floor(elapsed / 60);
-  const timerAmber = minutesElapsed >= 50;
+  const badgeCls = isAmber
+    ? "bg-amber-500 text-white"
+    : "bg-blue-500 text-white";
+  const btnBorderCls = isAmber ? "border-amber-400" : "border-blue-300";
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 border-b text-xs flex-wrap ${barBg}`}>
+    <div className="flex items-center gap-1.5">
       {/* Status badge */}
-      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeBg}`}>
+      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
         <AlertTriangle className="h-3 w-3" />
         {isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
       </span>
 
-      {/* Target user / role info */}
+      {/* Target user name — impersonation only, hidden on narrow screens */}
       {isImpersonating && impersonationSession && (
-        <>
-          <span className="font-medium text-amber-900">
-            {impersonationSession.targetUser.name}
-          </span>
-          <span className="text-amber-700">{impersonationSession.targetUser.email}</span>
-          <span className="text-amber-600">·</span>
-        </>
+        <span className="hidden sm:inline text-xs font-medium truncate max-w-[120px]">
+          {impersonationSession.targetUser.name}
+        </span>
       )}
 
       {/* Role switcher */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-6 text-xs gap-1 border-amber-300">
-            Role: {getRoleDisplayLabel(effectiveRole)} <ChevronDown className="h-3 w-3" />
+          <Button
+            variant="outline"
+            size="sm"
+            className={`h-7 text-xs gap-1 ${btnBorderCls}`}
+          >
+            Role: {getRoleDisplayLabel(effectiveRole)}<ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
+        <DropdownMenuContent align="end">
           {ROLES.map((r) => (
             <DropdownMenuItem
               key={r}
@@ -196,40 +198,34 @@ export function EmulationActiveBanner() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Permission count */}
+      {/* Permissions / debug toggle */}
       <Button
         variant="ghost"
         size="sm"
-        className="h-6 text-xs gap-1"
+        className="h-7 text-xs gap-1 px-2"
         onClick={toggleDebugMode}
         title="Toggle permission debugger (Ctrl+Shift+P)"
       >
         <Bug className="h-3 w-3" />
-        {permCount > 0 ? `${permCount} permissions` : "Permissions"}
-        {debugMode && <Badge className="ml-1 h-4 text-xs">ON</Badge>}
+        Permissions
+        {debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
       </Button>
 
-      {/* Session timer */}
+      {/* Session timer — impersonation only */}
       {isImpersonating && (
-        <span className={`tabular-nums ${timerAmber ? "text-amber-600 font-semibold" : "text-amber-800"}`}>
+        <span className="hidden sm:inline text-xs tabular-nums">
           {formatDuration(elapsed)}
         </span>
       )}
 
-      <div className="flex-1" />
-
       {/* Copy context */}
-      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={handleCopyContext}>
-        <Copy className="h-3 w-3" />Copy Context
+      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={handleCopyContext}>
+        <Copy className="h-3 w-3" />
+        <span className="hidden sm:inline">Copy Context</span>
       </Button>
 
       {/* Exit */}
-      <Button
-        variant="destructive"
-        size="sm"
-        className="h-6 text-xs gap-1"
-        onClick={handleExit}
-      >
+      <Button variant="destructive" size="sm" className="h-7 text-xs gap-1" onClick={handleExit}>
         <LogOut className="h-3 w-3" />
         {isImpersonating ? "Exit Emulation" : "Exit Preview"}
       </Button>
@@ -237,8 +233,10 @@ export function EmulationActiveBanner() {
   );
 }
 
-// ── Legacy export (kept for any other import sites) ───────────────────────────
-/** @deprecated Use EmulationInlineControls + EmulationActiveBanner instead */
-export function EmulationBar() {
-  return null;
-}
+// ── Legacy exports (kept so old import sites don't break) ────────────────────
+/** @deprecated Use EmulationHeaderControls */
+export function EmulationInlineControls() { return null; }
+/** @deprecated Use EmulationHeaderControls */
+export function EmulationActiveBanner()   { return null; }
+/** @deprecated Use EmulationHeaderControls */
+export function EmulationBar()            { return null; }

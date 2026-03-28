@@ -70,66 +70,93 @@ export default function StudioPreview({
     error:      "Something went wrong",
   };
 
+  // Inner video canvas — same content in both layout modes
+  const videoCanvas = (
+    <div
+      className="relative bg-black rounded-lg overflow-hidden"
+      style={{
+        aspectRatio: compiledVideo ? `${compiledVideo.width}/${compiledVideo.height}` : "16/9",
+        // In height-fit mode: constrain by height, let width follow aspect ratio
+        ...(showActions ? {} : { maxHeight: "100%", width: "auto", maxWidth: "100%" }),
+      }}
+    >
+      {compiledVideo ? (
+        <VideoPreview
+          compiledVideo={compiledVideo}
+          playing={playing}
+          currentTime={currentTime}
+          onTimeUpdate={onTimeUpdate}
+          audio={state.script?.video?.audio}
+          className="w-full h-full"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
+          {state.status === "generating" ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Generating…
+            </span>
+          ) : (
+            "Run to preview"
+          )}
+        </div>
+      )}
+
+      {/* Expand button */}
+      {compiledVideo && (
+        <button
+          type="button"
+          className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 text-white hover:bg-black/80 transition-colors"
+          onClick={() => setExpanded(true)}
+          title="Expand preview"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
+  // Playback controls — same in both modes
+  const playbackControls = compiledVideo && (
+    <div className="flex items-center gap-2">
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPlayPause}>
+        {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+      </Button>
+      <div className="flex-1 relative h-1 bg-muted rounded-full overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
+          style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
+        />
+      </div>
+      <span className="text-[10px] text-muted-foreground font-mono">
+        {formatTime(currentTime)} / {formatTime(totalDuration)}
+      </span>
+    </div>
+  );
+
   return (
     <div className={cn("flex flex-col", className)}>
       {/* Canvas + playback */}
-      {showVideo && <div className="p-3 border-b">
-        <div
-          className="relative bg-black rounded-lg overflow-hidden"
-          style={{ aspectRatio: compiledVideo ? `${compiledVideo.width}/${compiledVideo.height}` : "16/9" }}
-        >
-          {compiledVideo ? (
-            <VideoPreview
-              compiledVideo={compiledVideo}
-              playing={playing}
-              currentTime={currentTime}
-              onTimeUpdate={onTimeUpdate}
-              audio={state.script?.video?.audio}
-              className="w-full h-full"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
-              {state.status === "generating" ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Generating…
-                </span>
-              ) : (
-                "Run to preview"
-              )}
-            </div>
-          )}
-
-          {/* Expand button */}
-          {compiledVideo && (
-            <button
-              type="button"
-              className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 text-white hover:bg-black/80 transition-colors"
-              onClick={() => setExpanded(true)}
-              title="Expand preview"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Playback controls */}
-        {compiledVideo && (
-          <div className="flex items-center gap-2 mt-2">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPlayPause}>
-              {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </Button>
-            <div className="flex-1 relative h-1 bg-muted rounded-full overflow-hidden">
-              <div
-                className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-                style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
-              />
-            </div>
-            <span className="text-[10px] text-muted-foreground font-mono">
-              {formatTime(currentTime)} / {formatTime(totalDuration)}
-            </span>
+      {showVideo && (
+        showActions ? (
+          // Static layout (standalone / right-panel use)
+          <div className="p-3 border-b">
+            {videoCanvas}
+            {playbackControls && <div className="mt-2">{playbackControls}</div>}
           </div>
-        )}
-      </div>}
+        ) : (
+          // Height-fit layout (center panel) — video shrinks to fit dragged height
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden p-2">
+              {videoCanvas}
+            </div>
+            {playbackControls && (
+              <div className="shrink-0 flex items-center gap-2 px-2 py-1.5 border-t bg-background">
+                {playbackControls}
+              </div>
+            )}
+          </div>
+        )
+      )}
 
       {/* Fullscreen overlay — only relevant when video is shown */}
       {expanded && compiledVideo && (
