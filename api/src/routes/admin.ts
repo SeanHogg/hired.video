@@ -57,8 +57,8 @@ adminRoutes.get("/", async (c) => {
 		db.select({ n: count() }).from(schema.jobItems).where(gte(schema.jobItems.createdAt, thirtyDaysAgo)),
 		db.select({ n: count() }).from(schema.resumeInformation),
 		db.select({ n: count() }).from(schema.resumeInformation).where(gte(schema.resumeInformation.createdAt, thirtyDaysAgo)),
-		db.select({ n: count() }).from(schema.companies),
-		db.select({ n: count() }).from(schema.companies).where(gte(schema.companies.createdAt, thirtyDaysAgo)),
+		db.select({ n: count() }).from(schema.companyProfiles),
+		db.select({ n: count() }).from(schema.companyProfiles).where(gte(schema.companyProfiles.createdAt, thirtyDaysAgo)),
 		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active")),
 		db.select({ n: count() }).from(schema.subscriptions),
 		db.select({ total: sum(schema.subscriptionPlans.priceMonthly) })
