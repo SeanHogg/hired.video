@@ -87,7 +87,7 @@ export default function UserManagement() {
 
   const handleImpersonate = async (user: User) => {
     try {
-      await startImpersonation(user.id);
+      await startImpersonation(user.id, "Admin user management");
       toast({ title: `Impersonating ${user.name}` });
     } catch {
       toast({ title: "Failed to start impersonation", variant: "destructive" });
