@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
+import { useAdminPermissions } from "@/lib/admin-permissions";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,7 +39,8 @@ export default function Sidebar({
   onClose,
   collapsed = false,
 }: SidebarProps) {
-  const { isAuthenticated, user, logout, isSuperAdmin } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
+  const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
   const location = useLocation();
 
   // Main navigation items - shown to all users
@@ -181,8 +183,8 @@ export default function Sidebar({
               </nav>
             </div>
 
-            {/* Admin Navigation - SuperAdmin only */}
-            {isAuthenticated && isSuperAdmin && (
+            {/* Admin Navigation - roles with any admin CRUD access */}
+            {isAuthenticated && hasAdminAccess && (
               <div>
                 {!collapsed && (
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">

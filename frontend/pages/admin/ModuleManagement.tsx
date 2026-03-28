@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Package, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +36,8 @@ const CATEGORY_ORDER = ["Core", "AI", "Recruiting", "Social", "Tools", "Revenue"
 export default function ModuleManagement() {
   const [modules, setModules] = useState(INITIAL_MODULES);
   const [changed, setChanged] = useState<Set<string>>(new Set());
+  const { can } = useAdminPermissions();
+  const canToggle = can("modules", "update");
 
   const toggle = (id: string) => {
     setModules((prev) =>
@@ -55,7 +58,10 @@ export default function ModuleManagement() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Modules & Features</h1>
-          <p className="text-muted-foreground text-sm">Enable or disable platform features globally.</p>
+          <p className="text-muted-foreground text-sm">
+            Enable or disable platform features globally.
+            {!canToggle && " You have read-only access."}
+          </p>
         </div>
         <div className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{enabledCount}</span> / {modules.length} enabled
@@ -102,6 +108,7 @@ export default function ModuleManagement() {
                       <Switch
                         checked={mod.enabled}
                         onCheckedChange={() => toggle(mod.id)}
+                        disabled={!canToggle}
                         aria-label={`Toggle ${mod.name}`}
                       />
                     </div>

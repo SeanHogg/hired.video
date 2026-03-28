@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Users, CreditCard, Search, MoreHorizontal } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, Search, MoreHorizontal } from "lucide-react";
+import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,9 @@ const pastDueCount = MOCK_SUBS.filter((s) => s.status === "past_due").length;
 export default function BillingManagement() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { can } = useAdminPermissions();
+  const canUpdate = can("billing", "update");
+  const canDelete = can("billing", "delete");
 
   const filtered = MOCK_SUBS.filter((s) => {
     const matchSearch = s.user.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase());
@@ -211,10 +215,14 @@ export default function BillingManagement() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem>Change Plan</DropdownMenuItem>
-                      <DropdownMenuItem>Issue Refund</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">Cancel Subscription</DropdownMenuItem>
+                      {canUpdate && <DropdownMenuItem>Change Plan</DropdownMenuItem>}
+                      {canUpdate && <DropdownMenuItem>Issue Refund</DropdownMenuItem>}
+                      {canDelete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive">Cancel Subscription</DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

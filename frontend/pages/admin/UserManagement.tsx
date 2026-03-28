@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { useAdminPermissions } from "@/lib/admin-permissions";
 
 const ROLE_COLORS: Record<string, string> = {
   SuperAdmin:  "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
@@ -70,6 +71,12 @@ export default function UserManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const { startImpersonation } = useAuth();
   const { toast } = useToast();
+  const { can } = useAdminPermissions();
+
+  const canCreate    = can("users", "create");
+  const canUpdate    = can("users", "update");
+  const canDelete    = can("users", "delete");
+  const canImpersonate = can("users", "delete"); // impersonate requires full access
 
   const filtered = MOCK_USERS.filter((u) => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -94,8 +101,13 @@ export default function UserManagement() {
           <h1 className="text-2xl font-bold">User Management</h1>
           <p className="text-muted-foreground text-sm">View, edit, and manage all platform users.</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{MOCK_USERS.length}</span> total users
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{MOCK_USERS.length}</span> total users
+          </span>
+          {canCreate && (
+            <Button size="sm">Invite User</Button>
+          )}
         </div>
       </div>
 
@@ -200,17 +212,25 @@ export default function UserManagement() {
                       <DropdownMenuItem>
                         <Eye className="h-4 w-4 mr-2" />View Profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <ShieldCheck className="h-4 w-4 mr-2" />Change Role
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => handleImpersonate(user)}>
-                        <UserCheck className="h-4 w-4 mr-2" />Impersonate
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        <UserX className="h-4 w-4 mr-2" />
-                        {user.status === "suspended" ? "Unsuspend" : "Suspend"}
-                      </DropdownMenuItem>
+                      {canUpdate && (
+                        <DropdownMenuItem>
+                          <ShieldCheck className="h-4 w-4 mr-2" />Change Role
+                        </DropdownMenuItem>
+                      )}
+                      {canImpersonate && (
+                        <DropdownMenuItem onSelect={() => handleImpersonate(user)}>
+                          <UserCheck className="h-4 w-4 mr-2" />Impersonate
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive">
+                            <UserX className="h-4 w-4 mr-2" />
+                            {user.status === "suspended" ? "Unsuspend" : "Suspend"}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

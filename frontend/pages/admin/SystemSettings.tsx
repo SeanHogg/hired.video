@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Save, AlertCircle, Mail, Globe, Bell, Lock, Palette } from "lucide-react";
+import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,8 @@ const SECTIONS: SettingSection[] = [
 
 export default function SystemSettings() {
   const { toast } = useToast();
+  const { can } = useAdminPermissions();
+  const canUpdate = can("settings", "update");
   const [activeSection, setActiveSection] = useState("general");
   const [dirty, setDirty] = useState(false);
 
@@ -65,9 +68,12 @@ export default function SystemSettings() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">System Settings</h1>
-          <p className="text-muted-foreground text-sm">Platform-wide configuration and defaults.</p>
+          <p className="text-muted-foreground text-sm">
+            Platform-wide configuration and defaults.
+            {!canUpdate && " You have read-only access."}
+          </p>
         </div>
-        <Button onClick={handleSave} disabled={!dirty} className="gap-1.5">
+        <Button onClick={handleSave} disabled={!dirty || !canUpdate} className="gap-1.5">
           <Save className="h-4 w-4" />
           Save Changes
         </Button>
@@ -110,11 +116,11 @@ export default function SystemSettings() {
               <CardContent className="space-y-4">
                 <div className="grid gap-1.5">
                   <Label>Site Name</Label>
-                  <Input value={siteName} onChange={(e) => { setSiteName(e.target.value); mark(); }} />
+                  <Input value={siteName} onChange={(e) => { setSiteName(e.target.value); mark(); }} disabled={!canUpdate} />
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Support Email</Label>
-                  <Input value={supportEmail} onChange={(e) => { setSupportEmail(e.target.value); mark(); }} />
+                  <Input value={supportEmail} onChange={(e) => { setSupportEmail(e.target.value); mark(); }} disabled={!canUpdate} />
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
@@ -122,21 +128,21 @@ export default function SystemSettings() {
                     <Label>Open Registration</Label>
                     <p className="text-xs text-muted-foreground">Allow new users to sign up.</p>
                   </div>
-                  <Switch checked={registrationOpen} onCheckedChange={(v) => { setRegistrationOpen(v); mark(); }} />
+                  <Switch checked={registrationOpen} onCheckedChange={(v) => { setRegistrationOpen(v); mark(); }} disabled={!canUpdate} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Require Email Verification</Label>
                     <p className="text-xs text-muted-foreground">New accounts must verify their email before access.</p>
                   </div>
-                  <Switch checked={requireEmailVerification} onCheckedChange={(v) => { setRequireEmailVerification(v); mark(); }} />
+                  <Switch checked={requireEmailVerification} onCheckedChange={(v) => { setRequireEmailVerification(v); mark(); }} disabled={!canUpdate} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-destructive">Maintenance Mode</Label>
                     <p className="text-xs text-muted-foreground">Take the platform offline for non-admins.</p>
                   </div>
-                  <Switch checked={maintenanceMode} onCheckedChange={(v) => { setMaintenanceMode(v); mark(); }} />
+                  <Switch checked={maintenanceMode} onCheckedChange={(v) => { setMaintenanceMode(v); mark(); }} disabled={!canUpdate} />
                 </div>
               </CardContent>
             </Card>
@@ -152,21 +158,21 @@ export default function SystemSettings() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>SMTP Host</Label>
-                    <Input value={smtpHost} onChange={(e) => { setSmtpHost(e.target.value); mark(); }} />
+                    <Input value={smtpHost} onChange={(e) => { setSmtpHost(e.target.value); mark(); }} disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>SMTP Port</Label>
-                    <Input value={smtpPort} onChange={(e) => { setSmtpPort(e.target.value); mark(); }} />
+                    <Input value={smtpPort} onChange={(e) => { setSmtpPort(e.target.value); mark(); }} disabled={!canUpdate} />
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>From Name</Label>
-                    <Input value={fromName} onChange={(e) => { setFromName(e.target.value); mark(); }} />
+                    <Input value={fromName} onChange={(e) => { setFromName(e.target.value); mark(); }} disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>From Email</Label>
-                    <Input value={fromEmail} onChange={(e) => { setFromEmail(e.target.value); mark(); }} />
+                    <Input value={fromEmail} onChange={(e) => { setFromEmail(e.target.value); mark(); }} disabled={!canUpdate} />
                   </div>
                 </div>
                 <Button variant="outline" size="sm">Send Test Email</Button>
@@ -184,15 +190,15 @@ export default function SystemSettings() {
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div className="grid gap-1.5">
                     <Label>Session TTL (hours)</Label>
-                    <Input value={sessionTtlHours} onChange={(e) => { setSessionTtlHours(e.target.value); mark(); }} type="number" min="1" />
+                    <Input value={sessionTtlHours} onChange={(e) => { setSessionTtlHours(e.target.value); mark(); }} type="number" min="1" disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Impersonation TTL (minutes)</Label>
-                    <Input value={impersonationTtlMin} onChange={(e) => { setImpersonationTtlMin(e.target.value); mark(); }} type="number" min="5" />
+                    <Input value={impersonationTtlMin} onChange={(e) => { setImpersonationTtlMin(e.target.value); mark(); }} type="number" min="5" disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Max Login Attempts</Label>
-                    <Input value={maxLoginAttempts} onChange={(e) => { setMaxLoginAttempts(e.target.value); mark(); }} type="number" min="1" />
+                    <Input value={maxLoginAttempts} onChange={(e) => { setMaxLoginAttempts(e.target.value); mark(); }} type="number" min="1" disabled={!canUpdate} />
                   </div>
                 </div>
               </CardContent>
@@ -217,7 +223,7 @@ export default function SystemSettings() {
                       <Label>{label}</Label>
                       <p className="text-xs text-muted-foreground">{desc}</p>
                     </div>
-                    <Switch checked={value} onCheckedChange={(v) => { set(v); mark(); }} />
+                    <Switch checked={value} onCheckedChange={(v) => { set(v); mark(); }} disabled={!canUpdate} />
                   </div>
                 ))}
               </CardContent>

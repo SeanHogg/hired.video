@@ -1,12 +1,43 @@
 import React, { useState } from "react";
 import { Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  useAdminPermissions,
+  ADMIN_RESOURCES,
+  CRUD_LABELS,
+  RESOURCE_LABELS,
+  type CrudAction,
+  type AdminResource,
+} from "@/lib/admin-permissions";
+
+// Mirrors the ADMIN_CRUD map in admin-permissions.ts — single source of truth displayed here
+const ROLE_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
+  SuperAdmin: {
+    dashboard: ["read"],
+    users:     ["create", "read", "update", "delete"],
+    roles:     ["create", "read", "update", "delete"],
+    billing:   ["create", "read", "update", "delete"],
+    modules:   ["create", "read", "update", "delete"],
+    audit:     ["read"],
+    settings:  ["read", "update"],
+  },
+  Admin: {
+    dashboard: ["read"],
+    users:     ["read"],
+    roles:     ["read"],
+    audit:     ["read"],
+  },
+  Employer:  {},
+  Recruiter: {},
+  JobSeeker: {},
+  Affiliate: {},
+};
 
 const ROLES = ["JobSeeker", "Affiliate", "Recruiter", "Employer", "Admin", "SuperAdmin"] as const;
+type Role = typeof ROLES[number];
 
-const ROLE_LABELS: Record<string, string> = {
+const ROLE_LABELS: Record<Role, string> = {
   JobSeeker:  "Job Seeker",
   Affiliate:  "Affiliate",
   Recruiter:  "Recruiter",
@@ -15,65 +46,7 @@ const ROLE_LABELS: Record<string, string> = {
   SuperAdmin: "Super Admin",
 };
 
-const PERMISSION_GROUPS = [
-  {
-    group: "Content",
-    permissions: [
-      { key: "viewJobs",       label: "View Jobs" },
-      { key: "postJobs",       label: "Post Jobs" },
-      { key: "manageJobs",     label: "Manage All Jobs" },
-      { key: "viewResumes",    label: "View Resumes" },
-      { key: "manageResumes",  label: "Manage All Resumes" },
-      { key: "viewCompanies",  label: "View Companies" },
-      { key: "manageCompanies",label: "Manage Companies" },
-    ],
-  },
-  {
-    group: "Recruiting",
-    permissions: [
-      { key: "searchCandidates",  label: "Search Candidates" },
-      { key: "contactCandidates", label: "Contact Candidates" },
-      { key: "manageApplications",label: "Manage Applications" },
-      { key: "viewAnalytics",     label: "View Analytics" },
-    ],
-  },
-  {
-    group: "Platform",
-    permissions: [
-      { key: "accessAdmin",    label: "Access Admin Panel" },
-      { key: "manageUsers",    label: "Manage Users" },
-      { key: "manageRoles",    label: "Manage Roles" },
-      { key: "manageBilling",  label: "Manage Billing" },
-      { key: "viewAuditLog",   label: "View Audit Log" },
-      { key: "manageModules",  label: "Manage Modules" },
-      { key: "impersonateUser",label: "Impersonate Users" },
-    ],
-  },
-];
-
-// Permission matrix — which roles have which permissions
-const MATRIX: Record<string, Record<string, boolean>> = {
-  viewJobs:           { JobSeeker: true,  Affiliate: true,  Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  postJobs:           { JobSeeker: false, Affiliate: false, Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  manageJobs:         { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: true,  SuperAdmin: true  },
-  viewResumes:        { JobSeeker: false, Affiliate: false, Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  manageResumes:      { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: true,  SuperAdmin: true  },
-  viewCompanies:      { JobSeeker: true,  Affiliate: true,  Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  manageCompanies:    { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: true,  Admin: true,  SuperAdmin: true  },
-  searchCandidates:   { JobSeeker: false, Affiliate: false, Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  contactCandidates:  { JobSeeker: false, Affiliate: false, Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  manageApplications: { JobSeeker: true,  Affiliate: false, Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  viewAnalytics:      { JobSeeker: false, Affiliate: true,  Recruiter: true,  Employer: true,  Admin: true,  SuperAdmin: true  },
-  accessAdmin:        { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: true,  SuperAdmin: true  },
-  manageUsers:        { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: false, SuperAdmin: true  },
-  manageRoles:        { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: false, SuperAdmin: true  },
-  manageBilling:      { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: false, SuperAdmin: true  },
-  viewAuditLog:       { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: true,  SuperAdmin: true  },
-  manageModules:      { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: false, SuperAdmin: true  },
-  impersonateUser:    { JobSeeker: false, Affiliate: false, Recruiter: false, Employer: false, Admin: false, SuperAdmin: true  },
-};
-
-const ROLE_COLORS: Record<string, string> = {
+const ROLE_COLORS: Record<Role, string> = {
   SuperAdmin: "text-purple-700 dark:text-purple-300",
   Admin:      "text-blue-700 dark:text-blue-300",
   Employer:   "text-green-700 dark:text-green-300",
@@ -82,17 +55,48 @@ const ROLE_COLORS: Record<string, string> = {
   Affiliate:  "text-orange-700 dark:text-orange-300",
 };
 
-export default function RolesPermissions() {
-  const [highlighted, setHighlighted] = useState<string | null>(null);
+const CRUD_COLORS: Record<CrudAction, string> = {
+  create: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  read:   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  update: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  delete: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+};
 
-  const grantCount = (role: string) =>
-    Object.values(MATRIX).filter((m) => m[role]).length;
+function CrudBadge({ action }: { action: CrudAction }) {
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${CRUD_COLORS[action]}`}>
+      {action[0].toUpperCase()}
+    </span>
+  );
+}
+
+function totalGrants(role: Role): number {
+  const grants = ROLE_CRUD[role] ?? {};
+  return Object.values(grants).reduce((sum, actions) => sum + (actions?.length ?? 0), 0);
+}
+
+export default function RolesPermissions() {
+  const [highlighted, setHighlighted] = useState<Role | null>(null);
+  const { can } = useAdminPermissions();
+  const canEdit = can("roles", "update");
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Roles & Permissions</h1>
-        <p className="text-muted-foreground text-sm">Permission matrix for all platform roles. Full editing coming soon.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Roles & Permissions</h1>
+          <p className="text-muted-foreground text-sm">
+            CRUD permission matrix for admin resources across all platform roles.
+            {!canEdit && " You have read-only access."}
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap justify-end">
+          {(["create","read","update","delete"] as CrudAction[]).map((a) => (
+            <span key={a} className="flex items-center gap-1 text-xs text-muted-foreground">
+              <CrudBadge action={a} /> {CRUD_LABELS[a]}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Role summary cards */}
@@ -102,31 +106,35 @@ export default function RolesPermissions() {
             key={role}
             className={cn(
               "cursor-pointer transition-all border-2",
-              highlighted === role ? "border-primary" : "border-transparent hover:border-muted-foreground/30",
+              highlighted === role
+                ? "border-primary"
+                : "border-transparent hover:border-muted-foreground/30",
             )}
             onClick={() => setHighlighted(highlighted === role ? null : role)}
           >
             <CardContent className="pt-4 pb-3 text-center">
               <p className={`text-xs font-semibold ${ROLE_COLORS[role]}`}>{ROLE_LABELS[role]}</p>
-              <p className="text-2xl font-bold mt-1">{grantCount(role)}</p>
-              <p className="text-[10px] text-muted-foreground">permissions</p>
+              <p className="text-2xl font-bold mt-1">{totalGrants(role)}</p>
+              <p className="text-[10px] text-muted-foreground">CRUD grants</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Permission matrix */}
+      {/* CRUD matrix */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Permission Matrix</CardTitle>
-          <CardDescription>Click a role card above to highlight its column.</CardDescription>
+          <CardTitle className="text-base">Admin CRUD Matrix</CardTitle>
+          <CardDescription>
+            Which Create / Read / Update / Delete operations each role can perform on each admin resource. Click a role card to highlight its column.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-4 py-2 font-medium text-muted-foreground w-48">Permission</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground w-36">Resource</th>
                   {ROLES.map((role) => (
                     <th
                       key={role}
@@ -142,34 +150,34 @@ export default function RolesPermissions() {
                 </tr>
               </thead>
               <tbody>
-                {PERMISSION_GROUPS.map(({ group, permissions }) => (
-                  <React.Fragment key={group}>
-                    <tr className="bg-muted/40">
-                      <td colSpan={ROLES.length + 1} className="px-4 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        {group}
-                      </td>
-                    </tr>
-                    {permissions.map(({ key, label }) => (
-                      <tr key={key} className="border-b border-border/50 hover:bg-muted/20">
-                        <td className="px-4 py-2 text-sm">{label}</td>
-                        {ROLES.map((role) => (
-                          <td
-                            key={role}
-                            className={cn(
-                              "px-3 py-2 text-center",
-                              highlighted === role ? "bg-primary/10" : "",
-                            )}
-                          >
-                            {MATRIX[key]?.[role] ? (
-                              <Check className="h-4 w-4 text-green-600 mx-auto" />
-                            ) : (
-                              <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </React.Fragment>
+                {ADMIN_RESOURCES.map((resource) => (
+                  <tr key={resource} className="border-b border-border/50 hover:bg-muted/20">
+                    <td className="px-4 py-2.5 font-medium text-sm">{RESOURCE_LABELS[resource]}</td>
+                    {ROLES.map((role) => {
+                      const granted = ROLE_CRUD[role]?.[resource] ?? [];
+                      return (
+                        <td
+                          key={role}
+                          className={cn(
+                            "px-3 py-2.5 text-center",
+                            highlighted === role ? "bg-primary/10" : "",
+                          )}
+                        >
+                          {granted.length > 0 ? (
+                            <div className="flex gap-0.5 justify-center flex-wrap">
+                              {(["create","read","update","delete"] as CrudAction[]).map((action) =>
+                                granted.includes(action) ? (
+                                  <CrudBadge key={action} action={action} />
+                                ) : null
+                              )}
+                            </div>
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-muted-foreground/30 mx-auto" />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
               </tbody>
             </table>
