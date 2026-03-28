@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Mic,
   Brain,
+  ShieldCheck,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -37,7 +38,7 @@ export default function Sidebar({
   onClose,
   collapsed = false,
 }: SidebarProps) {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isSuperAdmin } = useAuth();
   const location = useLocation();
 
   // Main navigation items - shown to all users
@@ -179,6 +180,34 @@ export default function Sidebar({
                 ))}
               </nav>
             </div>
+
+            {/* Admin Navigation - SuperAdmin only */}
+            {isAuthenticated && isSuperAdmin && (
+              <div>
+                {!collapsed && (
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    Administration
+                  </h3>
+                )}
+                <nav className="space-y-1">
+                  <Link
+                    to="/admin/dashboard"
+                    className={cn(
+                      "flex items-center text-sm font-medium rounded-md transition-colors",
+                      collapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
+                      location.pathname.startsWith("/admin")
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    )}
+                    onClick={onClose}
+                    title={collapsed ? "Admin Panel" : undefined}
+                  >
+                    <ShieldCheck className={cn("h-4 w-4", !collapsed && "mr-3")} />
+                    {!collapsed && "Admin Panel"}
+                  </Link>
+                </nav>
+              </div>
+            )}
 
             {/* Public Navigation - Only for unauthenticated users */}
             {!isAuthenticated && (

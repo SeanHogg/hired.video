@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -49,7 +48,7 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated, isLoading, impersonationSession, isImpersonating } = useAuth();
+  const { user, isAuthenticated, isLoading, impersonationSession } = useAuth();
   const { personaPreview } = usePersonaPreview();
 
   // Use custom dashboard hook for data management
@@ -100,9 +99,8 @@ export default function Dashboard() {
       onRefresh: refreshDashboard,
     };
 
-    // SuperAdmin with no active preview/impersonation gets the Product Dashboard
-    const isEmulating = isImpersonating || personaPreview !== null;
-    if (rolePermissions.isSuperAdmin && !isEmulating) return <ProductDashboard />;
+    // SuperAdmin (real or previewed) gets the Product Dashboard
+    if (rolePermissions.isSuperAdmin) return <ProductDashboard />;
 
     // Other role-based dashboards
     if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;

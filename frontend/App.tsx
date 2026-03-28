@@ -106,6 +106,13 @@ const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const AccountManagement = lazy(() => import("./pages/AccountManagement"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
+const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
+const RolesPermissions = lazy(() => import("./pages/admin/RolesPermissions"));
+const BillingManagement = lazy(() => import("./pages/admin/BillingManagement"));
+const ModuleManagement = lazy(() => import("./pages/admin/ModuleManagement"));
+const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
+import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
 const PageLoader = () => (
@@ -497,10 +504,16 @@ const App = () => (
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />
                       <Route path="/account" element={<AccountManagement />} />
-                      <Route
-                        path="/admin/product-dashboard"
-                        element={<ProductDashboard />}
-                      />
+                      {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
+                      <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
+                      <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
+                      <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />
+                      <Route path="/admin/billing"           element={<AdminLayout><BillingManagement /></AdminLayout>} />
+                      <Route path="/admin/modules"           element={<AdminLayout><ModuleManagement /></AdminLayout>} />
+                      <Route path="/admin/audit"             element={<AdminLayout><AuditLog /></AdminLayout>} />
+                      <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
+                      {/* Legacy redirect */}
+                      <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/help" element={<Help />} />
