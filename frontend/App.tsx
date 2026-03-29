@@ -106,7 +106,6 @@ const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const AccountManagement = lazy(() => import("./pages/AccountManagement"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
-const ServiceInquiries = lazy(() => import("./pages/ServiceInquiries"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -508,7 +507,7 @@ const App = () => (
                       <Route path="/outreach" element={<Outreach />} />
                       <Route path="/phone" element={<PhoneDashboard />} />
                       <Route path="/services" element={<ServicesManagement />} />
-                      <Route path="/services/inquiries" element={<ServiceInquiries />} />
+                      <Route path="/services/inquiries" element={<Navigate to="/services" replace />} />
                       <Route path="/account" element={<AccountManagement />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />

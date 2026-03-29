@@ -14,6 +14,12 @@ import {
   BellOff,
   CheckCircle,
   AlertCircle,
+  Inbox,
+  Send,
+  Check,
+  X,
+  CheckCircle2,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -21,6 +27,7 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -54,16 +62,19 @@ import {
   servicesService,
   type ServiceOffering,
   type CreateServiceInput,
+  type InquiryWithDetails,
+  type MyRequestWithDetails,
 } from "@/lib/services/services-service";
 import {
   isPushSupported,
-  getPushPermission,
   requestPushPermission,
   subscribeToPush,
   unsubscribeFromPush,
   getCurrentPushSubscription,
 } from "@/lib/push-notifications";
 import { toast } from "sonner";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const SERVICE_CATEGORIES = [
   "Resume Review",
@@ -88,51 +99,115 @@ const defaultForm: CreateServiceInput = {
   deliveryDays: undefined,
 };
 
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+> = {
+  pending:   { label: "Pending",   variant: "secondary" },
+  accepted:  { label: "Accepted",  variant: "default" },
+  rejected:  { label: "Declined",  variant: "destructive" },
+  completed: { label: "Completed", variant: "outline" },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "secondary" as const };
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+}
+
+function initials(name: string) {
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function formatPrice(cents: number | null) {
+  if (cents === null) return "Contact for pricing";
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
+
+  // ── Services state ──────────────────────────────────────────────────────────
   const [providesServices, setProviderServices] = useState(false);
   const [services, setServices] = useState<ServiceOffering[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateServiceInput>(defaultForm);
 
-  // Push notification state
   const [pushSupported, setPushSupported] = useState(false);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
 
+  // ── Inquiries state ─────────────────────────────────────────────────────────
+  const [incoming, setIncoming] = useState<InquiryWithDetails[]>([]);
+  const [myRequests, setMyRequests] = useState<MyRequestWithDetails[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  // ── Load on mount ───────────────────────────────────────────────────────────
+
   useEffect(() => {
-    loadData();
+    loadServices();
     checkPushStatus();
   }, []);
 
-  async function loadData() {
+  useEffect(() => {
+    if (activeTab === "inquiries" && incoming.length === 0 && myRequests.length === 0 && !inquiriesLoading) {
+      loadInquiries();
+    }
+  }, [activeTab]);
+
+  async function loadServices() {
     setLoading(true);
     try {
-      // Fetch own services
       const data = await servicesService.listMyServices();
       setServices(data);
-
-      // We need profile info to know if providesServices is on.
-      // The /api/users/me endpoint should include this; fall back gracefully.
       try {
         const { apiClient } = await import("@/lib/api-client");
         const res = await apiClient.get<any>("/api/users/me");
         const profile = (res as any)?.data?.profile ?? (res as any)?.data;
         setProviderServices(profile?.providesServices ?? false);
       } catch {
-        // ignore — toggle will still work
+        // ignore — toggle still works
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to load services");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadInquiries() {
+    setInquiriesLoading(true);
+    try {
+      const [incomingData, requestsData] = await Promise.all([
+        servicesService.listInquiries(),
+        servicesService.listMyRequests(),
+      ]);
+      setIncoming(incomingData);
+      setMyRequests(requestsData);
+    } catch {
+      toast.error("Failed to load inquiries");
+    } finally {
+      setInquiriesLoading(false);
     }
   }
 
@@ -142,6 +217,8 @@ export default function ServicesManagement() {
     const sub = await getCurrentPushSubscription();
     setPushSubscribed(!!sub);
   }
+
+  // ── Service handlers ────────────────────────────────────────────────────────
 
   async function handleToggleProvider(checked: boolean) {
     setSaving(true);
@@ -193,10 +270,10 @@ export default function ServicesManagement() {
   function openEdit(s: ServiceOffering) {
     setEditingId(s.id);
     setForm({
-      title: s.title,
-      description: s.description ?? "",
-      category: s.category ?? "",
-      priceCents: s.priceCents ?? 0,
+      title:        s.title,
+      description:  s.description ?? "",
+      category:     s.category ?? "",
+      priceCents:   s.priceCents ?? 0,
       priceVisible: s.priceVisible,
       deliveryDays: s.deliveryDays ?? undefined,
     });
@@ -204,10 +281,7 @@ export default function ServicesManagement() {
   }
 
   async function handleSave() {
-    if (!form.title.trim()) {
-      toast.error("Title is required");
-      return;
-    }
+    if (!form.title.trim()) { toast.error("Title is required"); return; }
     setSaving(true);
     try {
       if (editingId) {
@@ -247,18 +321,32 @@ export default function ServicesManagement() {
     }
   }
 
-  const formatPrice = (cents: number | null) => {
-    if (cents === null) return "Contact for pricing";
-    return `$${(cents / 100).toFixed(2)}`;
-  };
+  // ── Inquiry handlers ────────────────────────────────────────────────────────
+
+  async function handleUpdateStatus(id: string, status: "accepted" | "rejected" | "completed") {
+    setUpdating(id);
+    try {
+      const updated = await servicesService.updateInquiryStatus(id, status);
+      setIncoming((prev) =>
+        prev.map((item) => item.inquiry.id === id ? { ...item, inquiry: updated } : item),
+      );
+      toast.success(`Inquiry ${status}`);
+    } catch {
+      toast.error("Failed to update inquiry");
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  // ── Derived ─────────────────────────────────────────────────────────────────
+
+  const pendingCount = incoming.filter((i) => i.inquiry.status === "pending").length;
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation
           onMenuClick={openSidebar}
@@ -266,206 +354,389 @@ export default function ServicesManagement() {
           sidebarCollapsed={sidebarCollapsed}
         />
         <main className="pt-16 p-4 md:p-8 max-w-4xl mx-auto w-full">
+
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold">My Services</h1>
+              <h1 className="text-2xl font-bold">Services</h1>
               <p className="text-muted-foreground mt-1">
-                Offer services to other users and manage incoming leads
+                Manage your offerings and respond to incoming leads
               </p>
             </div>
-            <Link to="/services/inquiries">
-              <Button variant="outline">View Inquiries</Button>
-            </Link>
+            {activeTab === "offerings" && (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Service
+              </Button>
+            )}
           </div>
 
-          {/* Provider toggle */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-base">Lead Generation</CardTitle>
-              <CardDescription>
-                Enable this to list your services publicly on your profile. Other users can
-                browse and purchase them directly or submit an inquiry.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {providesServices ? (
-                    <ToggleRight className="h-5 w-5 text-violet-600" />
-                  ) : (
-                    <ToggleLeft className="h-5 w-5 text-muted-foreground" />
-                  )}
-                  <div>
-                    <p className="font-medium">Provide Services</p>
-                    <p className="text-sm text-muted-foreground">
-                      {providesServices
-                        ? "Your services are publicly visible on your profile"
-                        : "Your services are hidden from your profile"}
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={providesServices}
-                  onCheckedChange={handleToggleProvider}
-                  disabled={saving}
-                />
-              </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="offerings">My Offerings</TabsTrigger>
+              <TabsTrigger value="inquiries" className="flex items-center gap-2">
+                Inquiries
+                {pendingCount > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1 text-xs">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
 
-              {/* Push notification toggle */}
-              {pushSupported && (
-                <div className="flex items-center justify-between border-t pt-4">
-                  <div className="flex items-center gap-3">
-                    {pushSubscribed ? (
-                      <Bell className="h-5 w-5 text-violet-600" />
-                    ) : (
-                      <BellOff className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <div>
-                      <p className="font-medium">Push Notifications</p>
-                      <p className="text-sm text-muted-foreground">
-                        Get notified on this device when someone messages you or requests a service
-                      </p>
+            {/* ── My Offerings ─────────────────────────────────────────────── */}
+            <TabsContent value="offerings" className="space-y-6">
+
+              {/* Lead generation toggle */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Lead Generation</CardTitle>
+                  <CardDescription>
+                    Enable this to list your services publicly on your profile. Other users can
+                    browse and purchase them directly or submit an inquiry.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {providesServices ? (
+                        <ToggleRight className="h-5 w-5 text-violet-600" />
+                      ) : (
+                        <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="font-medium">Provide Services</p>
+                        <p className="text-sm text-muted-foreground">
+                          {providesServices
+                            ? "Your services are publicly visible on your profile"
+                            : "Your services are hidden from your profile"}
+                        </p>
+                      </div>
                     </div>
+                    <Switch
+                      checked={providesServices}
+                      onCheckedChange={handleToggleProvider}
+                      disabled={saving}
+                    />
                   </div>
-                  <Button
-                    variant={pushSubscribed ? "outline" : "default"}
-                    size="sm"
-                    onClick={handleTogglePush}
-                    disabled={pushLoading}
-                  >
-                    {pushLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : pushSubscribed ? (
-                      "Disable"
-                    ) : (
-                      "Enable"
-                    )}
-                  </Button>
+
+                  {pushSupported && (
+                    <div className="flex items-center justify-between border-t pt-4">
+                      <div className="flex items-center gap-3">
+                        {pushSubscribed ? (
+                          <Bell className="h-5 w-5 text-violet-600" />
+                        ) : (
+                          <BellOff className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        <div>
+                          <p className="font-medium">Push Notifications</p>
+                          <p className="text-sm text-muted-foreground">
+                            Get notified on this device when someone messages you or requests a service
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant={pushSubscribed ? "outline" : "default"}
+                        size="sm"
+                        onClick={handleTogglePush}
+                        disabled={pushLoading}
+                      >
+                        {pushLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : pushSubscribed ? (
+                          "Disable"
+                        ) : (
+                          "Enable"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Service list */}
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : services.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    You haven't added any services yet.{" "}
+                    <button className="underline font-medium" onClick={openCreate}>
+                      Add your first service
+                    </button>{" "}
+                    to start receiving leads.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-3">
+                  {services.map((s) => (
+                    <Card key={s.id} className={!s.isActive ? "opacity-60" : undefined}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold truncate">{s.title}</h3>
+                              {s.category && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Tag className="h-3 w-3 mr-1" />
+                                  {s.category}
+                                </Badge>
+                              )}
+                              {!s.isActive && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Inactive
+                                </Badge>
+                              )}
+                            </div>
+                            {s.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {s.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-sm">
+                              <span className="flex items-center gap-1 font-medium text-violet-600">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                {formatPrice(s.priceCents)}
+                              </span>
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                {s.priceVisible ? (
+                                  <><Eye className="h-3.5 w-3.5" /> Price visible</>
+                                ) : (
+                                  <><EyeOff className="h-3.5 w-3.5" /> Price on inquiry</>
+                                )}
+                              </span>
+                              {s.deliveryDays && (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {s.deliveryDays}d delivery
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title={s.isActive ? "Deactivate" : "Activate"}
+                              onClick={() => handleToggleActive(s)}
+                            >
+                              {s.isActive ? (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEdit(s)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(s.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {/* Services list */}
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Service Offerings</h2>
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Service
-            </Button>
-          </div>
+            {/* ── Inquiries ────────────────────────────────────────────────── */}
+            <TabsContent value="inquiries">
+              {inquiriesLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Tabs defaultValue="incoming">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="incoming" className="flex items-center gap-2">
+                      <Inbox className="h-4 w-4" />
+                      Incoming
+                      {pendingCount > 0 && (
+                        <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">
+                          {pendingCount}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="sent" className="flex items-center gap-2">
+                      <Send className="h-4 w-4" />
+                      My Requests
+                    </TabsTrigger>
+                  </TabsList>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : services.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                You haven't added any services yet. Click{" "}
-                <button
-                  className="underline font-medium"
-                  onClick={openCreate}
-                >
-                  Add Service
-                </button>{" "}
-                to get started.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-3">
-              {services.map((s) => (
-                <Card
-                  key={s.id}
-                  className={!s.isActive ? "opacity-60" : undefined}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold truncate">{s.title}</h3>
-                          {s.category && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Tag className="h-3 w-3 mr-1" />
-                              {s.category}
-                            </Badge>
-                          )}
-                          {!s.isActive && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                              Inactive
-                            </Badge>
-                          )}
-                        </div>
-                        {s.description && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {s.description}
+                  {/* Incoming */}
+                  <TabsContent value="incoming">
+                    {incoming.length === 0 ? (
+                      <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                          <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-medium mb-1">No incoming inquiries</h3>
+                          <p className="text-muted-foreground text-sm">
+                            When someone requests one of your services, it will appear here.
                           </p>
-                        )}
-                        <div className="flex items-center gap-4 mt-2 text-sm">
-                          <span className="flex items-center gap-1 font-medium text-violet-600">
-                            <DollarSign className="h-3.5 w-3.5" />
-                            {formatPrice(s.priceCents)}
-                          </span>
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            {s.priceVisible ? (
-                              <>
-                                <Eye className="h-3.5 w-3.5" />
-                                Price visible
-                              </>
-                            ) : (
-                              <>
-                                <EyeOff className="h-3.5 w-3.5" />
-                                Price on inquiry
-                              </>
-                            )}
-                          </span>
-                          {s.deliveryDays && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5" />
-                              {s.deliveryDays}d delivery
-                            </span>
-                          )}
-                        </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-3">
+                        {incoming.map(({ inquiry, service, buyer }) => (
+                          <Card key={inquiry.id}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-4">
+                                <Avatar className="h-10 w-10 shrink-0">
+                                  <AvatarFallback>{initials(buyer.name)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="font-semibold">{buyer.name}</span>
+                                    <StatusBadge status={inquiry.status} />
+                                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                                      {inquiry.orderType === "purchase" ? "Purchase" : "Inquiry"}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-1">
+                                    <span className="font-medium text-foreground">{service.title}</span>
+                                    {" · "}
+                                    {inquiry.orderType === "purchase" && (
+                                      <span className="text-violet-600 font-medium">
+                                        {formatPrice(inquiry.paidAmountCents)}
+                                      </span>
+                                    )}
+                                  </p>
+                                  {inquiry.message && (
+                                    <p className="text-sm bg-muted rounded-md px-3 py-2 mt-2">
+                                      <MessageSquare className="h-3.5 w-3.5 inline mr-1.5 text-muted-foreground" />
+                                      {inquiry.message}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {timeAgo(inquiry.createdAt)}
+                                  </p>
+                                </div>
+
+                                {inquiry.status === "pending" && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-green-600 border-green-300 hover:bg-green-50"
+                                      disabled={updating === inquiry.id}
+                                      onClick={() => handleUpdateStatus(inquiry.id, "accepted")}
+                                    >
+                                      {updating === inquiry.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Check className="h-4 w-4 mr-1" />
+                                      )}
+                                      Accept
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                      disabled={updating === inquiry.id}
+                                      onClick={() => handleUpdateStatus(inquiry.id, "rejected")}
+                                    >
+                                      <X className="h-4 w-4 mr-1" />
+                                      Decline
+                                    </Button>
+                                  </div>
+                                )}
+                                {inquiry.status === "accepted" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="shrink-0"
+                                    disabled={updating === inquiry.id}
+                                    onClick={() => handleUpdateStatus(inquiry.id, "completed")}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    Complete
+                                  </Button>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title={s.isActive ? "Deactivate" : "Activate"}
-                          onClick={() => handleToggleActive(s)}
-                        >
-                          {s.isActive ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => openEdit(s)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(s.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                    )}
+                  </TabsContent>
+
+                  {/* My Requests */}
+                  <TabsContent value="sent">
+                    {myRequests.length === 0 ? (
+                      <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                          <Send className="h-12 w-12 text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-medium mb-1">No requests yet</h3>
+                          <p className="text-muted-foreground text-sm">
+                            Browse people's profiles to find and request services.
+                          </p>
+                          <Link to="/people" className="mt-4">
+                            <Button variant="outline">Browse People</Button>
+                          </Link>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-3">
+                        {myRequests.map(({ inquiry, service, provider }) => (
+                          <Card key={inquiry.id}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-4">
+                                <Avatar className="h-10 w-10 shrink-0">
+                                  <AvatarFallback>{initials(provider.name)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="font-semibold">{provider.name}</span>
+                                    <StatusBadge status={inquiry.status} />
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-1">
+                                    <span className="font-medium text-foreground">{service.title}</span>
+                                    {" · "}
+                                    {inquiry.orderType === "purchase" ? (
+                                      <span className="text-violet-600 font-medium">
+                                        {formatPrice(inquiry.paidAmountCents)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">Inquiry</span>
+                                    )}
+                                  </p>
+                                  {inquiry.message && (
+                                    <p className="text-sm bg-muted rounded-md px-3 py-2 mt-2">
+                                      {inquiry.message}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {timeAgo(inquiry.createdAt)}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
+            </TabsContent>
+          </Tabs>
         </main>
         <Footer />
       </div>
@@ -514,9 +785,7 @@ export default function ServicesManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {SERVICE_CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
