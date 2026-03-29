@@ -75,6 +75,7 @@ const AIResumeScorer = lazy(() => import("./pages/tools/AIResumeScorer"));
 const ValueProposition = lazy(() => import("./pages/tools/ValueProposition"));
 const ResumeTailor = lazy(() => import("./pages/tools/ResumeTailor"));
 const Outreach = lazy(() => import("./pages/Outreach"));
+const PhoneDashboard = lazy(() => import("./pages/PhoneDashboard"));
 const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -505,6 +506,7 @@ const App = () => (
                       />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />
+                      <Route path="/phone" element={<PhoneDashboard />} />
                       <Route path="/services" element={<ServicesManagement />} />
                       <Route path="/services/inquiries" element={<ServiceInquiries />} />
                       <Route path="/account" element={<AccountManagement />} />

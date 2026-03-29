@@ -21,6 +21,12 @@ import {
   Trash2,
   FileText,
   ExternalLink,
+  TrendingUp,
+  DollarSign,
+  Eye,
+  MousePointer,
+  Megaphone,
+  Layers,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -76,6 +82,7 @@ import { useAuth } from "@/lib/auth";
 import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
+import { advertisingService, type JobBoost, type AdvertisingStats } from "@/lib/services/advertising-service";
 import {
   EmailTemplateDTO,
   EmailCampaignDTO,
@@ -103,7 +110,7 @@ export default function Outreach() {
 
   // State management
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards"
+    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
   >("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +155,20 @@ export default function Outreach() {
     boardId: "all",
     status: "all",
   });
+
+  // Advertising state
+  const [adStats, setAdStats] = useState<AdvertisingStats | null>(null);
+  const [activeBoosts, setActiveBoosts] = useState<JobBoost[]>([]);
+  const [boostActionLoading, setBoostActionLoading] = useState<string | null>(null);
+
+  // Boost dialog state
+  const [showBoostDialog, setShowBoostDialog] = useState(false);
+  const [boostJobId, setBoostJobId] = useState("");
+  const [boostPlacementType, setBoostPlacementType] = useState<"search_top" | "discovery_feed" | "both" | "">("");
+  const [boostPricingModel, setBoostPricingModel] = useState<"cpm" | "cpc" | "">("");
+  const [boostBudget, setBoostBudget] = useState("");
+  const [boostDuration, setBoostDuration] = useState("");
+  const [boostSubmitting, setBoostSubmitting] = useState(false);
 
   // Dialog states
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -199,6 +220,8 @@ export default function Outreach() {
           jobBoardPostingsData,
           jobBoardStatsData,
           userJobsData,
+          adStatsData,
+          boostsData,
         ] = await Promise.all([
           communicationService.getEmailTemplates(),
           communicationService.getEmailCampaigns(),
@@ -210,6 +233,8 @@ export default function Outreach() {
           jobBoardService.getJobBoardPostings().catch(() => []),
           jobBoardService.getJobBoardStats().catch(() => null),
           jobService.getUserJobs().catch(() => []),
+          advertisingService.getStats().catch(() => null),
+          advertisingService.getBoosts().catch(() => []),
         ]);
 
         setEmailTemplates(templatesData);
@@ -222,6 +247,8 @@ export default function Outreach() {
         setJobBoardPostings(jobBoardPostingsData);
         setJobBoardStats(jobBoardStatsData);
         setUserJobs(userJobsData);
+        setAdStats(adStatsData);
+        setActiveBoosts(boostsData);
       } catch (err) {
         console.error("Failed to load outreach data:", err);
         setError(
@@ -679,17 +706,23 @@ export default function Outreach() {
                         | "templates"
                         | "campaigns"
                         | "tracking"
-                        | "contacts",
+                        | "contacts"
+                        | "job-boards"
+                        | "advertise",
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-6">
+                  <TabsList className="grid w-full grid-cols-7">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="templates">Templates</TabsTrigger>
                     <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
                     <TabsTrigger value="tracking">Tracking</TabsTrigger>
                     <TabsTrigger value="contacts">Contacts</TabsTrigger>
                     <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
+                    <TabsTrigger value="advertise" className="flex items-center gap-1">
+                      <Megaphone className="h-3.5 w-3.5" />
+                      Advertise
+                    </TabsTrigger>
                   </TabsList>
 
                   {/* Dashboard Tab */}
@@ -1602,6 +1635,356 @@ export default function Outreach() {
                       </CardContent>
                     </Card>
                   </TabsContent>
+
+                  {/* Advertise Tab */}
+                  <TabsContent value="advertise" className="space-y-6">
+
+                    {/* KPI Overview */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Total Ad Spend</CardTitle>
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">${(adStats?.totalSpentDollars ?? 0).toFixed(2)}</div>
+                          <div className="text-xs text-muted-foreground">{adStats?.activeBoosts ?? 0} active boost{(adStats?.activeBoosts ?? 0) !== 1 ? "s" : ""}</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Impressions</CardTitle>
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">{(adStats?.totalImpressions ?? 0).toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground">Total ad impressions</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Clicks</CardTitle>
+                          <MousePointer className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">{(adStats?.totalClicks ?? 0).toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground">{(adStats?.ctr ?? 0).toFixed(2)}% CTR</div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Cost per Application</CardTitle>
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {adStats?.costPerApplication != null ? `$${adStats.costPerApplication.toFixed(2)}` : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {adStats?.totalApplications ? `${adStats.totalApplications} attributed` : "No applications attributed yet"}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Sponsored Job Listings */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <Zap className="h-5 w-5 text-brand-purple" />
+                              Sponsored Job Listings
+                            </CardTitle>
+                            <CardDescription>
+                              Boost jobs to the top of search results and the talent discovery feed
+                            </CardDescription>
+                          </div>
+                          <Button
+                            onClick={() => setShowBoostDialog(true)}
+                            className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                          >
+                            <Zap className="h-4 w-4 mr-2" />
+                            Boost a Job
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {activeBoosts.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Job</TableHead>
+                                <TableHead>Placement</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Budget</TableHead>
+                                <TableHead className="text-right">Spent</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                                <TableHead></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {activeBoosts.map((boost) => (
+                                <TableRow key={boost.id}>
+                                  <TableCell className="font-medium">{boost.jobTitle ?? boost.jobId.slice(0, 8)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="capitalize text-xs">
+                                      {boost.placementType.replace(/_/g, " ")}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={boost.status === "active" ? "default" : "secondary"}
+                                      className={`text-xs ${boost.status === "active" ? "bg-green-500/10 text-green-600" : ""}`}
+                                    >
+                                      {boost.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">${boost.budgetDollars.toFixed(2)}</TableCell>
+                                  <TableCell className="text-right">${boost.spentDollars.toFixed(2)}</TableCell>
+                                  <TableCell className="text-right">{boost.impressions.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{boost.clicks.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{boost.ctr.toFixed(2)}%</TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-1 justify-end">
+                                      {boost.status === "active" && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          disabled={boostActionLoading === boost.id}
+                                          onClick={async () => {
+                                            setBoostActionLoading(boost.id);
+                                            try {
+                                              const updated = await advertisingService.pauseBoost(boost.id);
+                                              setActiveBoosts((prev) => prev.map((b) => b.id === boost.id ? updated : b));
+                                            } catch (err) {
+                                              console.error("Failed to pause boost:", err);
+                                            } finally {
+                                              setBoostActionLoading(null);
+                                            }
+                                          }}
+                                        >
+                                          Pause
+                                        </Button>
+                                      )}
+                                      {boost.status === "paused" && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          disabled={boostActionLoading === boost.id}
+                                          onClick={async () => {
+                                            setBoostActionLoading(boost.id);
+                                            try {
+                                              const updated = await advertisingService.resumeBoost(boost.id);
+                                              setActiveBoosts((prev) => prev.map((b) => b.id === boost.id ? updated : b));
+                                            } catch (err) {
+                                              console.error("Failed to resume boost:", err);
+                                            } finally {
+                                              setBoostActionLoading(null);
+                                            }
+                                          }}
+                                        >
+                                          Resume
+                                        </Button>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-destructive hover:text-destructive"
+                                        disabled={boostActionLoading === boost.id}
+                                        onClick={async () => {
+                                          if (!confirm("Cancel this boost?")) return;
+                                          setBoostActionLoading(boost.id);
+                                          try {
+                                            await advertisingService.cancelBoost(boost.id);
+                                            setActiveBoosts((prev) => prev.filter((b) => b.id !== boost.id));
+                                          } catch (err) {
+                                            console.error("Failed to cancel boost:", err);
+                                          } finally {
+                                            setBoostActionLoading(null);
+                                          }
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <Megaphone className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                            <p className="text-lg font-medium mb-2">No sponsored listings yet</p>
+                            <p className="text-sm mb-6">
+                              Boost a job to reach qualified candidates faster and cut time-to-hire.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl mx-auto text-left mb-8">
+                              <div className="bg-muted/40 rounded-lg p-4">
+                                <div className="font-semibold text-sm mb-1">Search Top</div>
+                                <div className="text-xs text-muted-foreground">First result in keyword search — highest intent traffic</div>
+                              </div>
+                              <div className="bg-muted/40 rounded-lg p-4">
+                                <div className="font-semibold text-sm mb-1">Discovery Feed</div>
+                                <div className="text-xs text-muted-foreground">Featured card in the TikTok-style talent discovery feed</div>
+                              </div>
+                              <div className="bg-muted/40 rounded-lg p-4">
+                                <div className="font-semibold text-sm mb-1">Both Placements</div>
+                                <div className="text-xs text-muted-foreground">Maximum reach — search + feed simultaneously</div>
+                              </div>
+                            </div>
+                            <Button onClick={() => setShowBoostDialog(true)} variant="outline">
+                              <Zap className="h-4 w-4 mr-2" />
+                              Create Your First Boost
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Company Profile Boost */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <Star className="h-5 w-5 text-brand-blue" />
+                              Featured Company Profile
+                            </CardTitle>
+                            <CardDescription>
+                              Promote your employer brand in company search, candidate dashboards, and the talent discovery feed
+                            </CardDescription>
+                          </div>
+                          <Badge variant="secondary">Coming Soon</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
+                            <Network className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                            <div className="font-medium text-sm mb-1">Company Directory</div>
+                            <div className="text-xs text-muted-foreground">Featured slot in employer search results</div>
+                          </div>
+                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
+                            <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                            <div className="font-medium text-sm mb-1">Candidate Dashboard</div>
+                            <div className="text-xs text-muted-foreground">Spotlight card shown to active job seekers</div>
+                          </div>
+                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
+                            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                            <div className="font-medium text-sm mb-1">Discovery Feed</div>
+                            <div className="text-xs text-muted-foreground">Branded employer card in the talent feed</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Campaign Manager */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <Layers className="h-5 w-5 text-primary" />
+                              Campaign Manager
+                            </CardTitle>
+                            <CardDescription>
+                              Industry-standard hierarchy: Campaign → Ad Set → Ad. Coordinate targeting, creative, and budget across all placements in one place.
+                            </CardDescription>
+                          </div>
+                          <Badge variant="secondary">Coming Soon</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-gradient-to-br from-brand-purple/10 to-brand-purple/5 border border-brand-purple/20 rounded-lg p-4">
+                            <div className="text-xs font-semibold text-brand-purple uppercase tracking-wide mb-2">Level 1</div>
+                            <div className="font-bold mb-1">Campaign</div>
+                            <div className="text-sm text-muted-foreground">Strategic objective: Awareness, Traffic, Applications, or Employer Brand</div>
+                          </div>
+                          <div className="bg-gradient-to-br from-brand-blue/10 to-brand-blue/5 border border-brand-blue/20 rounded-lg p-4">
+                            <div className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-2">Level 2</div>
+                            <div className="font-bold mb-1">Ad Set</div>
+                            <div className="text-sm text-muted-foreground">Audience targeting, budget, schedule, bid strategy, and frequency cap</div>
+                          </div>
+                          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4">
+                            <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Level 3</div>
+                            <div className="font-bold mb-1">Ad</div>
+                            <div className="text-sm text-muted-foreground">Custom headline, description, CTA, image or video creative, A/B variants</div>
+                          </div>
+                          <div className="bg-gradient-to-br from-muted/50 to-muted/20 border border-muted rounded-lg p-4">
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Analytics</div>
+                            <div className="font-bold mb-1">ROAS Dashboard</div>
+                            <div className="text-sm text-muted-foreground">Cost-per-hire, conversion funnel, and cross-channel performance</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                          <div className="flex items-start gap-3">
+                            <Target className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Audience Targeting</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">Target by role, skills, experience, location, and open-to-work status. Exclude existing applicants.</div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <BarChart3 className="h-4 w-4 text-brand-blue mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Bid Strategies</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">Manual CPM / CPC or auto-bid to maximise clicks and applications within budget</div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Cross-Channel</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">Coordinate paid placements with email outreach sequences in a single unified campaign</div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Ad Performance Analytics */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <BarChart3 className="h-5 w-5 text-brand-purple" />
+                              Ad Performance Analytics
+                            </CardTitle>
+                            <CardDescription>
+                              ROAS, conversion funnel, cost-per-application, and cost-per-hire — unified across all placements and email campaigns
+                            </CardDescription>
+                          </div>
+                          <Badge variant="secondary">Coming Soon</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-muted-foreground">
+                          {[
+                            "ROAS",
+                            "Cost per Click",
+                            "Cost per Application",
+                            "Cost per Hire",
+                            "Impression → Click rate",
+                            "Click → Apply rate",
+                            "Apply → Interview rate",
+                            "Placement rate",
+                          ].map((metric) => (
+                            <div key={metric} className="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2">
+                              <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+                              {metric}
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                  </TabsContent>
                 </Tabs>
               </>
             )}
@@ -2036,6 +2419,166 @@ export default function Outreach() {
               disabled={!selectedJobId || selectedBoardIds.length === 0}
             >
               Post to {selectedBoardIds.length} Board{selectedBoardIds.length !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Boost Job Dialog */}
+      <Dialog open={showBoostDialog} onOpenChange={setShowBoostDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-brand-purple" />
+              Boost a Job Listing
+            </DialogTitle>
+            <DialogDescription>
+              Sponsor a job to appear at the top of search results and the talent discovery feed. You are only charged when your budget is spent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Job to Boost</Label>
+              <Select value={boostJobId} onValueChange={setBoostJobId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job posting" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userJobs.length > 0 ? (
+                    userJobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No job postings found
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Placement</Label>
+              <Select value={boostPlacementType} onValueChange={setBoostPlacementType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Where should this job appear?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="search_top">Search Top — first result in keyword search</SelectItem>
+                  <SelectItem value="discovery_feed">Discovery Feed — featured in talent discovery</SelectItem>
+                  <SelectItem value="both">Both Placements — maximum reach</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Pricing Model</Label>
+              <Select value={boostPricingModel} onValueChange={setBoostPricingModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="How do you want to be charged?" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cpm">CPM — pay per 1,000 impressions</SelectItem>
+                  <SelectItem value="cpc">CPC — pay per click only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Total Budget (USD)</Label>
+                <Input
+                  type="number"
+                  min="10"
+                  step="5"
+                  placeholder="e.g. 100"
+                  value={boostBudget}
+                  onChange={(e) => setBoostBudget(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Minimum $10.00</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Duration</Label>
+                <Select value={boostDuration} onValueChange={setBoostDuration}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="14">14 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="60">60 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {boostBudget && boostDuration && parseFloat(boostBudget) >= 10 && (
+              <div className="bg-muted/40 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Daily budget</span>
+                  <span className="font-medium">
+                    ${(parseFloat(boostBudget) / parseInt(boostDuration)).toFixed(2)}/day
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total charge</span>
+                  <span className="font-bold">${parseFloat(boostBudget).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBoostDialog(false);
+                setBoostJobId("");
+                setBoostPlacementType("");
+                setBoostPricingModel("");
+                setBoostBudget("");
+                setBoostDuration("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+              disabled={
+                boostSubmitting ||
+                !boostJobId ||
+                !boostPlacementType ||
+                !boostPricingModel ||
+                !boostBudget ||
+                parseFloat(boostBudget) < 10 ||
+                !boostDuration
+              }
+              onClick={async () => {
+                if (!boostPlacementType || !boostPricingModel) return;
+                setBoostSubmitting(true);
+                try {
+                  const newBoost = await advertisingService.createBoost({
+                    jobId: boostJobId,
+                    placementType: boostPlacementType as "search_top" | "discovery_feed" | "both",
+                    pricingModel: boostPricingModel as "cpm" | "cpc",
+                    budgetCents: Math.round(parseFloat(boostBudget) * 100),
+                    durationDays: parseInt(boostDuration),
+                  });
+                  setActiveBoosts((prev) => [newBoost, ...prev]);
+                  setAdStats((prev) => prev ? { ...prev, activeBoosts: prev.activeBoosts + 1 } : prev);
+                  setShowBoostDialog(false);
+                  setBoostJobId("");
+                  setBoostPlacementType("");
+                  setBoostPricingModel("");
+                  setBoostBudget("");
+                  setBoostDuration("");
+                } catch (err) {
+                  console.error("Failed to create boost:", err);
+                } finally {
+                  setBoostSubmitting(false);
+                }
+              }}
+            >
+              {boostSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+              Launch Boost
             </Button>
           </DialogFooter>
         </DialogContent>

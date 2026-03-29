@@ -67,6 +67,9 @@ import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { serviceRoutes } from "./routes/services.js";
+import { advertisingRoutes } from "./routes/advertising.js";
+import { careerRoutes } from "./routes/career.js";
+import { phoneRoutes } from "./routes/phone.js";
 import { pushRoutes } from "./routes/push.js";
 import { openapiRoutes } from "./routes/openapi.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
@@ -168,6 +171,7 @@ export function createApp() {
     "/api/discovery/creators/leaderboard",
     "/api/discovery/creators/products",
     "/api/services/public",
+    "/api/phone/webhook",
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
@@ -342,6 +346,9 @@ export function createApp() {
   app.route("/api/discovery", discoveryRoutes);
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api/services", serviceRoutes);
+  app.route("/api/advertising", advertisingRoutes);
+  app.route("/api/career", careerRoutes);
+  app.route("/api/phone", phoneRoutes);
   app.route("/api/push", pushRoutes);
   app.route("/api", openapiRoutes);
   app.route("/", sitemapRoutes);

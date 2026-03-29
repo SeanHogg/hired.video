@@ -55,7 +55,7 @@ const GenerateStoryboardSchema = z.object({
   resolution: z.enum(["720p", "1080p"]).optional(),
   motion: z.enum(["minimal", "moderate", "cinematic"]).optional(),
   // Advertising: set purpose to unlock ad-specific scene types + prompts
-  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch"]).default("resume"),
+  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).default("resume"),
   // Brand kit to inject into generated script
   brandKitId: z.string().uuid().optional(),
   // CTA for ad use cases
