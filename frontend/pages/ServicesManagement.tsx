@@ -253,15 +253,19 @@ export default function ServicesManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navigation onSidebarToggle={toggleSidebar} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
+    <div className="min-h-screen bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
         />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto w-full">
+        <main className="pt-16 p-4 md:p-8 max-w-4xl mx-auto w-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -463,8 +467,8 @@ export default function ServicesManagement() {
             </div>
           )}
         </main>
+        <Footer />
       </div>
-      <Footer />
 
       {/* Create / Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
