@@ -323,37 +323,24 @@ export default function PhoneDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <Navigation
-          sidebarOpen={sidebarOpen}
-          onOpenSidebar={openSidebar}
-          onCloseSidebar={closeSidebar}
-          onToggleSidebar={toggleSidebar}
-        />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Please sign in to access Business Phone.</p>
+      <div className="min-h-screen bg-background">
+        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+          <div className="pt-16 flex items-center justify-center min-h-screen">
+            <p className="text-muted-foreground">Please sign in to access Business Phone.</p>
+          </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navigation
-        sidebarOpen={sidebarOpen}
-        onOpenSidebar={openSidebar}
-        onCloseSidebar={closeSidebar}
-        onToggleSidebar={toggleSidebar}
-      />
-      <div className="flex flex-1">
-        <Sidebar
-          isOpen={sidebarOpen}
-          isCollapsed={sidebarCollapsed}
-          onClose={closeSidebar}
-          onToggleCollapse={toggleSidebar}
-        />
-        <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"} pt-16`}>
+    <div className="min-h-screen bg-background">
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+        <main className="pt-16">
           <div className="container mx-auto px-4 py-8 max-w-6xl">
 
             {/* Header */}

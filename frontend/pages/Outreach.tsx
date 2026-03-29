@@ -2460,7 +2460,7 @@ export default function Outreach() {
             </div>
             <div className="space-y-2">
               <Label>Placement</Label>
-              <Select value={boostPlacementType} onValueChange={setBoostPlacementType}>
+              <Select value={boostPlacementType} onValueChange={(v) => setBoostPlacementType(v as typeof boostPlacementType)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Where should this job appear?" />
                 </SelectTrigger>
@@ -2473,7 +2473,7 @@ export default function Outreach() {
             </div>
             <div className="space-y-2">
               <Label>Pricing Model</Label>
-              <Select value={boostPricingModel} onValueChange={setBoostPricingModel}>
+              <Select value={boostPricingModel} onValueChange={(v) => setBoostPricingModel(v as typeof boostPricingModel)}>
                 <SelectTrigger>
                   <SelectValue placeholder="How do you want to be charged?" />
                 </SelectTrigger>
