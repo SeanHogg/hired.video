@@ -66,6 +66,8 @@ import { assessmentRoutes } from "./routes/assessments.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
+import { serviceRoutes } from "./routes/services.js";
+import { pushRoutes } from "./routes/push.js";
 import { openapiRoutes } from "./routes/openapi.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
 import { callLLM, getApiKey } from "./services/ai.js";
@@ -165,6 +167,7 @@ export function createApp() {
     "/api/discovery/talent-feed",
     "/api/discovery/creators/leaderboard",
     "/api/discovery/creators/products",
+    "/api/services/public",
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
@@ -338,6 +341,8 @@ export function createApp() {
   app.route("/api/auto-apply", autoApplyRoutes);
   app.route("/api/discovery", discoveryRoutes);
   app.route("/api/whitelabel", whitelabelRoutes);
+  app.route("/api/services", serviceRoutes);
+  app.route("/api/push", pushRoutes);
   app.route("/api", openapiRoutes);
   app.route("/", sitemapRoutes);
 

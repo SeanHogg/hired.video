@@ -5,6 +5,7 @@ import {
   X,
   CreditCard,
   Users,
+  Briefcase,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -49,15 +50,20 @@ export default function ShoppingCart() {
     navigate("/checkout");
   };
 
-  const formatPrice = (price: number, billingCycle: "monthly" | "annual") => {
+  const formatPlanPrice = (price: number, billingCycle?: "monthly" | "annual") => {
     if (billingCycle === "annual") {
       return `$${price.toFixed(2)}/year`;
     }
     return `$${price.toFixed(2)}/month`;
   };
 
+  const formatServicePrice = (price: number) => `$${price.toFixed(2)}`;
+
   const itemCount = getItemCount();
   const totalPrice = getTotalPrice();
+
+  const planItems = items.filter((i) => i.type !== "service");
+  const serviceItems = items.filter((i) => i.type === "service");
 
   return (
     <Sheet
@@ -77,11 +83,11 @@ export default function ShoppingCart() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[90%] max-w-sm">
+      <SheetContent side="right" className="w-[90%] max-w-sm overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
-            Review your plan upgrades and proceed to checkout
+            Review your items and proceed to checkout
           </SheetDescription>
         </SheetHeader>
 
@@ -105,137 +111,179 @@ export default function ShoppingCart() {
             </div>
           ) : (
             <>
-              {/* Cart Items */}
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <Card key={item.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {formatPrice(item.price, item.billingCycle)}
-                            {item.billingCycle === "annual" && (
-                              <Badge
-                                variant="secondary"
-                                className="ml-2 text-xs"
-                              >
-                                20% OFF
-                              </Badge>
+              {/* Service Items */}
+              {serviceItems.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    Services
+                  </div>
+                  {serviceItems.map((item) => (
+                    <Card key={item.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium truncate">{item.name}</h4>
+                            {item.providerName && (
+                              <p className="text-xs text-muted-foreground">
+                                by {item.providerName}
+                              </p>
                             )}
-                          </p>
+                            <p className="text-sm font-semibold mt-1 text-violet-600">
+                              {formatServicePrice(item.price)}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.id)}
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
 
-                          {/* Users Selection */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              <span className="text-sm font-medium">
-                                Number of users:
-                              </span>
-                              <Select
-                                value={item.users.toString()}
-                                onValueChange={(value) =>
-                                  updateUsers(item.id, parseInt(value))
-                                }
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Array.from(
-                                    { length: 20 },
-                                    (_, i) => i + 1,
-                                  ).map((num) => (
-                                    <SelectItem
-                                      key={num}
-                                      value={num.toString()}
-                                    >
-                                      {num}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Billing Cycle */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                Billing:
-                              </span>
-                              <Select
-                                value={item.billingCycle}
-                                onValueChange={(value: "monthly" | "annual") =>
-                                  updateBillingCycle(item.id, value)
-                                }
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="monthly">
-                                    Monthly
-                                  </SelectItem>
-                                  <SelectItem value="annual">
-                                    Annual
-                                    <Badge
-                                      variant="secondary"
-                                      className="ml-2 text-xs"
-                                    >
-                                      Save 20%
-                                    </Badge>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Quantity Controls */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                Quantity:
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() =>
-                                    updateQuantity(item.id, item.quantity - 1)
-                                  }
-                                  disabled={item.quantity <= 1}
+              {/* Plan Items */}
+              {planItems.length > 0 && (
+                <div className="space-y-3">
+                  {serviceItems.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Plans
+                    </div>
+                  )}
+                  {planItems.map((item) => (
+                    <Card key={item.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{item.name}</h4>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {formatPlanPrice(item.price, item.billingCycle)}
+                              {item.billingCycle === "annual" && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-2 text-xs"
                                 >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="w-8 text-center text-sm">
-                                  {item.quantity}
+                                  20% OFF
+                                </Badge>
+                              )}
+                            </p>
+
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span className="text-sm font-medium">
+                                  Number of users:
                                 </span>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() =>
-                                    updateQuantity(item.id, item.quantity + 1)
+                                <Select
+                                  value={(item.users ?? 1).toString()}
+                                  onValueChange={(value) =>
+                                    updateUsers(item.id, parseInt(value))
                                   }
                                 >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
+                                  <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from(
+                                      { length: 20 },
+                                      (_, i) => i + 1,
+                                    ).map((num) => (
+                                      <SelectItem
+                                        key={num}
+                                        value={num.toString()}
+                                      >
+                                        {num}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                  Billing:
+                                </span>
+                                <Select
+                                  value={item.billingCycle ?? "monthly"}
+                                  onValueChange={(
+                                    value: "monthly" | "annual",
+                                  ) => updateBillingCycle(item.id, value)}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="monthly">
+                                      Monthly
+                                    </SelectItem>
+                                    <SelectItem value="annual">
+                                      Annual
+                                      <Badge
+                                        variant="secondary"
+                                        className="ml-2 text-xs"
+                                      >
+                                        Save 20%
+                                      </Badge>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                  Quantity:
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() =>
+                                      updateQuantity(item.id, item.quantity - 1)
+                                    }
+                                    disabled={item.quantity <= 1}
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="w-8 text-center text-sm">
+                                    {item.quantity}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() =>
+                                      updateQuantity(item.id, item.quantity + 1)
+                                    }
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.id)}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.id)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
 
               <Separator />
 
@@ -245,7 +293,7 @@ export default function ShoppingCart() {
                   <span>Total:</span>
                   <span>${totalPrice.toFixed(2)}</span>
                 </div>
-                {items.some((item) => item.billingCycle === "annual") && (
+                {planItems.some((item) => item.billingCycle === "annual") && (
                   <p className="text-sm text-green-600">
                     ✓ You're saving 20% with annual billing!
                   </p>
@@ -255,7 +303,7 @@ export default function ShoppingCart() {
               {/* Checkout Button */}
               <Button className="w-full" onClick={handleCheckout}>
                 <CreditCard className="h-4 w-4 mr-2" />
-                Proceed to Checkout - ${totalPrice.toFixed(2)}
+                Proceed to Checkout — ${totalPrice.toFixed(2)}
               </Button>
 
               {/* Clear Cart */}

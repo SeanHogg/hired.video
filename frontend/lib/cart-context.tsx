@@ -6,8 +6,15 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  billingCycle: "monthly" | "annual";
-  users: number;
+  /** "plan" = subscription upgrade; "service" = provider service offering */
+  type: "plan" | "service";
+  // Plan-specific (optional for service items)
+  billingCycle?: "monthly" | "annual";
+  users?: number;
+  // Service-specific
+  serviceId?: string;
+  providerId?: string;
+  providerName?: string;
 }
 
 interface CartState {
@@ -50,6 +57,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         (item) => item.id === action.payload.id,
       );
       if (existingItem) {
+        // Service items: replace rather than increment (one service per cart slot)
+        if (action.payload.type === "service") {
+          return { ...state, items: state.items };
+        }
         return {
           ...state,
           items: state.items.map((item) =>
@@ -95,9 +106,9 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
             ? {
                 ...item,
                 users: action.payload.users,
-                price: calculatePriceForUsers(
+                price: calculatePlanPrice(
                   action.payload.users,
-                  item.billingCycle,
+                  item.billingCycle ?? "monthly",
                 ),
               }
             : item,
@@ -112,8 +123,8 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
             ? {
                 ...item,
                 billingCycle: action.payload.billingCycle,
-                price: calculatePriceForUsers(
-                  item.users,
+                price: calculatePlanPrice(
+                  item.users ?? 1,
                   action.payload.billingCycle,
                 ),
               }
@@ -122,40 +133,28 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       };
 
     case "CLEAR_CART":
-      return {
-        ...state,
-        items: [],
-      };
+      return { ...state, items: [] };
 
     case "OPEN_CART":
-      return {
-        ...state,
-        isOpen: true,
-      };
+      return { ...state, isOpen: true };
 
     case "CLOSE_CART":
-      return {
-        ...state,
-        isOpen: false,
-      };
+      return { ...state, isOpen: false };
 
     default:
       return state;
   }
 };
 
-const calculatePriceForUsers = (
+const calculatePlanPrice = (
   users: number,
   billingCycle: "monthly" | "annual",
 ): number => {
   const basePrice = 9.95; // per user per month
   const monthlyTotal = basePrice * users;
-
   if (billingCycle === "annual") {
-    // 20% discount for annual billing
-    return monthlyTotal * 12 * 0.8;
+    return monthlyTotal * 12 * 0.8; // 20% annual discount
   }
-
   return monthlyTotal;
 };
 

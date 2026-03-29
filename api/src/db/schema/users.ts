@@ -137,6 +137,8 @@ export const userProfiles = pgTable("user_profiles", {
   customUrlSlug: varchar("custom_url_slug", { length: 100 }),
   // Featured candidate profile — paid one-off boost for recruiter search visibility
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
+  // Lead-generation / services marketplace
+  providesServices: boolean("provides_services").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

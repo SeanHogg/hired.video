@@ -53,7 +53,7 @@ adminRoutes.get("/", async (c) => {
 		db.select({ n: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
 		db.select({ n: count() }).from(schema.users).where(gte(schema.users.createdAt, thirtyDaysAgo)),
 		db.select({ n: count() }).from(schema.jobItems),
-		db.select({ n: count() }).from(schema.jobItems).where(eq(schema.jobItems.status, "active")),
+		db.select({ n: count() }).from(schema.jobItems).where(eq(schema.jobItems.isActive, true)),
 		db.select({ n: count() }).from(schema.jobItems).where(gte(schema.jobItems.createdAt, thirtyDaysAgo)),
 		db.select({ n: count() }).from(schema.resumeInformation),
 		db.select({ n: count() }).from(schema.resumeInformation).where(gte(schema.resumeInformation.createdAt, thirtyDaysAgo)),

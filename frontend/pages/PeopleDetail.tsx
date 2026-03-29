@@ -67,6 +67,8 @@ import {
 import { userService, type UserProfile } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type UserVideo } from "@/lib/services/studio-service";
+import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
+import { useCart } from "@/lib/cart-context";
 import {
   recruiterService,
   type AddToTalentPoolRequest,
@@ -224,6 +226,13 @@ export default function PeopleDetail() {
   // Published studio videos
   const [publishedVideos, setPublishedVideos] = useState<UserVideo[]>([]);
 
+  // Services marketplace
+  const [profileServices, setProfileServices] = useState<ServiceOffering[]>([]);
+  const [inquiryServiceId, setInquiryServiceId] = useState<string | null>(null);
+  const [inquiryMessage, setInquiryMessage] = useState("");
+  const [inquirySubmitting, setInquirySubmitting] = useState(false);
+  const { addItem, openCart } = useCart();
+
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -266,6 +275,14 @@ export default function PeopleDetail() {
     if (!userProfile?.id) return;
     studioService.getVideosForUser(userProfile.id)
       .then((res) => { if (res.data?.length) setPublishedVideos(res.data); })
+      .catch(() => {});
+  }, [userProfile?.id]);
+
+  // Fetch public services for this profile
+  useEffect(() => {
+    if (!userProfile?.id) return;
+    servicesService.getPublicServices(userProfile.id)
+      .then((data) => setProfileServices(data))
       .catch(() => {});
   }, [userProfile?.id]);
 
@@ -1125,6 +1142,95 @@ export default function PeopleDetail() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* ── Services Menu ── */}
+                {profileServices.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Briefcase className="h-5 w-5 text-violet-600" />
+                        Services
+                      </CardTitle>
+                      <CardDescription>
+                        Services offered by {person?.data?.firstName ?? "this user"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {profileServices.map((svc) => (
+                        <div
+                          key={svc.id}
+                          className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{svc.title}</span>
+                              {svc.category && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {svc.category}
+                                </Badge>
+                              )}
+                            </div>
+                            {svc.description && (
+                              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                                {svc.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 mt-1.5 text-sm">
+                              {svc.priceCents !== null ? (
+                                <span className="font-semibold text-violet-600">
+                                  ${(svc.priceCents / 100).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground italic">
+                                  Contact for pricing
+                                </span>
+                              )}
+                              {svc.deliveryDays && (
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {svc.deliveryDays}d delivery
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {!isOwnProfile && (
+                            <div className="shrink-0">
+                              {svc.priceCents !== null ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    addItem({
+                                      id: `service-${svc.id}`,
+                                      name: svc.title,
+                                      price: svc.priceCents! / 100,
+                                      type: "service",
+                                      serviceId: svc.id,
+                                      providerId: svc.userId,
+                                      providerName: person?.data?.firstName
+                                        ? `${person.data.firstName} ${person.data.lastName ?? ""}`.trim()
+                                        : undefined,
+                                    });
+                                    openCart();
+                                  }}
+                                >
+                                  Add to Cart
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setInquiryServiceId(svc.id)}
+                                >
+                                  Request Quote
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Sidebar */}
@@ -1380,6 +1486,61 @@ export default function PeopleDetail() {
           <Footer />
         </div>
       </div>
+
+      {/* Inquiry / Quote Request dialog */}
+      {inquiryServiceId && (() => {
+        const svc = profileServices.find((s) => s.id === inquiryServiceId);
+        return (
+          <Dialog open={!!inquiryServiceId} onOpenChange={(open) => !open && setInquiryServiceId(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Request Quote</DialogTitle>
+                <DialogDescription>
+                  {svc?.title} — send a message to {person?.data?.firstName ?? "the provider"} to get pricing details.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 mt-2">
+                <Textarea
+                  rows={4}
+                  placeholder="Describe your needs, timeline, or any specific requirements..."
+                  value={inquiryMessage}
+                  onChange={(e) => setInquiryMessage(e.target.value)}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setInquiryServiceId(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={inquirySubmitting}
+                    onClick={async () => {
+                      if (!inquiryServiceId) return;
+                      setInquirySubmitting(true);
+                      try {
+                        await servicesService.submitInquiry(inquiryServiceId, {
+                          message: inquiryMessage,
+                          orderType: "inquiry",
+                        });
+                        toast.success("Inquiry sent! The provider will get back to you.");
+                        setInquiryServiceId(null);
+                        setInquiryMessage("");
+                      } catch {
+                        toast.error("Failed to send inquiry");
+                      } finally {
+                        setInquirySubmitting(false);
+                      }
+                    }}
+                  >
+                    {inquirySubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Send Request
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
