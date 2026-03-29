@@ -25,7 +25,7 @@ export default function AICoach() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated } = useAuth();
-  const { openAIChat, openAIWithContext, openAIWithMessage, isAIChatOpen } = useAI();
+  const { openAIChat, openAIWithMessage, isAIChatOpen } = useAI();
 
   // SEO for AI Coach page
   useSEO(location.pathname);

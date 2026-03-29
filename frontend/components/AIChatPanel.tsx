@@ -432,17 +432,6 @@ export default function AIChatPanel() {
       };
       setMessages((prev) => [...prev, aiMessage]);
 
-      // Add suggestions as separate messages
-      if (suggestions.length > 0) {
-        const suggestionMessage: Message = {
-          id: (Date.now() + 2).toString(),
-          content: `**Suggestions:**\n${suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}`,
-          sender: "ai",
-          timestamp: new Date(),
-          type: "suggestion",
-        };
-        setMessages((prev) => [...prev, suggestionMessage]);
-      }
     } catch (error) {
       console.error("Error in AI chat:", error);
 
@@ -629,6 +618,7 @@ export default function AIChatPanel() {
   const startNewChat = () => {
     setCurrentSessionId(null);
     setConversationHistory([]);
+    setRateLimitError(null);
     setMessages([
       {
         id: "welcome",
