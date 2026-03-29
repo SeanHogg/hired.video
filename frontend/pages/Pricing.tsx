@@ -245,6 +245,7 @@ export default function Pricing() {
       id: `premium-${selectedUsers}-${isAnnual ? "annual" : "monthly"}`,
       name: "Premium Plan",
       price: calculatePrice(selectedUsers, isAnnual),
+      type: "plan",
       billingCycle: isAnnual ? "annual" : "monthly",
       users: selectedUsers,
     });

@@ -57,10 +57,10 @@ pushRoutes.post("/subscribe", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /api/push/unsubscribe
+// POST /api/push/unsubscribe
 // Body: { endpoint }
 // ---------------------------------------------------------------------------
-pushRoutes.delete("/unsubscribe", async (c) => {
+pushRoutes.post("/unsubscribe", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

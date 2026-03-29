@@ -254,10 +254,7 @@ export default function ServicesManagement() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Navigation
-        sidebarOpen={sidebarOpen}
-        onSidebarToggle={toggleSidebar}
-      />
+      <Navigation onSidebarToggle={toggleSidebar} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           isOpen={sidebarOpen}

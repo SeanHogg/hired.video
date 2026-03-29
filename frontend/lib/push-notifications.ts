@@ -84,7 +84,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   const endpoint = sub.endpoint;
   await sub.unsubscribe();
 
-  await apiClient.delete("/api/push/unsubscribe", { endpoint }).catch(() => undefined);
+  await apiClient.post("/api/push/unsubscribe", { endpoint }).catch(() => undefined);
 }
 
 /** Get the current push subscription (null if not subscribed) */
