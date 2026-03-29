@@ -35,9 +35,15 @@ interface AIContextType {
   currentContext?: AIContextPayload;
   /** New structured page context */
   pageContext?: AIContextData;
+  /** Message to auto-send when the chat panel opens */
+  pendingMessage?: string;
   openAIChat: () => void;
   // Open and set context in one call (preferred)
   openAIWithContext: <TMeta = unknown>(payload: AIContextPayload<TMeta>) => void;
+  /** Open AI chat and immediately queue a message to send */
+  openAIWithMessage: (message: string) => void;
+  /** Clear the pending message after it has been sent */
+  clearPendingMessage: () => void;
   /** Set the current page context (new system) */
   setPageContext: (context: AIContextData | undefined) => void;
   /** Open AI chat with page context (new system) */
@@ -54,6 +60,7 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     undefined,
   );
   const [pageContext, setPageContext] = useState<AIContextData | undefined>(undefined);
+  const [pendingMessage, setPendingMessage] = useState<string | undefined>(undefined);
 
   const openAIChat = () => setIsAIChatOpen(true);
   const closeAIChat = () => {
@@ -71,6 +78,15 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     setIsAIChatOpen(true);
   };
 
+  // Open chat and auto-send a message
+  const openAIWithMessage = (message: string) => {
+    setPendingMessage(message);
+    setCurrentContext(undefined);
+    setIsAIChatOpen(true);
+  };
+
+  const clearPendingMessage = () => setPendingMessage(undefined);
+
   // New context system
   const openAIWithPageContext = (context: AIContextData) => {
     setPageContext(context);
@@ -82,8 +98,11 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     isAIChatOpen,
     currentContext,
     pageContext,
+    pendingMessage,
     openAIChat,
     openAIWithContext,
+    openAIWithMessage,
+    clearPendingMessage,
     setPageContext,
     openAIWithPageContext,
     closeAIChat,

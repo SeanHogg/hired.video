@@ -12,17 +12,24 @@ import {
   Sparkles,
   Code,
   AlertTriangle,
+  Plus,
+  History,
+  Copy,
+  Check,
+  ChevronLeft,
+  MessageSquare,
+  Trash2,
 } from "lucide-react";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAI } from "@/lib/ai-context";
 import {
-  sendHRMessage,
   isAIServiceConfigured,
   type ChatMessage,
 } from "@/lib/services/ai-service";
+import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
 import { useAuth, USER_ROLES } from "@/lib/auth";
@@ -34,7 +41,6 @@ import { aiService } from "@/lib/services/ai-service";
 import {
   getContextLabel,
   getActionLabel,
-  getContextIcon,
   createDashboardContext,
   createJobContext,
   createResumeContext,
@@ -45,7 +51,6 @@ import {
 } from "@/lib/utils/ai-context-helpers";
 import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
 import { billingService } from "@/lib/services/billing-service";
-import { getAPIsByAction } from "@/lib/config/ai-api-registry";
 
 interface Message {
   id: string;
@@ -60,10 +65,19 @@ interface Message {
 // ============================================================================
 
 /**
- * Create an enhanced system prompt with context and action awareness
+ * Create an enhanced system prompt with context, action, and user awareness
  */
-function createEnhancedSystemPrompt(context: AIContext, action?: AIAction): string {
+function createEnhancedSystemPrompt(
+  context: AIContext,
+  action?: AIAction,
+  userInfo?: { name?: string; role?: string; plan?: string },
+): string {
+  const userContext = userInfo
+    ? `\nUSER PROFILE:\n- Name: ${userInfo.name || "Unknown"}\n- Role: ${userInfo.role || "job_seeker"}\n- Plan: ${userInfo.plan || "free"}\n`
+    : "";
+
   const basePrompt = `You are the AI Chief Human Resources Officer (CHRO) for hired.video — an always-on HR guru who acts as the strategic brain behind every hiring, talent, and career decision on the platform.
+${userContext}
 
 Your expertise spans the full talent lifecycle:
 - **Talent Acquisition**: Job description crafting, candidate sourcing, boolean search, recruiter outreach
@@ -194,7 +208,7 @@ USER INTENT: The user wants help with: ${action.replace(/-/g, " ")}
 Engage conversationally to understand their needs and provide helpful guidance.`;
   }
 
-  return basePrompt + contextInstructions + actionInstructions;
+  return (basePrompt + contextInstructions + actionInstructions).trim();
 }
 
 // ============================================================================
@@ -204,7 +218,7 @@ Engage conversationally to understand their needs and provide helpful guidance.`
 export default function AIChatPanel() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext } = useAI();
+  const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
   const isMobile = useIsMobile();
 
   // Get personalized welcome message based on user role
@@ -228,6 +242,11 @@ export default function AIChatPanel() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // Initialize welcome message based on user role
   useEffect(() => {
@@ -263,6 +282,18 @@ export default function AIChatPanel() {
       setInputValue(currentContext.hint);
     }
   }, [isAIChatOpen, currentContext?.hint, currentContext?.source]);
+
+  // Auto-send pending message when panel opens (e.g. from quick prompts)
+  useEffect(() => {
+    if (isAIChatOpen && pendingMessage) {
+      clearPendingMessage();
+      // Small delay to let the panel render first
+      setTimeout(() => {
+        handleSendMessage(pendingMessage);
+      }, 300);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAIChatOpen, pendingMessage]);
 
   // Auto-detect and set context based on current route and user role
   useEffect(() => {
@@ -343,7 +374,7 @@ export default function AIChatPanel() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (content: string, action?: AIAction) => {
+  const handleSendMessage = useCallback(async (content: string, action?: AIAction) => {
     if (!content.trim()) return;
 
     // Add user message
@@ -357,37 +388,31 @@ export default function AIChatPanel() {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsTyping(true);
-    setRateLimitError(null); // Clear any previous rate limit errors
+    setRateLimitError(null);
 
     try {
       let responseMessage = "";
-      let suggestions: string[] = [];
 
-      // Use context-aware AI if page context is available
-      if (pageContext) {
-        // Create enhanced system message with context and action
-        const systemMessage = {
-          role: "system" as const,
-          content: createEnhancedSystemPrompt(pageContext, action),
-        };
+      // Build user info for system prompt personalisation
+      const userInfo = user
+        ? { name: user.name || user.email, role: user.role, plan: aiUsage?.isUnlimited ? "pro" : "free" }
+        : undefined;
 
-        const userChatMessage = {
-          role: "user" as const,
-          content: content.trim(),
-        };
+      // Always use context-aware AI with enhanced system prompt
+      const activeContext = pageContext;
+      const systemContent = activeContext
+        ? createEnhancedSystemPrompt(activeContext, action, userInfo)
+        : `You are the AI CHRO for hired.video — an expert HR advisor helping ${userInfo?.role || "users"} with career, hiring, and workforce decisions. Be concise, actionable, and personalised.${userInfo ? `\n\nUser: ${userInfo.name}, Role: ${userInfo.role}, Plan: ${userInfo.plan}` : ""}`;
 
-        const messages = [
-          systemMessage,
-          ...conversationHistory,
-          userChatMessage,
-        ];
+      const systemMessage = { role: "system" as const, content: systemContent };
+      const userChatMessage = { role: "user" as const, content: content.trim() };
+      const chatMessages = [systemMessage, ...conversationHistory, userChatMessage];
 
-        const response = await aiService.sendChatMessage(messages);
-        responseMessage = response.message;
-      } else {
-        // Fallback to regular AI service
-        const response = await sendHRMessage(content.trim(), conversationHistory);
-        responseMessage = response.message;
+      const response = await aiService.sendChatMessage(chatMessages, { sessionId: currentSessionId ?? undefined });
+      responseMessage = response.message;
+      // Persist the session ID for subsequent turns
+      if (response.sessionId && response.sessionId !== currentSessionId) {
+        setCurrentSessionId(response.sessionId);
       }
 
       // Update conversation history
@@ -452,12 +477,12 @@ export default function AIChatPanel() {
       }
     } finally {
       setIsTyping(false);
-      // Refresh usage after sending a message
       if (isAuthenticated) {
         fetchAIUsage();
       }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationHistory, currentSessionId, pageContext, user, aiUsage, isAuthenticated]);
 
   /**
    * Get a conversational prompt for an action
@@ -547,6 +572,91 @@ export default function AIChatPanel() {
     }
   }, [isAIChatOpen, isAuthenticated]);
 
+  // Load session list
+  const fetchSessions = async () => {
+    if (!isAuthenticated) return;
+    setIsLoadingSessions(true);
+    try {
+      const res = await apiClient.get<Array<{ id: string; title: string; updatedAt: string }>>("/api/ai/sessions");
+      if (res.data) setSessions(res.data);
+    } catch {
+      // silently fail
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  // Load a prior session into the chat
+  const loadSession = async (sessionId: string) => {
+    try {
+      const res = await apiClient.get<{
+        id: string;
+        title: string;
+        messages: Array<{ id: string; role: string; content: string; createdAt: string }>;
+      }>(`/api/ai/sessions/${sessionId}`);
+      if (!res.data) return;
+      setCurrentSessionId(sessionId);
+      setConversationHistory(
+        res.data.messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+      );
+      setMessages([
+        ...res.data.messages.map((m) => ({
+          id: m.id,
+          content: m.content,
+          sender: (m.role === "user" ? "user" : "ai") as "user" | "ai",
+          timestamp: new Date(m.createdAt),
+        })),
+      ]);
+      setShowHistory(false);
+    } catch {
+      // silently fail
+    }
+  };
+
+  // Delete a session
+  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await apiClient.delete(`/api/ai/sessions/${sessionId}`);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (currentSessionId === sessionId) startNewChat();
+    } catch {
+      // silently fail
+    }
+  };
+
+  // Start a fresh conversation
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setConversationHistory([]);
+    setMessages([
+      {
+        id: "welcome",
+        content: getWelcomeMessage(),
+        sender: "ai",
+        timestamp: new Date(),
+      },
+    ]);
+    setShowHistory(false);
+  };
+
+  // Copy message content to clipboard
+  const copyMessage = async (id: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(id);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch {
+      // silently fail
+    }
+  };
+
+  // Open history and load sessions
+  const toggleHistory = () => {
+    if (!showHistory) fetchSessions();
+    setShowHistory((v) => !v);
+  };
+
   return (
     <div className={cn(
       "fixed inset-0 z-50 flex transition-opacity duration-500 ease-in-out",
@@ -564,11 +674,11 @@ export default function AIChatPanel() {
 
       {/* Panel */}
       <div className={cn(
-        "fixed inset-y-0 right-0 z-50 bg-background border-l shadow-2xl flex flex-col transition-all duration-500 ease-in-out",
+        "fixed inset-y-0 right-0 z-50 bg-background border-l shadow-2xl flex flex-col transition-all duration-500 ease-in-out overflow-hidden",
         isAIChatOpen ? "translate-x-0" : "translate-x-full",
         isMobile
-          ? "w-[90%]" // Mobile: 90% width, matching sidebar and cart
-          : "w-[60%] max-w-2xl"   // Desktop: 60% width with max-width for very large screens
+          ? "w-[90%]"
+          : "w-[60%] max-w-2xl"
       )}>
         {/* Header */}
         <div className={cn(
@@ -595,7 +705,24 @@ export default function AIChatPanel() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={startNewChat}
+              title="New chat"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleHistory}
+              title="Chat history"
+              className={cn(showHistory && "bg-muted")}
+            >
+              <History className="h-4 w-4" />
+            </Button>
             {pageContext && (
               <Button
                 variant="ghost"
@@ -611,8 +738,8 @@ export default function AIChatPanel() {
               size="icon"
               onClick={closeAIChat}
               className={cn(
-                "touch-manipulation", // Optimize for touch on mobile
-                isMobile && "min-w-[44px] min-h-[44px]" // Ensure minimum touch target size on mobile
+                "touch-manipulation",
+                isMobile && "min-w-[44px] min-h-[44px]"
               )}
             >
               <X className="h-4 w-4" />
@@ -734,6 +861,62 @@ export default function AIChatPanel() {
           </div>
         )}
 
+        {/* Chat History Sidebar */}
+        {showHistory && (
+          <div className="absolute inset-0 z-10 bg-background flex flex-col">
+            <div className="flex items-center gap-2 p-4 border-b">
+              <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <h4 className="font-semibold text-sm flex-1">Chat History</h4>
+              <Button variant="ghost" size="sm" onClick={startNewChat} className="gap-1 text-xs">
+                <Plus className="h-3 w-3" />
+                New Chat
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingSessions ? (
+                <div className="p-4 text-sm text-muted-foreground text-center">Loading...</div>
+              ) : sessions.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p>No previous chats</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {sessions.map((session) => (
+                    <button
+                      key={session.id}
+                      className={cn(
+                        "w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-start gap-3 group",
+                        currentSessionId === session.id && "bg-muted"
+                      )}
+                      onClick={() => loadSession(session.id)}
+                    >
+                      <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{session.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(session.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0"
+                        onClick={(e) => deleteSession(session.id, e)}
+                        title="Delete chat"
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
           <div className="space-y-4">
@@ -747,18 +930,29 @@ export default function AIChatPanel() {
               >
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-lg p-3 text-sm",
+                    "max-w-[80%] rounded-lg p-3 text-sm group relative",
                     message.sender === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted",
                   )}
                 >
                   {message.sender === "ai" && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <Brain className="h-3 w-3 text-primary" />
-                      <span className="text-xs font-medium text-primary">
-                        AI Assistant
-                      </span>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-3 w-3 text-primary" />
+                        <span className="text-xs font-medium text-primary">AI CHRO</span>
+                      </div>
+                      <button
+                        onClick={() => copyMessage(message.id, message.content)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background"
+                        title="Copy response"
+                      >
+                        {copiedMessageId === message.id ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Copy className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </button>
                     </div>
                   )}
                   {message.sender === "ai" ? (

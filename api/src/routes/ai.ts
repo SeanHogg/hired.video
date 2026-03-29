@@ -3,7 +3,8 @@ import { eq, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/ai.js";
+import { callLLMWithMessages, getApiKey } from "../services/ai.js";
+import type { LLMMessage } from "../services/ai.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
@@ -80,6 +81,10 @@ aiRoutes.post("/chat", async (c) => {
 
   const incomingSessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+  // Accept a custom system prompt from the frontend (includes user role, context, etc.)
+  const customSystemPrompt = typeof body.systemPrompt === "string" && body.systemPrompt.trim()
+    ? body.systemPrompt.trim()
+    : SYSTEM_PROMPT;
   const db = getDb();
 
   // Resolve or create a chat session
@@ -100,11 +105,17 @@ aiRoutes.post("/chat", async (c) => {
         userId,
         title: userMessage.slice(0, 100),
         model: "google/gemini-flash-1.5",
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: customSystemPrompt,
         isActive: true,
       })
       .returning({ id: schema.aiChatSessions.id });
     sessionId = created.id;
+  } else {
+    // Update the session's updatedAt so it bubbles to top of history list
+    await db
+      .update(schema.aiChatSessions)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.aiChatSessions.id, sessionId));
   }
 
   // Fetch previous messages when no history provided
@@ -114,7 +125,7 @@ aiRoutes.post("/chat", async (c) => {
       .from(schema.aiChatMessages)
       .where(eq(schema.aiChatMessages.sessionId, sessionId))
       .orderBy(desc(schema.aiChatMessages.createdAt))
-      .limit(10);
+      .limit(20);
     history.push(...prevMessages.reverse());
   }
 
@@ -125,19 +136,22 @@ aiRoutes.post("/chat", async (c) => {
   const apiKey = getApiKey((c.env as any) ?? {});
   if (apiKey) {
     try {
-      const contextLines = history
-        .slice(-8)
-        .map((h) => `${h.role}: ${h.content}`)
-        .join("\n");
-      const fullUserContent = contextLines ? `${contextLines}\nuser: ${userMessage}` : userMessage;
+      // Build a proper messages array for multi-turn conversation
+      const llmMessages: LLMMessage[] = [
+        { role: "system", content: customSystemPrompt },
+        ...history.slice(-16).map((h) => ({
+          role: (h.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+          content: h.content,
+        })),
+        { role: "user", content: userMessage },
+      ];
 
-      responseMessage = await callLLM(apiKey, {
-        systemPrompt: SYSTEM_PROMPT,
-        userMessage: fullUserContent,
+      responseMessage = await callLLMWithMessages(apiKey, {
+        messages: llmMessages,
         responseFormat: "text",
         temperature: 0.7,
       });
-      promptTokens = estimateTokens(fullUserContent);
+      promptTokens = estimateTokens(llmMessages.map((m) => m.content).join(" "));
       completionTokens = estimateTokens(responseMessage);
     } catch {
       const mock = generateMockResponse(userMessage);

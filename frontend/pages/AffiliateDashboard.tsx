@@ -272,14 +272,14 @@ function AffiliateDashboardContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data?.referrals.map((r) => (
+                      {data?.referrals?.map((r) => (
                         <tr key={r.id} className="border-b last:border-b-0">
                           <td className="py-2 pr-4">{r.referredUserId}</td>
                           <td className="py-2 pr-4">{r.referralCode}</td>
                           <td className="py-2 pr-4">{new Date(r.createdAt).toLocaleString()}</td>
                         </tr>
                       ))}
-                      {(!data || data.referrals.length === 0) && (
+                      {(!data?.referrals?.length) && (
                         <tr>
                           <td className="py-3 text-muted-foreground" colSpan={3}>No referrals yet.</td>
                         </tr>
@@ -308,7 +308,7 @@ function AffiliateDashboardContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data?.conversions.map((c) => (
+                      {data?.conversions?.map((c) => (
                         <tr key={c.id} className="border-b last:border-b-0">
                           <td className="py-2 pr-4">{c.referredUserId}</td>
                           <td className="py-2 pr-4">${cents(c.subscriptionAmountCents)}</td>
@@ -317,7 +317,7 @@ function AffiliateDashboardContent() {
                           <td className="py-2 pr-4">{new Date(c.createdAt).toLocaleString()}</td>
                         </tr>
                       ))}
-                      {(!data || data.conversions.length === 0) && (
+                      {(!data?.conversions?.length) && (
                         <tr>
                           <td className="py-3 text-muted-foreground" colSpan={5}>No conversions yet.</td>
                         </tr>

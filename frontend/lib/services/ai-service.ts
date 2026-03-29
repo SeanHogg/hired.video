@@ -41,11 +41,16 @@ export interface AIServiceError {
 
 export interface BackendChatResponse {
   message: string;
+  sessionId?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
   };
+}
+
+export interface ChatResponseWithSession extends ChatResponse {
+  sessionId?: string;
 }
 
 // ============================================================================
@@ -62,12 +67,14 @@ class AIService {
       model?: string;
       maxTokens?: number;
       temperature?: number;
+      sessionId?: string;
     },
-  ): Promise<ChatResponse> {
+  ): Promise<ChatResponseWithSession> {
     try {
       logger.info("Sending AI chat request to backend");
 
-      // Extract user message and history
+      // Extract system prompt, user message, and history
+      const systemMsg = messages.find((m) => m.role === "system");
       const userMessage = messages[messages.length - 1]?.content || "";
       const history = messages
         .slice(0, -1)
@@ -83,7 +90,6 @@ class AIService {
             code: "AI_USAGE_LIMIT_REACHED",
             message: `You've used all ${limit} free AI requests for this month. Upgrade to Premium for unlimited AI.`,
           };
-          // Throw structured error; caller can display an upgrade prompt
           throw limitError as unknown as Error;
         }
       }
@@ -91,12 +97,15 @@ class AIService {
       const requestData = {
         message: userMessage,
         history: history.length > 0 ? history : undefined,
+        // Pass the rich system prompt so the backend sends it to OpenRouter
+        systemPrompt: systemMsg?.content,
+        sessionId: options?.sessionId,
         maxTokens: options?.maxTokens,
         temperature: options?.temperature,
       };
 
       const response = await apiClient.post<BackendChatResponse>(
-        "/api/chat/message",
+        "/api/ai/chat",
         requestData,
       );
 
@@ -106,29 +115,28 @@ class AIService {
 
       logger.info("AI chat response received from backend", {
         messageLength: response.data.message?.length || 0,
+        sessionId: response.data.sessionId,
         usage: response.data.usage,
       });
 
       return {
         message: response.data.message,
+        sessionId: response.data.sessionId,
         usage: response.data.usage,
       };
     } catch (error: unknown) {
       logger.error("AI service error", { error });
 
-      // If this is an AI usage limit or rate limit error, propagate it to the UI (no mock fallback)
       if (error instanceof AIUsageLimitError || error instanceof RateLimitError) {
         logger.warn("AI usage limit reached, propagating to UI");
         throw error;
       }
 
-      // Also check for legacy error format
       const maybe = error as Partial<AIServiceError> | undefined;
       if (maybe && maybe.code === "AI_USAGE_LIMIT_REACHED") {
         throw error as Error;
       }
 
-      // Fallback to mock response on other errors (e.g., network/AI provider issues)
       logger.warn("Falling back to mock response due to AI service error");
       return this.getMockResponse(messages[messages.length - 1]?.content || "");
     }

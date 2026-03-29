@@ -10,16 +10,17 @@ import type { SceneNode, Transform2D } from "../compiler/types";
 // ─── Image cache ─────────────────────────────────────────────────────────────
 // Synchronous renderer — we start loading on first miss and return null until ready.
 
-const _imgCache = new Map<string, HTMLImageElement | "loading">();
+const _imgCache = new Map<string, HTMLImageElement | "loading" | "error">();
 
 function getCachedImage(url: string): HTMLImageElement | null {
   const cached = _imgCache.get(url);
+  if (cached === "error") return null;        // failed — don't retry
   if (cached && cached !== "loading") return cached;
   if (!cached) {
     _imgCache.set(url, "loading");
     const img = new Image();
     img.onload = () => _imgCache.set(url, img);
-    img.onerror = () => _imgCache.delete(url);
+    img.onerror = () => _imgCache.set(url, "error"); // stop retrying on failure
     img.src = url;
   }
   return null;

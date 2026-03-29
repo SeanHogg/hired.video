@@ -53,6 +53,26 @@ import StudioSettings from "./StudioSettings";
 import TimelineEditor from "@/components/TimelineEditor";
 import LinkedInPostModal from "@/components/LinkedInPostModal";
 
+/** Strip ephemeral blob: URLs from a script before persisting to the server.
+ * Blob URLs are session-scoped and become invalid after a page reload, so they
+ * must never be stored in the database. */
+function sanitizeScriptForSave(script: VideoScript): VideoScript {
+  const cleanTheme = { ...script.video.theme };
+  const themeAny = cleanTheme as Record<string, unknown>;
+  if (typeof themeAny.customBackground === "string" && themeAny.customBackground.startsWith("blob:")) {
+    delete themeAny.customBackground;
+  }
+  return {
+    ...script,
+    video: { ...script.video, theme: cleanTheme },
+    scenes: script.scenes.map((scene) => ({
+      ...scene,
+      ...(scene.backgroundImage?.startsWith("blob:") ? { backgroundImage: undefined } : {}),
+      ...(scene.sceneAudio?.startsWith("blob:") ? { sceneAudio: undefined, sceneAudioLabel: undefined } : {}),
+    })),
+  };
+}
+
 function makeInitialState(): StudioProjectState {
   return {
     ...defaultStudioState,
@@ -718,8 +738,8 @@ export default function StudioLayout() {
         projectId = uploadRes.data.id;
         patchState({ projectId });
       } else if (!projectId) {
-        // No blob, no project — save draft first
-        const saveRes = await studioService.saveDraft(state.name, state.resumeText, state.script);
+        // No blob, no project — save draft first (sanitize blob: URLs before persisting)
+        const saveRes = await studioService.saveDraft(state.name, state.resumeText, state.script ? sanitizeScriptForSave(state.script) : null);
         if (!saveRes.data) throw new Error("Save failed");
         projectId = saveRes.data.id;
         patchState({ projectId });
@@ -777,9 +797,10 @@ export default function StudioLayout() {
   async function handleSave() {
     setIsSaving(true);
     try {
-      // Embed model setting into the script metadata so it round-trips through the DB
+      // Embed model setting into the script metadata so it round-trips through the DB.
+      // Sanitize to remove blob: URLs which are session-scoped and invalid after reload.
       const scriptToSave = state.script
-        ? { ...state.script, _meta: { ...state.script._meta, model: state.model } }
+        ? sanitizeScriptForSave({ ...state.script, _meta: { ...state.script._meta, model: state.model } })
         : null;
       const res = await studioService.saveDraft(
         state.name,

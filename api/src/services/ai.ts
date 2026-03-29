@@ -12,6 +12,18 @@ export interface LLMOptions {
   responseFormat?: "json_object" | "text";
 }
 
+export interface LLMMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface LLMMessagesOptions {
+  model?: string;
+  temperature?: number;
+  messages: LLMMessage[];
+  responseFormat?: "json_object" | "text";
+}
+
 /**
  * Call the OpenRouter chat-completions endpoint.
  *
@@ -72,6 +84,44 @@ export async function callLLMJson<T>(
   const parsed = schema.safeParse(JSON.parse(stripped));
   if (!parsed.success) throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
   return parsed.data;
+}
+
+/**
+ * Call the OpenRouter chat-completions endpoint with a full messages array.
+ * Preferred over callLLM for multi-turn conversations.
+ */
+export async function callLLMWithMessages(apiKey: string, options: LLMMessagesOptions): Promise<string> {
+  const {
+    model = "google/gemini-flash-1.5",
+    temperature = 0.7,
+    messages,
+    responseFormat = "text",
+  } = options;
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://hired.video",
+      "X-Title": "hired.video",
+    },
+    body: JSON.stringify({
+      model,
+      temperature,
+      ...(responseFormat === "json_object" ? { response_format: { type: "json_object" } } : {}),
+      messages,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+  }
+
+  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Empty LLM response");
+  return content;
 }
 
 /**

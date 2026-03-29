@@ -25,7 +25,7 @@ export default function AICoach() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated } = useAuth();
-  const { openAIChat, openAIWithContext, isAIChatOpen } = useAI();
+  const { openAIChat, openAIWithContext, openAIWithMessage, isAIChatOpen } = useAI();
 
   // SEO for AI Coach page
   useSEO(location.pathname);
@@ -36,11 +36,7 @@ export default function AICoach() {
       const initialQuery = searchParams.get("q");
       setTimeout(() => {
         if (initialQuery) {
-          openAIWithContext({
-            source: "homepage.chro",
-            task: "answer_question",
-            hint: initialQuery,
-          });
+          openAIWithMessage(initialQuery);
         } else {
           openAIChat();
         }
@@ -177,10 +173,7 @@ export default function AICoach() {
                         key={index}
                         variant="outline"
                         className="text-left justify-start h-auto p-4 whitespace-normal"
-                        onClick={() => {
-                          openAIChat();
-                          // Note: In a real implementation, you'd also send this prompt to the AI
-                        }}
+                        onClick={() => openAIWithMessage(prompt)}
                       >
                         <MessageSquare className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
                         <span className="text-sm">{prompt}</span>
