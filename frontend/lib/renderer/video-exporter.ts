@@ -181,8 +181,22 @@ async function exportMediaRecorderWithAudio(
   // Set up audio capture
   const audioCtx = new AudioContext();
   const audioDest = audioCtx.createMediaStreamDestination();
+
+  // Play ambient music if a real track is selected
+  const hasAmbientTrack = audio.track && audio.track !== "none";
   const exportPlayer = new AmbientPlayer();
-  exportPlayer.playToDestination(audio.track, audio.volume ?? 0.6, audioCtx, audioDest);
+  if (hasAmbientTrack) {
+    exportPlayer.playToDestination(audio.track, audio.volume ?? 0.6, audioCtx, audioDest);
+  } else {
+    // Create a silent oscillator so the audio destination stream stays active
+    // (MediaRecorder needs at least one active audio source)
+    const silence = audioCtx.createOscillator();
+    const silenceGain = audioCtx.createGain();
+    silenceGain.gain.value = 0;
+    silence.connect(silenceGain);
+    silenceGain.connect(audioDest);
+    silence.start();
+  }
 
   // Schedule voiceover audio buffers at each scene's start time
   if (opts.voiceover?.enabled && opts.sceneTimings) {
@@ -194,7 +208,6 @@ async function exportMediaRecorderWithAudio(
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioDest);
-      // Schedule playback at the scene's start time relative to AudioContext time
       source.start(audioCtx.currentTime + timing.start);
     }
   }
@@ -242,7 +255,7 @@ async function exportMediaRecorderWithAudio(
 
   await new Promise<void>((r) => { recorder.onstop = () => r(); });
 
-  exportPlayer.stop();
+  if (hasAmbientTrack) exportPlayer.stop();
   audioCtx.close().catch(() => {});
 
   opts.onProgress?.(1);

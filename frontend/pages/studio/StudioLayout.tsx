@@ -583,11 +583,12 @@ export default function StudioLayout() {
       });
       patchState({ videoBlob: blob, status: "ready" });
 
-      // Auto-download
+      // Auto-download — use correct extension based on container format
+      const ext = blob.type.includes("webm") ? "webm" : "mp4";
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${state.name.replace(/\s+/g, "-")}.mp4`;
+      a.download = `${state.name.replace(/\s+/g, "-")}.${ext}`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
 
