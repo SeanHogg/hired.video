@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
+import { extractText } from "unpdf";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
@@ -139,66 +140,9 @@ async function parseBodyToContent(c: any): Promise<Record<string, unknown>> {
  * in Cloudflare Workers.
  */
 async function extractPdfText(pdfBytes: Uint8Array): Promise<string> {
-  // Decode as latin1 so byte values map 1:1 to char codes
-  const pdfStr = new TextDecoder("latin1").decode(pdfBytes);
-  const texts: string[] = [];
-
-  // Find every stream...endstream block
-  const streamRe = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  let m: RegExpExecArray | null;
-
-  while ((m = streamRe.exec(pdfStr)) !== null) {
-    const before = pdfStr.slice(Math.max(0, m.index - 300), m.index);
-    const isFlateDecode = /\/FlateDecode/.test(before);
-    let content = m[1];
-
-    if (isFlateDecode) {
-      try {
-        // Convert latin1 string back to raw bytes
-        const streamBytes = new Uint8Array(content.length);
-        for (let i = 0; i < content.length; i++) streamBytes[i] = content.charCodeAt(i) & 0xff;
-
-        // Decompress using zlib (PDF FlateDecode = zlib format with 2-byte header)
-        const ds = new DecompressionStream("deflate");
-        const writer = ds.writable.getWriter();
-        const reader = ds.readable.getReader();
-        writer.write(streamBytes);
-        writer.close();
-
-        const chunks: Uint8Array[] = [];
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-        }
-        const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
-        let off = 0;
-        for (const c of chunks) { out.set(c, off); off += c.length; }
-        content = new TextDecoder("latin1").decode(out);
-      } catch {
-        continue; // skip streams that fail to decompress
-      }
-    }
-
-    // Extract text from BT...ET blocks
-    const btRe = /BT([\s\S]*?)ET/g;
-    let bt: RegExpExecArray | null;
-    while ((bt = btRe.exec(content)) !== null) {
-      // Match (string) Tj/TJ and [(string)] TJ operators
-      const ops = bt[1].match(/\((?:[^\\)]|\\.)*\)\s*Tj|\[(?:[^\]])*\]\s*TJ/g) ?? [];
-      for (const op of ops) {
-        const parens = op.match(/\((?:[^\\)]|\\.)*\)/g) ?? [];
-        for (const p of parens) {
-          const text = p.slice(1, -1)
-            .replace(/\\n/g, "\n").replace(/\\r/g, "").replace(/\\t/g, " ")
-            .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\");
-          if (text.trim()) texts.push(text.trim());
-        }
-      }
-    }
-  }
-
-  return texts.join(" ").replace(/\s{2,}/g, " ").trim();
+  const result = await extractText(pdfBytes, { mergePages: true });
+  const raw = Array.isArray(result.text) ? result.text.join(" ") : String(result.text);
+  return raw.replace(/\s{2,}/g, " ").trim();
 }
 
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
