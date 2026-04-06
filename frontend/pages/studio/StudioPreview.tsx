@@ -101,7 +101,16 @@ export default function StudioPreview({
           onTimeUpdate={onTimeUpdate}
           audio={state.script?.video?.audio}
           voiceover={state.voiceover}
-          sceneTimings={state.script?.scenes.map((s) => ({ id: s.id, start: s.start, duration: s.duration }))}
+          sceneTimings={state.script?.scenes.map((s) => ({
+            id: s.id,
+            start: s.start,
+            duration: s.duration,
+            text: [
+              typeof s.text === "string" ? s.text : s.text?.join(". "),
+              s.items?.join(". "),
+              s.skills ? `Skills: ${s.skills.join(", ")}` : undefined,
+            ].filter(Boolean).join(" "),
+          }))}
           className="w-full h-full"
         />
       ) : (

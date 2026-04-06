@@ -32,6 +32,8 @@ function fail(code: string, message: string, details?: unknown) {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Map privacy string → stored integer
 const PRIVACY_TO_LEVEL: Record<string, number> = {
   public: 0,
@@ -443,6 +445,19 @@ resumeRoutes.get("/public", async (c) => {
   );
 });
 
+resumeRoutes.get("/public/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  const db = getDb();
+
+  const condition = UUID_RE.test(slug)
+    ? and(eq(resumes.id, slug), eq(resumes.privacyLevel, 0))
+    : and(eq(resumes.slug, slug), eq(resumes.privacyLevel, 0));
+
+  const [row] = await db.select().from(resumes).where(condition).limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  return c.json(ok(rowToLegacyResume(row)), 200);
+});
+
 resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
   const user = c.var.user;
   const db = getDb();
@@ -490,10 +505,15 @@ resumeRoutes.get("/validateslug", async (c) => {
 });
 
 resumeRoutes.get("/embedded/:identifier", async (c) => {
-  const id = c.req.param("identifier");
+  const identifier = c.req.param("identifier");
   const user = c.var.user;
   const db = getDb();
-  const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+
+  const condition = UUID_RE.test(identifier)
+    ? and(eq(resumes.id, identifier), eq(resumes.userId, user.sub))
+    : and(eq(resumes.slug, identifier), eq(resumes.userId, user.sub));
+
+  const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
   return c.json(ok(rowToLegacyResume(row)), 200);
 });
@@ -609,7 +629,12 @@ resumeRoutes.get("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
   const db = getDb();
-  const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+
+  const condition = UUID_RE.test(id)
+    ? and(eq(resumes.id, id), eq(resumes.userId, user.sub))
+    : and(eq(resumes.slug, id), eq(resumes.userId, user.sub));
+
+  const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
   return c.json(ok(rowToLegacyResume(row)), 200);
 });

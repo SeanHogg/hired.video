@@ -541,6 +541,17 @@ export class ResumeService {
 
 
   /**
+   * Get a public resume by slug or UUID (no auth required)
+   */
+  async getPublicResume(slugOrId: string): Promise<FrontendResume> {
+    const response = await apiClient.get<any>(
+      `/api/resumes/public/${slugOrId}`,
+      z.any(),
+    );
+    return this.transformApiResumeToResume(response.data);
+  }
+
+  /**
    * Create new resume from CreateResumeRequest
    */
   async createResume(request: {

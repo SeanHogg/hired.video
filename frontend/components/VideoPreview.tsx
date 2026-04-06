@@ -1,17 +1,20 @@
 // VideoPreview.tsx — canvas RAF loop calling frameRenderer.render().
 // When an audio track is provided it is played/paused in sync with the video.
-// When voiceover is provided, per-scene audio is played at the correct time.
+// When voiceover is enabled, browser TTS speaks each scene's text at the right time.
 
 import { useEffect, useRef, useCallback } from "react";
 import { render } from "@/lib/renderer/frame-renderer";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoAudio, VoiceoverConfig } from "@/types/video-script";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
+import { speak, stopSpeaking } from "@/lib/services/browser-tts";
 
 interface SceneTiming {
   id: string;
   start: number;
   duration: number;
+  /** Text to speak for this scene (pre-built from scene fields) */
+  text?: string;
 }
 
 interface Props {
@@ -32,51 +35,17 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
   const lastTsRef   = useRef<number | null>(null);
   const audioActiveRef = useRef<string | null>(null);
 
-  // ── Voiceover audio elements ────────────────────────────────────────────
-  const voAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  // ── Voiceover: browser TTS synced to scene timing ──────────────────────
   const voActiveRef = useRef<string | null>(null);
+  const voCancelRef = useRef<(() => void) | null>(null);
 
-  // Create/update Audio elements when voiceover config changes
+  // Sync voiceover speech with current time and playing state
   useEffect(() => {
-    const map = voAudiosRef.current;
-    // Clean up old elements
-    for (const [id, el] of map) {
-      el.pause();
-      el.src = "";
-    }
-    map.clear();
-    voActiveRef.current = null;
-
-    if (!voiceover?.enabled || !sceneTimings) return;
-
-    for (const timing of sceneTimings) {
-      const sceneVo = voiceover.scenes[timing.id];
-      if (!sceneVo?.audioUrl) continue;
-      const el = new Audio(sceneVo.audioUrl);
-      el.preload = "auto";
-      map.set(timing.id, el);
-    }
-
-    return () => {
-      for (const [, el] of map) {
-        el.pause();
-        el.src = "";
-      }
-      map.clear();
-    };
-  }, [voiceover, sceneTimings]);
-
-  // Sync voiceover playback with current time and playing state
-  useEffect(() => {
-    if (!sceneTimings || !voiceover?.enabled) return;
-
-    const map = voAudiosRef.current;
-    if (map.size === 0) return;
-
-    if (!playing) {
-      // Pause all
-      for (const [, el] of map) {
-        if (!el.paused) el.pause();
+    if (!sceneTimings || !voiceover?.enabled || !playing) {
+      // Stop any active speech when paused or voiceover disabled
+      if (voCancelRef.current) {
+        voCancelRef.current();
+        voCancelRef.current = null;
       }
       voActiveRef.current = null;
       return;
@@ -85,32 +54,40 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
     // Find which scene we're in
     const t = timeRef.current;
     let activeSceneId: string | null = null;
-    let offsetInScene = 0;
     for (const timing of sceneTimings) {
       if (t >= timing.start && t < timing.start + timing.duration) {
         activeSceneId = timing.id;
-        offsetInScene = t - timing.start;
         break;
       }
     }
 
-    // Pause scenes that are not active
-    for (const [id, el] of map) {
-      if (id !== activeSceneId && !el.paused) {
-        el.pause();
+    // If we moved to a new scene, start speaking its text
+    if (activeSceneId && activeSceneId !== voActiveRef.current) {
+      // Stop previous speech
+      if (voCancelRef.current) {
+        voCancelRef.current();
+        voCancelRef.current = null;
       }
-    }
 
-    // Play the active scene's voiceover
-    if (activeSceneId && map.has(activeSceneId)) {
-      const el = map.get(activeSceneId)!;
-      if (voActiveRef.current !== activeSceneId) {
-        // New scene — seek and play
-        el.currentTime = offsetInScene;
-        el.play().catch(() => {});
-        voActiveRef.current = activeSceneId;
+      const timing = sceneTimings.find((s) => s.id === activeSceneId);
+      const text = timing?.text;
+      if (text) {
+        const cancel = speak({
+          text,
+          voiceId: voiceover.voiceId !== "browser-default" ? voiceover.voiceId : undefined,
+          rate: voiceover.speed ?? 1,
+          onEnd: () => { voCancelRef.current = null; },
+          onError: () => { voCancelRef.current = null; },
+        });
+        voCancelRef.current = cancel;
       }
-    } else {
+      voActiveRef.current = activeSceneId;
+    } else if (!activeSceneId && voActiveRef.current) {
+      // Between scenes or past end
+      if (voCancelRef.current) {
+        voCancelRef.current();
+        voCancelRef.current = null;
+      }
       voActiveRef.current = null;
     }
   });
@@ -143,11 +120,8 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
   useEffect(() => {
     return () => {
       getAmbientPlayer().stop();
-      for (const [, el] of voAudiosRef.current) {
-        el.pause();
-        el.src = "";
-      }
-      voAudiosRef.current.clear();
+      stopSpeaking();
+      if (voCancelRef.current) { voCancelRef.current(); voCancelRef.current = null; }
     };
   }, []);
 

@@ -220,17 +220,22 @@ export default function ResumeDetail() {
 
       setLoading(true);
       try {
-        // Primary: standard endpoint (respects privacy/auth)
+        // Primary: standard endpoint (respects privacy/auth, supports UUID + slug)
         const foundResume = await resumeService.getResumeById(id);
         setResume(foundResume);
       } catch (error) {
-        console.error("Failed to load resume via /api/Resume/{id}, attempting embedded endpoint:", error);
         try {
-          // Fallback: embedded endpoint allows public viewing by slug or GUID
+          // Fallback 1: embedded endpoint (auth required, supports slug)
           const embedded = await resumeService.getResumeForEmbed(id);
           setResume(embedded);
-        } catch (embeddedErr) {
-          console.error("Failed to load resume via embedded endpoint:", embeddedErr);
+        } catch {
+          try {
+            // Fallback 2: public endpoint (no auth, public resumes only)
+            const publicResume = await resumeService.getPublicResume(id);
+            setResume(publicResume);
+          } catch {
+            console.error("Failed to load resume with identifier:", id);
+          }
         }
       } finally {
         setLoading(false);
