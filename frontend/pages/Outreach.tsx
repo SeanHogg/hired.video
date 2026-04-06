@@ -27,8 +27,15 @@ import {
   MousePointer,
   Megaphone,
   Layers,
+  Share2,
+  Play,
+  Globe,
+  Lock,
+  ChevronDown,
+  ChevronRight,
+  Link2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -83,6 +90,10 @@ import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
 import { advertisingService, type JobBoost, type AdvertisingStats } from "@/lib/services/advertising-service";
+import { studioService, type StudioProject, StudioProjectStatus, type VideoCampaign, type CampaignStats } from "@/lib/services/studio-service";
+
+const VideoAnalyticsDashboard = lazy(() => import("@/components/studio/VideoAnalyticsDashboard"));
+
 import {
   EmailTemplateDTO,
   EmailCampaignDTO,
@@ -110,7 +121,7 @@ export default function Outreach() {
 
   // State management
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
+    "dashboard" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
   >("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +171,15 @@ export default function Outreach() {
   const [adStats, setAdStats] = useState<AdvertisingStats | null>(null);
   const [activeBoosts, setActiveBoosts] = useState<JobBoost[]>([]);
   const [boostActionLoading, setBoostActionLoading] = useState<string | null>(null);
+
+  // Published content state
+  const [publishedProjects, setPublishedProjects] = useState<StudioProject[]>([]);
+  const [videoCampaigns, setVideoCampaigns] = useState<VideoCampaign[]>([]);
+  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
+  const [showCampaignDialog, setShowCampaignDialog] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" });
+  const [campaignVideoSelect, setCampaignVideoSelect] = useState<string[]>([]);
+  const [campaignSubmitting, setCampaignSubmitting] = useState(false);
 
   // Boost dialog state
   const [showBoostDialog, setShowBoostDialog] = useState(false);
@@ -222,6 +242,8 @@ export default function Outreach() {
           userJobsData,
           adStatsData,
           boostsData,
+          studioProjectsData,
+          videoCampaignsData,
         ] = await Promise.all([
           communicationService.getEmailTemplates(),
           communicationService.getEmailCampaigns(),
@@ -235,6 +257,8 @@ export default function Outreach() {
           jobService.getUserJobs().catch(() => []),
           advertisingService.getStats().catch(() => null),
           advertisingService.getBoosts().catch(() => []),
+          studioService.getProjects().then((r) => r.data ?? []).catch(() => [] as StudioProject[]),
+          studioService.getCampaigns().then((r) => r.data ?? []).catch(() => [] as VideoCampaign[]),
         ]);
 
         setEmailTemplates(templatesData);
@@ -249,6 +273,10 @@ export default function Outreach() {
         setUserJobs(userJobsData);
         setAdStats(adStatsData);
         setActiveBoosts(boostsData);
+        setPublishedProjects(studioProjectsData.filter(
+          (p: StudioProject) => p.status === StudioProjectStatus.Published || p.status === StudioProjectStatus.Exported || p.status === StudioProjectStatus.Completed,
+        ));
+        setVideoCampaigns(videoCampaignsData);
       } catch (err) {
         console.error("Failed to load outreach data:", err);
         setError(
@@ -701,21 +729,18 @@ export default function Outreach() {
                   value={activeTab}
                   onValueChange={(value) =>
                     setActiveTab(
-                      value as
-                        | "dashboard"
-                        | "templates"
-                        | "campaigns"
-                        | "tracking"
-                        | "contacts"
-                        | "job-boards"
-                        | "advertise",
+                      value as typeof activeTab,
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-7">
+                  <TabsList className="grid w-full grid-cols-8">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                    <TabsTrigger value="templates">Templates</TabsTrigger>
+                    <TabsTrigger value="content" className="flex items-center gap-1">
+                      <Video className="h-3.5 w-3.5" />
+                      My Content
+                    </TabsTrigger>
                     <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+                    <TabsTrigger value="templates">Templates</TabsTrigger>
                     <TabsTrigger value="tracking">Tracking</TabsTrigger>
                     <TabsTrigger value="contacts">Contacts</TabsTrigger>
                     <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
@@ -988,6 +1013,127 @@ export default function Outreach() {
                     </div>
                   </TabsContent>
 
+                  {/* My Content Tab — published videos & artifacts */}
+                  <TabsContent value="content" className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-bold">My Published Content</h2>
+                      <Link to="/studio">
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Video
+                        </Button>
+                      </Link>
+                    </div>
+
+                    {publishedProjects.length > 0 ? (
+                      <div className="space-y-4">
+                        {publishedProjects.map((project) => {
+                          const isExpanded = expandedVideoId === project.id;
+                          const videoId = project.youtubeVideoId ?? project.id;
+                          const publicUrl = `https://hired.video/v/${videoId}`;
+                          return (
+                            <Card key={project.id}>
+                              <CardHeader className="pb-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-4 min-w-0">
+                                    {/* Thumbnail */}
+                                    <div className="shrink-0 w-32 h-20 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                                      {project.thumbnailUrl ? (
+                                        <img src={project.thumbnailUrl} alt={project.title} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <Play className="h-6 w-6 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <CardTitle className="text-base truncate">{project.title}</CardTitle>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <Badge variant={project.status === StudioProjectStatus.Published ? "default" : "secondary"}>
+                                          {project.status}
+                                        </Badge>
+                                        {project.isPublic ? (
+                                          <span className="flex items-center gap-1 text-[11px] text-emerald-500"><Globe className="w-3 h-3" /> Public</span>
+                                        ) : (
+                                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Lock className="w-3 h-3" /> Unlisted</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {project.viewCount ?? 0} views</span>
+                                        <span className="flex items-center gap-1"><MousePointer className="w-3 h-3" /> {project.ctaClickCount ?? 0} clicks</span>
+                                        <span>{new Date(project.creationDateTime).toLocaleDateString()}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(publicUrl);
+                                      }}
+                                    >
+                                      <Link2 className="w-3 h-3 mr-1" /> Copy Link
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      asChild
+                                    >
+                                      <a
+                                        href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <Share2 className="w-3 h-3 mr-1" /> Share
+                                      </a>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs"
+                                      onClick={() => setExpandedVideoId(isExpanded ? null : project.id)}
+                                    >
+                                      <BarChart3 className="w-3 h-3 mr-1" />
+                                      Analytics
+                                      {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              {/* Inline analytics */}
+                              {isExpanded && (
+                                <CardContent className="pt-0 border-t">
+                                  <Suspense fallback={<div className="flex items-center justify-center py-8 text-muted-foreground text-sm"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading analytics…</div>}>
+                                    <VideoAnalyticsDashboard
+                                      videoId={videoId}
+                                      videoDurationSec={project.script?.video?.duration}
+                                    />
+                                  </Suspense>
+                                </CardContent>
+                              )}
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No published content yet</h3>
+                        <p className="text-muted-foreground mb-4">
+                          Create and publish videos in the Studio to promote them here
+                        </p>
+                        <Link to="/studio">
+                          <Button>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Go to Studio
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </TabsContent>
+
                   {/* Templates Tab */}
                   <TabsContent value="templates" className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -1081,81 +1227,102 @@ export default function Outreach() {
                   {/* Campaigns Tab */}
                   <TabsContent value="campaigns" className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">Email Campaigns</h2>
-                      <Button disabled>
+                      <h2 className="text-2xl font-bold">Campaigns</h2>
+                      <Button onClick={() => { setCampaignForm({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" }); setCampaignVideoSelect([]); setShowCampaignDialog(true); }}>
                         <Plus className="h-4 w-4 mr-2" />
-                        New Campaign (Coming Soon)
+                        New Video Campaign
                       </Button>
                     </div>
 
-                    <div className="space-y-4">
-                      {emailCampaigns.map((campaign) => (
-                        <Card key={campaign.id}>
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle>{campaign.name}</CardTitle>
-                                <CardDescription>
-                                  {campaign.description}
-                                </CardDescription>
-                              </div>
-                              <Badge
-                                variant={
-                                  campaign.status === EmailCampaignStatus.Sent
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {EmailCampaignStatus[campaign.status]}
-                              </Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">
-                                  Recipients
-                                </p>
-                                <p className="font-medium">
-                                  {campaign.totalRecipients}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Sent</p>
-                                <p className="font-medium">
-                                  {campaign.emailsSent}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Opened</p>
-                                <p className="font-medium">
-                                  {campaign.emailsOpened}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Replies</p>
-                                <p className="font-medium">
-                                  {campaign.repliesReceived}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                    {/* Video Campaigns */}
+                    {videoCampaigns.length > 0 && (
+                      <>
+                        <h3 className="text-lg font-semibold flex items-center gap-2"><Video className="h-4 w-4" /> Video Campaigns</h3>
+                        <div className="space-y-4">
+                          {videoCampaigns.map((vc) => (
+                            <Card key={vc.id}>
+                              <CardHeader>
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle>{vc.name}</CardTitle>
+                                    <CardDescription>{vc.description || "No description"}</CardDescription>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={vc.status === "active" ? "default" : "secondary"}>{vc.status}</Badge>
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => { await studioService.deleteCampaign(vc.id); setVideoCampaigns((prev) => prev.filter((c) => c.id !== vc.id)); }}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">Videos</p>
+                                    <p className="font-medium">{vc.videoIds.length}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">UTM Source</p>
+                                    <p className="font-medium">{vc.utmSource || "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">UTM Medium</p>
+                                    <p className="font-medium">{vc.utmMedium || "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Created</p>
+                                    <p className="font-medium">{new Date(vc.createdAt).toLocaleDateString()}</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </>
+                    )}
 
-                    {emailCampaigns.length === 0 && (
+                    {/* Email Campaigns */}
+                    {emailCampaigns.length > 0 && (
+                      <>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Mail className="h-4 w-4" /> Email Campaigns</h3>
+                        <div className="space-y-4">
+                          {emailCampaigns.map((campaign) => (
+                            <Card key={campaign.id}>
+                              <CardHeader>
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle>{campaign.name}</CardTitle>
+                                    <CardDescription>{campaign.description}</CardDescription>
+                                  </div>
+                                  <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"}>
+                                    {EmailCampaignStatus[campaign.status]}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div><p className="text-muted-foreground">Recipients</p><p className="font-medium">{campaign.totalRecipients}</p></div>
+                                  <div><p className="text-muted-foreground">Sent</p><p className="font-medium">{campaign.emailsSent}</p></div>
+                                  <div><p className="text-muted-foreground">Opened</p><p className="font-medium">{campaign.emailsOpened}</p></div>
+                                  <div><p className="text-muted-foreground">Replies</p><p className="font-medium">{campaign.repliesReceived}</p></div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {emailCampaigns.length === 0 && videoCampaigns.length === 0 && (
                       <div className="text-center py-12">
-                        <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          No campaigns yet
-                        </h3>
+                        <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
                         <p className="text-muted-foreground mb-4">
-                          Create your first email campaign to start outreach
+                          Create a video campaign to group and track your published content
                         </p>
-                        <Button disabled>
+                        <Button onClick={() => { setCampaignForm({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" }); setCampaignVideoSelect([]); setShowCampaignDialog(true); }}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Create Campaign (Coming Soon)
+                          Create Campaign
                         </Button>
                       </div>
                     )}
@@ -1992,6 +2159,96 @@ export default function Outreach() {
         </div>
         <Footer />
       </div>
+
+      {/* Video Campaign Dialog */}
+      <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Video Campaign</DialogTitle>
+            <DialogDescription>
+              Group your published videos into a campaign with UTM tracking to measure promotion effectiveness.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="campaign-name">Campaign Name *</Label>
+              <Input id="campaign-name" placeholder="e.g. Q2 Job Search" value={campaignForm.name} onChange={(e) => setCampaignForm((f) => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <Label htmlFor="campaign-desc">Description</Label>
+              <Textarea id="campaign-desc" placeholder="What is this campaign for?" value={campaignForm.description} onChange={(e) => setCampaignForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="utm-source" className="text-xs">UTM Source</Label>
+                <Input id="utm-source" placeholder="linkedin" className="h-8 text-xs" value={campaignForm.utmSource} onChange={(e) => setCampaignForm((f) => ({ ...f, utmSource: e.target.value }))} />
+              </div>
+              <div>
+                <Label htmlFor="utm-medium" className="text-xs">UTM Medium</Label>
+                <Input id="utm-medium" placeholder="video" className="h-8 text-xs" value={campaignForm.utmMedium} onChange={(e) => setCampaignForm((f) => ({ ...f, utmMedium: e.target.value }))} />
+              </div>
+              <div>
+                <Label htmlFor="utm-campaign" className="text-xs">UTM Campaign</Label>
+                <Input id="utm-campaign" placeholder="spring-2026" className="h-8 text-xs" value={campaignForm.utmCampaign} onChange={(e) => setCampaignForm((f) => ({ ...f, utmCampaign: e.target.value }))} />
+              </div>
+            </div>
+            {/* Select videos to include */}
+            {publishedProjects.length > 0 && (
+              <div>
+                <Label className="text-xs mb-1.5 block">Include Videos</Label>
+                <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
+                  {publishedProjects.map((p) => (
+                    <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={campaignVideoSelect.includes(p.id)}
+                        onChange={(e) => {
+                          setCampaignVideoSelect((prev) =>
+                            e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id),
+                          );
+                        }}
+                        className="rounded"
+                      />
+                      <span className="truncate">{p.title}</span>
+                      <Badge variant="outline" className="text-[10px] ml-auto shrink-0">{p.status}</Badge>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>Cancel</Button>
+            <Button
+              disabled={!campaignForm.name.trim() || campaignSubmitting}
+              onClick={async () => {
+                setCampaignSubmitting(true);
+                try {
+                  const res = await studioService.createCampaign({
+                    name: campaignForm.name.trim(),
+                    description: campaignForm.description || undefined,
+                    utmSource: campaignForm.utmSource || undefined,
+                    utmMedium: campaignForm.utmMedium || undefined,
+                    utmCampaign: campaignForm.utmCampaign || undefined,
+                    videoIds: campaignVideoSelect,
+                  });
+                  if (res.data) {
+                    setVideoCampaigns((prev) => [res.data!, ...prev]);
+                  }
+                  setShowCampaignDialog(false);
+                } catch {
+                  // toast would go here
+                } finally {
+                  setCampaignSubmitting(false);
+                }
+              }}
+            >
+              {campaignSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Create Campaign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Email Template Sheet (Slide-out Panel) */}
       <Sheet open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>

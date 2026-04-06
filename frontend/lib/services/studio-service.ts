@@ -197,6 +197,33 @@ export type UserVideo = z.infer<typeof UserVideoSchema>;
 
 export type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
 
+// ─── Video campaign types ────────────────────────────────────────────────────
+
+export const VideoCampaignSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  utmSource: z.string().nullable(),
+  utmMedium: z.string().nullable(),
+  utmCampaign: z.string().nullable(),
+  status: z.string(),
+  videoIds: z.array(z.string()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type VideoCampaign = z.infer<typeof VideoCampaignSchema>;
+
+export const CampaignStatsSchema = z.object({
+  views: z.number(),
+  ctaClicks: z.number(),
+  shares: z.number(),
+  videoCount: z.number(),
+});
+export type CampaignStats = z.infer<typeof CampaignStatsSchema>;
+
+// ─── Storyboard generation ───────────────────────────────────────────────────
+
 export interface GenerateStoryboardParams {
   resumeText: string;
   resumeId?: string;
@@ -391,4 +418,40 @@ export const studioService = {
     return apiClient.get(`/api/studio/videos/user/${userId}`, z.array(UserVideoSchema));
   },
 
+  // ── Video Campaigns ─────────────────────────────────────────────────────────
+
+  async getCampaigns(): Promise<ApiSuccessResponse<VideoCampaign[]>> {
+    return apiClient.get("/api/studio/campaigns", z.array(VideoCampaignSchema));
+  },
+
+  async createCampaign(data: {
+    name: string;
+    description?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    videoIds?: string[];
+  }): Promise<ApiSuccessResponse<VideoCampaign>> {
+    return apiClient.post("/api/studio/campaigns", data, VideoCampaignSchema);
+  },
+
+  async updateCampaign(id: string, data: Partial<{
+    name: string;
+    description: string;
+    utmSource: string;
+    utmMedium: string;
+    utmCampaign: string;
+    status: string;
+    videoIds: string[];
+  }>): Promise<ApiSuccessResponse<VideoCampaign>> {
+    return apiClient.patch(`/api/studio/campaigns/${id}`, data, VideoCampaignSchema);
+  },
+
+  async deleteCampaign(id: string): Promise<ApiSuccessResponse<{ archived: boolean }>> {
+    return apiClient.delete(`/api/studio/campaigns/${id}`, z.object({ archived: z.boolean() }));
+  },
+
+  async getCampaignStats(id: string): Promise<ApiSuccessResponse<CampaignStats>> {
+    return apiClient.get(`/api/studio/campaigns/${id}/stats`, CampaignStatsSchema);
+  },
 };
