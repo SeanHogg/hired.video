@@ -987,6 +987,7 @@ export default function StudioLayout() {
                 canRedo={canRedo}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
+                contentTemplate={contentTemplate}
               />
             )}
 

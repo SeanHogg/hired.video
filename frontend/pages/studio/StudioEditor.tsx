@@ -1,18 +1,18 @@
-// StudioEditor.tsx — tab switcher: Prompt | Storyboard.
-// Auto-switches to Storyboard after generation.
+// StudioEditor.tsx — tab switcher that adapts per content template.
+//
+// Resume / Personal Brand  →  Prompt  | Storyboard
+// Skills Demo               →  Setup   | Storyboard
+// Job Ad / Company Promo    →  Job Details | Storyboard
 
 import { Undo2, Redo2 } from "lucide-react";
 import PromptEditor from "@/components/PromptEditor";
+import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
+import type { ContentTemplate } from "./StudioSidebar";
 
 export type EditorTab = "prompt" | "storyboard";
-
-const TABS: { id: EditorTab; label: string }[] = [
-  { id: "prompt",     label: "Prompt"     },
-  { id: "storyboard", label: "Storyboard" },
-];
 
 interface Props {
   tab: EditorTab;
@@ -28,6 +28,16 @@ interface Props {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  contentTemplate?: ContentTemplate;
+}
+
+/** First-tab label per content template */
+function getFirstTabLabel(ct?: ContentTemplate): string {
+  switch (ct) {
+    case "skills-demo":    return "Setup";
+    case "job_ad":         return "Job Details";
+    default:               return "Prompt";
+  }
 }
 
 export default function StudioEditor({
@@ -35,12 +45,18 @@ export default function StudioEditor({
   state, onStateChange, showJD, onToggleJD,
   onScriptChange, focusedSceneId, onSceneFocus,
   canUndo, canRedo, onUndo, onRedo,
+  contentTemplate,
 }: Props) {
+  const firstLabel = getFirstTabLabel(contentTemplate);
+
   return (
     <div className="studio-editor">
       {/* Tab bar */}
       <div className="flex items-center border-b shrink-0">
-        {TABS.map((t) => (
+        {([
+          { id: "prompt" as EditorTab,     label: firstLabel },
+          { id: "storyboard" as EditorTab, label: "Storyboard" },
+        ]).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -83,7 +99,14 @@ export default function StudioEditor({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "prompt" && (
+        {tab === "prompt" && contentTemplate === "skills-demo" && (
+          <SkillsDemoSetup
+            state={state}
+            onStateChange={onStateChange}
+          />
+        )}
+
+        {tab === "prompt" && contentTemplate !== "skills-demo" && (
           <PromptEditor
             state={state}
             onStateChange={onStateChange}
