@@ -27,7 +27,7 @@ interface Props {
   onPublishToProfile: () => void;
   isPublishedToProfile?: boolean;
   profileUrl?: string;
-  onLinkedInPost: () => void;
+  onLinkedInPublish: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
   /** Callback for the Generate button in the action stepper */
@@ -48,7 +48,7 @@ function formatTime(s: number): string {
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime, exportProgress,
   onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
-  onLinkedInPost, onMakePublic, isPublic,
+  onLinkedInPublish, onMakePublic, isPublic,
   onGenerate,
   showVideo = true, showActions = true, className,
 }: Props) {
@@ -283,10 +283,10 @@ export default function StudioPreview({
                     <Upload className="w-3 h-3 mr-1.5" />
                     {hasYoutube ? "Re-publish to YouTube" : "Publish to YouTube"}
                   </Button>
-                  {/* LinkedIn always available once video is ready */}
+                  {/* LinkedIn — direct OAuth publishing */}
                   {hasVideo && (
-                    <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onLinkedInPost} disabled={busy}>
-                      <Share2 className="w-3 h-3 mr-1.5" /> Post to LinkedIn
+                    <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onLinkedInPublish} disabled={busy}>
+                      <Share2 className="w-3 h-3 mr-1.5" /> Publish to LinkedIn
                     </Button>
                   )}
                   {/* Publish to Profile */}

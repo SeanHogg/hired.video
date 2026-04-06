@@ -2,7 +2,7 @@
 // Unauthenticated users see a marketing landing. Authenticated users get the
 // full workspace.
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import {
   Sparkles,
@@ -46,13 +46,15 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 
-import StudioSidebar from "./StudioSidebar";
+import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioSettings from "./StudioSettings";
 import StudioFeaturesHub from "./StudioFeaturesHub";
 import TimelineEditor from "@/components/TimelineEditor";
-import LinkedInPostModal from "@/components/LinkedInPostModal";
+
+const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
+const SkillsDemoCreator = lazy(() => import("@/components/studio/SkillsDemoCreator"));
 
 /** Strip ephemeral blob: URLs from a script before persisting to the server.
  * Blob URLs are session-scoped and become invalid after a page reload, so they
@@ -376,7 +378,8 @@ export default function StudioLayout() {
   const [exportProgress, setExportProgress] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [isPublishedToProfile, setIsPublishedToProfile] = useState(false);
-  const [linkedInOpen, setLinkedInOpen] = useState(false);
+  const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
+  const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
@@ -513,6 +516,7 @@ export default function StudioLayout() {
         targetDuration: state.targetDuration,
         resolution: state.resolution,
         motion: state.motion,
+        purpose: state.purpose,
       });
 
       if (!res.data) throw new Error("No data returned");
@@ -647,6 +651,7 @@ export default function StudioLayout() {
     setCurrentTime(0);
     setPlaying(false);
     setIsPublic(false);
+    setContentTemplate("resume");
   }
 
   function handleProjectSelect(p: import("@/lib/services/studio-service").StudioProject) {
@@ -729,6 +734,18 @@ export default function StudioLayout() {
     } catch {
       toast({ title: "Delete failed", description: "Could not delete project.", variant: "destructive" });
     }
+  }
+
+  function handleContentTemplateSelect(template: ContentTemplate) {
+    setContentTemplate(template);
+    // Map content template to API purpose
+    const purposeMap: Record<ContentTemplate, typeof state.purpose> = {
+      "resume": "resume",
+      "skills-demo": "resume", // Skills Demo uses its own generation flow
+      "job_ad": "job_ad",
+      "personal_brand": "personal_brand",
+    };
+    patchState({ purpose: purposeMap[template] ?? "resume" });
   }
 
   async function handlePublishToProfile() {
@@ -887,6 +904,8 @@ export default function StudioLayout() {
             onBackgroundSelect={handleBackgroundSelect}
             script={state.script}
             onScriptChange={handleScriptChange}
+            contentTemplate={contentTemplate}
+            onContentTemplateSelect={handleContentTemplateSelect}
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -905,7 +924,7 @@ export default function StudioLayout() {
                 onPublishToProfile={handlePublishToProfile}
                 isPublishedToProfile={isPublishedToProfile}
                 profileUrl={user?.id ? `/people/${user.id}` : undefined}
-                onLinkedInPost={() => setLinkedInOpen(true)}
+                onLinkedInPublish={() => setLinkedInPublishOpen(true)}
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
                 showActions={false}
@@ -952,8 +971,17 @@ export default function StudioLayout() {
               )}
             </div>
 
-            {/* Prompt / Storyboard tabs — fills remaining space (when features closed) */}
-            {!featuresOpen && (
+            {/* Main editor — skills-demo template shows SkillsDemoCreator, others show Prompt/Storyboard */}
+            {!featuresOpen && contentTemplate === "skills-demo" ? (
+              <div className="flex-1 overflow-y-auto p-4">
+                <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Loading…</div>}>
+                  <SkillsDemoCreator
+                    resumeText={state.resumeText}
+                    onRecordingStart={() => setFeaturesOpen(true)}
+                  />
+                </Suspense>
+              </div>
+            ) : !featuresOpen ? (
               <StudioEditor
                 tab={tab}
                 onTabChange={setTab}
@@ -969,9 +997,9 @@ export default function StudioLayout() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
               />
-            )}
+            ) : null}
 
-            {/* Advanced Features Hub toggle */}
+            {/* Advanced Enhancements toggle */}
             <div className="shrink-0 border-t">
               <button
                 type="button"
@@ -982,20 +1010,14 @@ export default function StudioLayout() {
                 onClick={() => setFeaturesOpen((v) => !v)}
               >
                 {featuresOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                Advanced Studio Features
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary ml-2">
-                  New
-                </span>
+                Advanced Enhancements
               </button>
             </div>
 
-            {/* Features Hub — fills remaining space when open */}
+            {/* Enhancements Hub — fills remaining space when open */}
             {featuresOpen && (
               <div className="flex-1 overflow-hidden">
                 <StudioFeaturesHub
-                  projectId={state.projectId ?? undefined}
-                  videoId={state.youtubeVideoId ?? undefined}
-                  resumeText={state.resumeText}
                   scriptText={state.script?.scenes.map((s) =>
                     [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
                   ).join(" ") ?? ""}
@@ -1006,10 +1028,7 @@ export default function StudioLayout() {
                     items: s.items,
                     skills: s.skills,
                   }))}
-                  videoBlob={state.videoBlob}
-                  videoUrl={state.youtubeVideoId ? `https://www.youtube.com/watch?v=${state.youtubeVideoId}` : undefined}
-                  videoDurationSec={state.script?.video.duration}
-                  candidateName={state.name}
+                  projectId={state.projectId ?? undefined}
                 />
               </div>
             )}
@@ -1030,7 +1049,7 @@ export default function StudioLayout() {
               onPublishToProfile={handlePublishToProfile}
               isPublishedToProfile={isPublishedToProfile}
               profileUrl={user?.id ? `/people/${user.id}` : undefined}
-              onLinkedInPost={() => setLinkedInOpen(true)}
+              onLinkedInPublish={() => setLinkedInPublishOpen(true)}
               onMakePublic={handleMakePublic}
               isPublic={isPublic}
               onGenerate={handleGenerate}
@@ -1041,12 +1060,33 @@ export default function StudioLayout() {
         </div>
       </div>
 
-      {linkedInOpen && (state.youtubeVideoId || state.projectId) && (
-        <LinkedInPostModal
-          videoId={state.youtubeVideoId ?? state.projectId!}
-          videoTitle={state.name}
-          onClose={() => setLinkedInOpen(false)}
-        />
+      {linkedInPublishOpen && state.projectId && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="font-semibold">Publish to LinkedIn</h2>
+              <button type="button" onClick={() => setLinkedInPublishOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <span className="sr-only">Close</span>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5">
+              <Suspense fallback={<div className="text-center py-8 text-muted-foreground text-sm">Loading…</div>}>
+                <LinkedInPublisher
+                  projectId={state.projectId}
+                  videoBlob={state.videoBlob}
+                  defaultText={state.script?.scenes.map((s) =>
+                    [s.title, typeof s.text === "string" ? s.text : ""].filter(Boolean).join(". ")
+                  ).join(" ").slice(0, 200) ?? ""}
+                  onPublished={() => {
+                    setLinkedInPublishOpen(false);
+                    toast({ title: "Published to LinkedIn!" });
+                  }}
+                />
+              </Suspense>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* First-time onboarding overlay */}

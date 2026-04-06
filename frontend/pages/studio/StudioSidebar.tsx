@@ -1,7 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick } from "lucide-react";
+import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle } from "lucide-react";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -12,6 +12,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
+
+// ─── Content templates (what kind of video) ──────────────────────────────
+
+export type ContentTemplate = "resume" | "skills-demo" | "job_ad" | "personal_brand";
+
+interface ContentTemplateDef {
+  id: ContentTemplate;
+  label: string;
+  desc: string;
+  icon: React.ElementType;
+}
+
+const CONTENT_TEMPLATES: ContentTemplateDef[] = [
+  { id: "resume",         label: "Promote Yourself",  desc: "Video resume from your experience",           icon: FileVideo },
+  { id: "skills-demo",    label: "Skills Demo",       desc: "Screen + webcam walkthrough of your work",    icon: Code2 },
+  { id: "job_ad",         label: "Job Ad",            desc: "Video ad for a job opening or company promo", icon: Megaphone },
+  { id: "personal_brand", label: "Personal Brand",    desc: "Showcase your story and brand",               icon: UserCircle },
+];
+
+// ─── Visual themes (how it looks) ─────────────────────────────────────────
 
 // Template metadata with visual descriptions
 const TEMPLATES: {
@@ -88,6 +108,10 @@ interface Props {
   onBackgroundSelect?: (bgValue: string, customImageUrl?: string) => void;
   script?: import("@/types/video-script").VideoScript | null;
   onScriptChange?: (s: import("@/types/video-script").VideoScript) => void;
+  /** Currently selected content template */
+  contentTemplate?: ContentTemplate;
+  /** Called when user selects a content template */
+  onContentTemplateSelect?: (template: ContentTemplate) => void;
 }
 
 const STATUS_COLOUR: Record<string, string> = {
@@ -116,10 +140,10 @@ function loadCollapsed() {
     const raw = localStorage.getItem(SIDEBAR_PREFS_KEY);
     if (raw) return JSON.parse(raw) as Record<string, boolean>;
   } catch {}
-  return { templates: false, backgrounds: false, theme: false, music: false };
+  return { contentTemplates: false, templates: false, backgrounds: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -332,14 +356,55 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </ul>
       </section>
 
-      {/* Templates */}
+      {/* Content Templates — what kind of video */}
+      <section className="px-3 pb-3 border-t pt-3">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
+          onClick={() => toggleSection("contentTemplates")}
+        >
+          <LayoutTemplate className="w-3 h-3" /> <span className="flex-1 text-left">Templates</span>
+          {collapsed.contentTemplates ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+        {!collapsed.contentTemplates && (
+          <ul className="flex flex-col gap-1.5">
+            {CONTENT_TEMPLATES.map((ct) => {
+              const isActive = contentTemplate === ct.id;
+              return (
+                <li key={ct.id}>
+                  <button
+                    type="button"
+                    className={`w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-lg border transition-colors ${
+                      isActive
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40 hover:bg-accent"
+                    }`}
+                    onClick={() => onContentTemplateSelect?.(ct.id)}
+                  >
+                    <ct.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-xs font-semibold ${isActive ? "text-primary" : ""}`}>{ct.label}</span>
+                        {isActive && <Check className="w-3 h-3 text-primary" />}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{ct.desc}</p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Visual Themes — how it looks */}
       <section className="px-3 pb-3 border-t pt-3">
         <button
           type="button"
           className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
           onClick={() => toggleSection("templates")}
         >
-          <LayoutTemplate className="w-3 h-3" /> <span className="flex-1 text-left">Templates</span>
+          <Palette className="w-3 h-3" /> <span className="flex-1 text-left">Visual Themes</span>
           {collapsed.templates ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.templates && <ul className="flex flex-col gap-2">

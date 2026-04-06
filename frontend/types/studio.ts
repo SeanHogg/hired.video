@@ -1,5 +1,6 @@
 import type { VideoScript, VoiceoverConfig, CaptionConfig } from "./video-script";
 import type { CompiledVideo } from "../lib/compiler/types";
+import type { StudioPurpose } from "../lib/services/studio-service";
 
 export type StudioStatus =
   | "idle"
@@ -26,6 +27,8 @@ export interface StudioProjectState {
   projectId: string | null;
   youtubeVideoId: string | null;
   status: StudioStatus;
+  // Content template purpose
+  purpose: StudioPurpose;       // default "resume"
   // AI settings
   model: string;                // default "qwen/qwen3.6-plus:free"
   temperature: number;          // 0–1
@@ -44,6 +47,7 @@ export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemp
   name: "New Video Resume",
   prompt: "Create a professional 28-second video resume",
   resumeText: "",
+  purpose: "resume",
   status: "idle",
   model: "qwen/qwen3.6-plus:free",
   temperature: 0.7,

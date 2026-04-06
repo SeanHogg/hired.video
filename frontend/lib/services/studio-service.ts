@@ -195,6 +195,8 @@ export const UserVideoSchema = z.object({
 });
 export type UserVideo = z.infer<typeof UserVideoSchema>;
 
+export type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
+
 export interface GenerateStoryboardParams {
   resumeText: string;
   resumeId?: string;
@@ -205,6 +207,7 @@ export interface GenerateStoryboardParams {
   targetDuration?: number;
   resolution?: "720p" | "1080p";
   motion?: "minimal" | "moderate" | "cinematic";
+  purpose?: StudioPurpose;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
