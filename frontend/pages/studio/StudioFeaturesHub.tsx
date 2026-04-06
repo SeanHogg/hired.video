@@ -105,7 +105,7 @@ export default function StudioFeaturesHub({
   const [isScrolling, setIsScrolling] = useState(false);
   const [teleprompterText, setTeleprompterText] = useState(scriptText ?? "");
 
-  const isRecruiter = user?.role === "recruiter" || user?.role === "admin";
+  const isRecruiter = user?.role === "Recruiter" || user?.role === "Admin";
 
   return (
     <div className="flex flex-col h-full">
