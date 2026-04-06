@@ -217,7 +217,7 @@ export class RolePermissions {
   }
 
   get canCreateResume(): boolean {
-    return this.isJobSeeker;
+    return true;
   }
 
   get canManageAccount(): boolean {

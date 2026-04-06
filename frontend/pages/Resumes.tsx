@@ -72,6 +72,7 @@ import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { generateResumeId, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type {
@@ -110,6 +111,7 @@ export default function Resumes() {
   // SEO for resumes page
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
+  const { effectiveRole, isJobSeeker: isEffectiveJobSeeker, isRecruiter: isEffectiveRecruiter, isEmployer: isEffectiveEmployer } = usePermissions();
   const { toast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -131,7 +133,7 @@ export default function Resumes() {
   const displayMasterGroups = optimisticState.masterGroups;
 
   // Master Resume System state - only applicable to Job Seekers
-  const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
+  const isJobSeeker = isEffectiveJobSeeker;
   const [showMasterGroups, setShowMasterGroups] = useState(false); // Will be set based on role in useEffect
   const [variationDialog, setVariationDialog] = useState<{
     isOpen: boolean;
@@ -202,11 +204,11 @@ export default function Resumes() {
 
   // Set default view state based on user role
   useEffect(() => {
-    if (user?.role) {
+    if (effectiveRole) {
       // Job Seekers default to Collections view, others default to All Resumes view
-      setShowMasterGroups(user.role === USER_ROLES.JOB_SEEKER);
+      setShowMasterGroups(isEffectiveJobSeeker);
     }
-  }, [user?.role]);
+  }, [effectiveRole, isEffectiveJobSeeker]);
 
   useEffect(() => {
     if (id) {
@@ -1228,7 +1230,7 @@ export default function Resumes() {
                           Active: {getActiveResume()?.name}
                         </Badge>
                       )}
-                      {!loading && !getActiveResume() && user?.role === "JobSeeker" && (
+                      {!loading && !getActiveResume() && isJobSeeker && (
                         <Badge
                           variant="outline"
                           className="text-orange-600 border-orange-200"
@@ -1236,13 +1238,12 @@ export default function Resumes() {
                           No active resume
                         </Badge>
                       )}
-                      {(user?.role === USER_ROLES.RECRUITER ||
-                        user?.role === USER_ROLES.EMPLOYER) && (
+                      {(isEffectiveRecruiter || isEffectiveEmployer) && (
                         <Badge
                           variant="outline"
                           className="text-blue-600 border-blue-200"
                         >
-                          {user.role === USER_ROLES.RECRUITER
+                          {isEffectiveRecruiter
                             ? "Recruiter"
                             : "Employer"}{" "}
                           • Tracking{" "}
@@ -1255,26 +1256,24 @@ export default function Resumes() {
                       )}
                     </div>
                   </div>
-                  {user?.role === "JobSeeker" && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => setUploadSheetOpen(true)}
-                        variant="outline"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Resume
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const newId = generateResumeId();
-                          navigate(`/resumes/create/${newId}`);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Resume
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setUploadSheetOpen(true)}
+                      variant="outline"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Resume
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const newId = generateResumeId();
+                        navigate(`/resumes/create/${newId}`);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Resume
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Search and Filters */}
@@ -1360,7 +1359,7 @@ export default function Resumes() {
                       <MasterResumeGroupComponent
                         key={group.masterResume.id}
                         group={group}
-                        userRole={user?.role || "JobSeeker"}
+                        userRole={effectiveRole || "JobSeeker"}
                         isOwned={true} // Master resume groups are always owned by the current user
                         onViewResume={handleResumeView}
                         onCreateVariation={handleCreateVariation}
@@ -1570,33 +1569,22 @@ export default function Resumes() {
                           : "Create your first resume to get started"}
                       </p>
                       <div className="flex gap-2 justify-center">
-                        {user?.role === "JobSeeker" && (
-                          <>
-                            <Button
-                              onClick={() => setUploadSheetOpen(true)}
-                              variant="outline"
-                            >
-                              <Upload className="h-4 w-4 mr-2" />
-                              Upload Resume
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                const newId = generateResumeId();
-                                navigate(`/resumes/create/${newId}`);
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Create Resume
-                            </Button>
-                          </>
-                        )}
-                        {(user?.role === USER_ROLES.RECRUITER ||
-                          user?.role === USER_ROLES.EMPLOYER) && (
-                          <p className="text-sm text-muted-foreground">
-                            Browse and track candidate resumes from the home
-                            page search.
-                          </p>
-                        )}
+                        <Button
+                          onClick={() => setUploadSheetOpen(true)}
+                          variant="outline"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Resume
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            const newId = generateResumeId();
+                            navigate(`/resumes/create/${newId}`);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Resume
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

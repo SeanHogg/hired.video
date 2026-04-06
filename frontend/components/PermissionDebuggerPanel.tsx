@@ -44,9 +44,13 @@ export function PermissionDebuggerPanel() {
       null,
       2,
     );
-    await navigator.clipboard.writeText(data);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(data);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access denied by browser
+    }
   };
 
   const statusIcon = (status: PermissionCheck["status"]) => {

@@ -42,8 +42,11 @@ export const SceneScriptSchema = z.object({
   accentColor: z.string().optional(),
   backgroundImage: z.string().optional(),
   backgroundImagePosition: z.enum(["full","half-left","half-right","small-left","small-right","corner-tl","corner-tr","corner-bl","corner-br"]).optional(),
+  imageAnimation: z.enum(["none","zoom-in","zoom-out","pan-left","pan-right"]).optional(),
   sceneAudio: z.string().optional(),
   sceneAudioLabel: z.string().optional(),
+  textAlign: z.enum(["left","center","right"]).optional(),
+  contentPosition: z.enum(["top","center","bottom"]).optional(),
 });
 
 export const VideoScriptSchema = z.object({

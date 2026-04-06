@@ -142,8 +142,12 @@ export function EmulationHeaderControls() {
       permissionCount: permCount,
       timestamp: new Date().toISOString(),
     };
-    await navigator.clipboard.writeText(JSON.stringify(ctx, null, 2));
-    toast({ title: "Context copied to clipboard" });
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(ctx, null, 2));
+      toast({ title: "Context copied to clipboard" });
+    } catch {
+      toast({ title: "Failed to copy", description: "Clipboard access denied by browser", variant: "destructive" });
+    }
   };
 
   const handleExit = async () => {
