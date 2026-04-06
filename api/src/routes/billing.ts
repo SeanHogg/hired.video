@@ -598,7 +598,7 @@ billingRoutes.patch("/company/:companyId/seats", async (c) => {
       .where(eq(companySubsTable.companyId, companyId))
       .returning();
   } else {
-    [result] = await db.insert(companySubsTable)
+    [result] = (await db.insert(companySubsTable)
       .values({
         companyId,
         planTier: tier,
@@ -608,8 +608,8 @@ billingRoutes.patch("/company/:companyId/seats", async (c) => {
         status: "active",
         currentPeriodStart: now,
         currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-      })
-      .returning();
+      } as any)
+      .returning()) as any[];
   }
 
   // TODO: sync with Stripe to update subscription quantity when stripeSubscriptionId is set

@@ -89,17 +89,17 @@ atsRoutes.post("/connections", async (c) => {
   const table = getAtsTable();
   if (!table) return c.json(error("SERVICE_UNAVAILABLE", "ATS connections not available"), 503);
 
-  const [row] = await db.insert(table).values({
+  const [row] = (await db.insert(table).values({
     companyId,
     provider,
     apiKey,
     webhookSecret: webhookSecret ?? null,
     config: config ?? {},
     isActive: true,
-  }).onConflictDoUpdate({
+  } as any).onConflictDoUpdate({
     target: [table.companyId, table.provider],
-    set: { apiKey, webhookSecret: webhookSecret ?? null, config: config ?? {}, isActive: true, updatedAt: new Date() },
-  }).returning().catch(() => []);
+    set: { apiKey, webhookSecret: webhookSecret ?? null, config: config ?? {}, isActive: true, updatedAt: new Date() } as any,
+  }).returning().catch(() => [])) as any[];
 
   return c.json(success(row ?? {}), row ? 201 : 503);
 });
