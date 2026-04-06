@@ -370,11 +370,11 @@ export const studioService = {
   async updateProjectVisibility(
     projectId: string,
     isPublic: boolean,
-  ): Promise<ApiSuccessResponse<StudioProject & { isPublic: boolean }>> {
+  ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.patch(
       `/api/studio/projects/${projectId}/visibility`,
       { isPublic },
-      StudioProjectSchema.extend({ isPublic: z.boolean().optional() }),
+      StudioProjectSchema,
     );
   },
 
