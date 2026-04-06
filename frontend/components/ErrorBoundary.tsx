@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { normalizeError, handleError, type AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { reportError } from "@/lib/error-tracking";
+import { getRecentApiRequests, type ApiRequestLogEntry } from "@/lib/api-client";
 
 // ============================================================================
 // ERROR BOUNDARY PROPS AND STATE
@@ -26,6 +27,7 @@ interface ErrorBoundaryState {
   error: AppError | null;
   errorId: string | null;
   copyStatus: "idle" | "copied" | "failed";
+  recentApiRequests: ApiRequestLogEntry[];
 }
 
 // ============================================================================
@@ -43,6 +45,7 @@ export class ErrorBoundary extends Component<
       error: null,
       errorId: null,
       copyStatus: "idle",
+      recentApiRequests: [],
     };
   }
 
@@ -50,11 +53,15 @@ export class ErrorBoundary extends Component<
     const normalizedError = normalizeError(error);
     const errorId = `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // Snapshot recent API requests at the moment of the crash
+    const recentApiRequests = getRecentApiRequests();
+
     return {
       hasError: true,
       error: normalizedError,
       errorId,
       copyStatus: "idle",
+      recentApiRequests,
     };
   }
 
@@ -124,7 +131,7 @@ export class ErrorBoundary extends Component<
   };
 
   private handleCopyErrorDetails = async (): Promise<void> => {
-    const { error, errorId } = this.state;
+    const { error, errorId, recentApiRequests } = this.state;
     if (!error) {
       return;
     }
@@ -142,6 +149,7 @@ export class ErrorBoundary extends Component<
       userAgent:
         typeof navigator !== "undefined" ? navigator.userAgent : undefined,
       timestamp: new Date().toISOString(),
+      recentApiRequests: recentApiRequests.length > 0 ? recentApiRequests : undefined,
     };
 
     try {
@@ -274,6 +282,54 @@ export class ErrorBoundary extends Component<
                     </pre>
                   </div>
                 )}
+
+                {this.state.recentApiRequests.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Recent API Requests ({this.state.recentApiRequests.length}):
+                    </label>
+                    <div className="mt-1 space-y-2">
+                      {this.state.recentApiRequests.map((req) => (
+                        <div
+                          key={req.id}
+                          className="p-3 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{req.method}</span>
+                            <span className="text-gray-600 break-all">{req.url}</span>
+                            {req.status != null && (
+                              <span
+                                className={`ml-auto font-mono ${
+                                  req.status >= 400
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {req.status}
+                              </span>
+                            )}
+                            {req.durationMs != null && (
+                              <span className="text-gray-400">{req.durationMs}ms</span>
+                            )}
+                          </div>
+                          {req.error && (
+                            <div className="text-red-600 mb-1">Error: {req.error}</div>
+                          )}
+                          {req.responseBody != null && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                                Response body
+                              </summary>
+                              <pre className="mt-1 p-2 bg-white border border-gray-100 rounded overflow-x-auto max-h-48 overflow-y-auto">
+                                {JSON.stringify(req.responseBody, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -313,7 +369,25 @@ export class ErrorBoundary extends Component<
 
             {/* Show detailed error information */}
             <div className="bg-white rounded-lg shadow-lg p-6 text-left">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">Error Details</h3>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-3 gap-2">
+                <h3 className="text-base font-semibold text-gray-900">Error Details</h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={this.handleCopyErrorDetails}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy details
+                  </Button>
+                  {this.state.copyStatus === "copied" && (
+                    <span className="text-sm text-green-600">Copied!</span>
+                  )}
+                  {this.state.copyStatus === "failed" && (
+                    <span className="text-sm text-red-600">Copy failed</span>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-3">
                 <div>
@@ -338,6 +412,41 @@ export class ErrorBoundary extends Component<
                     <pre className="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 overflow-x-auto max-h-48 overflow-y-auto">
                       {error.stack}
                     </pre>
+                  </div>
+                )}
+
+                {this.state.recentApiRequests.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Recent API Requests ({this.state.recentApiRequests.length}):
+                    </label>
+                    <div className="mt-1 space-y-2">
+                      {this.state.recentApiRequests.map((req) => (
+                        <div
+                          key={req.id}
+                          className="p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{req.method}</span>
+                            <span className="text-gray-600 break-all">{req.url}</span>
+                            {req.status != null && (
+                              <span
+                                className={`ml-auto font-mono ${
+                                  req.status >= 400
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {req.status}
+                              </span>
+                            )}
+                          </div>
+                          {req.error && (
+                            <div className="text-red-600 mt-1">Error: {req.error}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

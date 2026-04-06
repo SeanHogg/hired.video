@@ -43,6 +43,42 @@ export interface RequestConfig {
   validateResponse?: boolean;
 }
 
+// ============================================================================
+// RECENT API REQUEST LOG (ring buffer for error diagnostics)
+// ============================================================================
+
+export interface ApiRequestLogEntry {
+  id: number;
+  method: string;
+  url: string;
+  requestBody?: unknown;
+  status?: number;
+  responseBody?: unknown;
+  error?: string;
+  timestamp: string;
+  durationMs?: number;
+}
+
+const MAX_LOG_ENTRIES = 10;
+let _logIdCounter = 0;
+const _recentApiRequests: ApiRequestLogEntry[] = [];
+
+function pushApiLogEntry(entry: ApiRequestLogEntry): void {
+  _recentApiRequests.push(entry);
+  if (_recentApiRequests.length > MAX_LOG_ENTRIES) {
+    _recentApiRequests.shift();
+  }
+}
+
+function findLogEntry(id: number): ApiRequestLogEntry | undefined {
+  return _recentApiRequests.find((e) => e.id === id);
+}
+
+/** Returns a snapshot of the most recent API requests/responses for error diagnostics. */
+export function getRecentApiRequests(): ApiRequestLogEntry[] {
+  return [..._recentApiRequests];
+}
+
 export interface ApiClientConfig {
   baseUrl?: string;
   timeout?: number;
@@ -500,15 +536,46 @@ export class ApiClient {
     const processedConfig = await this.applyRequestInterceptors(config);
 
     while (attempt < maxAttempts) {
+      const logId = ++_logIdCounter;
+      const startTime = Date.now();
+      const method = processedConfig.method || "GET";
+
+      // Record the request in the ring buffer immediately
+      pushApiLogEntry({
+        id: logId,
+        method,
+        url,
+        requestBody: processedConfig.body,
+        timestamp: new Date().toISOString(),
+      });
+
       try {
-        logApiCall(processedConfig.method || "GET", url, undefined, {
+        logApiCall(method, url, undefined, {
           attempt: attempt + 1,
         });
 
         const response = await this.executeRequest(url, processedConfig);
+
+        // Clone the response so we can read the body for logging without consuming it
+        const clonedResponse = response.clone();
+        let rawResponseBody: unknown;
+        try {
+          rawResponseBody = await clonedResponse.json();
+        } catch {
+          // non-JSON response; leave undefined
+        }
+
         const apiResponse = await this.handleResponse<T>(response, schema);
 
-        logApiCall(processedConfig.method || "GET", url, response.status);
+        logApiCall(method, url, response.status);
+
+        // Update the log entry with response details
+        const entry = findLogEntry(logId);
+        if (entry) {
+          entry.status = response.status;
+          entry.responseBody = rawResponseBody;
+          entry.durationMs = Date.now() - startTime;
+        }
 
         // Apply response interceptors
         const processedResponse =
@@ -519,7 +586,14 @@ export class ApiClient {
         attempt++;
         const normalizedError = normalizeError(error);
 
-        logApiCall(processedConfig.method || "GET", url, undefined, {
+        // Update the log entry with error details
+        const entry = findLogEntry(logId);
+        if (entry) {
+          entry.error = normalizedError.message;
+          entry.durationMs = Date.now() - startTime;
+        }
+
+        logApiCall(method, url, undefined, {
           attempt,
           error: normalizedError.message,
         });
@@ -560,36 +634,62 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
-    const response = await this.executeRequest(url, { method: "GET" });
+    const logId = ++_logIdCounter;
+    const startTime = Date.now();
+
+    pushApiLogEntry({
+      id: logId,
+      method: "GET",
+      url,
+      timestamp: new Date().toISOString(),
+    });
 
     let responseData: unknown;
     try {
-      responseData = await response.json();
-    } catch (error) {
-      throw new NetworkError(
-        "Invalid JSON response",
-        error instanceof Error ? error : undefined,
-      );
-    }
+      const response = await this.executeRequest(url, { method: "GET" });
 
-    if (!response.ok) {
-      this.handleErrorResponse(response.status, responseData);
-    }
-
-    if (schema) {
-      const preprocessed = nullToUndefined
-        ? nullToUndefined(responseData)
-        : responseData;
-      const validation = schema.safeParse(preprocessed);
-      if (!validation.success) {
-        throw new ValidationError(
-          `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
+      try {
+        responseData = await response.json();
+      } catch (error) {
+        throw new NetworkError(
+          "Invalid JSON response",
+          error instanceof Error ? error : undefined,
         );
       }
-      return { data: validation.data };
-    }
 
-    return { data: responseData as T };
+      const entry = findLogEntry(logId);
+      if (entry) {
+        entry.status = response.status;
+        entry.responseBody = responseData;
+        entry.durationMs = Date.now() - startTime;
+      }
+
+      if (!response.ok) {
+        this.handleErrorResponse(response.status, responseData);
+      }
+
+      if (schema) {
+        const preprocessed = nullToUndefined
+          ? nullToUndefined(responseData)
+          : responseData;
+        const validation = schema.safeParse(preprocessed);
+        if (!validation.success) {
+          throw new ValidationError(
+            `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
+          );
+        }
+        return { data: validation.data };
+      }
+
+      return { data: responseData as T };
+    } catch (error) {
+      const entry = findLogEntry(logId);
+      if (entry && !entry.durationMs) {
+        entry.error = error instanceof Error ? error.message : String(error);
+        entry.durationMs = Date.now() - startTime;
+      }
+      throw error;
+    }
   }
 
   // Raw request for endpoints that return non-standard envelopes (any method)
@@ -599,40 +699,67 @@ export class ApiClient {
     schema?: z.ZodSchema<T>,
   ): Promise<{ data: T }> {
     const url = this.createUrl(endpoint);
+    const logId = ++_logIdCounter;
+    const startTime = Date.now();
+    const method = config.method || "GET";
 
-    // Apply request interceptors (e.g., Authorization header injection)
-    const processedConfig = await this.applyRequestInterceptors(config);
+    pushApiLogEntry({
+      id: logId,
+      method,
+      url,
+      requestBody: config.body,
+      timestamp: new Date().toISOString(),
+    });
 
-    const response = await this.executeRequest(url, processedConfig);
-
-    let responseData: unknown;
     try {
-      responseData = await response.json();
-    } catch (error) {
-      throw new NetworkError(
-        "Invalid JSON response",
-        error instanceof Error ? error : undefined,
-      );
-    }
+      // Apply request interceptors (e.g., Authorization header injection)
+      const processedConfig = await this.applyRequestInterceptors(config);
 
-    if (!response.ok) {
-      this.handleErrorResponse(response.status, responseData);
-    }
+      const response = await this.executeRequest(url, processedConfig);
 
-    if (schema) {
-      const preprocessed = nullToUndefined
-        ? nullToUndefined(responseData)
-        : responseData;
-      const validation = schema.safeParse(preprocessed);
-      if (!validation.success) {
-        throw new ValidationError(
-          `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
+      let responseData: unknown;
+      try {
+        responseData = await response.json();
+      } catch (error) {
+        throw new NetworkError(
+          "Invalid JSON response",
+          error instanceof Error ? error : undefined,
         );
       }
-      return { data: validation.data };
-    }
 
-    return { data: responseData as T };
+      const entry = findLogEntry(logId);
+      if (entry) {
+        entry.status = response.status;
+        entry.responseBody = responseData;
+        entry.durationMs = Date.now() - startTime;
+      }
+
+      if (!response.ok) {
+        this.handleErrorResponse(response.status, responseData);
+      }
+
+      if (schema) {
+        const preprocessed = nullToUndefined
+          ? nullToUndefined(responseData)
+          : responseData;
+        const validation = schema.safeParse(preprocessed);
+        if (!validation.success) {
+          throw new ValidationError(
+            `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
+          );
+        }
+        return { data: validation.data };
+      }
+
+      return { data: responseData as T };
+    } catch (error) {
+      const entry = findLogEntry(logId);
+      if (entry && !entry.durationMs) {
+        entry.error = error instanceof Error ? error.message : String(error);
+        entry.durationMs = Date.now() - startTime;
+      }
+      throw error;
+    }
   }
 
   async post<T>(

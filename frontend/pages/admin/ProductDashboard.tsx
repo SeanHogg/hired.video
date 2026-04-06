@@ -57,56 +57,56 @@ interface ProductDashboardData {
     totalUsers: number;
     activeUsers: number;
     newUsersLast30Days: number;
-    usersByRole: Record<string, number>;
-    usersByStatus: Record<string, number>;
+    usersByRole?: Record<string, number>;
+    usersByStatus?: Record<string, number>;
   };
   jobMetrics: {
     totalJobs: number;
     activeJobs: number;
     newJobsLast30Days: number;
-    jobsByStatus: Record<string, number>;
-    jobsByOrigin: Record<string, number>;
+    jobsByStatus?: Record<string, number>;
+    jobsByOrigin?: Record<string, number>;
   };
-  profileMetrics: {
+  profileMetrics?: {
     totalProfiles: number;
     publicProfiles: number;
     newProfilesLast30Days: number;
-    profilesByStatus: Record<string, number>;
-    profilesByPrivacy: Record<string, number>;
+    profilesByStatus?: Record<string, number>;
+    profilesByPrivacy?: Record<string, number>;
   };
   companyMetrics: {
     totalCompanies: number;
-    activeCompanies: number;
+    activeCompanies?: number;
     newCompaniesLast30Days: number;
-    companiesByStatus: Record<string, number>;
-    companiesBySize: Record<string, number>;
+    companiesByStatus?: Record<string, number>;
+    companiesBySize?: Record<string, number>;
   };
   resumeMetrics: {
     totalResumes: number;
-    publicResumes: number;
+    publicResumes?: number;
     newResumesLast30Days: number;
-    resumesByType: Record<string, number>;
-    resumesByStatus: Record<string, number>;
+    resumesByType?: Record<string, number>;
+    resumesByStatus?: Record<string, number>;
   };
   saasMetrics?: {
     monthlyRecurringRevenue: number;
     annualRecurringRevenue: number;
     averageRevenuePerUser: number;
-    customerLifetimeValue: number;
-    customerAcquisitionCost: number;
+    customerLifetimeValue?: number;
+    customerAcquisitionCost?: number;
     churnRate: number;
     growthRate: number;
     conversionRate: number;
     totalSubscriptions: number;
     activeSubscriptions: number;
-    subscriptionsByTier: Record<string, number>;
-    revenueByTier: Record<string, number>;
+    subscriptionsByTier?: Record<string, number>;
+    revenueByTier?: Record<string, number>;
   };
-  userGrowthLast90Days: Array<{ date: string; count: number }>;
-  jobGrowthLast90Days: Array<{ date: string; count: number }>;
-  profileGrowthLast90Days: Array<{ date: string; count: number }>;
-  companyGrowthLast90Days: Array<{ date: string; count: number }>;
-  resumeGrowthLast90Days: Array<{ date: string; count: number }>;
+  userGrowthLast90Days?: Array<{ date: string; count: number }>;
+  jobGrowthLast90Days?: Array<{ date: string; count: number }>;
+  profileGrowthLast90Days?: Array<{ date: string; count: number }>;
+  companyGrowthLast90Days?: Array<{ date: string; count: number }>;
+  resumeGrowthLast90Days?: Array<{ date: string; count: number }>;
 }
 
 interface MetricCardProps {
@@ -425,7 +425,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart
-                    data={dashboardData.userGrowthLast90Days.map(item => ({
+                    data={(dashboardData.userGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -458,7 +458,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
                   <LineChart
-                    data={dashboardData.jobGrowthLast90Days.map(item => ({
+                    data={(dashboardData.jobGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -521,7 +521,7 @@ export default function ProductDashboard() {
                     <RechartsPieChart>
                       <Pie
                         data={Object.entries(
-                          dashboardData.userMetrics.usersByRole,
+                          dashboardData.userMetrics.usersByRole || {},
                         ).map(([role, count]) => ({
                           name: getRoleDisplayLabel(role),
                           value: count,
@@ -538,7 +538,7 @@ export default function ProductDashboard() {
                         dataKey="value"
                       >
                         {Object.entries(
-                          dashboardData.userMetrics.usersByRole,
+                          dashboardData.userMetrics.usersByRole || {},
                         ).map((entry, index) => {
                           const colors = [
                             "#0088FE",
@@ -567,7 +567,7 @@ export default function ProductDashboard() {
                   <div className="text-sm font-medium">
                     Account Status Summary:
                   </div>
-                  {Object.entries(dashboardData.userMetrics.usersByRole).map(
+                  {Object.entries(dashboardData.userMetrics.usersByRole || {}).map(
                     ([role, count]) => {
                       const isPaid =
                         role === "employer" || role === "recruiter";
@@ -606,7 +606,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart
-                    data={dashboardData.userGrowthLast90Days.map(item => ({
+                    data={(dashboardData.userGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -664,9 +664,9 @@ export default function ProductDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {Object.keys(dashboardData.jobMetrics.jobsByStatus).length > 0 ? (
+                {Object.keys(dashboardData.jobMetrics.jobsByStatus || {}).length > 0 ? (
                   <div className="space-y-2">
-                    {Object.entries(dashboardData.jobMetrics.jobsByStatus).map(
+                    {Object.entries(dashboardData.jobMetrics.jobsByStatus || {}).map(
                       ([status, count]) => (
                         <div
                           key={status}
@@ -694,7 +694,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart
-                    data={dashboardData.jobGrowthLast90Days.map(item => ({
+                    data={(dashboardData.jobGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -750,10 +750,10 @@ export default function ProductDashboard() {
                 <CardDescription>Company size distribution</CardDescription>
               </CardHeader>
               <CardContent>
-                {Object.keys(dashboardData.companyMetrics.companiesBySize).length > 0 ? (
+                {Object.keys(dashboardData.companyMetrics.companiesBySize || {}).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(
-                      dashboardData.companyMetrics.companiesBySize,
+                      dashboardData.companyMetrics.companiesBySize || {},
                     ).map(([size, count]) => (
                       <div
                         key={size}
@@ -782,7 +782,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart
-                    data={dashboardData.companyGrowthLast90Days.map(item => ({
+                    data={(dashboardData.companyGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -840,7 +840,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <div className="space-y-2">
                   {Object.entries(
-                    dashboardData.resumeMetrics.resumesByType,
+                    dashboardData.resumeMetrics.resumesByType || {},
                   ).map(([type, count]) => (
                     <div
                       key={type}
@@ -862,7 +862,7 @@ export default function ProductDashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart
-                    data={dashboardData.resumeGrowthLast90Days.map(item => ({
+                    data={(dashboardData.resumeGrowthLast90Days || []).map(item => ({
                       ...item,
                       date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     }))}
@@ -959,7 +959,7 @@ export default function ProductDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {Object.entries(dashboardData.saasMetrics.revenueByTier).map(
+                      {Object.entries(dashboardData.saasMetrics.revenueByTier || {}).map(
                         ([tier, revenue]) => (
                           <div
                             key={tier}
@@ -989,14 +989,14 @@ export default function ProductDashboard() {
                         <RechartsPieChart>
                           <Pie
                             data={Object.entries(
-                              dashboardData.saasMetrics.revenueByTier,
+                              dashboardData.saasMetrics.revenueByTier || {},
                             ).map(([tier, revenue]) => ({
                               name: tier
                                 .replace("_", " ")
                                 .replace(/\b\w/g, (l) => l.toUpperCase()),
                               value: revenue,
                               subscriptions:
-                                dashboardData.saasMetrics.subscriptionsByTier[
+                                (dashboardData.saasMetrics.subscriptionsByTier || {})[
                                   tier
                                 ] || 0,
                             }))}
@@ -1011,7 +1011,7 @@ export default function ProductDashboard() {
                             dataKey="value"
                           >
                             {Object.entries(
-                              dashboardData.saasMetrics.revenueByTier,
+                              dashboardData.saasMetrics.revenueByTier || {},
                             ).map((_entry, index) => {
                               const colors = [
                                 "#00C49F",
@@ -1042,10 +1042,10 @@ export default function ProductDashboard() {
                     <div className="mt-4 space-y-2">
                       <div className="text-sm font-medium">Subscription Tiers:</div>
                       {Object.entries(
-                        dashboardData.saasMetrics.subscriptionsByTier,
+                        dashboardData.saasMetrics.subscriptionsByTier || {},
                       ).map(([tier, count]) => {
                         const revenue =
-                          dashboardData.saasMetrics.revenueByTier[tier] || 0;
+                          (dashboardData.saasMetrics.revenueByTier || {})[tier] || 0;
                         const avgRevenue = count > 0 ? revenue / count : 0;
                         return (
                           <div
