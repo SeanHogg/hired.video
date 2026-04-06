@@ -224,6 +224,21 @@ const RESUME_PARSE_PROMPT = `You are a resume parser. Extract structured informa
 }
 Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
 
+/** Strip markdown fences and extract the first JSON object from an LLM response. */
+function extractJson(raw: string): Record<string, unknown> {
+  // Strip ```json ... ``` or ``` ... ``` fences
+  let cleaned = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  // Try direct parse first
+  try { return JSON.parse(cleaned); } catch { /* fall through */ }
+  // Find the first { and last } to handle surrounding text / truncation
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { /* fall through */ }
+  }
+  throw new Error("No valid JSON found in LLM response");
+}
+
 async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record<string, unknown>> {
   // Primary: Cloudflare Workers AI
   const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
@@ -236,7 +251,7 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
         ],
       });
       const result = typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
-      return JSON.parse(result);
+      return extractJson(result);
     } catch (cfErr) {
       console.error("[parse] CF AI error:", cfErr instanceof Error ? cfErr.message : String(cfErr));
     }
@@ -251,7 +266,7 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
         userMessage: resumeText.slice(0, 12000),
         responseFormat: "text",
       });
-      return JSON.parse(result);
+      return extractJson(result);
     } catch (llmErr) {
       console.error("[parse] OpenRouter error:", llmErr instanceof Error ? llmErr.message : String(llmErr));
     }
