@@ -9,13 +9,17 @@
 import type { CompiledVideo } from "../compiler/types";
 import { renderFrame } from "./frame-renderer";
 import { AmbientPlayer } from "../audio/ambient-player";
-import type { VideoAudio } from "../../types/video-script";
+import type { VideoAudio, VoiceoverConfig } from "../../types/video-script";
 
 export interface ExportOptions {
   onProgress?: (progress: number) => void;
   videoBitsPerSecond?: number;
   /** When set, ambient music is mixed into the exported video */
   audio?: VideoAudio;
+  /** When set, voiceover audio is mixed per-scene into the exported video */
+  voiceover?: VoiceoverConfig | null;
+  /** Scene start times (seconds) keyed by scene id — needed to schedule voiceover playback */
+  sceneTimings?: Array<{ id: string; start: number }>;
 }
 
 // ─── WebCodecs export ─────────────────────────────────────────────────────────
@@ -153,6 +157,17 @@ async function exportMediaRecorder(
 
 // ─── MediaRecorder with audio ─────────────────────────────────────────────────
 
+/** Fetch an audio URL and decode it into an AudioBuffer. Returns null on failure. */
+async function fetchAudioBuffer(url: string, ctx: AudioContext): Promise<AudioBuffer | null> {
+  try {
+    const res = await fetch(url);
+    const arrayBuf = await res.arrayBuffer();
+    return await ctx.decodeAudioData(arrayBuf);
+  } catch {
+    return null;
+  }
+}
+
 async function exportMediaRecorderWithAudio(
   compiledVideo: CompiledVideo,
   audio: VideoAudio,
@@ -168,6 +183,21 @@ async function exportMediaRecorderWithAudio(
   const audioDest = audioCtx.createMediaStreamDestination();
   const exportPlayer = new AmbientPlayer();
   exportPlayer.playToDestination(audio.track, audio.volume ?? 0.6, audioCtx, audioDest);
+
+  // Schedule voiceover audio buffers at each scene's start time
+  if (opts.voiceover?.enabled && opts.sceneTimings) {
+    for (const timing of opts.sceneTimings) {
+      const sceneVo = opts.voiceover.scenes[timing.id];
+      if (!sceneVo?.audioUrl) continue;
+      const buffer = await fetchAudioBuffer(sceneVo.audioUrl, audioCtx);
+      if (!buffer) continue;
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioDest);
+      // Schedule playback at the scene's start time relative to AudioContext time
+      source.start(audioCtx.currentTime + timing.start);
+    }
+  }
 
   // Combine video + audio streams
   const videoStream = (canvas as unknown as { captureStream(fps: number): MediaStream }).captureStream(fps);
@@ -225,9 +255,13 @@ export async function exportVideo(
   compiledVideo: CompiledVideo,
   opts: ExportOptions = {},
 ): Promise<Blob> {
-  // When audio is requested, always use MediaRecorder so we can capture the audio stream
-  if (opts.audio && opts.audio.track && opts.audio.track !== "none") {
-    return exportMediaRecorderWithAudio(compiledVideo, opts.audio, opts);
+  const hasAmbient = opts.audio && opts.audio.track && opts.audio.track !== "none";
+  const hasVoiceover = opts.voiceover?.enabled && Object.values(opts.voiceover.scenes).some((s) => s.audioUrl);
+
+  // When any audio is requested, use MediaRecorder so we can capture the audio stream
+  if (hasAmbient || hasVoiceover) {
+    const audio: VideoAudio = hasAmbient ? opts.audio! : { track: "none", label: "None", volume: 0 };
+    return exportMediaRecorderWithAudio(compiledVideo, audio, opts);
   }
 
   if (

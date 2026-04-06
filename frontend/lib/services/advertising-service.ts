@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export interface JobBoost {
   id: string;
@@ -117,10 +117,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const advertisingService = {
   // ── Stats ────────────────────────────────────────────────────────────────
-  getStats: () => apiFetch<AdvertisingStats>("/advertising/stats"),
+  getStats: () => apiFetch<AdvertisingStats>("/api/advertising/stats"),
 
   // ── Job Boosts ───────────────────────────────────────────────────────────
-  getBoosts: () => apiFetch<JobBoost[]>("/advertising/boosts"),
+  getBoosts: () => apiFetch<JobBoost[]>("/api/advertising/boosts"),
 
   createBoost: (data: {
     jobId: string;
@@ -128,7 +128,7 @@ export const advertisingService = {
     pricingModel: "cpm" | "cpc";
     budgetCents: number;
     durationDays: number;
-  }) => apiFetch<JobBoost>("/advertising/boosts", {
+  }) => apiFetch<JobBoost>("/api/advertising/boosts", {
     method: "POST",
     body: JSON.stringify(data),
   }),
@@ -138,9 +138,9 @@ export const advertisingService = {
   cancelBoost: (id: string) => apiFetch<{ cancelled: boolean }>(`/advertising/boosts/${id}`, { method: "DELETE" }),
 
   // ── Campaigns ────────────────────────────────────────────────────────────
-  getCampaigns: () => apiFetch<AdCampaign[]>("/advertising/campaigns"),
+  getCampaigns: () => apiFetch<AdCampaign[]>("/api/advertising/campaigns"),
 
-  createCampaign: (data: Partial<AdCampaign>) => apiFetch<AdCampaign>("/advertising/campaigns", {
+  createCampaign: (data: Partial<AdCampaign>) => apiFetch<AdCampaign>("/api/advertising/campaigns", {
     method: "POST",
     body: JSON.stringify(data),
   }),
@@ -183,10 +183,10 @@ export const advertisingService = {
   deleteAd: (id: string) => apiFetch<{ deleted: boolean }>(`/advertising/ads/${id}`, { method: "DELETE" }),
 
   // ── Enrichment Credits ───────────────────────────────────────────────────
-  getEnrichmentCredits: () => apiFetch<EnrichmentCredits>("/advertising/enrichment/credits"),
+  getEnrichmentCredits: () => apiFetch<EnrichmentCredits>("/api/advertising/enrichment/credits"),
 
   enrichContact: (data: { email?: string; name?: string; company?: string }) =>
-    apiFetch<Record<string, unknown>>("/advertising/enrichment/enrich", {
+    apiFetch<Record<string, unknown>>("/api/advertising/enrichment/enrich", {
       method: "POST",
       body: JSON.stringify(data),
     }),

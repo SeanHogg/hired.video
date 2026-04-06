@@ -578,6 +578,8 @@ export default function StudioLayout() {
       const blob = await exportVideo(compiledVideo, {
         onProgress: setExportProgress,
         audio: state.script?.video?.audio,
+        voiceover: state.voiceover,
+        sceneTimings: state.script?.scenes.map((s) => ({ id: s.id, start: s.start })),
       });
       patchState({ videoBlob: blob, status: "ready" });
 
@@ -1031,6 +1033,23 @@ export default function StudioLayout() {
                     skills: s.skills,
                   }))}
                   projectId={state.projectId ?? undefined}
+                  onVoiceoverGenerated={(results) => {
+                    // Store voiceover results keyed by scene ID
+                    const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
+                    for (const r of results) {
+                      scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
+                    }
+                    patchState({
+                      voiceover: {
+                        enabled: true,
+                        voiceId: state.voiceover?.voiceId ?? "browser-default",
+                        voiceName: state.voiceover?.voiceName ?? "Default",
+                        speed: state.voiceover?.speed ?? 1,
+                        scenes,
+                      },
+                    });
+                    toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
+                  }}
                 />
               </div>
             )}

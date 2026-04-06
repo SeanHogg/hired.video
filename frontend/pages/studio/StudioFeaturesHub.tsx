@@ -47,16 +47,25 @@ function Loading() {
   );
 }
 
+interface VoiceoverResult {
+  sceneId: string;
+  audioUrl: string | null;
+  durationMs: number;
+  wordTimestamps: Array<{ word: string; start: number; end: number }>;
+}
+
 interface Props {
   scriptText?: string;
   scenes?: Array<{ id: string; title?: string; text?: string; items?: string[]; skills?: string[] }>;
   projectId?: string;
+  onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
 }
 
 export default function StudioFeaturesHub({
   scriptText,
   scenes,
   projectId,
+  onVoiceoverGenerated,
 }: Props) {
   const [activeTab, setActiveTab] = useState<FeatureTab>("record");
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -129,7 +138,7 @@ export default function StudioFeaturesHub({
                 scenes={scenes}
                 projectId={projectId}
                 onVoiceoverGenerated={(results) => {
-                  // Forward to parent for integration with video export
+                  onVoiceoverGenerated?.(results);
                 }}
               />
             </div>
