@@ -254,6 +254,13 @@ export async function unlikeFeedPost(postId: string): Promise<void> {
 }
 
 /**
+ * Report a feed post
+ */
+export async function reportFeedPost(postId: string, reason: string, details?: string): Promise<void> {
+  await apiClient.post(`/api/feed/posts/${postId}/report`, { reason, details });
+}
+
+/**
  * Add a comment to a feed post
  */
 export async function createComment(request: CreateFeedPostCommentRequest): Promise<FeedPostComment> {

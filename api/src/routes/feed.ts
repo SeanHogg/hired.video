@@ -4,7 +4,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
-const { feedPosts, feedPostLikes, feedPostComments, users, userProfiles, notifications } = schema;
+const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, users, userProfiles, notifications } = schema;
 
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
@@ -466,6 +466,31 @@ feedRoutes.get("/trending-tags", async (c) => {
   `);
 
   return c.json(success(rows.rows as Array<{ tag: string; post_count: number }>), 200);
+});
+
+/** POST /api/feed/posts/:postId/report */
+feedRoutes.post("/posts/:postId/report", async (c) => {
+  const postId = c.req.param("postId");
+  const userId = c.var.user.sub;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const reason = typeof body.reason === "string" ? body.reason : "other";
+  const details = typeof body.details === "string" ? body.details : null;
+  const db = getDb();
+
+  const [existing] = await db.select({ id: feedPosts.id }).from(feedPosts).where(eq(feedPosts.id, postId)).limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Post not found"), 404);
+
+  // Prevent duplicate reports
+  const [alreadyReported] = await db
+    .select({ id: feedPostReports.id })
+    .from(feedPostReports)
+    .where(and(eq(feedPostReports.feedPostId, postId), eq(feedPostReports.userId, userId)))
+    .limit(1);
+
+  if (alreadyReported) return c.json(success({ reported: true }), 200);
+
+  await db.insert(feedPostReports).values({ feedPostId: postId, userId, reason, details } as any);
+  return c.json(success({ reported: true }), 201);
 });
 
 /** POST /api/feed/link-preview */

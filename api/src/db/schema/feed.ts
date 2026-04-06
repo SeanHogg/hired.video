@@ -55,3 +55,15 @@ export const feedPostComments = pgTable("feed_post_comments", {
 
 export type FeedPostComment = typeof feedPostComments.$inferSelect;
 export type NewFeedPostComment = typeof feedPostComments.$inferInsert;
+
+export const feedPostReports = pgTable("feed_post_reports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  feedPostId: uuid("feed_post_id").notNull().references(() => feedPosts.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 100 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type FeedPostReport = typeof feedPostReports.$inferSelect;
+export type NewFeedPostReport = typeof feedPostReports.$inferInsert;

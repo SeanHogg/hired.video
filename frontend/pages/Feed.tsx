@@ -388,6 +388,20 @@ export default function Feed() {
     );
   }, []);
 
+  const handlePostDelete = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+  }, []);
+
+  const handlePostEdit = useCallback((postId: string, updatedPost: FeedPost) => {
+    setPosts((prev) =>
+      prev.map((post) => (post.id === postId ? updatedPost : post)),
+    );
+  }, []);
+
+  const handlePostHide = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+  }, []);
+
   const openCreate = useCallback((mode: PostMode) => {
     setCreatePostMode(mode);
     setCreatePostOpen(true);
@@ -520,6 +534,9 @@ export default function Feed() {
                         post={post}
                         onLike={handlePostLike}
                         onComment={() => {}}
+                        onDelete={handlePostDelete}
+                        onEdit={handlePostEdit}
+                        onHide={handlePostHide}
                       />
                     ))}
 

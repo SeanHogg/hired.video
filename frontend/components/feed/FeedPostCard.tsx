@@ -29,8 +29,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { likeFeedPost, unlikeFeedPost, createComment } from "@/lib/services/feed-service";
+import { likeFeedPost, unlikeFeedPost, createComment, deleteFeedPost, updateFeedPost, reportFeedPost } from "@/lib/services/feed-service";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import type { FeedPost, CreateFeedPostCommentRequest } from "@/types/feed";
 
 // Sub-components
@@ -131,15 +132,27 @@ const FeedPostTags = ({ tags }: { tags: FeedPost['tags'] }) => {
 const FeedPostActions = ({
   post,
   onLike,
-  onComment
+  onComment,
+  onDelete,
+  onEdit,
+  onHide,
 }: {
   post: FeedPost;
   onLike: (postId: string) => void;
   onComment: (postId: string) => void;
+  onDelete: (postId: string) => void;
+  onEdit: (postId: string, updatedPost: FeedPost) => void;
+  onHide: (postId: string) => void;
 }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [liking, setLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [saving, setSaving] = useState(false);
 
   const handleLike = async () => {
     if (!user) return;
@@ -164,8 +177,101 @@ const FeedPostActions = ({
     onComment(post.id);
   };
 
+  const handleReport = async () => {
+    try {
+      await reportFeedPost(post.id, "inappropriate");
+      toast({ title: "Post reported", description: "Thank you for helping keep the community safe." });
+    } catch {
+      toast({ title: "Could not report", description: "Please try again later.", variant: "destructive" });
+    }
+  };
+
+  const handleHide = () => {
+    onHide(post.id);
+    toast({ title: "Post hidden", description: "You won't see this post in your feed anymore." });
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteFeedPost(post.id);
+      onDelete(post.id);
+      toast({ title: "Post deleted" });
+    } catch {
+      toast({ title: "Could not delete post", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editContent.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await updateFeedPost(post.id, {
+        content: editContent.trim(),
+        privacy: post.privacy,
+        media: post.media.map((m) => ({
+          mediaType: m.mediaType,
+          mediaUrl: m.mediaUrl,
+          thumbnailUrl: m.thumbnailUrl,
+          altText: m.altText,
+          displayOrder: m.displayOrder,
+        })),
+      });
+      onEdit(post.id, updated);
+      setEditing(false);
+      toast({ title: "Post updated" });
+    } catch {
+      toast({ title: "Could not save changes", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditContent(post.content);
+    setEditing(false);
+  };
+
   return (
     <div className="mt-4 space-y-4">
+      {/* Inline Edit */}
+      {editing && (
+        <div className="border rounded-lg p-3 space-y-2">
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="w-full min-h-[80px] px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            disabled={saving}
+          />
+          <div className="flex justify-end space-x-2">
+            <Button size="sm" variant="ghost" onClick={handleEditCancel} disabled={saving}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleEditSave} disabled={saving || !editContent.trim()}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {confirmDelete && (
+        <div className="border border-red-200 bg-red-50 dark:bg-red-950/20 rounded-lg p-3 flex items-center justify-between">
+          <p className="text-sm text-red-600">Delete this post? This can't be undone.</p>
+          <div className="flex space-x-2">
+            <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -213,12 +319,16 @@ const FeedPostActions = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Report Post</DropdownMenuItem>
-            <DropdownMenuItem>Hide Post</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleReport}>Report Post</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleHide}>Hide Post</DropdownMenuItem>
             {post.userId === user?.id && (
               <>
-                <DropdownMenuItem>Edit Post</DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600">Delete Post</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setEditing(true); setEditContent(post.content); }}>
+                  Edit Post
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(true)}>
+                  Delete Post
+                </DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>
@@ -283,9 +393,12 @@ interface FeedPostCardProps {
   post: FeedPost;
   onLike: (postId: string) => void;
   onComment: (postId: string) => void;
+  onDelete: (postId: string) => void;
+  onEdit: (postId: string, updatedPost: FeedPost) => void;
+  onHide: (postId: string) => void;
 }
 
-export default function FeedPostCard({ post, onLike, onComment }: FeedPostCardProps) {
+export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit, onHide }: FeedPostCardProps) {
   const getPrivacyIcon = () => {
     switch (post.privacy) {
       case 'Public':
@@ -363,6 +476,9 @@ export default function FeedPostCard({ post, onLike, onComment }: FeedPostCardPr
           post={post}
           onLike={onLike}
           onComment={onComment}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onHide={onHide}
         />
       </CardContent>
     </Card>
