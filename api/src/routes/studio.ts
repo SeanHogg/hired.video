@@ -926,9 +926,8 @@ studioRoutes.post("/publish", async (c) => {
     linkedVideo = createdVideo;
   }
 
-  const youtubeVideoId = linkedVideo.youtubeVideoId ?? `yt_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
-  const youtubeUrl = linkedVideo.youtubeUrl ?? `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-
+  // Only set YouTube fields if the video was actually uploaded to YouTube.
+  // For R2-hosted videos, leave youtubeVideoId/youtubeUrl as-is (null).
   const [updatedVideo] = await db
     .update(videos)
     .set({
@@ -936,8 +935,6 @@ studioRoutes.post("/publish", async (c) => {
       description: parsed.data.description,
       privacyStatus: parsed.data.privacyStatus,
       status: "Completed",
-      youtubeVideoId,
-      youtubeUrl,
       resumeId: publishResumeId,
       updatedAt: new Date(),
     } as any)

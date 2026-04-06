@@ -56,6 +56,7 @@ export default function StudioPreview({
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null;
   const hasYoutube = state.youtubeVideoId != null;
+  const isPublished = isPublishedToProfile || hasYoutube;
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const canGenerate = state.resumeText.trim().length > 50;
 
@@ -224,7 +225,7 @@ export default function StudioPreview({
         {([
           { n: 1, title: "Generate Script", done: !!state.script,   active: !state.script || state.status === "generating" },
           { n: 2, title: "Export MP4",      done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
-          { n: 3, title: "Share",           done: !!state.youtubeVideoId, active: !!state.videoBlob || !!isPublishedToProfile },
+          { n: 3, title: "Share",           done: isPublished, active: !!state.videoBlob || isPublished },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
             {/* Step badge */}
@@ -312,7 +313,7 @@ export default function StudioPreview({
                       <ExternalLink className="w-3 h-3" /> View Profile
                     </a>
                   )}
-                  {hasYoutube && (
+                  {isPublished && (
                     <>
                       <div className="flex items-center justify-between pt-0.5">
                         <div className="flex items-center gap-1.5">
@@ -325,10 +326,10 @@ export default function StudioPreview({
                         </div>
                         <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
                       </div>
-                      {/* X sharing post-YouTube */}
+                      {/* Share on X — use hired.video public URL, not YouTube */}
                       <Button size="sm" variant="secondary" className="w-full h-7 text-xs" asChild>
                         <a
-                          href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=https%3A%2F%2Fhired.video%2Fv%2F${state.youtubeVideoId}`}
+                          href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=${encodeURIComponent(`https://hired.video/v/${state.youtubeVideoId ?? state.projectId ?? ""}`)}`}
                           target="_blank" rel="noopener noreferrer"
                         >
                           <Share2 className="w-3 h-3 mr-1" /> Share on X
