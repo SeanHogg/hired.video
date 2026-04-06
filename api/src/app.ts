@@ -316,10 +316,11 @@ export function createApp() {
   app.route("/api/ai", aiRoutes);
   app.route("/api/locations", locationRoutes);
   app.route("/api/passwordmanagement", passwordManagementRoutes);
+  // SuperAdmin management portal — impersonation sessions, user management, modules, audit
+  // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
+  app.route("/api/admin/impersonate", superadminRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
-  // SuperAdmin management portal — impersonation sessions, user management, modules, audit
-  app.route("/api/admin/impersonate", superadminRoutes);
   app.route("/api/studio", studioRoutes);
   app.route("/api/studio", studioFeaturesRoutes);
   app.route("/api/studio", linkedInPostRoutes);

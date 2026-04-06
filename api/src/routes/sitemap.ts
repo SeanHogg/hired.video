@@ -39,16 +39,16 @@ const STATIC_PAGES = [
 ];
 
 sitemapRoutes.get("/sitemap.xml", async (c) => {
-  const db = getDb(c.env);
+  const db = getDb(c.env as any);
   const now = new Date().toISOString();
 
   // Fetch dynamic content (limit to recent 500 of each to keep sitemap manageable)
   const [jobs, companies, publicUsers] = await Promise.allSettled([
     db
-      .select({ id: schema.jobs.id, title: schema.jobs.title, updatedAt: schema.jobs.updatedAt })
-      .from(schema.jobs)
-      .where(eq(schema.jobs.status, "active"))
-      .orderBy(desc(schema.jobs.updatedAt))
+      .select({ id: schema.jobItems.id, title: schema.jobItems.title, updatedAt: schema.jobItems.updatedAt })
+      .from(schema.jobItems)
+      .where(eq((schema.jobItems as any).status, "active"))
+      .orderBy(desc(schema.jobItems.updatedAt))
       .limit(500),
 
     db
@@ -58,9 +58,9 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
       .limit(300),
 
     db
-      .select({ id: schema.userProfiles.userId, slug: schema.userProfiles.slug, updatedAt: schema.userProfiles.updatedAt })
+      .select({ id: schema.userProfiles.userId, slug: schema.userProfiles.customUrlSlug, updatedAt: schema.userProfiles.updatedAt })
       .from(schema.userProfiles)
-      .where(eq(schema.userProfiles.privacySetting, "public"))
+      .where(eq(schema.userProfiles.profileVisibility, "public"))
       .orderBy(desc(schema.userProfiles.updatedAt))
       .limit(500),
   ]);

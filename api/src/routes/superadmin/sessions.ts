@@ -38,15 +38,19 @@ sessionRoutes.post("/", async (c) => {
 
   const result = await startImpersonation({ adminId: c.var.user.sub, ...body.data });
   if (!result.ok) {
-    const status = result.code === "NOT_FOUND" ? 404 : result.code === "FORBIDDEN" ? 403 : 409;
-    return c.json({ error: { code: result.code, message: result.message } }, status);
+    const err = result as { ok: false; code: string; message: string };
+    const status = err.code === "NOT_FOUND" ? 404 : err.code === "FORBIDDEN" ? 403 : 409;
+    return c.json({ error: { code: err.code, message: err.message } }, status);
   }
   return c.json(ok(result.result), 201);
 });
 
 sessionRoutes.post("/:id/end", async (c) => {
   const result = await endImpersonation(c.var.user.sub, c.req.param("id"));
-  if (!result.ok) return c.json({ error: { code: result.code, message: result.message } }, result.code === "NOT_FOUND" ? 404 : 409);
+  if (!result.ok) {
+    const err = result as { ok: false; code: string; message: string };
+    return c.json({ error: { code: err.code, message: err.message } }, err.code === "NOT_FOUND" ? 404 : 409);
+  }
   return c.json(ok(result.result), 200);
 });
 
@@ -55,7 +59,10 @@ sessionRoutes.post("/:id/switch-role", async (c) => {
   if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
 
   const result = await switchImpersonationRole(c.var.user.sub, c.req.param("id"), body.data.role);
-  if (!result.ok) return c.json({ error: { code: result.code, message: result.message } }, 404);
+  if (!result.ok) {
+    const err = result as { ok: false; code: string; message: string };
+    return c.json({ error: { code: err.code, message: err.message } }, 404);
+  }
   return c.json(ok(result.result), 200);
 });
 

@@ -24,6 +24,7 @@ import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
 import { generateSpeech, getVoices, cloneVoice, wordTimestampsToSrt, wordTimestampsToVtt } from "../services/tts.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/transcription.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 const {
   studioVoiceovers, studioVoiceClones, studioCaptions,
@@ -145,7 +146,7 @@ studioFeaturesRoutes.post("/tts/generate", async (c) => {
         ContentType: result.contentType,
         Metadata: { userId: user.sub, voiceoverId: voiceover.id },
       }));
-      audioUrl = `https://cdn.hired.video/${audioKey}`;
+      audioUrl = cdnUrl(audioKey);
     }
 
     // Update record with results
@@ -214,7 +215,7 @@ studioFeaturesRoutes.post("/tts/generate-all", async (c) => {
           Body: Buffer.from(result.audioBuffer),
           ContentType: result.contentType,
         }));
-        audioUrl = `https://cdn.hired.video/${audioKey}`;
+        audioUrl = cdnUrl(audioKey);
       }
 
       const db = getDb();
@@ -570,7 +571,7 @@ studioFeaturesRoutes.post("/recording/upload", async (c) => {
       Body: Buffer.from(bytes),
       ContentType: file.type || "video/webm",
     }));
-    videoUrl = `https://cdn.hired.video/${videoKey}`;
+    videoUrl = cdnUrl(videoKey);
   }
 
   const [recording] = await db.insert(studioRecordings).values({
@@ -1191,7 +1192,7 @@ studioFeaturesRoutes.post("/voice-clones", async (c) => {
       Body: Buffer.from(bytes),
       ContentType: audioFile.type || "audio/mpeg",
     }));
-    sampleUrl = `https://cdn.hired.video/${sampleKey}`;
+    sampleUrl = cdnUrl(sampleKey);
   }
 
   const [clone] = await db.insert(studioVoiceClones).values({

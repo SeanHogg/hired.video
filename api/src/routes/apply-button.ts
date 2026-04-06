@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { eq } from "drizzle-orm";
 
 export const applyButtonRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -73,7 +74,7 @@ applyButtonRoutes.get("/:jobId/meta", async (c) => {
   const [job] = await db
     .select({ id: schema.jobItems.id, title: schema.jobItems.title, company: schema.jobItems.company })
     .from(schema.jobItems)
-    .where(schema.jobItems.id === (jobId as any))
+    .where(eq(schema.jobItems.id, jobId))
     .limit(1);
 
   if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);

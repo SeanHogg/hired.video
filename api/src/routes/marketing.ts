@@ -20,7 +20,7 @@ const CreateLeadSchema = z.object({
   company: z.string().optional(),
   source: z.string().optional(),
   notes: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ─── Campaigns ────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ marketingRoutes.post("/campaigns", async (c) => {
       subject: parsed.data.subject,
       status: parsed.data.status,
       scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : null,
-    })
+    } as any)
     .returning();
   return c.json(success(campaign), 201);
 });
@@ -84,7 +84,7 @@ marketingRoutes.patch("/campaigns/:id/status", async (c) => {
   const db = getDb();
   const [updated] = await db
     .update(schema.emailCampaigns)
-    .set({ status: newStatus, updatedAt: new Date() })
+    .set({ status: newStatus, updatedAt: new Date() } as any)
     .where(eq(schema.emailCampaigns.id, c.req.param("id")))
     .returning();
   if (!updated) return c.json(error("NOT_FOUND", "Campaign not found"), 404);
@@ -120,7 +120,7 @@ marketingRoutes.post("/leads", async (c) => {
       source: parsed.data.source ?? "api",
       notes: parsed.data.notes ?? null,
       metadata: parsed.data.metadata ?? null,
-    })
+    } as any)
     .returning();
   return c.json(success(lead), 201);
 });

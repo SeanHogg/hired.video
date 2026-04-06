@@ -45,7 +45,7 @@ autoApplyRoutes.post("/start", requirePremium("Auto-Apply Agent"), async (c) => 
   const db = getDb();
 
   // Fetch the user's resume (most recent if not specified)
-  const resumeTable = schema.resumes ?? (schema as any).userResumes;
+  const resumeTable = schema.resumeInformation ?? (schema as any).userResumes;
   let resumeContent = "";
   let resolvedResumeId: string | null = resumeId ?? null;
 
@@ -154,7 +154,7 @@ autoApplyRoutes.get("/matches", requirePremium("Auto-Apply Agent"), async (c) =>
   const db = getDb();
 
   // Fetch user's resume skills
-  const resumeTable = schema.resumes ?? (schema as any).userResumes;
+  const resumeTable = schema.resumeInformation ?? (schema as any).userResumes;
   let resumeSummary = "";
   if (resumeTable) {
     const [resume] = await db.select()

@@ -22,7 +22,7 @@ const ConnectSchema = z.object({
   provider: z.enum(SUPPORTED_PROVIDERS),
   apiKey: z.string().min(1),
   webhookSecret: z.string().optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 function getAtsTable() {

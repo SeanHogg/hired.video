@@ -1,57 +1,102 @@
-import React, { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { useAdminPermissions } from "@/lib/admin-permissions";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
+import { apiClient } from "@/lib/api-client";
 
 interface Module {
   id: string;
   name: string;
-  description: string;
-  category: string;
-  enabled: boolean;
-  requiredPlan: string | null;
-  affectedRoles: string[];
+  slug: string;
+  description: string | null;
+  requiredRole: string;
+  planTier: string;
+  permissions: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const INITIAL_MODULES: Module[] = [
-  { id: "video_resume",      name: "Video Resumes",        description: "Allow users to create and publish video resumes.",            category: "Core",      enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker"] },
-  { id: "ai_coach",          name: "AI Coach",             description: "AI-powered career coaching and interview practice.",          category: "AI",        enabled: true,  requiredPlan: "Pro",         affectedRoles: ["JobSeeker"] },
-  { id: "resume_tailor",     name: "Resume Tailor",        description: "Tailor resumes to specific job descriptions using AI.",        category: "AI",        enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker"] },
-  { id: "interview_practice",name: "Interview Practice",   description: "Simulated interview sessions with AI feedback.",              category: "AI",        enabled: true,  requiredPlan: "Pro",         affectedRoles: ["JobSeeker"] },
-  { id: "outreach",          name: "Outreach & CRM",       description: "Contact candidates and track recruitment pipeline.",          category: "Recruiting",enabled: true,  requiredPlan: "Pro",         affectedRoles: ["Recruiter", "Employer"] },
-  { id: "ats",               name: "Applicant Tracking",   description: "Full ATS with stages, notes, and team collaboration.",        category: "Recruiting",enabled: true,  requiredPlan: "Pro",         affectedRoles: ["Employer", "Recruiter"] },
-  { id: "affiliate",         name: "Affiliate Program",    description: "Referral and commission tracking for affiliates.",            category: "Revenue",   enabled: true,  requiredPlan: null,          affectedRoles: ["Affiliate"] },
-  { id: "job_board",         name: "Public Job Board",     description: "Publicly listed jobs searchable without an account.",         category: "Core",      enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker", "Recruiter", "Employer"] },
-  { id: "social_feed",       name: "Social Feed",          description: "LinkedIn-style activity feed for platform members.",          category: "Social",    enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker", "Recruiter", "Employer"] },
-  { id: "chrome_extension",  name: "Chrome Extension",     description: "Browser extension for one-click apply and job capture.",      category: "Tools",     enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker"] },
-  { id: "referral_banner",   name: "Referral Banner",      description: "In-app referral prompt to grow user base.",                  category: "Growth",    enabled: true,  requiredPlan: null,          affectedRoles: ["JobSeeker", "Recruiter", "Employer"] },
-  { id: "ads",               name: "Ad Slots",             description: "Display advertising within the platform.",                   category: "Revenue",   enabled: false, requiredPlan: null,          affectedRoles: ["JobSeeker"] },
-];
+// Group modules by a derived category based on slug/name
+function getCategory(mod: Module): string {
+  const s = mod.slug.toLowerCase();
+  if (s.includes("video") || s.includes("job-board") || s.includes("job_board")) return "Core";
+  if (s.includes("ai") || s.includes("coach") || s.includes("resume-tailor") || s.includes("interview")) return "AI";
+  if (s.includes("outreach") || s.includes("ats") || s.includes("applicant") || s.includes("recruit")) return "Recruiting";
+  if (s.includes("social") || s.includes("feed")) return "Social";
+  if (s.includes("chrome") || s.includes("extension")) return "Tools";
+  if (s.includes("affiliate") || s.includes("ad") || s.includes("ads")) return "Revenue";
+  if (s.includes("referral") || s.includes("banner")) return "Growth";
+  return "Other";
+}
 
-const CATEGORY_ORDER = ["Core", "AI", "Recruiting", "Social", "Tools", "Revenue", "Growth"];
+const CATEGORY_ORDER = ["Core", "AI", "Recruiting", "Social", "Tools", "Revenue", "Growth", "Other"];
 
 export default function ModuleManagement() {
-  const [modules, setModules] = useState(INITIAL_MODULES);
-  const [changed, setChanged] = useState<Set<string>>(new Set());
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<Set<string>>(new Set());
   const { can } = useAdminPermissions();
   const canToggle = can("modules", "update");
+  const { toast } = useToast();
 
-  const toggle = (id: string) => {
-    setModules((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, enabled: !m.enabled } : m))
-    );
-    setChanged((prev) => new Set(prev).add(id));
+  const loadModules = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await apiClient.get<Module[]>("/api/admin/impersonate/modules");
+      setModules(res.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load modules");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadModules(); }, [loadModules]);
+
+  const toggle = async (mod: Module) => {
+    setToggling(prev => new Set(prev).add(mod.id));
+    try {
+      await apiClient.put(`/api/admin/impersonate/modules/${mod.id}`, { isActive: !mod.isActive });
+      setModules(prev => prev.map(m => m.id === mod.id ? { ...m, isActive: !m.isActive } : m));
+      toast({ title: `${mod.name} ${!mod.isActive ? "enabled" : "disabled"}` });
+    } catch {
+      toast({ title: `Failed to toggle ${mod.name}`, variant: "destructive" });
+    } finally {
+      setToggling(prev => { const s = new Set(prev); s.delete(mod.id); return s; });
+    }
   };
 
   const grouped = CATEGORY_ORDER.reduce<Record<string, Module[]>>((acc, cat) => {
-    acc[cat] = modules.filter((m) => m.category === cat);
+    acc[cat] = modules.filter((m) => getCategory(m) === cat);
     return acc;
   }, {});
 
-  const enabledCount = modules.filter((m) => m.enabled).length;
+  const enabledCount = modules.filter((m) => m.isActive).length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Loading modules...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-destructive py-8">
+        {error}
+        <Button variant="ghost" size="sm" className="ml-2" onClick={loadModules}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -68,15 +113,6 @@ export default function ModuleManagement() {
         </div>
       </div>
 
-      {changed.size > 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {changed.size} module{changed.size > 1 ? "s" : ""} changed. Changes are applied immediately and saved to the database.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {CATEGORY_ORDER.map((category) => {
         const items = grouped[category];
         if (!items?.length) return null;
@@ -85,30 +121,27 @@ export default function ModuleManagement() {
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{category}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {items.map((mod) => (
-                <Card key={mod.id} className={mod.enabled ? "" : "opacity-60"}>
+                <Card key={mod.id} className={mod.isActive ? "" : "opacity-60"}>
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium">{mod.name}</p>
-                          {mod.requiredPlan && (
+                          {mod.planTier !== "free" && (
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                              {mod.requiredPlan}
+                              {mod.planTier}
                             </Badge>
-                          )}
-                          {changed.has(mod.id) && (
-                            <Badge className="text-[10px] px-1.5 py-0 bg-amber-500">changed</Badge>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{mod.description}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          Affects: {mod.affectedRoles.join(", ")}
+                          Required role: {mod.requiredRole}
                         </p>
                       </div>
                       <Switch
-                        checked={mod.enabled}
-                        onCheckedChange={() => toggle(mod.id)}
-                        disabled={!canToggle}
+                        checked={mod.isActive}
+                        onCheckedChange={() => toggle(mod)}
+                        disabled={!canToggle || toggling.has(mod.id)}
                         aria-label={`Toggle ${mod.name}`}
                       />
                     </div>

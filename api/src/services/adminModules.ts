@@ -31,7 +31,7 @@ export async function createModule(adminId: string, input: CreateModuleInput) {
       requiredRole: input.requiredRole,
       planTier: input.planTier ?? "free",
       permissions: input.permissions ?? [],
-    })
+    } as any)
     .returning();
 
   await auditLog({
@@ -73,7 +73,7 @@ export async function updateModule(
 
   const [updated] = await db
     .update(schema.modules)
-    .set({ ...updates, updatedAt: new Date() })
+    .set({ ...updates, updatedAt: new Date() } as any)
     .where(eq(schema.modules.id, moduleId))
     .returning();
 
@@ -101,7 +101,7 @@ export async function assignModuleToUser(
 
   await db
     .insert(schema.userModuleAssignments)
-    .values({ userId, moduleId, assignedBy: adminId })
+    .values({ userId, moduleId, assignedBy: adminId } as any)
     .onConflictDoNothing();
 
   const permissions = (mod.permissions as string[] | null) ?? [];
@@ -135,7 +135,7 @@ export async function removeModuleFromUser(adminId: string, userId: string, modu
   const db = getDb();
   await db
     .update(schema.userModuleAssignments)
-    .set({ revokedAt: new Date() })
+    .set({ revokedAt: new Date() } as any)
     .where(and(eq(schema.userModuleAssignments.userId, userId), eq(schema.userModuleAssignments.moduleId, moduleId)));
 
   await auditLog({

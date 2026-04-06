@@ -6,7 +6,7 @@
  * Swap to Helcim (or any future provider) by setting PAYMENT_PROVIDER=helcim.
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
@@ -189,7 +189,7 @@ paymentRoutes.post("/save-payment-method", async (c) => {
 // POST /api/payment/webhook         (generic path)
 // Verifies the provider signature and dispatches normalised events.
 // ---------------------------------------------------------------------------
-async function handleWebhook(c: Parameters<typeof paymentRoutes.post>[1] extends (c: infer C) => unknown ? C : never) {
+async function handleWebhook(c: Context<{ Variables: Variables }>) {
   const env = getEnv(c);
   const webhookSecret =
     env.STRIPE_WEBHOOK_SIGNING_KEY ??
@@ -241,8 +241,8 @@ async function handleWebhook(c: Parameters<typeof paymentRoutes.post>[1] extends
   return c.json({ received: true }, 200);
 }
 
-paymentRoutes.post("/webhook", handleWebhook);
-paymentRoutes.post("/stripe/webhook", handleWebhook); // legacy Stripe dashboard URL
+paymentRoutes.post("/webhook", handleWebhook as any);
+paymentRoutes.post("/stripe/webhook", handleWebhook as any); // legacy Stripe dashboard URL
 
 // ---------------------------------------------------------------------------
 // Webhook event dispatcher (normalised — provider-agnostic)

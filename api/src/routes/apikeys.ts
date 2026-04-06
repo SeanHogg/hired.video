@@ -95,7 +95,7 @@ apiKeyRoutes.post("/", requirePremium("API Access"), async (c) => {
       scopes: parsed.data.scopes,
       isActive: true,
       expiresAt: expiresAt ?? undefined,
-    })
+    } as any)
     .returning({
       id: schema.apiKeys.id,
       name: schema.apiKeys.name,
@@ -134,7 +134,7 @@ apiKeyRoutes.delete("/:id", requirePremium("API Access"), async (c) => {
 
   await db
     .update(schema.apiKeys)
-    .set({ isActive: false })
+    .set({ isActive: false } as any)
     .where(eq(schema.apiKeys.id, key.id));
 
   return c.json(success({ revoked: true, id: key.id }), 200);

@@ -104,7 +104,7 @@ async function deliverWebPush(
   payload: { title: string; body: string; url?: string },
   vapid: { publicKey: string; privateKey: string; subject: string },
 ) {
-  const crypto = globalThis.crypto;
+  const crypto = (globalThis as any).crypto as Crypto;
 
   // 1. Generate salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -123,22 +123,22 @@ async function deliverWebPush(
     { name: "ECDH", namedCurve: "P-256" },
     true,
     ["deriveKey"],
-  );
+  ) as CryptoKeyPair;
 
   // 4. Derive shared secret
   const sharedSecret = await crypto.subtle.deriveKey(
-    { name: "ECDH", public: receiverPubKey },
+    { name: "ECDH", public: receiverPubKey } as any,
     senderKeys.privateKey,
-    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new Uint8Array(0) },
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new Uint8Array(0) } as any,
     false,
     ["deriveBits"],
   );
   const ikm = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: base64UrlDecode(subscription.auth), info: utf8Encode("Content-Encoding: auth\0") }, sharedSecret as any, 256),
+    await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: base64UrlDecode(subscription.auth), info: utf8Encode("Content-Encoding: auth\0") } as any, sharedSecret as any, 256),
   );
 
   const senderPubKeyRaw = new Uint8Array(
-    await crypto.subtle.exportKey("raw", senderKeys.publicKey),
+    await (crypto.subtle.exportKey as any)("raw", senderKeys.publicKey),
   );
 
   // PRK

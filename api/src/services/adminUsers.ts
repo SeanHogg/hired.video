@@ -103,7 +103,7 @@ export async function assignUserRole(
 
   if (!existing) return { ok: false, code: "NOT_FOUND" };
 
-  await db.update(schema.users).set({ role, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+  await db.update(schema.users).set({ role, updatedAt: new Date() } as any).where(eq(schema.users.id, userId));
 
   await auditLog({
     actorId: adminId,
@@ -124,7 +124,7 @@ export async function setUserStatus(
   const db = getDb();
   await db
     .update(schema.users)
-    .set({ isSuspended: status === "suspended", isActive: status === "active", updatedAt: new Date() })
+    .set({ isSuspended: status === "suspended", isActive: status === "active", updatedAt: new Date() } as any)
     .where(eq(schema.users.id, userId));
 
   await auditLog({

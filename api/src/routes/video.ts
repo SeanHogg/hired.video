@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 const { videos } = schema;
 
@@ -53,7 +54,7 @@ function toVideoDto(video: typeof videos.$inferSelect) {
     resumeId: video.resumeId ?? "",
     userId: video.userId,
     status,
-    filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.hired.video/${video.r2Key}` : null),
+    filePath: video.youtubeUrl ?? (video.r2Key ? cdnUrl(video.r2Key) : null),
     includeAvatar: false,
     scenePrompt: null,
     errorMessage: video.errorMessage ?? null,
@@ -210,7 +211,7 @@ videoRoutes.get("/:id/status", async (c) => {
       progressPercentage,
       estimatedTimeRemaining: video.status === "Processing" ? 60 : null,
       errorMessage: video.errorMessage ?? null,
-      filePath: video.youtubeUrl ?? (video.r2Key ? `https://cdn.hired.video/${video.r2Key}` : null),
+      filePath: video.youtubeUrl ?? (video.r2Key ? cdnUrl(video.r2Key) : null),
     }),
   );
 });

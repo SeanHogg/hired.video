@@ -12,9 +12,63 @@ const app = createApp();
 // Some libraries (like Hono) don't expose `env` everywhere, so we store it in a
 // global shortcut for any runtime helper to access.
 
+/** Serve R2 objects for cdn.hired.video requests. */
+async function handleCdnRequest(request: Request, env: any): Promise<Response> {
+  const url = new URL(request.url);
+  const key = url.pathname.slice(1); // strip leading /
+
+  if (!key) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  const bucket: R2Bucket | undefined = env.VIDEO_BUCKET;
+  if (!bucket) {
+    return new Response("Storage not configured", { status: 503 });
+  }
+
+  if (request.method === "HEAD") {
+    const head = await bucket.head(key);
+    if (!head) return new Response(null, { status: 404 });
+    return new Response(null, {
+      headers: {
+        "Content-Type": head.httpMetadata?.contentType ?? "application/octet-stream",
+        "Content-Length": String(head.size),
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  const object = await bucket.get(key);
+  if (!object) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  return new Response(object.body as ReadableStream, {
+    headers: {
+      "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
+      "Content-Length": String(object.size),
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "Access-Control-Allow-Origin": "*",
+      "ETag": object.etag,
+    },
+  });
+}
+
+function isCdnRequest(request: Request): boolean {
+  const host = new URL(request.url).hostname;
+  return host === "cdn.hired.video";
+}
+
 export default {
   async fetch(request: Request, env: any, ctx: any) {
     (globalThis as any).__ENV = env;
+
+    // CDN requests go straight to R2 — no Hono routing needed
+    if (isCdnRequest(request)) {
+      return handleCdnRequest(request, env);
+    }
+
     // Seed runs after __ENV is set so getDb() can resolve the database URL from bindings.
     void seedSuperAdminAndCompany().catch((err) => {
       console.error("Failed to seed superadmin/company:", err);

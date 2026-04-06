@@ -22,7 +22,7 @@ const CreateReviewSchema = z.object({
   strengths: z.string().optional(),
   areasForImprovement: z.string().optional(),
   goals: z.array(z.object({ goal: z.string(), status: z.string(), notes: z.string().optional() })).optional(),
-  ratings: z.record(z.number()).optional(),
+  ratings: z.record(z.string(), z.number()).optional(),
   reviewerNotes: z.string().optional(),
 });
 
@@ -72,7 +72,7 @@ performanceRoutes.post("/cycles", requirePremium("Performance Management"), asyn
       startDate: new Date(parsed.data.startDate),
       endDate: new Date(parsed.data.endDate),
       status: "active",
-    })
+    } as any)
     .returning();
 
   return c.json(success(cycle), 201);
@@ -116,7 +116,7 @@ performanceRoutes.patch("/cycles/:id/complete", requirePremium("Performance Mana
 
   const [updated] = await db
     .update(schema.performanceCycles)
-    .set({ status: "completed", updatedAt: new Date() })
+    .set({ status: "completed", updatedAt: new Date() } as any)
     .where(eq(schema.performanceCycles.id, cycle.id))
     .returning();
 
@@ -150,7 +150,7 @@ performanceRoutes.post("/reviews", requirePremium("Performance Management"), asy
       goals: parsed.data.goals ?? [],
       ratings: parsed.data.ratings ?? {},
       reviewerNotes: parsed.data.reviewerNotes,
-    })
+    } as any)
     .returning();
 
   return c.json(success(review), 201);
@@ -186,7 +186,7 @@ performanceRoutes.patch("/reviews/:id/submit", requirePremium("Performance Manag
 
   const [updated] = await db
     .update(schema.performanceReviews)
-    .set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() })
+    .set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() } as any)
     .where(eq(schema.performanceReviews.id, review.id))
     .returning();
 
@@ -233,7 +233,7 @@ performanceRoutes.post("/goals", requirePremium("Performance Management"), async
       targetDate: parsed.data.targetDate ? new Date(parsed.data.targetDate) : undefined,
       progressPercentage: 0,
       status: "in_progress",
-    })
+    } as any)
     .returning();
 
   return c.json(success(goal), 201);

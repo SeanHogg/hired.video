@@ -91,7 +91,7 @@ export async function startImpersonation(input: StartImpersonationInput): Promis
       reason: input.reason.trim(),
       debuggerEnabled: input.enableDebugger ?? false,
       expiresAt,
-    })
+    } as any)
     .returning();
 
   await auditLog({
@@ -135,7 +135,7 @@ export async function endImpersonation(adminId: string, sessionId: string): Prom
 
   await db
     .update(schema.impersonationSessions)
-    .set({ endedAt: now, endReason: "manual" })
+    .set({ endedAt: now, endReason: "manual" } as any)
     .where(eq(schema.impersonationSessions.id, sessionId));
 
   await auditLog({

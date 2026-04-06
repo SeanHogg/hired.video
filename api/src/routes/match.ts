@@ -193,7 +193,7 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
         promptTokens: Math.round((jobText.length + resumeText.length) / 4),
         completionTokens: Math.round(JSON.stringify(result).length / 4),
         totalTokens: Math.round((jobText.length + resumeText.length + JSON.stringify(result).length) / 4),
-      });
+      } as any);
 
       return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: resume.id, sourceUrl }), 200);
     } catch {
@@ -277,7 +277,7 @@ Rules:
         promptTokens: Math.round((jobText.length + resumeText.length) / 4),
         completionTokens: Math.round(result.markdownResume.length / 4),
         totalTokens,
-      });
+      } as any);
 
       return c.json(
         success({ ...result, resumeId: resume.id, sourceUrl }),
@@ -497,7 +497,7 @@ Return JSON matching this structure exactly:
         promptTokens: Math.round((jobText.length + resumeText.length) / 4),
         completionTokens: Math.round(JSON.stringify(result).length / 4),
         totalTokens: Math.round((jobText.length + resumeText.length + JSON.stringify(result).length) / 4),
-      });
+      } as any);
 
       return c.json(success({ ...result, resumeId: resume.id }), 200);
     } catch {

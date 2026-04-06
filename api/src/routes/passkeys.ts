@@ -131,7 +131,7 @@ passkeyRoutes.post("/register/begin", async (c) => {
     challenge: challengeB64,
     rp: { id: rpId, name: "hired.video" },
     user: {
-      id: b64url(new TextEncoder().encode(userId)),
+      id: b64url(new TextEncoder().encode(userId).buffer as ArrayBuffer),
       name: user?.email ?? userId,
       displayName: user?.name ?? "User",
     },

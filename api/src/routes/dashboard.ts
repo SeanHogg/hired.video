@@ -525,7 +525,7 @@ Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observ
       AiInsightsResponseSchema,
     );
 
-    await db.insert(schema.aiUsageRecords).values({
+    await (db.insert(schema.aiUsageRecords) as any).values({
       userId,
       model: "google/gemini-flash-1.5",
       featureKey: "dashboard_insights",
@@ -558,7 +558,10 @@ const CareerCopilotResponseSchema = z.object({
   nextReviewDate: z.string(),
 });
 
-dashboardRoutes.post("/career-copilot", requirePremium, checkAIUsage("career_copilot"), async (c) => {
+dashboardRoutes.post("/career-copilot", requirePremium("Career Copilot"), async (c) => {
+  const limitError = await checkAIUsage(c as any);
+  if (limitError) return limitError;
+
   const userId = c.var.user.sub;
   const db = getDb();
   const since = daysAgo(30);
@@ -632,7 +635,7 @@ Return JSON: {
       CareerCopilotResponseSchema,
     );
 
-    await db.insert(schema.aiUsageRecords).values({
+    await (db.insert(schema.aiUsageRecords) as any).values({
       userId,
       model: "google/gemini-flash-1.5",
       featureKey: "career_copilot",

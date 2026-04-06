@@ -61,7 +61,7 @@ export async function auditLog(entry: AuditEntry): Promise<void> {
       targetId: entry.targetId,
       metadata: entry.metadata as any,
       impersonationSessionId: entry.impersonationSessionId,
-    });
+    } as any);
   } catch (err) {
     console.error("[audit] Failed to write audit log entry:", err);
   }

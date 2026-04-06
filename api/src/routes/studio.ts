@@ -6,6 +6,7 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
 import { getSubscription } from "../services/billing.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -147,7 +148,7 @@ const VideoScriptSchema = z.object({
     logoUrl: z.string().optional(),
     logoPosition: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).optional(),
     // Purpose label stored in the script so renderers can optimise for ad vs. resume
-    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch"]).optional(),
+    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
   }).passthrough(),
   scenes: z.array(z.object({
     id: z.string(),
@@ -257,6 +258,12 @@ function buildMockAdVideoScript(
       { id: "scene-2", start: perScene * 2, duration: perScene, type: "benefits",        title: "Why It Matters", items: ["Reduce operational overhead by 40%", "Ship faster with fewer errors", "Delight your customers every time"] },
       { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",             title: "Get Started Today", text: "Join thousands of teams already winning.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
+    personal_brand: [
+      { id: "scene-0", start: 0,            duration: perScene, type: "intro",       title: name, subtitle: "My Story", text: "Building a career that makes an impact." },
+      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story", title: "What I Do", items: ["Helping businesses solve complex challenges", "Sharing expertise through content and speaking", "Mentoring the next generation of professionals"] },
+      { id: "scene-2", start: perScene * 2, duration: perScene, type: "achievement", title: "Key Highlights", items: ["10+ years of industry experience", "Speaker at major conferences", "Published thought leader in the space"] },
+      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",         title: "Let's Connect", text: "Follow my journey and join the conversation.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+    ],
   };
 
   return {
@@ -333,7 +340,7 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
   };
 }
 
-type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch";
+type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
 
 function buildStudioSystemPrompt(
   targetDuration: number,
@@ -702,7 +709,7 @@ function toProjectDto(
     title: savedName || project.resumeText?.slice(0, 80) || "My Video Resume",
     status: mapStudioStatus(project.status),
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
-    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
+    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
     thumbnailUrl: linkedVideo?.thumbnailUrl ?? null,
     storyboard,
     script,
@@ -987,7 +994,7 @@ studioRoutes.get("/status/:projectId", async (c) => {
     status,
     progressPercentage,
     youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
-    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? `https://cdn.hired.video/${linkedVideo.r2Key}` : null),
+    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
     errorMessage: status === "Failed" ? linkedVideo?.errorMessage ?? "Publishing failed" : null,
   }));
 });
@@ -1051,8 +1058,8 @@ studioRoutes.get("/projects", async (c) => {
       ? db
           .select({
             videoId: videoAnalytics.videoId,
-            viewCount: sql<number>`count(*) filter (where ${videoAnalytics.eventType} = 'view')::int`,
-            ctaClickCount: sql<number>`count(*) filter (where ${videoAnalytics.eventType} = 'cta_click')::int`,
+            viewCount: sql<number>`count(*) filter (where ${videoAnalytics.event} = 'view')::int`,
+            ctaClickCount: sql<number>`count(*) filter (where ${videoAnalytics.event} = 'cta_click')::int`,
           })
           .from(videoAnalytics)
           .where(inArray(videoAnalytics.videoId, videoIds))
@@ -1100,7 +1107,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
   return c.json(ok(rows.map((v) => ({
     id: v.id,
     title: v.title,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? `https://cdn.hired.video/${v.r2Key}` : null),
+    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
     youtubeUrl: v.youtubeUrl,
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
@@ -1133,7 +1140,7 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
   return c.json(ok(visible.map((v) => ({
     id: v.id,
     title: v.title,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? `https://cdn.hired.video/${v.r2Key}` : null),
+    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
     youtubeUrl: v.youtubeUrl,
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
@@ -1171,7 +1178,7 @@ studioRoutes.get("/videos/public", async (c) => {
   return c.json(ok(rows.map((v) => ({
     id: v.id,
     title: v.title || `${v.ownerName}'s Video Resume`,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? `https://cdn.hired.video/${v.r2Key}` : null),
+    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
     youtubeUrl: v.youtubeUrl,
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
@@ -1219,7 +1226,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     id: v.id,
     title: v.title || `${v.ownerName}'s Video Resume`,
     description: v.description,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? `https://cdn.hired.video/${v.r2Key}` : null),
+    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
     youtubeUrl: v.youtubeUrl,
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
@@ -1412,7 +1419,7 @@ studioRoutes.get("/videos/:videoId/embed", async (c) => {
   const videoUrl = vid.youtubeVideoId
     ? `https://www.youtube.com/embed/${vid.youtubeVideoId}`
     : vid.r2Key
-    ? `https://cdn.hired.video/${vid.r2Key}`
+    ? cdnUrl(vid.r2Key)
     : null;
   if (!videoUrl) return c.json(fail("NOT_AVAILABLE", "Video not yet available for embed"), 404);
   const title = vid.title ?? "Video";

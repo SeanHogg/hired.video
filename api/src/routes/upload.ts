@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -33,9 +34,6 @@ function fileExt(name: string): string {
   return idx >= 0 ? name.slice(idx + 1).toLowerCase() : "";
 }
 
-function cdnUrl(key: string): string {
-  return `https://cdn.hired.video/${key}`;
-}
 
 /** POST /api/upload — upload a file to S3-compatible storage (avatars, documents, etc.) */
 uploadRoutes.post("/", async (c) => {

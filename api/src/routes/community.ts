@@ -71,7 +71,7 @@ communityRoutes.get("/posts", requirePremium("Employee Community"), async (c) =>
     .limit(50);
 
   // Filter to posts that have the company tag (jsonb contains)
-  const filtered = posts.filter((p) => Array.isArray(p.tags) && (p.tags as string[]).includes(tag));
+  const filtered = posts.filter((p) => Array.isArray(p.tags) && (p.tags as unknown as string[]).includes(tag));
 
   return c.json(success({ channel, companyId, posts: filtered }), 200);
 });
@@ -101,7 +101,7 @@ communityRoutes.post("/posts", requirePremium("Employee Community"), async (c) =
       privacy: "Private", // hidden from public feed
       media: parsed.data.media as any,
       tags: [tag, `channel:${parsed.data.channel}`] as any,
-    })
+    } as any)
     .returning();
 
   // Notify all company members except the poster (#19)

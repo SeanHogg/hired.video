@@ -107,14 +107,14 @@ aiRoutes.post("/chat", async (c) => {
         model: "google/gemini-flash-1.5",
         systemPrompt: customSystemPrompt,
         isActive: true,
-      })
+      } as any)
       .returning({ id: schema.aiChatSessions.id });
     sessionId = created.id;
   } else {
     // Update the session's updatedAt so it bubbles to top of history list
     await db
       .update(schema.aiChatSessions)
-      .set({ updatedAt: new Date() })
+      .set({ updatedAt: new Date() } as any)
       .where(eq(schema.aiChatSessions.id, sessionId));
   }
 
@@ -172,7 +172,7 @@ aiRoutes.post("/chat", async (c) => {
   await db.insert(schema.aiChatMessages).values([
     { sessionId, role: "user", content: userMessage, tokensUsed: promptTokens },
     { sessionId, role: "assistant", content: responseMessage, tokensUsed: completionTokens },
-  ]);
+  ] as any);
 
   // Track usage
   if (totalTokens > 0) {
@@ -184,7 +184,7 @@ aiRoutes.post("/chat", async (c) => {
       completionTokens,
       totalTokens,
       sessionId,
-    });
+    } as any);
   }
 
   return c.json(success({ message: responseMessage, sessionId, usage: { promptTokens, completionTokens, totalTokens } }), 200);

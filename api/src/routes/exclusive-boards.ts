@@ -90,7 +90,7 @@ exclusiveBoardRoutes.post("/bids", requirePremium("Exclusive Job Boards"), async
       durationDays: parsed.data.durationDays,
       message: parsed.data.message,
       status: "pending",
-    })
+    } as any)
     .returning();
 
   return c.json(success(bid), 201);

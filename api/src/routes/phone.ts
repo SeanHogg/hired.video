@@ -39,7 +39,7 @@ async function deductBalance(userId: string, amountCents: number, description: s
   const balance = await getOrCreateBalance(userId);
   const newBalance = balance.balanceCents - amountCents;
   await db.update(schema.phoneBalances)
-    .set({ balanceCents: newBalance, updatedAt: new Date().toISOString() as any })
+    .set({ balanceCents: newBalance, updatedAt: new Date().toISOString() } as any)
     .where(eq(schema.phoneBalances.userId, userId));
   await db.insert(schema.phoneBalanceTransactions).values({
     userId,
@@ -184,7 +184,7 @@ phoneRoutes.delete("/numbers/:id", async (c) => {
 
   await db
     .update(schema.businessPhoneNumbers)
-    .set({ status: "released", updatedAt: new Date().toISOString() as any })
+    .set({ status: "released", updatedAt: new Date().toISOString() } as any)
     .where(eq(schema.businessPhoneNumbers.id, numberId));
 
   return c.json(ok({ released: true }));
@@ -356,8 +356,8 @@ phoneRoutes.patch("/balance/auto-topup", async (c) => {
       autoTopUpEnabled:        parsed.data.enabled,
       autoTopUpThresholdCents: parsed.data.thresholdCents,
       autoTopUpAmountCents:    parsed.data.amountCents,
-      updatedAt:               new Date().toISOString() as any,
-    })
+      updatedAt:               new Date().toISOString(),
+    } as any)
     .where(eq(schema.phoneBalances.userId, userId))
     .returning();
   return c.json(ok(updated));

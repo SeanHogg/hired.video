@@ -5,6 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 const { users, userProfiles, userConnections, tasks } = schema;
 
@@ -697,7 +698,7 @@ userRoutes.get("/:id", async (c) => {
   } else {
     // Slug lookup via userProfiles
     const [p] = await db.select(profileCols).from(userProfiles).where(eq(userProfiles.customUrlSlug, id)).limit(1);
-    profile = p;
+    profile = p as any;
     if (p) {
       const [row] = await db
         .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
@@ -772,7 +773,7 @@ userRoutes.post("/me/avatar", async (c) => {
   if (!bucket) {
     // No bucket configured (local dev) — return a data URL stub
     const db = getDb();
-    const stubUrl = `https://cdn.hired.video/${key}`;
+    const stubUrl = cdnUrl(key);
     await db.insert(userProfiles)
       .values({ userId: user.sub, avatarUrl: stubUrl, createdAt: new Date(), updatedAt: new Date() } as any)
       .onConflictDoUpdate({ target: userProfiles.userId, set: { avatarUrl: stubUrl, updatedAt: new Date() } as any });
@@ -780,7 +781,7 @@ userRoutes.post("/me/avatar", async (c) => {
   }
 
   await bucket.put(key, bytes, { httpMetadata: { contentType } });
-  const avatarUrl = `https://cdn.hired.video/${key}`;
+  const avatarUrl = cdnUrl(key);
 
   const db = getDb();
   await db.insert(userProfiles)

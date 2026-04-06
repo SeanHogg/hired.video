@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,13 +13,35 @@ import {
   UserPlus,
   DollarSign,
   Calendar,
-  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
 import { BillingManagement } from "@/components/billing/BillingManagement";
 import { BillingAnalytics } from "@/components/billing/BillingAnalytics";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAuth } from "@/lib/auth";
+import { apiClient } from "@/lib/api-client";
+
+interface DashboardMetrics {
+  userMetrics: {
+    totalUsers: number;
+    activeUsers: number;
+    newUsersLast30Days: number;
+    usersByRole: Record<string, number>;
+    usersByStatus: { active: number; inactive: number };
+  };
+  jobMetrics: {
+    totalJobs: number;
+    activeJobs: number;
+    newJobsLast30Days: number;
+  };
+  saasMetrics: {
+    monthlyRecurringRevenue: number;
+    annualRecurringRevenue: number;
+    growthRate: number;
+    activeSubscriptions: number;
+  };
+}
 
 interface QuickStat {
   title: string;
@@ -33,58 +55,74 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const { user } = useAuth();
   const { isAdmin } = usePermissions();
-  const isOwner = isAdmin; // For now, treat admin as owner
+  const isOwner = isAdmin;
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const quickStats: QuickStat[] = [
-    {
-      title: "Team Members",
-      value: "12",
-      change: "+2 this month",
-      trend: "up",
-      icon: <Users className="h-5 w-5" />,
-    },
-    {
-      title: "Monthly Revenue",
-      value: "$2,450",
-      change: "+15% from last month",
-      trend: "up",
-      icon: <DollarSign className="h-5 w-5" />,
-    },
-    {
-      title: "Active Jobs",
-      value: "34",
-      change: "+8 this week",
-      trend: "up",
-      icon: <BarChart3 className="h-5 w-5" />,
-    },
-    {
-      title: "Subscription",
-      value: "Employer Plan",
-      change: "Renews in 15 days",
-      trend: "neutral",
-      icon: <CreditCard className="h-5 w-5" />,
-    },
-  ];
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.get<DashboardMetrics>(
+          "/api/admin?IncludeSaaSMetrics=true"
+        );
+        setMetrics(res.data);
+      } catch {
+        // Silently fail — cards will show fallback
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isAdmin]);
+
+  const m = metrics;
+  const quickStats: QuickStat[] = m
+    ? [
+        {
+          title: "Total Users",
+          value: m.userMetrics.totalUsers.toLocaleString(),
+          change: `+${m.userMetrics.newUsersLast30Days} this month`,
+          trend: m.userMetrics.newUsersLast30Days > 0 ? "up" : "neutral",
+          icon: <Users className="h-5 w-5" />,
+        },
+        {
+          title: "Monthly Revenue",
+          value: `$${m.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`,
+          change: m.saasMetrics.growthRate > 0 ? `+${m.saasMetrics.growthRate}% growth` : "No change",
+          trend: m.saasMetrics.growthRate > 0 ? "up" : "neutral",
+          icon: <DollarSign className="h-5 w-5" />,
+        },
+        {
+          title: "Active Jobs",
+          value: m.jobMetrics.activeJobs.toLocaleString(),
+          change: `+${m.jobMetrics.newJobsLast30Days} this month`,
+          trend: m.jobMetrics.newJobsLast30Days > 0 ? "up" : "neutral",
+          icon: <BarChart3 className="h-5 w-5" />,
+        },
+        {
+          title: "Subscriptions",
+          value: m.saasMetrics.activeSubscriptions.toLocaleString(),
+          change: `ARR $${m.saasMetrics.annualRecurringRevenue.toLocaleString()}`,
+          trend: "neutral",
+          icon: <CreditCard className="h-5 w-5" />,
+        },
+      ]
+    : [];
 
   const getTrendColor = (trend: string) => {
     switch (trend) {
-      case "up":
-        return "text-green-600";
-      case "down":
-        return "text-red-600";
-      default:
-        return "text-muted-foreground";
+      case "up": return "text-green-600";
+      case "down": return "text-red-600";
+      default: return "text-muted-foreground";
     }
   };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
-      case "up":
-        return <TrendingUp className="h-4 w-4" />;
-      case "down":
-        return <TrendingUp className="h-4 w-4 rotate-180" />;
-      default:
-        return <Calendar className="h-4 w-4" />;
+      case "up": return <TrendingUp className="h-4 w-4" />;
+      case "down": return <TrendingUp className="h-4 w-4 rotate-180" />;
+      default: return <Calendar className="h-4 w-4" />;
     }
   };
 
@@ -125,7 +163,6 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-        {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
         <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
           <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-2'} gap-1 min-w-max sm:min-w-0`}>
             <TabsTrigger value="overview" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
@@ -161,31 +198,36 @@ export default function AdminDashboard() {
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {quickStats.map((stat, index) => (
-              <Card key={index}>
-                <CardContent className="pt-4 sm:pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                        {stat.title}
-                      </p>
-                      <p className="text-xl sm:text-2xl font-bold truncate">{stat.value}</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              Loading metrics...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {quickStats.map((stat, index) => (
+                <Card key={index}>
+                  <CardContent className="pt-4 sm:pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+                          {stat.title}
+                        </p>
+                        <p className="text-xl sm:text-2xl font-bold truncate">{stat.value}</p>
+                      </div>
+                      <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                        {stat.icon}
+                      </div>
                     </div>
-                    <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                      {stat.icon}
+                    <div className={`flex items-center mt-2 ${getTrendColor(stat.trend)}`}>
+                      {getTrendIcon(stat.trend)}
+                      <span className="text-xs sm:text-sm ml-1 truncate">{stat.change}</span>
                     </div>
-                  </div>
-                  <div
-                    className={`flex items-center mt-2 ${getTrendColor(stat.trend)}`}
-                  >
-                    {getTrendIcon(stat.trend)}
-                    <span className="text-xs sm:text-sm ml-1 truncate">{stat.change}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -241,61 +283,6 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-                  <div className="p-2 bg-blue-100 rounded-full">
-                    <UserPlus className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">New team member invited</p>
-                    <p className="text-sm text-muted-foreground">
-                      sarah.johnson@company.com was invited as a Recruiter
-                    </p>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    2 hours ago
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-                  <div className="p-2 bg-green-100 rounded-full">
-                    <CreditCard className="h-4 w-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Payment successful</p>
-                    <p className="text-sm text-muted-foreground">
-                      Monthly subscription payment of $99.00 processed
-                    </p>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    1 day ago
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-                  <div className="p-2 bg-yellow-100 rounded-full">
-                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Usage limit warning</p>
-                    <p className="text-sm text-muted-foreground">
-                      You've used 85% of your monthly AI credits
-                    </p>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    3 days ago
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {isAdmin && (

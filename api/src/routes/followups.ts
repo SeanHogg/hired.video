@@ -27,7 +27,7 @@ const EnrollSchema = z.object({
   recipientEmail: z.string().email(),
   recipientName: z.string().optional(),
   recipientUserId: z.string().uuid().optional(),
-  context: z.record(z.string()).optional(),
+  context: z.record(z.string(), z.string()).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ followUpRoutes.post("/sequences", requirePremium("Automated Follow-ups"), async 
   const db = getDb();
   const [sequence] = await db
     .insert(schema.followUpSequences)
-    .values({ userId, name: parsed.data.name, description: parsed.data.description })
+    .values({ userId, name: parsed.data.name, description: parsed.data.description } as any)
     .returning();
 
   const steps = await db
@@ -178,7 +178,7 @@ followUpRoutes.post("/enroll", requirePremium("Automated Follow-ups"), async (c)
       status: "active",
       currentStep: 0,
       nextSendAt: nextSendAt ?? undefined,
-    })
+    } as any)
     .returning();
 
   return c.json(success(enrollment), 201);
@@ -224,7 +224,7 @@ followUpRoutes.patch("/enrollments/:id/:action", requirePremium("Automated Follo
   const statusMap: Record<string, string> = { pause: "paused", resume: "active", cancel: "unsubscribed" };
   const [updated] = await db
     .update(schema.followUpEnrollments)
-    .set({ status: statusMap[action], updatedAt: new Date() })
+    .set({ status: statusMap[action], updatedAt: new Date() } as any)
     .where(eq(schema.followUpEnrollments.id, enrollment.id))
     .returning();
 
@@ -244,7 +244,7 @@ const TriggerSchema = z.object({
   recipientEmail: z.string().email(),
   recipientName: z.string().optional(),
   recipientUserId: z.string().uuid().optional(),
-  context: z.record(z.string()).optional(),
+  context: z.record(z.string(), z.string()).optional(),
 });
 
 followUpRoutes.post("/trigger", requirePremium("Smart Outreach"), async (c) => {

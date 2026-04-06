@@ -58,7 +58,7 @@ careerRoutes.post("/resilience-score", async (c) => {
     riskScore,
     reportJson,
     shareToken,
-  }).returning();
+  } as any).returning();
 
   return c.json(ok({ ...report, report: reportJson }), 201);
 });

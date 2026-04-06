@@ -86,7 +86,7 @@ calendarRoutes.post("/events", requirePremium("Calendar Integration"), async (c)
       reminderMinutes: parsed.data.reminderMinutes,
       status: "confirmed",
       syncedToCalendar: false,
-    })
+    } as any)
     .returning();
 
   return c.json(success(event), 201);
@@ -256,7 +256,7 @@ calendarRoutes.delete("/connections/:id", requirePremium("Calendar Integration")
     .limit(1);
 
   if (!conn) return c.json(error("NOT_FOUND", "Calendar connection not found"), 404);
-  await db.update(schema.calendarConnections).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.calendarConnections.id, conn.id));
+  await db.update(schema.calendarConnections).set({ isActive: false, updatedAt: new Date() } as any).where(eq(schema.calendarConnections.id, conn.id));
   return c.json(success({ disconnected: true }), 200);
 });
 

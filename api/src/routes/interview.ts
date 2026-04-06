@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
+import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
@@ -334,7 +335,7 @@ interviewRoutes.post("/sessions/:id/answers", async (c) => {
         Metadata: { userId: user.sub, sessionId },
       }),
     );
-    videoUrl = `https://cdn.hired.video/${r2Key}`;
+    videoUrl = cdnUrl(r2Key);
   }
 
   const [answer] = await db

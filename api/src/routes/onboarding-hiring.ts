@@ -67,7 +67,7 @@ hiringOnboardingRoutes.post("/offers", requirePremium("Hiring & Onboarding"), as
       expiresAt,
       bodyHtml: parsed.data.bodyHtml,
       status: "draft",
-    })
+    } as any)
     .returning();
 
   return c.json(success(offer), 201);
@@ -106,7 +106,7 @@ hiringOnboardingRoutes.patch("/offers/:id/send", requirePremium("Hiring & Onboar
 
   const [updated] = await db
     .update(schema.offerLetters)
-    .set({ status: "sent", updatedAt: new Date() })
+    .set({ status: "sent", updatedAt: new Date() } as any)
     .where(eq(schema.offerLetters.id, offer.id))
     .returning();
 
@@ -129,7 +129,7 @@ hiringOnboardingRoutes.patch("/offers/:id/accept", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const [updated] = await db
     .update(schema.offerLetters)
-    .set({ status: "accepted", signedAt: new Date(), signatureData: body.signatureData ?? null, updatedAt: new Date() })
+    .set({ status: "accepted", signedAt: new Date(), signatureData: body.signatureData ?? null, updatedAt: new Date() } as any)
     .where(eq(schema.offerLetters.id, offer.id))
     .returning();
 
@@ -150,7 +150,7 @@ hiringOnboardingRoutes.patch("/offers/:id/decline", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const [updated] = await db
     .update(schema.offerLetters)
-    .set({ status: "declined", declineReason: body.reason ?? null, updatedAt: new Date() })
+    .set({ status: "declined", declineReason: body.reason ?? null, updatedAt: new Date() } as any)
     .where(eq(schema.offerLetters.id, offer.id))
     .returning();
 
@@ -228,7 +228,7 @@ hiringOnboardingRoutes.post("/checklists", requirePremium("Hiring & Onboarding")
       startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : undefined,
       status: "pending",
       completionPercentage: "0",
-    })
+    } as any)
     .returning();
 
   const tasks = await db
@@ -286,7 +286,7 @@ hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePr
 
   await db
     .update(schema.onboardingTasks)
-    .set({ isCompleted: true, completedAt: new Date(), completedByUserId: userId })
+    .set({ isCompleted: true, completedAt: new Date(), completedByUserId: userId } as any)
     .where(and(eq(schema.onboardingTasks.id, c.req.param("taskId")), eq(schema.onboardingTasks.checklistId, checklist.id)));
 
   // Recompute completion percentage
@@ -297,7 +297,7 @@ hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePr
 
   const [updated] = await db
     .update(schema.onboardingChecklists)
-    .set({ completionPercentage: String(pct), status: newStatus, updatedAt: new Date() })
+    .set({ completionPercentage: String(pct), status: newStatus, updatedAt: new Date() } as any)
     .where(eq(schema.onboardingChecklists.id, checklist.id))
     .returning();
 
@@ -319,7 +319,7 @@ hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePremium("E-
   const [offer] = await db
     .select()
     .from(schema.offerLetters)
-    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq(schema.offerLetters.recruiterId, userId)))
+    .where(and(eq(schema.offerLetters.id, c.req.param("id")), eq((schema.offerLetters as any).recruiterId, userId)))
     .limit(1);
 
   if (!offer) return c.json(error("NOT_FOUND", "Offer letter not found"), 404);

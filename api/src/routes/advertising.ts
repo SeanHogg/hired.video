@@ -77,7 +77,7 @@ advertisingRoutes.post("/boosts", async (c) => {
   const db = getDb();
 
   // Verify job ownership
-  const [job] = await db.select().from(schema.jobItems).where(and(eq(schema.jobItems.id, jobId), eq(schema.jobItems.userId, userId))).limit(1);
+  const [job] = await db.select().from(schema.jobItems).where(and(eq(schema.jobItems.id, jobId), eq((schema.jobItems as any).userId, userId))).limit(1);
   if (!job) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Job not found or not owned by you" } }, 404);
 
   const endsAt = new Date();
@@ -91,11 +91,11 @@ advertisingRoutes.post("/boosts", async (c) => {
     budgetCents,
     endsAt,
     rateUnitCents: pricingModel === "cpc" ? 5 : 500, // $0.05 CPC or $5.00 CPM
-  }).returning();
+  } as any).returning();
 
   // Mark job as sponsored
   await db.update(schema.jobItems)
-    .set({ sponsored: true, sponsoredUntil: endsAt, sponsoredRankBoost: 10 })
+    .set({ sponsored: true, sponsoredUntil: endsAt, sponsoredRankBoost: 10 } as any)
     .where(eq(schema.jobItems.id, jobId));
 
   return c.json(ok(boost), 201);
@@ -106,7 +106,7 @@ advertisingRoutes.patch("/boosts/:id/pause", async (c) => {
   const userId = uid(c);
   const db = getDb();
   const [boost] = await db.update(schema.jobBoosts)
-    .set({ status: "paused", updatedAt: new Date() })
+    .set({ status: "paused", updatedAt: new Date() } as any)
     .where(and(eq(schema.jobBoosts.id, c.req.param("id")), eq(schema.jobBoosts.userId, userId)))
     .returning();
   if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
@@ -118,7 +118,7 @@ advertisingRoutes.patch("/boosts/:id/resume", async (c) => {
   const userId = uid(c);
   const db = getDb();
   const [boost] = await db.update(schema.jobBoosts)
-    .set({ status: "active", updatedAt: new Date() })
+    .set({ status: "active", updatedAt: new Date() } as any)
     .where(and(eq(schema.jobBoosts.id, c.req.param("id")), eq(schema.jobBoosts.userId, userId)))
     .returning();
   if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
@@ -134,8 +134,8 @@ advertisingRoutes.delete("/boosts/:id", async (c) => {
     .limit(1);
   if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
 
-  await db.update(schema.jobBoosts).set({ status: "cancelled", updatedAt: new Date() }).where(eq(schema.jobBoosts.id, boost.id));
-  await db.update(schema.jobItems).set({ sponsored: false, sponsoredUntil: null, sponsoredRankBoost: 0 }).where(eq(schema.jobItems.id, boost.jobId));
+  await db.update(schema.jobBoosts).set({ status: "cancelled", updatedAt: new Date() } as any).where(eq(schema.jobBoosts.id, boost.id));
+  await db.update(schema.jobItems).set({ sponsored: false, sponsoredUntil: null, sponsoredRankBoost: 0 } as any).where(eq(schema.jobItems.id, boost.jobId));
 
   return c.json(ok({ cancelled: true }));
 });
@@ -170,7 +170,7 @@ advertisingRoutes.post("/campaigns", async (c) => {
     ...parsed.data,
     startAt: parsed.data.startAt ? new Date(parsed.data.startAt) : undefined,
     endAt: parsed.data.endAt ? new Date(parsed.data.endAt) : undefined,
-  }).returning();
+  } as any).returning();
   return c.json(ok(campaign), 201);
 });
 
@@ -181,7 +181,7 @@ advertisingRoutes.put("/campaigns/:id", async (c) => {
 
   const db = getDb();
   const [campaign] = await db.update(schema.adCampaigns)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
     .where(and(eq(schema.adCampaigns.id, c.req.param("id")), eq(schema.adCampaigns.userId, uid(c))))
     .returning();
   if (!campaign) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Campaign not found" } }, 404);
@@ -206,7 +206,7 @@ const CreateAdSetSchema = z.object({
   bidStrategy:       z.enum(["manual", "maximize_clicks", "maximize_impressions", "target_cpa"]).default("manual"),
   bidAmountCents:    z.number().int().min(1).optional(),
   budgetCents:       z.number().int().min(0).optional(),
-  targetingJson:     z.record(z.unknown()).optional().default({}),
+  targetingJson:     z.record(z.string(), z.unknown()).optional().default({}),
   frequencyCapCount: z.number().int().min(1).max(100).optional(),
   frequencyCapHours: z.number().int().min(1).max(168).optional(),
   startAt:           z.string().datetime().optional(),
@@ -243,7 +243,7 @@ advertisingRoutes.post("/campaigns/:id/ad-sets", async (c) => {
     targetingJson: parsed.data.targetingJson ?? {},
     startAt: parsed.data.startAt ? new Date(parsed.data.startAt) : undefined,
     endAt: parsed.data.endAt ? new Date(parsed.data.endAt) : undefined,
-  }).returning();
+  } as any).returning();
   return c.json(ok(adSet), 201);
 });
 
@@ -254,7 +254,7 @@ advertisingRoutes.put("/ad-sets/:id", async (c) => {
 
   const db = getDb();
   const [adSet] = await db.update(schema.adSets)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
     .where(and(eq(schema.adSets.id, c.req.param("id")), eq(schema.adSets.userId, uid(c))))
     .returning();
   if (!adSet) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Ad set not found" } }, 404);
@@ -321,7 +321,7 @@ advertisingRoutes.put("/ads/:id", async (c) => {
 
   const db = getDb();
   const [ad] = await db.update(schema.ads)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
     .where(and(eq(schema.ads.id, c.req.param("id")), eq(schema.ads.userId, uid(c))))
     .returning();
   if (!ad) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Ad not found" } }, 404);
@@ -394,7 +394,7 @@ advertisingRoutes.get("/enrichment/credits", async (c) => {
   let [credits] = await db.select().from(schema.enrichmentCredits).where(eq(schema.enrichmentCredits.userId, userId)).limit(1);
   if (!credits) {
     // Auto-provision for Pro users: 25 monthly included credits
-    [credits] = await db.insert(schema.enrichmentCredits).values({ userId, balance: 0 }).returning();
+    [credits] = await db.insert(schema.enrichmentCredits).values({ userId, balance: 0 } as any).returning();
   }
   return c.json(ok(credits));
 });
@@ -426,7 +426,7 @@ advertisingRoutes.post("/enrichment/enrich", async (c) => {
   // Deduct credit
   const newBalance = credits.balance - 1;
   await db.update(schema.enrichmentCredits)
-    .set({ balance: newBalance, totalConsumed: credits.totalConsumed + 1, updatedAt: new Date() })
+    .set({ balance: newBalance, totalConsumed: credits.totalConsumed + 1, updatedAt: new Date() } as any)
     .where(eq(schema.enrichmentCredits.userId, userId));
 
   await db.insert(schema.enrichmentTransactions).values({
@@ -435,7 +435,7 @@ advertisingRoutes.post("/enrichment/enrich", async (c) => {
     amount: -1,
     balanceAfter: newBalance,
     description: `Contact enrichment: ${email ?? name}`,
-  });
+  } as any);
 
   // TODO: Call PeopleDataLabs/Hunter.io API when ENRICHMENT_API_KEY is configured
   // For now return a stub response indicating enrichment was requested

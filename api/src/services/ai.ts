@@ -7,6 +7,7 @@ import { z } from "zod";
 export interface LLMOptions {
   model?: string;
   temperature?: number;
+  maxTokens?: number;
   systemPrompt: string;
   userMessage: string;
   responseFormat?: "json_object" | "text";

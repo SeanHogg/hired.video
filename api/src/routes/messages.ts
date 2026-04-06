@@ -178,7 +178,7 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
       promptTokens: Math.round(((context ?? "").length + recipientName.length + 200) / 4),
       completionTokens: Math.round((result.subject.length + result.body.length) / 4),
       totalTokens: Math.round(((context ?? "").length + result.subject.length + result.body.length + 300) / 4),
-    });
+    } as any);
 
     return c.json(
       success({

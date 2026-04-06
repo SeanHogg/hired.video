@@ -305,7 +305,7 @@ searchRoutes.post("/recruiter", async (c) => {
 const SavedSearchSchema = z.object({
   name: z.string().min(1).max(100),
   query: z.string().max(500),
-  filters: z.record(z.any()).default({}),
+  filters: z.record(z.string(), z.any()).default({}),
   searchType: z.enum(["recruiter", "jobs", "people", "companies"]).default("recruiter"),
 });
 
@@ -341,10 +341,10 @@ searchRoutes.post("/saved", async (c) => {
     return c.json(success({ id: crypto.randomUUID(), userId, ...parsed.data, createdAt: new Date().toISOString() }), 201);
   }
 
-  const [row] = await db
+  const [row] = (await db
     .insert(savedSearches)
     .values({ userId, ...parsed.data } as any)
-    .returning();
+    .returning()) as any[];
 
   return c.json(success(row), 201);
 });

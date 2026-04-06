@@ -741,17 +741,17 @@ recruiterRoutes.post("/agent/source", async (c) => {
 	const agentRunsTable = (schema as any).recruiterAgentRuns;
 	if (!agentRunsTable) return c.json({ success: false, error: { code: "SERVICE_UNAVAILABLE", message: "Agent not available" } }, 503);
 
-	const [run] = await db.insert(agentRunsTable).values({
+	const [run] = await (db.insert(agentRunsTable).values({
 		recruiterId,
 		jobId: body.jobId ?? null,
 		jobTitle,
 		criteria: { skills, location, experienceYears: body.experienceYears ?? null, maxCandidates },
 		status: "running",
 		startedAt: new Date(),
-	}).returning();
+	}).returning() as any);
 
 	// Source candidates: look up users with matching profile/resume skills
-	const resumesTable = schema.resumes ?? (schema as any).userResumes;
+	const resumesTable = schema.resumeInformation ?? (schema as any).userResumes;
 	let candidates: Array<{ id: string; name: string; email: string; headline?: string }> = [];
 
 	try {

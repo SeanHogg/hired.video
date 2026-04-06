@@ -669,10 +669,10 @@ authRoutes.post("/magic-link", async (c) => {
   const token = Array.from(rawBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  await db.insert(magicLinkTokens).values({ email, token, expiresAt, redirect, used: false });
+  await db.insert(magicLinkTokens).values({ email, token, expiresAt, redirect, used: false } as any);
 
   try {
-    await sendMagicLinkEmail(user.email, user.name, token, redirect);
+    await sendMagicLinkEmail(user.email, user.name, token);
   } catch {
     // Don't fail if email service is unavailable — token is stored and usable
   }

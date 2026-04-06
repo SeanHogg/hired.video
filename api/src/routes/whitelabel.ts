@@ -235,7 +235,7 @@ whitelabelRoutes.post("/demo-request", async (c) => {
     } as any,
   } as any).onConflictDoUpdate({
     target: [(schema.marketingLeads as any).email],
-    set: { source: "demo_request", metadata: { company } as any },
+    set: { source: "demo_request", metadata: { company } } as any,
   }).catch(() => undefined);
 
   return c.json(success({
