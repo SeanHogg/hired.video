@@ -65,6 +65,25 @@ function canUseObjectStorage(): boolean {
   return Boolean(process.env.STORAGE_ENDPOINT && process.env.STORAGE_ACCESS_KEY && process.env.STORAGE_SECRET_KEY);
 }
 
+function getR2Bucket(): R2Bucket | undefined {
+  return (globalThis as any).__ENV?.VIDEO_BUCKET;
+}
+
+async function uploadToStorage(key: string, body: ArrayBuffer, contentType: string, metadata?: Record<string, string>): Promise<boolean> {
+  const r2 = getR2Bucket();
+  if (r2) {
+    await r2.put(key, body, { httpMetadata: { contentType }, customMetadata: metadata });
+    return true;
+  }
+  if (canUseObjectStorage()) {
+    const s3 = getS3Client();
+    await s3.send(new PutObjectCommand({ Bucket: getBucket(), Key: key, Body: Buffer.from(body), ContentType: contentType, Metadata: metadata }));
+    return true;
+  }
+  console.warn("[studio-features] No storage available for key:", key);
+  return false;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ██  1. TTS VOICEOVER (ElevenLabs)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -133,19 +152,11 @@ studioFeaturesRoutes.post("/tts/generate", async (c) => {
       speed: parsed.data.speed,
     });
 
-    // Upload audio to R2/S3
+    // Upload audio to R2
     let audioUrl: string | null = null;
-    let audioKey: string | null = null;
-    if (canUseObjectStorage()) {
-      audioKey = `studio/tts/${user.sub}/${voiceover.id}.mp3`;
-      const s3 = getS3Client();
-      await s3.send(new PutObjectCommand({
-        Bucket: getBucket(),
-        Key: audioKey,
-        Body: Buffer.from(result.audioBuffer),
-        ContentType: result.contentType,
-        Metadata: { userId: user.sub, voiceoverId: voiceover.id },
-      }));
+    let audioKey: string | null = `studio/tts/${user.sub}/${voiceover.id}.mp3`;
+    const uploaded = await uploadToStorage(audioKey, result.audioBuffer, result.contentType, { userId: user.sub, voiceoverId: voiceover.id });
+    if (uploaded) {
       audioUrl = cdnUrl(audioKey);
     }
 
@@ -206,15 +217,8 @@ studioFeaturesRoutes.post("/tts/generate-all", async (c) => {
       });
 
       let audioUrl: string | null = null;
-      if (canUseObjectStorage()) {
-        const audioKey = `studio/tts/${user.sub}/${parsed.data.projectId ?? "adhoc"}/${scene.sceneId}.mp3`;
-        const s3 = getS3Client();
-        await s3.send(new PutObjectCommand({
-          Bucket: getBucket(),
-          Key: audioKey,
-          Body: Buffer.from(result.audioBuffer),
-          ContentType: result.contentType,
-        }));
+      const audioKey = `studio/tts/${user.sub}/${parsed.data.projectId ?? "adhoc"}/${scene.sceneId}.mp3`;
+      if (await uploadToStorage(audioKey, result.audioBuffer, result.contentType)) {
         audioUrl = cdnUrl(audioKey);
       }
 
@@ -561,17 +565,12 @@ studioFeaturesRoutes.post("/recording/upload", async (c) => {
   let videoUrl: string | null = null;
   let videoKey: string | null = null;
 
-  if (canUseObjectStorage()) {
+  {
     const bytes = await file.arrayBuffer();
     videoKey = `studio/recordings/${user.sub}/${Date.now()}-${file.name || "recording.webm"}`;
-    const s3 = getS3Client();
-    await s3.send(new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: videoKey,
-      Body: Buffer.from(bytes),
-      ContentType: file.type || "video/webm",
-    }));
-    videoUrl = cdnUrl(videoKey);
+    if (await uploadToStorage(videoKey, bytes, file.type || "video/webm")) {
+      videoUrl = cdnUrl(videoKey);
+    }
   }
 
   const [recording] = await db.insert(studioRecordings).values({
@@ -1182,17 +1181,12 @@ studioFeaturesRoutes.post("/voice-clones", async (c) => {
   // Upload sample to R2
   let sampleUrl: string | null = null;
   let sampleKey: string | null = null;
-  if (canUseObjectStorage()) {
+  {
     const bytes = await audioFile.arrayBuffer();
     sampleKey = `studio/voice-clones/${user.sub}/${Date.now()}-sample.mp3`;
-    const s3 = getS3Client();
-    await s3.send(new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: sampleKey,
-      Body: Buffer.from(bytes),
-      ContentType: audioFile.type || "audio/mpeg",
-    }));
-    sampleUrl = cdnUrl(sampleKey);
+    if (await uploadToStorage(sampleKey, bytes, audioFile.type || "audio/mpeg")) {
+      sampleUrl = cdnUrl(sampleKey);
+    }
   }
 
   const [clone] = await db.insert(studioVoiceClones).values({

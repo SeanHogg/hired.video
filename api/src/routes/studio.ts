@@ -688,6 +688,47 @@ function canUseObjectStorage(): boolean {
   return Boolean(process.env.STORAGE_ENDPOINT && process.env.STORAGE_ACCESS_KEY && process.env.STORAGE_SECRET_KEY);
 }
 
+/**
+ * Get the R2 bucket binding from the Worker environment.
+ * This is the correct way to access R2 in Cloudflare Workers — the S3 client
+ * path requires separate STORAGE_* env vars that may not be configured.
+ */
+function getR2Bucket(): R2Bucket | undefined {
+  return (globalThis as any).__ENV?.VIDEO_BUCKET;
+}
+
+/**
+ * Upload a file to R2 using the native binding (preferred) or S3 client (fallback).
+ * Returns true if the file was uploaded, false if no storage is available.
+ */
+async function uploadToStorage(key: string, body: ArrayBuffer, contentType: string, metadata?: Record<string, string>): Promise<boolean> {
+  // Preferred: R2 binding (always available in Cloudflare Workers)
+  const r2 = getR2Bucket();
+  if (r2) {
+    await r2.put(key, body, {
+      httpMetadata: { contentType },
+      customMetadata: metadata,
+    });
+    return true;
+  }
+
+  // Fallback: S3 client (requires STORAGE_* env vars)
+  if (canUseObjectStorage()) {
+    const s3 = getS3Client();
+    await s3.send(new PutObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+      Body: Buffer.from(body),
+      ContentType: contentType,
+      Metadata: metadata,
+    }));
+    return true;
+  }
+
+  console.warn("[studio] No storage available — R2 binding and S3 env vars both missing. File not uploaded:", key);
+  return false;
+}
+
 function toProjectDto(
   project: typeof studioProjects.$inferSelect,
   linkedVideo?: typeof videos.$inferSelect | null,
@@ -845,18 +886,13 @@ studioRoutes.post("/upload", async (c) => {
 
   let r2Key = `studio/${user.sub}/${project.id}/${Date.now()}-${file.name || "video.webm"}`;
 
-  if (canUseObjectStorage()) {
-    const bytes = await file.arrayBuffer();
-    const s3 = getS3Client();
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: getBucket(),
-        Key: r2Key,
-        Body: Buffer.from(bytes),
-        ContentType: file.type || "video/webm",
-        Metadata: { userId: user.sub, projectId: project.id },
-      }),
-    );
+  const bytes = await file.arrayBuffer();
+  const uploaded = await uploadToStorage(r2Key, bytes, file.type || "video/webm", {
+    userId: user.sub,
+    projectId: project.id,
+  });
+  if (!uploaded) {
+    return c.json(fail("STORAGE_UNAVAILABLE", "No storage configured. Cannot save video file."), 503);
   }
 
   const projectResumeId = maybeResumeId ?? project.resumeId ?? null;
