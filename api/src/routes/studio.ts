@@ -276,12 +276,12 @@ function buildMockAdVideoScript(
   const perScene = Math.max(4, Math.round(targetDuration / count));
 
   // Assign id, start, duration to each scene
-  const scenes: VideoScript["scenes"] = rawScenes.map((s, i) => ({
+  const scenes = rawScenes.map((s, i) => ({
     id: `scene-${i}`,
     start: perScene * i,
     duration: perScene,
     ...s,
-  }));
+  })) as VideoScript["scenes"];
 
   return {
     video: {
@@ -381,7 +381,7 @@ interface VideoScript {
     return `You are a recruitment advertising director. Produce a JSON VideoScript for a ${targetDuration}-second job advertisement.
 
 RULES:
-- Exactly 4 scenes: intro → job-details → requirements → cta
+- 5 scenes: intro → job-details → requirements → benefits → cta
 - Scene durations must sum to exactly ${targetDuration}s
 - motion style: ${motion}
 - Return ONLY valid JSON. No markdown fences.
@@ -390,7 +390,8 @@ SCENE CONTENT (derived from the job description provided):
 1. "intro" scene: title = company name, subtitle = job title, text = one compelling hook sentence about the opportunity
 2. "job-details" scene: title = "About the Role", items = 3–4 key responsibilities as concise bullet points
 3. "requirements" scene: title = "What We're Looking For", items = 3–4 must-have qualifications/skills
-4. "cta" scene: title = "Ready to Apply?", text = brief encouraging CTA copy, subtitle = "Apply Now"${ctaBlock}
+4. "benefits" scene: title = "Why You'll Love It", items = 3–4 perks, benefits, or reasons to join
+5. "cta" scene: title = "Ready to Apply?", text = brief encouraging CTA copy, subtitle = "Apply Now"${ctaBlock}
 
 ${baseInterface}
 
@@ -402,7 +403,7 @@ ${jd}`;
     return `You are a corporate video director. Produce a JSON VideoScript for a ${targetDuration}-second company promotional video.
 
 RULES:
-- Exactly 4 scenes: intro → brand-story → company-culture → cta
+- 5 scenes: intro → brand-story → company-culture → testimonial → cta
 - Scene durations must sum to exactly ${targetDuration}s
 - motion style: ${motion}
 - Return ONLY valid JSON. No markdown fences.
@@ -410,8 +411,9 @@ RULES:
 SCENE CONTENT (derived from the company brief provided):
 1. "intro" scene: title = company name, subtitle = tagline or sector, text = 1–2 sentence mission statement
 2. "brand-story" scene: title = "Our Story", items = 3–4 key milestones or differentiators
-3. "company-culture" scene: title = "Why Join Us", items = 3–4 culture/benefit highlights
-4. "cta" scene: title = "Partner With Us" (or "Hire With Us"), text = brief engaging close, subtitle = website or contact${ctaBlock}
+3. "company-culture" scene: title = "Our Culture", items = 3–4 culture/team highlights
+4. "testimonial" scene: title = "What People Say", items = 3–4 employee or partner quotes
+5. "cta" scene: title = "Partner With Us" (or "Hire With Us"), text = brief engaging close, subtitle = website or contact${ctaBlock}
 
 ${baseInterface}
 
@@ -423,7 +425,7 @@ Company Brief:
     return `You are a personal-brand video director. Produce a JSON VideoScript for a ${targetDuration}-second recruiter brand video.
 
 RULES:
-- Exactly 4 scenes: intro → brand-story → testimonial → cta
+- 5 scenes: intro → brand-story → testimonial → achievement → cta
 - Scene durations must sum to exactly ${targetDuration}s
 - motion style: ${motion}
 - Return ONLY valid JSON. No markdown fences.
@@ -432,7 +434,8 @@ SCENE CONTENT (derived from the bio/profile provided):
 1. "intro" scene: title = recruiter name, subtitle = specialisation (e.g. "Tech Recruiter · 10+ Years"), text = 1-sentence personal brand statement
 2. "brand-story" scene: title = "My Approach", items = 3–4 values or differentiators that define this recruiter
 3. "testimonial" scene: title = "Client Results", items = 3–4 quantified outcomes (placements made, time-to-fill improvements, retention rates)
-4. "cta" scene: title = "Let's Work Together", text = one warm closing line, subtitle = LinkedIn or email${ctaBlock}
+4. "achievement" scene: title = "Track Record", items = 3–4 career highlights or partnership milestones
+5. "cta" scene: title = "Let's Work Together", text = one warm closing line, subtitle = LinkedIn or email${ctaBlock}
 
 ${baseInterface}
 
@@ -444,7 +447,7 @@ Bio/Profile:
     return `You are a product marketing director. Produce a JSON VideoScript for a ${targetDuration}-second product launch video.
 
 RULES:
-- Exactly 4 scenes: intro → product-feature → benefits → cta
+- 5 scenes: intro → product-feature → benefits → testimonial → cta
 - Scene durations must sum to exactly ${targetDuration}s
 - motion style: ${motion}
 - Return ONLY valid JSON. No markdown fences.
@@ -453,12 +456,35 @@ SCENE CONTENT (derived from the product brief provided):
 1. "intro" scene: title = product name, subtitle = one-liner value proposition, text = the core problem this product solves
 2. "product-feature" scene: title = "Key Features", items = 3–4 standout features with concrete outcomes
 3. "benefits" scene: title = "Why It Matters", items = 3–4 tangible benefits for the target user
-4. "cta" scene: title = "Get Started Today", text = urgency-driven closing line, subtitle = "Try for free" or pricing anchor${ctaBlock}
+4. "testimonial" scene: title = "Early Results", items = 3–4 user quotes or measurable early outcomes
+5. "cta" scene: title = "Get Started Today", text = urgency-driven closing line, subtitle = "Try for free" or pricing anchor${ctaBlock}
 
 ${baseInterface}
 
 Product Brief:
 `;
+  }
+
+  if (purpose === "personal_brand") {
+    const jobBlock = jobDescription
+      ? `\n\nPersonalise for this role. Filter content to only what's relevant.\nJob Description:\n${jobDescription.slice(0, 3000)}`
+      : "";
+    return `You are a personal-brand video director. Produce a JSON VideoScript for a ${targetDuration}-second personal brand video.
+
+RULES:
+- 5 scenes: intro → brand-story → achievement → skills → cta
+- Scene durations must sum to exactly ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences, no explanation.
+
+SCENE CONTENT — extract from the bio/resume provided:
+1. "intro" scene: title = person's name, subtitle = their role or tagline, text = 1–2 sentence personal mission statement
+2. "brand-story" scene: title = "What I Do", items = 3–4 areas of focus, expertise, or impact
+3. "achievement" scene: title = "Key Highlights", items = 3–4 real career milestones with specific numbers or outcomes
+4. "skills" scene: title = "Core Expertise", skills = 5–8 specific skills, domains, or technologies
+5. "cta" scene: title = "Let's Connect", text = a warm invitation to follow or reach out, subtitle = LinkedIn/email or "Connect on LinkedIn"
+
+${baseInterface}${jobBlock}`;
   }
 
   // Default: resume
