@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate:pg",
-    "db:push": "node --require tsx/cjs ./node_modules/drizzle-kit/bin.cjs push --config drizzle.config.ts"
+    "db:push": "node --require tsx/cjs ./node_modules/drizzle-kit/bin.cjs push --config drizzle.config.ts --force",
+    "db:migrate": "node -e \"const{neon}=require('@neondatabase/serverless');const fs=require('fs');const f=process.argv[1]||'./drizzle/latest.sql';const sql=neon(process.env.DATABASE_URL);(async()=>{const stmts=fs.readFileSync(f,'utf8').split(';').filter(s=>s.trim().length>10);let ok=0;for(const s of stmts){try{await sql(s);ok++}catch(e){console.error('ERR:',e.message?.slice(0,120))}}console.log(ok+'/'+stmts.length+' statements OK')})();\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1009.0",

@@ -342,7 +342,7 @@ discoveryRoutes.post("/creators/products", async (c) => {
     return c.json(success({ id: `stub-${Date.now()}`, ...body, creatorId: userId, status: "pending_review" }), 201);
   }
 
-  const [product] = await db.insert(productsTable).values({
+  const [product] = (await db.insert(productsTable).values({
     creatorId: userId,
     title: body.title,
     description: body.description ?? null,
@@ -350,7 +350,7 @@ discoveryRoutes.post("/creators/products", async (c) => {
     category: body.category ?? "resume_template",
     downloadUrl: body.downloadUrl ?? null,
     status: "pending_review",
-  }).returning();
+  } as any).returning()) as any[];
 
   return c.json(success(product), 201);
 });

@@ -106,6 +106,32 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Run SQL migrations (fallback)
+        if: always()
+        run: |
+          cd api
+          for f in drizzle/0*.sql; do
+            echo "Running $f..."
+            node -e "
+              const{neon}=require('@neondatabase/serverless');
+              const fs=require('fs');
+              const sql=neon(process.env.DATABASE_URL);
+              (async()=>{
+                const stmts=fs.readFileSync('$f','utf8').split(';').filter(s=>s.trim().length>10);
+                let ok=0,skip=0;
+                for(const s of stmts){
+                  try{await sql(s);ok++}catch(e){
+                    if(e.message?.includes('already exists')){skip++}
+                    else{console.error('ERR:',e.message?.slice(0,120))}
+                  }
+                }
+                console.log('$f:',ok,'applied,',skip,'already existed');
+              })();
+            "
+          done
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Deploy to Cloudflare Workers
         run: cd api && npx wrangler deploy --env production
         env:

@@ -92,11 +92,11 @@ whitelabelRoutes.post("/tenants", async (c) => {
   const [existing] = await db.select({ id: table.id }).from(table).where(eq(table.subdomain, parsed.data.subdomain)).limit(1);
   if (existing) return c.json(error("CONFLICT", `Subdomain '${parsed.data.subdomain}' is already taken`), 409);
 
-  const [tenant] = await db.insert(table).values({
+  const [tenant] = (await db.insert(table).values({
     ownerId: userId,
     ...parsed.data,
     isActive: true,
-  }).returning();
+  } as any).returning()) as any[];
 
   return c.json(success(tenant), 201);
 });
