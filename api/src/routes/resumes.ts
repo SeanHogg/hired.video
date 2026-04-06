@@ -15,6 +15,7 @@ const CreateResumeSchema = z.object({
   status: z.enum(["draft", "published", "archived"]).default("draft"),
   isMaster: z.boolean().optional().default(false),
   privacy: z.string().optional(),
+  rawText: z.string().optional(),
 });
 
 const UpdateResumeSchema = CreateResumeSchema.partial();
@@ -60,29 +61,40 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     views: 0,
-    metaResume: {
-      basics: {
-        name: row.title,
-        label: "",
-        image: "",
-        email: "",
-        phone: "",
-        url: "",
-        summary: "",
-        location: null,
-      },
-      work: [],
-      education: [],
-      volunteer: [],
-      awards: [],
-      certificates: [],
-      publications: [],
-      skills: [],
-      languages: [],
-      interests: [],
-      references: [],
-      projects: [],
-    },
+    metaResume: (() => {
+      const c = (row.content ?? {}) as Record<string, unknown>;
+      const basics = (c.basics ?? {}) as Record<string, unknown>;
+      const loc = basics.location as Record<string, unknown> | null | undefined;
+      return {
+        basics: {
+          name: basics.name ?? row.title ?? "",
+          label: basics.label ?? "",
+          image: basics.image ?? "",
+          email: basics.email ?? "",
+          phone: basics.phone ?? "",
+          url: basics.url ?? "",
+          summary: basics.summary ?? "",
+          location: loc ? {
+            address: loc.address ?? "",
+            postalCode: loc.postalCode ?? "",
+            city: loc.city ?? "",
+            countryCode: loc.countryCode ?? "",
+            region: loc.region ?? "",
+          } : null,
+        },
+        work: Array.isArray(c.work) ? c.work : [],
+        education: Array.isArray(c.education) ? c.education : [],
+        volunteer: Array.isArray(c.volunteer) ? c.volunteer : [],
+        awards: Array.isArray(c.awards) ? c.awards : [],
+        certificates: Array.isArray(c.certificates) ? c.certificates : [],
+        publications: Array.isArray(c.publications) ? c.publications : [],
+        skills: Array.isArray(c.skills) ? c.skills : [],
+        languages: Array.isArray(c.languages) ? c.languages : [],
+        interests: Array.isArray(c.interests) ? c.interests : [],
+        references: Array.isArray(c.references) ? c.references : [],
+        projects: Array.isArray(c.projects) ? c.projects : [],
+      };
+    })(),
   };
 }
 
@@ -201,6 +213,53 @@ async function extractPdfText(pdfBytes: Uint8Array): Promise<string> {
   return texts.join(" ").replace(/\s{2,}/g, " ").trim();
 }
 
+const RESUME_PARSE_PROMPT = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
+{
+  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },
+  "work": [{ "name": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],
+  "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],
+  "skills": [{ "name": "", "level": "", "keywords": [] }],
+  "volunteer": [], "awards": [], "certificates": [], "publications": [],
+  "languages": [], "interests": [], "references": [], "projects": []
+}
+Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
+
+async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record<string, unknown>> {
+  // Primary: Cloudflare Workers AI
+  const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
+  if (cfAi) {
+    try {
+      const aiResponse = await (cfAi as any).run("@cf/meta/llama-3.1-8b-instruct", {
+        messages: [
+          { role: "system", content: RESUME_PARSE_PROMPT },
+          { role: "user", content: resumeText.slice(0, 6000) },
+        ],
+      });
+      const result = typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
+      return JSON.parse(result);
+    } catch (cfErr) {
+      console.error("[parse] CF AI error:", cfErr instanceof Error ? cfErr.message : String(cfErr));
+    }
+  }
+
+  // Fallback: OpenRouter
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  if (apiKey) {
+    try {
+      const result = await callLLM(apiKey, {
+        systemPrompt: RESUME_PARSE_PROMPT,
+        userMessage: resumeText.slice(0, 12000),
+        responseFormat: "text",
+      });
+      return JSON.parse(result);
+    } catch (llmErr) {
+      console.error("[parse] OpenRouter error:", llmErr instanceof Error ? llmErr.message : String(llmErr));
+    }
+  }
+
+  return { basics: { name: "", summary: "" } };
+}
+
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
 // (Hono sub-router root "/" never matches when mounted with app.route(prefix, router))
 export const listResumesHandler = async (c: any) => {
@@ -216,6 +275,12 @@ export const createResumeHandler = async (c: any) => {
   const parsed = CreateResumeSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
+  // If rawText is provided, parse it with AI to get structured content
+  let content = parsed.data.content;
+  if (parsed.data.rawText) {
+    content = await parseResumeTextWithAI(c, parsed.data.rawText);
+  }
+
   const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
   const db = getDb();
   const [created] = await db
@@ -223,7 +288,7 @@ export const createResumeHandler = async (c: any) => {
     .values({
       userId: user.sub,
       title: parsed.data.title,
-      content: parsed.data.content,
+      content,
       status: parsed.data.status,
       isMaster: parsed.data.isMaster ?? false,
       privacyLevel,
@@ -369,52 +434,8 @@ resumeRoutes.post("/parse", async (c) => {
     return c.json(ok({ result: "{}" }), 200);
   }
 
-  const systemPrompt = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
-{
-  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },
-  "work": [{ "name": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],
-  "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],
-  "skills": [{ "name": "", "level": "", "keywords": [] }],
-  "volunteer": [], "awards": [], "certificates": [], "publications": [],
-  "languages": [], "interests": [], "references": [], "projects": []
-}
-Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
-
-  // Primary: Cloudflare Workers AI (no external API key needed, already bound)
-  const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
-  if (cfAi) {
-    try {
-      const aiResponse = await (cfAi as any).run("@cf/meta/llama-3.1-8b-instruct", {
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: resumeText.slice(0, 6000) },
-        ],
-      });
-      const result = typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
-      return c.json(ok({ result }), 200);
-    } catch (cfErr) {
-      console.error("[parse] CF AI error:", cfErr instanceof Error ? cfErr.message : String(cfErr));
-      // fall through to OpenRouter
-    }
-  }
-
-  // Fallback: OpenRouter
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  if (apiKey) {
-    try {
-      const result = await callLLM(apiKey, {
-        systemPrompt,
-        userMessage: resumeText.slice(0, 12000),
-        responseFormat: "text",
-      });
-      return c.json(ok({ result }), 200);
-    } catch (llmErr) {
-      console.error("[parse] OpenRouter error:", llmErr instanceof Error ? llmErr.message : String(llmErr));
-    }
-  }
-
-  // Last resort: empty structure so upload still completes
-  return c.json(ok({ result: JSON.stringify({ basics: { name: "", summary: "" } }) }), 200);
+  const parsed = await parseResumeTextWithAI(c, resumeText);
+  return c.json(ok({ result: JSON.stringify(parsed) }), 200);
 });
 
 resumeRoutes.post("/createfromfile", async (c) => {

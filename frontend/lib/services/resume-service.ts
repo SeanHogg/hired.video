@@ -545,7 +545,8 @@ export class ResumeService {
    */
   async createResume(request: {
     name: string;
-    data: ResumeData;
+    data?: ResumeData;
+    rawText?: string;
     privacy?: string;
     isMaster?: boolean;
     isActive?: boolean;
@@ -556,10 +557,11 @@ export class ResumeService {
         method: "POST",
         body: JSON.stringify({
           title: request.name,
-          content: request.data as unknown as Record<string, unknown>,
+          content: (request.data as unknown as Record<string, unknown>) ?? {},
           status: "draft",
           isMaster: request.isMaster ?? false,
           privacy: request.privacy ?? "private",
+          rawText: request.rawText,
         }),
         headers: {
           "Content-Type": "application/json",

@@ -1,5 +1,6 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
 import { useState, useCallback, useMemo } from "react";
+import { extractTextFromFile } from "@/lib/extract-text";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -211,23 +212,28 @@ export default function ResumeUpload({
     setUploadProgress(0);
 
     try {
-      // Parse resume file
-      const parsed = await resumeService.parseResumeFromFile(file);
-      const uploadedData = parsed.data || getEmptyResumeData();
+      // Extract text client-side (pdfjs-dist for PDFs, jszip for docx, etc.)
+      const rawText = await extractTextFromFile(file);
 
-      // Save to DB immediately with all upload settings
+      // Single API call: sends rawText → API parses with LLM + creates resume
       const savedResume = await resumeService.createResume({
         name: name.trim(),
-        data: uploadedData,
+        rawText,
         privacy,
         isMaster,
       });
+
+      // Map the returned metaResume back to UI format for the success callback
+      const meta = savedResume.metaResume;
+      const uploadedData: ResumeData = meta
+        ? mapMetaResumeToResumeData(meta)
+        : getEmptyResumeData();
 
       const response: ResumeUploadResponse = {
         id: savedResume.id ?? "",
         data: uploadedData,
         message: name.trim(),
-        confidence: parsed.confidence || 0.8,
+        confidence: 0.8,
       };
 
       onUploadSuccess(response);
