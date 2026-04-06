@@ -6,7 +6,10 @@ export type VideoAspect = "16:9" | "9:16" | "1:1";
 export type MotionStyle = "minimal" | "moderate" | "cinematic";
 export type TransitionStyle = "cut" | "fade" | "slide" | "cinematic-fade";
 export type BackgroundStyle = "gradient" | "dark-tech-grid" | "particles" | "solid";
-export type SceneType = "intro" | "achievement" | "skills" | "closing";
+export type SceneType =
+  | "intro" | "achievement" | "skills" | "closing"
+  | "job-details" | "company-culture" | "cta" | "testimonial"
+  | "product-feature" | "brand-story" | "requirements" | "benefits";
 export type ImagePosition =
   | "full"
   | "half-left" | "half-right"

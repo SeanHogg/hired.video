@@ -163,6 +163,14 @@ const SCENE_IMAGE_BASE: Record<SceneType, string> = {
   achievement: "Abstract success visualization, upward trending graphs, glowing data, premium dark background",
   skills: "Futuristic technology, flowing circuit patterns, vibrant gradient, high-tech workspace",
   closing: "Bright sunrise cityscape, optimistic career horizon, warm golden hour, inspirational vista",
+  "job-details": "Modern office workspace, job posting on screen, professional environment, clean design",
+  "company-culture": "Collaborative team workspace, diverse people, vibrant office, energetic atmosphere",
+  cta: "Bold call-to-action, bright highlight, directional arrow, premium gradient background",
+  testimonial: "Warm portrait, quotation marks, soft professional lighting, trust and credibility",
+  "product-feature": "Product showcase, clean modern display, feature highlight, tech-forward design",
+  "brand-story": "Storytelling visual, personal journey, warm tones, cinematic narrative feel",
+  requirements: "Checklist visualization, organized requirements, structured layout, professional clarity",
+  benefits: "Uplifting benefit icons, positive growth, bright optimistic palette, rewarding atmosphere",
 };
 
 function buildScenePrompt(scene: SceneScript): string {
@@ -178,10 +186,18 @@ function buildScenePrompt(scene: SceneScript): string {
 }
 
 const TYPE_COLOURS: Record<SceneType, string> = {
-  intro:       "bg-violet-500/20 text-violet-300",
-  achievement: "bg-blue-500/20 text-blue-300",
-  skills:      "bg-emerald-500/20 text-emerald-300",
-  closing:     "bg-amber-500/20 text-amber-300",
+  intro:              "bg-violet-500/20 text-violet-300",
+  achievement:        "bg-blue-500/20 text-blue-300",
+  skills:             "bg-emerald-500/20 text-emerald-300",
+  closing:            "bg-amber-500/20 text-amber-300",
+  "job-details":      "bg-indigo-500/20 text-indigo-300",
+  "company-culture":  "bg-pink-500/20 text-pink-300",
+  cta:                "bg-orange-500/20 text-orange-300",
+  testimonial:        "bg-teal-500/20 text-teal-300",
+  "product-feature":  "bg-cyan-500/20 text-cyan-300",
+  "brand-story":      "bg-rose-500/20 text-rose-300",
+  requirements:       "bg-slate-500/20 text-slate-300",
+  benefits:           "bg-lime-500/20 text-lime-300",
 };
 
 function SceneCard({

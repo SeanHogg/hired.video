@@ -26,12 +26,13 @@ export const SceneScriptSchema = z.object({
   id: z.string(),
   start: z.number(),
   duration: z.number(),
-  type: z.enum(["intro", "achievement", "skills", "closing"]),
+  type: z.enum(["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"]),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   text: z.union([z.string(), z.array(z.string())]).optional(),
   items: z.array(z.string()).optional(),
   skills: z.array(z.string()).optional(),
+  ctaText: z.string().optional(),
   highlight: z.boolean().optional(),
   animation: z.object({
     titleEnter: AnimationSpecSchema.optional(),
@@ -55,6 +56,7 @@ export const VideoScriptSchema = z.object({
     fps: z.number().default(30),
     resolution: z.enum(["720p", "1080p"]),
     aspect: z.enum(["16:9", "9:16", "1:1"]),
+    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
     theme: z.object({
       colorPalette: z.array(z.string()),
       fontFamily: z.string(),
@@ -75,7 +77,7 @@ export const VideoScriptSchema = z.object({
 
 export const StoryboardSceneSchema = z.object({
   duration: z.number(),
-  type: z.enum(["intro", "achievement", "skills", "closing"]),
+  type: z.enum(["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"]),
   title: z.string().optional(),
   subtitle: z.string().optional(),
   text: z.string().optional(),

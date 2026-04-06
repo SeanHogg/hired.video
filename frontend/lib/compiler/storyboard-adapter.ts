@@ -25,7 +25,7 @@ export function storyboardToVideoScript(sb: Storyboard): VideoScript {
       : undefined;
 
     const type: SceneType =
-      ["intro", "achievement", "skills", "closing"].includes(s.type)
+      ["intro", "achievement", "skills", "closing", "job-details", "company-culture", "cta", "testimonial", "product-feature", "brand-story", "requirements", "benefits"].includes(s.type)
         ? (s.type as SceneType)
         : "intro";
 
