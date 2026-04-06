@@ -656,6 +656,14 @@ export default function StudioLayout() {
   function handleProjectSelect(p: import("@/lib/services/studio-service").StudioProject) {
     const script = p.script ?? null;
     const cv = script ? recompile(script) : null;
+    // Restore purpose — check saved _purpose, then video.purpose, fallback to "resume"
+    const savedPurpose = (p.purpose ?? script?.video?.purpose ?? "resume") as typeof state.purpose;
+    // Map purpose back to content template
+    const purposeToTemplate: Record<string, ContentTemplate> = {
+      resume: "resume", job_ad: "job_ad", company_promo: "job_ad",
+      recruiter_brand: "job_ad", product_launch: "job_ad", personal_brand: "personal_brand",
+    };
+    setContentTemplate(purposeToTemplate[savedPurpose] ?? "resume");
     setState({
       ...makeInitialState(),
       name: p.title,
@@ -665,6 +673,7 @@ export default function StudioLayout() {
       resumeText: p.resumeText ?? "",
       prompt: p.prompt ?? defaultStudioState.prompt,
       jobDescription: p.jobDescription ?? "",
+      purpose: savedPurpose,
       ...(script?._meta?.model ? { model: script._meta.model } : {}),
     });
     setCompiledVideo(cv);
@@ -837,6 +846,7 @@ export default function StudioLayout() {
         state.projectId ?? undefined,
         state.prompt,
         state.jobDescription,
+        state.purpose,
       );
       if (!res.data) throw new Error("Save failed");
       const saved = res.data;

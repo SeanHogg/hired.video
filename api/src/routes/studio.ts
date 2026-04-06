@@ -227,48 +227,65 @@ function buildMockAdVideoScript(
   ctaUrl?: string,
   ctaText?: string,
 ): VideoScript {
-  const perScene = Math.max(5, Math.round(targetDuration / 4));
   const name = text.replace(/\s+/g, " ").trim().slice(0, 60) || "Company";
   const cta = ctaText ?? "Learn More";
   const ctaSubtitle = ctaUrl ?? "Visit our website";
 
-  const scenesByPurpose: Record<StudioPurpose, VideoScript["scenes"]> = {
+  // Each template defines its own scene structure — scene count varies
+  const scenesByPurpose: Record<StudioPurpose, Array<{ type: string; title: string; subtitle?: string; text?: string; items?: string[]; skills?: string[]; ctaUrl?: string; ctaText?: string }>> = {
     resume: [], // handled by the existing resume path
     job_ad: [
-      { id: "scene-0", start: 0,            duration: perScene, type: "intro",       title: name, subtitle: "We're Hiring", text: "Join a team that is changing the industry." },
-      { id: "scene-1", start: perScene,     duration: perScene, type: "job-details", title: "About the Role", items: ["Own end-to-end delivery of key features", "Collaborate with cross-functional teams", "Drive measurable business outcomes"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "requirements", title: "What We're Looking For", items: ["3+ years of relevant experience", "Strong communication & problem-solving skills", "Passion for innovation and growth"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",          title: "Ready to Apply?", text: "Take the next step in your career journey.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+      { type: "intro",        title: name, subtitle: "We're Hiring", text: "Join a team that is changing the industry." },
+      { type: "job-details",  title: "About the Role", items: ["Own end-to-end delivery of key features", "Collaborate with cross-functional teams", "Drive measurable business outcomes"] },
+      { type: "requirements", title: "What We're Looking For", items: ["3+ years of relevant experience", "Strong communication & problem-solving skills", "Passion for innovation and growth"] },
+      { type: "benefits",     title: "Why You'll Love It", items: ["Competitive salary & equity", "Remote-first flexibility", "Career growth & mentorship"] },
+      { type: "cta",          title: "Ready to Apply?", text: "Take the next step in your career journey.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
     company_promo: [
-      { id: "scene-0", start: 0,            duration: perScene, type: "intro",          title: name, subtitle: "Who We Are", text: "Building products that matter." },
-      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story",    title: "Our Story", items: ["Founded with a mission to make a difference", "Grown to a team of passionate professionals", "Recognised for innovation and culture"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "company-culture", title: "Why Join Us", items: ["Flexible remote-first environment", "Competitive compensation & benefits", "Clear growth & development pathways"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",            title: "Partner With Us", text: "Let's build the future together.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+      { type: "intro",            title: name, subtitle: "Who We Are", text: "Building products that matter." },
+      { type: "brand-story",      title: "Our Story", items: ["Founded with a mission to make a difference", "Grown to a team of passionate professionals", "Recognised for innovation and culture"] },
+      { type: "company-culture",  title: "Our Culture", items: ["Collaborative and inclusive environment", "Innovation-driven mindset", "People-first leadership"] },
+      { type: "testimonial",      title: "What People Say", items: ["'Best team I've ever worked with'", "'Truly flexible and empowering'", "'Real impact, real growth'"] },
+      { type: "cta",              title: "Partner With Us", text: "Let's build the future together.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
     recruiter_brand: [
-      { id: "scene-0", start: 0,            duration: perScene, type: "intro",        title: name, subtitle: "Talent Partner", text: "Connecting exceptional talent with great companies." },
-      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story",  title: "My Approach", items: ["Consultative, candidate-first methodology", "Deep expertise in niche markets", "Long-term partnership over transactional placements"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "testimonial",  title: "Client Results", items: ["200+ successful placements", "Average 18-day time-to-fill", "94% 1-year retention rate"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",          title: "Let's Work Together", text: "Whether you're hiring or seeking your next role — reach out.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+      { type: "intro",       title: name, subtitle: "Talent Partner", text: "Connecting exceptional talent with great companies." },
+      { type: "brand-story", title: "My Approach", items: ["Consultative, candidate-first methodology", "Deep expertise in niche markets", "Long-term partnership over transactional placements"] },
+      { type: "testimonial", title: "Client Results", items: ["200+ successful placements", "Average 18-day time-to-fill", "94% 1-year retention rate"] },
+      { type: "achievement", title: "Track Record", items: ["Partnered with 50+ companies across sectors", "Specialised in senior & executive search", "Trusted advisor for scaling engineering teams"] },
+      { type: "cta",         title: "Let's Work Together", text: "Whether you're hiring or seeking your next role — reach out.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
     product_launch: [
-      { id: "scene-0", start: 0,            duration: perScene, type: "intro",           title: name, subtitle: "Introducing Something New", text: "The solution your team has been waiting for." },
-      { id: "scene-1", start: perScene,     duration: perScene, type: "product-feature", title: "Key Features", items: ["Blazing-fast performance from day one", "Seamless integrations with your existing stack", "AI-powered insights that save hours per week"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "benefits",        title: "Why It Matters", items: ["Reduce operational overhead by 40%", "Ship faster with fewer errors", "Delight your customers every time"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",             title: "Get Started Today", text: "Join thousands of teams already winning.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+      { type: "intro",           title: name, subtitle: "Introducing Something New", text: "The solution your team has been waiting for." },
+      { type: "product-feature", title: "Key Features", items: ["Blazing-fast performance from day one", "Seamless integrations with your existing stack", "AI-powered insights that save hours per week"] },
+      { type: "benefits",        title: "Why It Matters", items: ["Reduce operational overhead by 40%", "Ship faster with fewer errors", "Delight your customers every time"] },
+      { type: "testimonial",     title: "Early Results", items: ["'Cut our deploy time in half'", "'The ROI was immediate'", "'Our team adopted it in a day'"] },
+      { type: "cta",             title: "Get Started Today", text: "Join thousands of teams already winning.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
     personal_brand: [
-      { id: "scene-0", start: 0,            duration: perScene, type: "intro",       title: name, subtitle: "My Story", text: "Building a career that makes an impact." },
-      { id: "scene-1", start: perScene,     duration: perScene, type: "brand-story", title: "What I Do", items: ["Helping businesses solve complex challenges", "Sharing expertise through content and speaking", "Mentoring the next generation of professionals"] },
-      { id: "scene-2", start: perScene * 2, duration: perScene, type: "achievement", title: "Key Highlights", items: ["10+ years of industry experience", "Speaker at major conferences", "Published thought leader in the space"] },
-      { id: "scene-3", start: perScene * 3, duration: perScene, type: "cta",         title: "Let's Connect", text: "Follow my journey and join the conversation.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
+      { type: "intro",       title: name, subtitle: "My Story", text: "Building a career that makes an impact." },
+      { type: "brand-story", title: "What I Do", items: ["Helping businesses solve complex challenges", "Sharing expertise through content and speaking", "Mentoring the next generation of professionals"] },
+      { type: "achievement", title: "Key Highlights", items: ["10+ years of industry experience", "Speaker at major conferences", "Published thought leader in the space"] },
+      { type: "skills",      title: "Core Expertise", skills: ["Leadership", "Strategy", "Innovation", "AI & Technology", "Team Building"] },
+      { type: "cta",         title: "Let's Connect", text: "Follow my journey and join the conversation.", subtitle: ctaSubtitle, ctaUrl, ctaText: cta },
     ],
   };
 
+  const rawScenes = scenesByPurpose[purpose] ?? scenesByPurpose.job_ad;
+  const count = rawScenes.length;
+  const perScene = Math.max(4, Math.round(targetDuration / count));
+
+  // Assign id, start, duration to each scene
+  const scenes: VideoScript["scenes"] = rawScenes.map((s, i) => ({
+    id: `scene-${i}`,
+    start: perScene * i,
+    duration: perScene,
+    ...s,
+  }));
+
   return {
     video: {
-      duration: perScene * 4,
+      duration: perScene * count,
       fps: 30,
       resolution: "720p",
       aspect: "16:9",
@@ -281,7 +298,7 @@ function buildMockAdVideoScript(
         background: "gradient",
       },
     },
-    scenes: scenesByPurpose[purpose] ?? scenesByPurpose.job_ad,
+    scenes,
   };
 }
 
@@ -735,6 +752,7 @@ function toProjectDto(
   const savedName = meta?._name as string | undefined;
   const savedPrompt = meta?._prompt as string | undefined;
   const savedJobDescription = meta?._jobDescription as string | undefined;
+  const savedPurpose = meta?._purpose as string | undefined;
   // If the storyboard is a VideoScript (saved by save-draft), expose it as `script`
   const maybeScript = VideoScriptSchema.safeParse(project.storyboard);
   const script = maybeScript.success ? maybeScript.data : null;
@@ -755,6 +773,7 @@ function toProjectDto(
     resumeText: project.resumeText ?? null,
     viewCount: analytics?.viewCount ?? 0,
     ctaClickCount: analytics?.ctaClickCount ?? 0,
+    purpose: savedPurpose ?? (script?.video?.purpose as string | undefined) ?? null,
     isPublic: linkedVideo?.privacyStatus === "public",
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
@@ -773,17 +792,18 @@ studioRoutes.post("/save-draft", async (c) => {
     projectId:      z.string().uuid().optional(),
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
+    purpose:        z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
   }).safeParse(body);
 
   if (!parsed.success) {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose } = parsed.data;
   // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
   const storyboardValue = script
-    ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription }
-    : { _name: name, _prompt: prompt, _jobDescription: jobDescription };
+    ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose }
+    : { _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose };
   const db = getDb();
 
   if (projectId) {

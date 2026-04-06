@@ -124,6 +124,7 @@ export const StudioProjectSchema = z.object({
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
+  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).nullish(),
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
   isPublic: z.boolean().optional().default(false),
@@ -324,6 +325,7 @@ export const studioService = {
     projectId?: string,
     prompt?: string,
     jobDescription?: string,
+    purpose?: StudioPurpose,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post("/api/studio/save-draft", {
       name,
@@ -332,6 +334,7 @@ export const studioService = {
       ...(projectId ? { projectId } : {}),
       ...(prompt ? { prompt } : {}),
       ...(jobDescription ? { jobDescription } : {}),
+      ...(purpose ? { purpose } : {}),
     }, StudioProjectSchema);
   },
 
