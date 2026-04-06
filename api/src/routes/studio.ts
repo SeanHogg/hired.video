@@ -656,14 +656,8 @@ studioRoutes.post("/storyboard", async (c) => {
     script = { ...script, video: { ...script.video, purpose } };
   }
 
-  const db = getDb();
-  await db.insert(studioProjects).values({
-    userId: user.sub,
-    resumeText,
-    resumeId: parsed.data.resumeId ?? null,
-    storyboard: script as any,
-    status: "storyboard_ready",
-  } as any);
+  // NOTE: Do NOT auto-save a project here. The script is returned to the
+  // frontend and only persisted when the user explicitly clicks Save.
 
   return c.json(ok(script), 201);
 });
