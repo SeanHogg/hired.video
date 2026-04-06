@@ -54,7 +54,6 @@ import StudioFeaturesHub from "./StudioFeaturesHub";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
-const SkillsDemoCreator = lazy(() => import("@/components/studio/SkillsDemoCreator"));
 
 /** Strip ephemeral blob: URLs from a script before persisting to the server.
  * Blob URLs are session-scoped and become invalid after a page reload, so they
@@ -738,14 +737,15 @@ export default function StudioLayout() {
 
   function handleContentTemplateSelect(template: ContentTemplate) {
     setContentTemplate(template);
-    // Map content template to API purpose
-    const purposeMap: Record<ContentTemplate, typeof state.purpose> = {
-      "resume": "resume",
-      "skills-demo": "resume", // Skills Demo uses its own generation flow
-      "job_ad": "job_ad",
-      "personal_brand": "personal_brand",
+    // Map content template to API purpose + set sensible defaults
+    const config: Record<ContentTemplate, { purpose: typeof state.purpose; name: string; prompt: string }> = {
+      "resume":         { purpose: "resume",         name: "New Video Resume",    prompt: "Create a professional 28-second video resume" },
+      "skills-demo":    { purpose: "resume",         name: "Skills Demo",         prompt: "Create a skills demonstration video showcasing technical expertise" },
+      "job_ad":         { purpose: "job_ad",         name: "Job Ad Video",        prompt: "Create a compelling 30-second job advertisement video" },
+      "personal_brand": { purpose: "personal_brand", name: "Personal Brand Video", prompt: "Create a personal brand video that tells my story" },
     };
-    patchState({ purpose: purposeMap[template] ?? "resume" });
+    const c = config[template] ?? config.resume;
+    patchState({ purpose: c.purpose, name: c.name, prompt: c.prompt });
   }
 
   async function handlePublishToProfile() {
@@ -971,17 +971,8 @@ export default function StudioLayout() {
               )}
             </div>
 
-            {/* Main editor — skills-demo template shows SkillsDemoCreator, others show Prompt/Storyboard */}
-            {!featuresOpen && contentTemplate === "skills-demo" ? (
-              <div className="flex-1 overflow-y-auto p-4">
-                <Suspense fallback={<div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Loading…</div>}>
-                  <SkillsDemoCreator
-                    resumeText={state.resumeText}
-                    onRecordingStart={() => setFeaturesOpen(true)}
-                  />
-                </Suspense>
-              </div>
-            ) : !featuresOpen ? (
+            {/* Prompt / Storyboard editor — same flow for all templates */}
+            {!featuresOpen && (
               <StudioEditor
                 tab={tab}
                 onTabChange={setTab}
@@ -997,7 +988,7 @@ export default function StudioLayout() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
               />
-            ) : null}
+            )}
 
             {/* Advanced Enhancements toggle */}
             <div className="shrink-0 border-t">

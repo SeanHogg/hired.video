@@ -1,4 +1,5 @@
-// PromptEditor.tsx — resume text + prompt + optional job description + Run
+// PromptEditor.tsx — primary input for all video templates.
+// Adapts labels and placeholders based on the selected content template (purpose).
 
 import { useRef, useState, useEffect } from "react";
 import { Sparkles, Upload, ChevronDown, ChevronUp, Briefcase, FileText, Bookmark, Loader2, X } from "lucide-react";
@@ -13,6 +14,61 @@ import type { ResumeSummary } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import type { JobSummary } from "@/lib/services/job-service";
 import type { Resume as FrontendResume } from "@/types/resume";
+import type { StudioPurpose } from "@/lib/services/studio-service";
+
+// ─── Template-aware labels ──────────────────────────────────────────────────
+
+interface TemplateLabels {
+  inputLabel: string;
+  uploadButton: string;
+  inputPlaceholder: string;
+  directionPlaceholder: string;
+  showResumePicker: boolean;
+  showJobSection: boolean;
+}
+
+function getLabels(purpose: StudioPurpose): TemplateLabels {
+  switch (purpose) {
+    case "job_ad":
+    case "company_promo":
+    case "recruiter_brand":
+      return {
+        inputLabel: "Job / Company Info",
+        uploadButton: "Upload Document",
+        inputPlaceholder: "Paste the job description, company overview, or key details here…",
+        directionPlaceholder: "e.g. Create a 30-second job ad highlighting remote work and benefits",
+        showResumePicker: false,
+        showJobSection: false,
+      };
+    case "personal_brand":
+      return {
+        inputLabel: "About You",
+        uploadButton: "Upload Resume",
+        inputPlaceholder: "Paste your bio, resume, or key talking points here…",
+        directionPlaceholder: "e.g. Create a personal brand video focused on leadership and innovation",
+        showResumePicker: true,
+        showJobSection: true,
+      };
+    case "product_launch":
+      return {
+        inputLabel: "Product Details",
+        uploadButton: "Upload Document",
+        inputPlaceholder: "Paste the product description, features, and value proposition here…",
+        directionPlaceholder: "e.g. Create an energetic launch video with feature highlights",
+        showResumePicker: false,
+        showJobSection: false,
+      };
+    default: // "resume"
+      return {
+        inputLabel: "Resume",
+        uploadButton: "Upload Resume",
+        inputPlaceholder: "Paste your resume text here, or drag-and-drop a .pdf / .txt / .docx file…",
+        directionPlaceholder: "e.g. Create a 30-second video for a senior engineering role with a bold cinematic style",
+        showResumePicker: true,
+        showJobSection: true,
+      };
+  }
+}
 
 interface Props {
   state: StudioProjectState;
@@ -122,15 +178,17 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
     onStateChange({ resumeText: text });
   }
 
+  const labels = getLabels(state.purpose);
+
   return (
     <div className="flex flex-col gap-5 p-5">
-      {/* Resume */}
+      {/* Primary input — adapts label/placeholder per template */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <Label>Resume</Label>
+          <Label>{labels.inputLabel}</Label>
           <div className="flex items-center gap-2">
             <FileUploadInput
-              buttonText="Upload Resume"
+              buttonText={labels.uploadButton}
               accept=".pdf,.doc,.docx,.txt,.md,.json"
               onFileSelected={async (file) => {
                 const text = await extractTextFromFile(file);
@@ -138,8 +196,8 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
               }}
             />
 
-            {/* From account */}
-            {resumes.length > 0 && (
+            {/* From account — only for resume-based templates */}
+            {labels.showResumePicker && resumes.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -189,7 +247,7 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
 
         <Textarea
           className="h-48 font-mono text-xs resize-none"
-          placeholder="Paste your resume text here, or drag-and-drop a .pdf / .txt / .docx file…"
+          placeholder={labels.inputPlaceholder}
           value={state.resumeText}
           onChange={(e) => onStateChange({ resumeText: e.target.value })}
           onDragOver={(e) => e.preventDefault()}
@@ -202,73 +260,75 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
         <Label className="mb-1.5 block">Direction (optional)</Label>
         <Textarea
           className="h-20 resize-none"
-          placeholder="e.g. Create a 30-second video for a senior engineering role with a bold cinematic style"
+          placeholder={labels.directionPlaceholder}
           value={state.prompt}
           onChange={(e) => onStateChange({ prompt: e.target.value })}
         />
       </div>
 
-      {/* Job Description toggle */}
-      <div>
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            onClick={onToggleJD}
-          >
-            <Briefcase className="w-4 h-4" />
-            Personalise for a job
-            {showJD ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* Saved jobs picker trigger */}
-          {savedJobs.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => { setJobPickerOpen((o) => !o); if (!showJD) onToggleJD(); }}
+      {/* Job Description toggle — only for templates that use it */}
+      {labels.showJobSection && (
+        <div>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              onClick={onToggleJD}
             >
-              <Bookmark className="w-3.5 h-3.5 mr-1" /> Saved jobs
-            </Button>
+              <Briefcase className="w-4 h-4" />
+              Personalise for a job
+              {showJD ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Saved jobs picker trigger */}
+            {savedJobs.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setJobPickerOpen((o) => !o); if (!showJD) onToggleJD(); }}
+              >
+                <Bookmark className="w-3.5 h-3.5 mr-1" /> Saved jobs
+              </Button>
+            )}
+          </div>
+
+          {/* Saved job picker */}
+          {jobPickerOpen && (
+            <div className="mt-2 border rounded-lg overflow-hidden shadow-sm">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saved jobs</span>
+                <button type="button" onClick={() => setJobPickerOpen(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <ul className="max-h-48 overflow-y-auto divide-y">
+                {savedJobs.map((j) => (
+                  <li key={j.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
+                      onClick={() => handleSelectJob(j)}
+                    >
+                      <p className="text-xs font-medium leading-tight">{j.title}</p>
+                      {j.company && <p className="text-[11px] text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ""}</p>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {showJD && (
+            <Textarea
+              className="mt-2 h-32 text-xs resize-none"
+              placeholder="Paste the job description here. The AI will tailor your intro, achievements and skills to this role."
+              value={state.jobDescription ?? ""}
+              onChange={(e) => onStateChange({ jobDescription: e.target.value })}
+            />
           )}
         </div>
-
-        {/* Saved job picker */}
-        {jobPickerOpen && (
-          <div className="mt-2 border rounded-lg overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saved jobs</span>
-              <button type="button" onClick={() => setJobPickerOpen(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <ul className="max-h-48 overflow-y-auto divide-y">
-              {savedJobs.map((j) => (
-                <li key={j.id}>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
-                    onClick={() => handleSelectJob(j)}
-                  >
-                    <p className="text-xs font-medium leading-tight">{j.title}</p>
-                    {j.company && <p className="text-[11px] text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ""}</p>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {showJD && (
-          <Textarea
-            className="mt-2 h-32 text-xs resize-none"
-            placeholder="Paste the job description here. The AI will tailor your intro, achievements and skills to this role."
-            value={state.jobDescription ?? ""}
-            onChange={(e) => onStateChange({ jobDescription: e.target.value })}
-          />
-        )}
-      </div>
+      )}
     </div>
   );
 }

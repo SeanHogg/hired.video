@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck, ExternalLink,
 } from "lucide-react";
+import type { StudioPurpose } from "@/lib/services/studio-service";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -59,6 +60,17 @@ export default function StudioPreview({
   const isPublished = isPublishedToProfile || hasYoutube;
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const canGenerate = state.resumeText.trim().length > 50;
+
+  // Template-aware hint for Step 1
+  const purpose: StudioPurpose = state.purpose ?? "resume";
+  const inputHint: Record<StudioPurpose, string> = {
+    resume: "Add resume text in the Prompt tab",
+    job_ad: "Add job details in the Prompt tab",
+    company_promo: "Add company info in the Prompt tab",
+    recruiter_brand: "Add brand details in the Prompt tab",
+    product_launch: "Add product details in the Prompt tab",
+    personal_brand: "Add your bio in the Prompt tab",
+  };
 
   const statusLabel: Record<string, string> = {
     idle:       "",
@@ -256,7 +268,7 @@ export default function StudioPreview({
                     </Button>
                     {!canGenerate && (
                       <p className="text-[10px] text-muted-foreground leading-tight">
-                        Add resume text in the Prompt tab
+                        {inputHint[purpose]}
                       </p>
                     )}
                   </>
