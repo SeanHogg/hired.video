@@ -16,10 +16,18 @@ export async function extractTextFromPdf(file: File): Promise<string> {
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+      const parts: string[] = [];
+      for (const item of content.items) {
+        if (!("str" in item)) continue;
+        parts.push(item.str);
+        // pdfjs sets hasEOL when the text item ends a line in the original PDF
+        if ((item as any).hasEOL) parts.push("\n");
+      }
+      pages.push(parts.join(""));
     }
 
-    return pages.join("\n").replace(/\s+/g, " ").trim();
+    // Collapse runs of 3+ blank lines but preserve single/double line breaks and bullet structure
+    return pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
   } catch (err) {
     // Fallback: return raw bytes as text so the UI shows something instead of remaining blank.
     const bytes = await file.arrayBuffer();
@@ -37,7 +45,19 @@ export async function extractTextFromFile(file: File): Promise<string> {
     const xmlFile = zip.file("word/document.xml");
     if (xmlFile) {
       const xml = await xmlFile.async("text");
-      return xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      // Preserve paragraph structure: each </w:p> becomes a newline
+      // Detect list items via <w:numPr> (Word numbering) and prefix with bullet
+      const withBreaks = xml
+        .replace(/<w:p\b[^>]*>(?=[\s\S]*?<w:numPr\b)/g, "\n• ")  // list paragraphs → bullet
+        .replace(/<\/w:p>/g, "\n")                                  // paragraph breaks
+        .replace(/<w:tab\s*\/>/g, "\t")                             // tabs
+        .replace(/<w:br\s*\/>/g, "\n")                              // explicit breaks
+        .replace(/<[^>]+>/g, "")                                    // strip remaining tags
+        .replace(/[ \t]+/g, " ")                                    // collapse horizontal whitespace only
+        .replace(/\n /g, "\n")                                      // trim leading space on lines
+        .replace(/\n{3,}/g, "\n\n")                                 // collapse excess blank lines
+        .trim();
+      return withBreaks;
     }
   }
 

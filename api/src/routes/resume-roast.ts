@@ -36,7 +36,7 @@ function buildMockRoast(resumeText: string): RoastResponse {
   const lines = resumeText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
 
-  const bulletLines = lines.filter((l) => /^[\-•\*\d\.]+\s+/.test(l));
+  const bulletLines = lines.filter((l) => /^[\-•▪▸►◦‣\*\d\.]+\s+/.test(l));
   const hasBullets = bulletLines.length > 0;
 
   // Extract metrics but avoid treating phone numbers as metrics
@@ -145,10 +145,11 @@ const ROAST_SYSTEM_PROMPT = `You are a brutally honest but constructive career c
 }
 
 Rules:
+- The resume text preserves the original formatting including line breaks and bullet points (•, -, *). Evaluate formatting based on what you actually see — do NOT claim bullets are missing if they are present.
 - score: be honest and calibrated (6-7 is a good resume, 8-9 is exceptional, 1-3 is genuinely problematic)
 - roast: be sharp and memorable — this is the viral hook — but keep it useful
 - fixes: specific, actionable, not generic advice
-- improvedExamples: take 1–2 actual bullet points from the resume and rewrite them
+- improvedExamples: take 1–2 actual bullet points from the resume and rewrite them. Quote them accurately — preserve their original structure.
 - Return ONLY valid JSON`;
 
 // POST /api/resume/roast — no auth required (public tool)

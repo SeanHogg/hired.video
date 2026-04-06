@@ -1,5 +1,8 @@
 // PromptEditor.tsx — primary input for all video templates.
-// Adapts labels and placeholders based on the selected content template (purpose).
+// Adapts its entire layout based on the selected content template (purpose).
+//
+// Resume / Personal Brand / Skills Demo → resume-centric: paste or pick resume, optional job targeting
+// Job Ad / Company Promo               → job-centric: pick existing job or paste job/company details
 
 import { useRef, useState, useEffect } from "react";
 import { Sparkles, Upload, ChevronDown, ChevronUp, Briefcase, FileText, Bookmark, Loader2, X } from "lucide-react";
@@ -16,55 +19,67 @@ import type { JobSummary } from "@/lib/services/job-service";
 import type { Resume as FrontendResume } from "@/types/resume";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 
-// ─── Template-aware labels ──────────────────────────────────────────────────
+// ─── Template config ────────────────────────────────────────────────────────
 
-interface TemplateLabels {
+type InputMode = "resume" | "job";
+
+interface TemplateConfig {
+  /** Controls whether the primary input area shows resume tools or job tools */
+  inputMode: InputMode;
   inputLabel: string;
   uploadButton: string;
   inputPlaceholder: string;
   directionPlaceholder: string;
-  showResumePicker: boolean;
+  /** Show "Personalise for a job" secondary section (resume mode only) */
   showJobSection: boolean;
 }
 
-function getLabels(purpose: StudioPurpose): TemplateLabels {
+function getConfig(purpose: StudioPurpose): TemplateConfig {
   switch (purpose) {
     case "job_ad":
+      return {
+        inputMode: "job",
+        inputLabel: "Job Details",
+        uploadButton: "Upload Document",
+        inputPlaceholder: "Paste the job title, description, requirements, and benefits here…",
+        directionPlaceholder: "e.g. Create a 30-second video ad highlighting remote work and benefits",
+        showJobSection: false,
+      };
     case "company_promo":
     case "recruiter_brand":
       return {
-        inputLabel: "Job / Company Info",
+        inputMode: "job",
+        inputLabel: "Company Info",
         uploadButton: "Upload Document",
-        inputPlaceholder: "Paste the job description, company overview, or key details here…",
-        directionPlaceholder: "e.g. Create a 30-second job ad highlighting remote work and benefits",
-        showResumePicker: false,
+        inputPlaceholder: "Paste your company overview, mission, culture, and what makes you a great employer…",
+        directionPlaceholder: "e.g. Create a company culture video showcasing team and values",
         showJobSection: false,
       };
     case "personal_brand":
       return {
+        inputMode: "resume",
         inputLabel: "About You",
         uploadButton: "Upload Resume",
         inputPlaceholder: "Paste your bio, resume, or key talking points here…",
         directionPlaceholder: "e.g. Create a personal brand video focused on leadership and innovation",
-        showResumePicker: true,
         showJobSection: true,
       };
     case "product_launch":
       return {
+        inputMode: "job",
         inputLabel: "Product Details",
         uploadButton: "Upload Document",
         inputPlaceholder: "Paste the product description, features, and value proposition here…",
         directionPlaceholder: "e.g. Create an energetic launch video with feature highlights",
-        showResumePicker: false,
         showJobSection: false,
       };
     default: // "resume"
       return {
+        inputMode: "resume",
         inputLabel: "Resume",
         uploadButton: "Upload Resume",
         inputPlaceholder: "Paste your resume text here, or drag-and-drop a .pdf / .txt / .docx file…",
         directionPlaceholder: "e.g. Create a 30-second video for a senior engineering role with a bold cinematic style",
-        showResumePicker: true,
         showJobSection: true,
       };
   }
@@ -77,8 +92,21 @@ interface Props {
   onToggleJD: () => void;
 }
 
-async function extractText(file: File): Promise<string> {
-  return extractTextFromFile(file);
+/** Serialize a JobSummary into plain text for the AI. */
+function jobToText(j: JobSummary): string {
+  const lines: string[] = [];
+  lines.push(j.title);
+  if (j.company) lines.push(`Company: ${j.company}`);
+  if (j.location) lines.push(`Location: ${j.location}${j.isRemote ? " (Remote)" : ""}`);
+  if (j.employmentType) lines.push(`Type: ${j.employmentType}`);
+  if (j.experienceLevel) lines.push(`Level: ${j.experienceLevel}`);
+  if (j.salaryMin != null || j.salaryMax != null) {
+    const min = j.salaryMin != null ? `$${j.salaryMin.toLocaleString()}` : "";
+    const max = j.salaryMax != null ? `$${j.salaryMax.toLocaleString()}` : "";
+    lines.push(`Salary: ${min}${min && max ? " – " : ""}${max}`);
+  }
+  if (j.description) lines.push(`\n${j.description}`);
+  return lines.join("\n");
 }
 
 /** Serialize a loaded FrontendResume into plain readable text for the AI. */
@@ -118,6 +146,7 @@ function resumeToText(r: FrontendResume): string {
 
 export default function PromptEditor({ state, onStateChange, showJD, onToggleJD }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const cfg = getConfig(state.purpose);
 
   // ── Account resume picker ───────────────────────────────────────────────
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
@@ -139,27 +168,33 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
       const full = await resumeService.getResumeById(id);
       onStateChange({ resumeText: resumeToText(full), resumeId: id });
     } catch {
-      // fall back — at least set the ID
       onStateChange({ resumeId: id });
     } finally {
       setResumeLoading(false);
     }
   }
 
-  // ── Saved job picker ────────────────────────────────────────────────────
+  // ── Saved / posted jobs picker ──────────────────────────────────────────
   const [savedJobs, setSavedJobs] = useState<JobSummary[]>([]);
+  const [userJobs, setUserJobs] = useState<JobSummary[]>([]);
   const [jobPickerOpen, setJobPickerOpen] = useState(false);
 
   useEffect(() => {
-    jobService.getSavedJobs()
-      .then(setSavedJobs)
-      .catch(() => {});
+    jobService.getSavedJobs().then(setSavedJobs).catch(() => {});
+    jobService.getUserJobs().then(setUserJobs).catch(() => {});
   }, []);
 
-  function handleSelectJob(job: JobSummary) {
+  /** For resume templates: selecting a job populates the secondary jobDescription field */
+  function handleSelectJobForPersonalisation(job: JobSummary) {
     onStateChange({ jobDescription: job.description ?? `${job.title}${job.company ? ` at ${job.company}` : ""}` });
     setJobPickerOpen(false);
-    if (!showJD) onToggleJD(); // open the JD section if it's closed
+    if (!showJD) onToggleJD();
+  }
+
+  /** For job/company templates: selecting a job populates the primary resumeText field */
+  function handleSelectJobAsPrimary(job: JobSummary) {
+    onStateChange({ resumeText: jobToText(job) });
+    setJobPickerOpen(false);
   }
 
   // ── File handlers ───────────────────────────────────────────────────────
@@ -167,28 +202,24 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    const text = await extractText(file);
+    const text = await extractTextFromFile(file);
     onStateChange({ resumeText: text });
   }
 
-  async function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await extractText(file);
-    onStateChange({ resumeText: text });
-  }
-
-  const labels = getLabels(state.purpose);
+  // Merge saved + posted jobs, deduplicate by id
+  const allJobs = [...userJobs, ...savedJobs].filter(
+    (j, i, arr) => arr.findIndex((x) => x.id === j.id) === i,
+  );
 
   return (
     <div className="flex flex-col gap-5 p-5">
-      {/* Primary input — adapts label/placeholder per template */}
+      {/* Primary input area */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <Label>{labels.inputLabel}</Label>
+          <Label>{cfg.inputLabel}</Label>
           <div className="flex items-center gap-2">
             <FileUploadInput
-              buttonText={labels.uploadButton}
+              buttonText={cfg.uploadButton}
               accept=".pdf,.doc,.docx,.txt,.md,.json"
               onFileSelected={async (file) => {
                 const text = await extractTextFromFile(file);
@@ -196,13 +227,13 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
               }}
             />
 
-            {/* From account — only for resume-based templates */}
-            {labels.showResumePicker && resumes.length > 0 && (
+            {/* Resume picker — resume-mode templates */}
+            {cfg.inputMode === "resume" && resumes.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => setResumePickerOpen((o) => !o)}
+                onClick={() => { setResumePickerOpen((o) => !o); setJobPickerOpen(false); }}
                 disabled={resumeLoading}
               >
                 {resumeLoading
@@ -211,11 +242,23 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
                 }
               </Button>
             )}
+
+            {/* Job picker — job-mode templates */}
+            {cfg.inputMode === "job" && allJobs.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setJobPickerOpen((o) => !o); setResumePickerOpen(false); }}
+              >
+                <Briefcase className="w-3.5 h-3.5 mr-1" /> From jobs
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Account resume picker */}
-        {resumePickerOpen && (
+        {/* Account resume picker dropdown */}
+        {resumePickerOpen && cfg.inputMode === "resume" && (
           <div className="mb-2 border rounded-lg overflow-hidden shadow-sm">
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your resumes</span>
@@ -245,9 +288,41 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
           </div>
         )}
 
+        {/* Job picker dropdown — for job-mode templates */}
+        {jobPickerOpen && cfg.inputMode === "job" && (
+          <div className="mb-2 border rounded-lg overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your jobs</span>
+              <button type="button" onClick={() => setJobPickerOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {allJobs.length > 0 ? (
+              <ul className="max-h-48 overflow-y-auto divide-y">
+                {allJobs.map((j) => (
+                  <li key={j.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
+                      onClick={() => handleSelectJobAsPrimary(j)}
+                    >
+                      <p className="text-xs font-medium leading-tight">{j.title}</p>
+                      {j.company && <p className="text-[11px] text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ""}</p>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                No jobs yet. Paste job details in the text area below.
+              </div>
+            )}
+          </div>
+        )}
+
         <Textarea
           className="h-48 font-mono text-xs resize-none"
-          placeholder={labels.inputPlaceholder}
+          placeholder={cfg.inputPlaceholder}
           value={state.resumeText}
           onChange={(e) => onStateChange({ resumeText: e.target.value })}
           onDragOver={(e) => e.preventDefault()}
@@ -255,19 +330,19 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
         />
       </div>
 
-      {/* Prompt */}
+      {/* Direction prompt */}
       <div>
         <Label className="mb-1.5 block">Direction (optional)</Label>
         <Textarea
           className="h-20 resize-none"
-          placeholder={labels.directionPlaceholder}
+          placeholder={cfg.directionPlaceholder}
           value={state.prompt}
           onChange={(e) => onStateChange({ prompt: e.target.value })}
         />
       </div>
 
-      {/* Job Description toggle — only for templates that use it */}
-      {labels.showJobSection && (
+      {/* Job personalisation — resume-mode templates only */}
+      {cfg.showJobSection && (
         <div>
           <div className="flex items-center justify-between">
             <button
@@ -280,21 +355,20 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
               {showJD ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Saved jobs picker trigger */}
             {savedJobs.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => { setJobPickerOpen((o) => !o); if (!showJD) onToggleJD(); }}
+                onClick={() => { setJobPickerOpen((o) => !o); setResumePickerOpen(false); if (!showJD) onToggleJD(); }}
               >
                 <Bookmark className="w-3.5 h-3.5 mr-1" /> Saved jobs
               </Button>
             )}
           </div>
 
-          {/* Saved job picker */}
-          {jobPickerOpen && (
+          {/* Saved job picker for personalisation */}
+          {jobPickerOpen && cfg.inputMode === "resume" && (
             <div className="mt-2 border rounded-lg overflow-hidden shadow-sm">
               <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Saved jobs</span>
@@ -308,7 +382,7 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
                     <button
                       type="button"
                       className="w-full text-left px-3 py-2 hover:bg-accent transition-colors"
-                      onClick={() => handleSelectJob(j)}
+                      onClick={() => handleSelectJobForPersonalisation(j)}
                     >
                       <p className="text-xs font-medium leading-tight">{j.title}</p>
                       {j.company && <p className="text-[11px] text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ""}</p>}
