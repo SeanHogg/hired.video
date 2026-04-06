@@ -3,11 +3,16 @@ import { eq, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMWithMessages, getApiKey } from "../services/ai.js";
+import { callLLMWithMessages, getApiKey, MODEL_CATALOG } from "../services/ai.js";
 import type { LLMMessage } from "../services/ai.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
+
+// GET /api/ai/models — returns available LLM models for the frontend settings UI
+aiRoutes.get("/models", (c) => {
+  return c.json(success(MODEL_CATALOG));
+});
 
 const SYSTEM_PROMPT = `You are an AI career assistant for hired.video, a platform for video resumes, job search, and talent management.
 Help users with: resume writing and optimization, video resume tips, job searching and applications, interview preparation, career advice, networking, and recruitment.

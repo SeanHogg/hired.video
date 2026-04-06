@@ -272,7 +272,104 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     }
   }
 
-  return { basics: { name: "", summary: "" } };
+  // Fallback: regex-based extraction when AI is unavailable
+  console.warn("[parse] All AI providers failed. Using regex fallback for:", resumeText.slice(0, 80));
+  return parseResumeWithRegex(resumeText);
+}
+
+/** Regex-based resume parser — extracts basic fields when AI is unavailable. */
+function parseResumeWithRegex(text: string): Record<string, unknown> {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // Name: usually the first non-empty line
+  const name = lines[0]?.replace(/[▪•|].*$/, "").trim() ?? "";
+
+  // Email
+  const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
+  const email = emailMatch?.[0] ?? "";
+
+  // Phone
+  const phoneMatch = text.match(/(\+?\d[\d\s\-().]{7,}\d)/);
+  const phone = phoneMatch?.[1]?.trim() ?? "";
+
+  // URL
+  const urlMatch = text.match(/https?:\/\/[^\s,)]+/);
+  const url = urlMatch?.[0] ?? "";
+
+  // Summary: look for "Profile", "Summary", "Objective" section
+  let summary = "";
+  const summaryIdx = lines.findIndex((l) => /^(profile|summary|objective)\b/i.test(l));
+  if (summaryIdx !== -1) {
+    const nextSectionIdx = lines.findIndex((l, i) => i > summaryIdx && /^(work|experience|education|skills|volunteer)\b/i.test(l));
+    summary = lines.slice(summaryIdx + 1, nextSectionIdx !== -1 ? nextSectionIdx : summaryIdx + 5).join(" ").trim();
+  }
+
+  // Work: look for company + position patterns
+  const work: Array<Record<string, unknown>> = [];
+  const workIdx = lines.findIndex((l) => /^(work\s+experience|experience|employment)\b/i.test(l));
+  if (workIdx !== -1) {
+    // Find lines with dates (MM/YYYY or YYYY patterns)
+    const datePattern = /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
+    for (let i = workIdx + 1; i < lines.length; i++) {
+      const dateMatch = lines[i].match(datePattern);
+      if (dateMatch) {
+        // Previous line is likely company/position
+        const titleLine = lines[i - 1] ?? lines[i];
+        const parts = titleLine.split(/[|▪•,]/);
+        work.push({
+          name: parts[0]?.trim() ?? "",
+          position: parts[1]?.trim() ?? parts[0]?.trim() ?? "",
+          startDate: dateMatch[1],
+          endDate: dateMatch[2],
+          highlights: [],
+        });
+      }
+      // Bullet points
+      if (/^[⦁•▪\-*]/.test(lines[i]) && work.length > 0) {
+        const hl = (work[work.length - 1].highlights as string[]) ?? [];
+        hl.push(lines[i].replace(/^[⦁•▪\-*]\s*/, ""));
+        work[work.length - 1].highlights = hl;
+      }
+    }
+  }
+
+  // Skills: look for "Skills" section
+  const skills: Array<Record<string, string>> = [];
+  const skillsIdx = lines.findIndex((l) => /^skills\b/i.test(l));
+  if (skillsIdx !== -1) {
+    const nextSection = lines.findIndex((l, i) => i > skillsIdx && /^(education|volunteer|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
+    const skillLines = lines.slice(skillsIdx + 1, nextSection !== -1 ? nextSection : skillsIdx + 20);
+    for (const sl of skillLines) {
+      if (sl.length > 2) skills.push({ name: sl.replace(/^[⦁•▪\-*]\s*/, ""), level: "" });
+    }
+  }
+
+  // Education
+  const education: Array<Record<string, string>> = [];
+  const eduIdx = lines.findIndex((l) => /^education\b/i.test(l));
+  if (eduIdx !== -1) {
+    for (let i = eduIdx + 1; i < Math.min(eduIdx + 10, lines.length); i++) {
+      if (/university|college|institute|school/i.test(lines[i])) {
+        const parts = lines[i].split(",");
+        education.push({ institution: parts[0]?.trim() ?? "", area: parts[1]?.trim() ?? "", studyType: "" });
+      }
+    }
+  }
+
+  return {
+    basics: { name, label: "", email, phone, url, summary, location: null },
+    work,
+    education,
+    skills,
+    volunteer: [],
+    awards: [],
+    certificates: [],
+    publications: [],
+    languages: [],
+    interests: [],
+    references: [],
+    projects: [],
+  };
 }
 
 // Modern plural endpoints — also exported so app.ts can register them at the mount root

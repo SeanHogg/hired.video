@@ -1,6 +1,6 @@
 // StudioSettings.tsx — AI settings + Video settings accordions.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { StudioProjectState } from "@/types/studio";
+import { apiClient } from "@/lib/api-client";
+
+interface ModelEntry {
+  id: string;
+  label: string;
+  tier: "free" | "paid";
+  context: number;
+}
+
+// Static fallback in case the API call fails
+const FALLBACK_MODELS: ModelEntry[] = [
+  { id: "qwen/qwen3.6-plus:free", label: "Qwen 3.6 Plus", tier: "free", context: 1_000_000 },
+  { id: "openrouter/free", label: "Auto (best available)", tier: "free", context: 200_000 },
+];
 
 interface Props {
   state: StudioProjectState;
@@ -36,6 +50,17 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function StudioSettings({ state, onStateChange }: Props) {
+  const [models, setModels] = useState<ModelEntry[]>(FALLBACK_MODELS);
+
+  useEffect(() => {
+    apiClient.get("/api/ai/models")
+      .then((res: any) => {
+        const data = res?.data ?? res;
+        if (Array.isArray(data) && data.length > 0) setModels(data);
+      })
+      .catch(() => { /* use fallback */ });
+  }, []);
+
   return (
     <div className="flex flex-col overflow-y-auto">
       <div className="px-4 py-3 border-b">
@@ -53,11 +78,11 @@ export default function StudioSettings({ state, onStateChange }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="google/gemini-flash-1.5">Gemini Flash 1.5</SelectItem>
-              <SelectItem value="google/gemini-pro-1.5">Gemini Pro 1.5</SelectItem>
-              <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini</SelectItem>
-              <SelectItem value="openai/gpt-4o">GPT-4o</SelectItem>
-              <SelectItem value="anthropic/claude-3-haiku">Claude 3 Haiku</SelectItem>
+              {models.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.label} ({m.tier})
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

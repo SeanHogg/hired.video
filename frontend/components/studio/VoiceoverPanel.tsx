@@ -21,14 +21,16 @@ import {
   Mic,
   RefreshCw,
   Zap,
+  Square,
 } from "lucide-react";
+import type { TTSVoice, WordTimestamp } from "@/lib/services/studio-features-service";
 import {
-  getTTSVoices,
-  generateTTS,
-  generateTTSAll,
-  type TTSVoice,
-  type WordTimestamp,
-} from "@/lib/services/studio-features-service";
+  getBrowserVoices,
+  estimateWordTimestamps,
+  speak,
+  stopSpeaking,
+  previewVoice,
+} from "@/lib/services/browser-tts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,22 +97,14 @@ export default function VoiceoverPanel({
   const [results, setResults] = useState<Map<string, VoiceoverResult>>(
     new Map(),
   );
-  const [generatingSceneId, setGeneratingSceneId] = useState<string | null>(
-    null,
-  );
-  const [generatingAll, setGeneratingAll] = useState(false);
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [generationError, setGenerationError] = useState<string | null>(null);
 
   // --- Playback state -------------------------------------------------------
   const [playingSceneId, setPlayingSceneId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [playbackProgress, setPlaybackProgress] = useState(0);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const animationFrameRef = useRef<number>(0);
+  const cancelSpeechRef = useRef<(() => void) | null>(null);
 
-  // --- Fetch voices on mount ------------------------------------------------
+  // --- Fetch browser voices on mount ----------------------------------------
   useEffect(() => {
     let cancelled = false;
 
@@ -118,7 +112,7 @@ export default function VoiceoverPanel({
       try {
         setVoicesLoading(true);
         setVoicesError(null);
-        const data = await getTTSVoices();
+        const data = await getBrowserVoices();
         if (cancelled) return;
         setVoices(data);
         if (data.length > 0) {
@@ -140,216 +134,128 @@ export default function VoiceoverPanel({
     };
   }, []);
 
-  // --- Cleanup audio on unmount ---------------------------------------------
+  // --- Cleanup speech on unmount --------------------------------------------
   useEffect(() => {
     return () => {
-      stopPlayback();
+      stopSpeaking();
+      cancelSpeechRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- Audio playback helpers -----------------------------------------------
+  // --- Playback helpers -----------------------------------------------------
 
   const stopPlayback = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-      audioRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = 0;
-    }
+    stopSpeaking();
+    cancelSpeechRef.current = null;
     setPlayingSceneId(null);
-    setPlaybackProgress(0);
     setActiveWordIndex(-1);
   }, []);
-
-  const updatePlaybackState = useCallback(
-    (sceneId: string) => {
-      const audio = audioRef.current;
-      if (!audio || audio.paused) return;
-
-      const currentTimeMs = audio.currentTime * 1000;
-      const durationMs = (audio.duration || 1) * 1000;
-      setPlaybackProgress((currentTimeMs / durationMs) * 100);
-
-      // Find active word for caption highlight
-      const result = results.get(sceneId);
-      if (result?.wordTimestamps.length) {
-        const idx = result.wordTimestamps.findIndex(
-          (w) => currentTimeMs >= w.start && currentTimeMs < w.end,
-        );
-        setActiveWordIndex(idx);
-      }
-
-      animationFrameRef.current = requestAnimationFrame(() =>
-        updatePlaybackState(sceneId),
-      );
-    },
-    [results],
-  );
 
   const playScene = useCallback(
     (sceneId: string) => {
       const result = results.get(sceneId);
-      if (!result?.audioUrl) return;
+      const scene = scenes.find((s) => s.id === sceneId);
+      const text = scene ? buildSceneText(scene) : "";
+      if (!text) return;
 
-      // If already playing this scene, toggle pause/resume
-      if (playingSceneId === sceneId && audioRef.current) {
-        if (audioRef.current.paused) {
-          audioRef.current.play();
-          animationFrameRef.current = requestAnimationFrame(() =>
-            updatePlaybackState(sceneId),
-          );
-        } else {
-          audioRef.current.pause();
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = 0;
-          }
-        }
+      // If already playing this scene, stop it
+      if (playingSceneId === sceneId) {
+        stopPlayback();
         return;
       }
 
       // Stop any current playback first
       stopPlayback();
 
-      const audio = new Audio(result.audioUrl);
-      audio.playbackRate = playbackSpeed;
-      audioRef.current = audio;
       setPlayingSceneId(sceneId);
+      setActiveWordIndex(-1);
 
-      audio.addEventListener("ended", () => {
-        stopPlayback();
+      const cancel = speak({
+        text,
+        voiceId: selectedVoiceId || undefined,
+        rate: playbackSpeed,
+        onBoundary: (wordIndex) => {
+          setActiveWordIndex(wordIndex);
+        },
+        onEnd: () => {
+          setPlayingSceneId(null);
+          setActiveWordIndex(-1);
+          cancelSpeechRef.current = null;
+        },
+        onError: () => {
+          setPlayingSceneId(null);
+          setActiveWordIndex(-1);
+          cancelSpeechRef.current = null;
+        },
       });
 
-      audio.addEventListener("error", () => {
-        stopPlayback();
-      });
-
-      audio.play().then(() => {
-        animationFrameRef.current = requestAnimationFrame(() =>
-          updatePlaybackState(sceneId),
-        );
-      });
+      cancelSpeechRef.current = cancel;
     },
-    [playingSceneId, playbackSpeed, results, stopPlayback, updatePlaybackState],
+    [playingSceneId, playbackSpeed, results, scenes, selectedVoiceId, stopPlayback],
   );
 
-  // Update playback rate when speed changes
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackSpeed;
-    }
-  }, [playbackSpeed]);
-
   // --- Generation handlers --------------------------------------------------
+  // "Generate" now just estimates word timestamps instantly — no API call.
 
   const generateForScene = useCallback(
-    async (scene: Scene) => {
+    (scene: Scene) => {
       const text = buildSceneText(scene);
       if (!text) return;
 
-      try {
-        setGeneratingSceneId(scene.id);
-        setGenerationError(null);
+      const { timestamps, durationMs } = estimateWordTimestamps(
+        text,
+        playbackSpeed,
+      );
 
-        const ttsResult = await generateTTS({
-          text,
-          voiceId: selectedVoiceId || undefined,
-          projectId,
-          sceneId: scene.id,
-          speed: playbackSpeed,
-        });
+      const voiceoverResult: VoiceoverResult = {
+        sceneId: scene.id,
+        audioUrl: null, // browser TTS plays directly, no file URL
+        durationMs,
+        wordTimestamps: timestamps,
+      };
 
-        const voiceoverResult: VoiceoverResult = {
-          sceneId: scene.id,
-          audioUrl: ttsResult.audioUrl,
-          durationMs: ttsResult.durationMs,
-          wordTimestamps: ttsResult.wordTimestamps,
-        };
+      setResults((prev) => {
+        const next = new Map(prev);
+        next.set(scene.id, voiceoverResult);
+        return next;
+      });
 
-        setResults((prev) => {
-          const next = new Map(prev);
-          next.set(scene.id, voiceoverResult);
-          return next;
-        });
-
-        onVoiceoverGenerated?.([voiceoverResult]);
-      } catch (err) {
-        setGenerationError(
-          err instanceof Error
-            ? err.message
-            : "Failed to generate voiceover",
-        );
-      } finally {
-        setGeneratingSceneId(null);
-      }
+      onVoiceoverGenerated?.([voiceoverResult]);
     },
-    [selectedVoiceId, projectId, playbackSpeed, onVoiceoverGenerated],
+    [playbackSpeed, onVoiceoverGenerated],
   );
 
-  const generateForAll = useCallback(async () => {
-    const scenesWithText = scenes
-      .map((s) => ({ sceneId: s.id, text: buildSceneText(s) }))
-      .filter((s) => s.text.length > 0);
+  const generateForAll = useCallback(() => {
+    const allResults: VoiceoverResult[] = [];
+    const newResults = new Map(results);
 
-    if (scenesWithText.length === 0) return;
+    for (const scene of scenes) {
+      const text = buildSceneText(scene);
+      if (!text) continue;
 
-    try {
-      setGeneratingAll(true);
-      setGenerationError(null);
-      setGenerationProgress(0);
-
-      const ttsAllResult = await generateTTSAll({
-        scenes: scenesWithText,
-        voiceId: selectedVoiceId || undefined,
-        projectId,
-        speed: playbackSpeed,
-      });
-
-      const newResults = new Map(results);
-      const allResults: VoiceoverResult[] = [];
-
-      ttsAllResult.results.forEach((r, idx) => {
-        const voiceoverResult: VoiceoverResult = {
-          sceneId: r.sceneId,
-          audioUrl: r.audioUrl,
-          durationMs: r.durationMs,
-          wordTimestamps: r.wordTimestamps,
-        };
-        newResults.set(r.sceneId, voiceoverResult);
-        allResults.push(voiceoverResult);
-        setGenerationProgress(
-          Math.round(((idx + 1) / ttsAllResult.results.length) * 100),
-        );
-      });
-
-      setResults(newResults);
-      onVoiceoverGenerated?.(allResults);
-    } catch (err) {
-      setGenerationError(
-        err instanceof Error
-          ? err.message
-          : "Failed to generate voiceovers",
+      const { timestamps, durationMs } = estimateWordTimestamps(
+        text,
+        playbackSpeed,
       );
-    } finally {
-      setGeneratingAll(false);
-      setGenerationProgress(0);
+
+      const voiceoverResult: VoiceoverResult = {
+        sceneId: scene.id,
+        audioUrl: null,
+        durationMs,
+        wordTimestamps: timestamps,
+      };
+
+      newResults.set(scene.id, voiceoverResult);
+      allResults.push(voiceoverResult);
     }
-  }, [
-    scenes,
-    selectedVoiceId,
-    projectId,
-    playbackSpeed,
-    results,
-    onVoiceoverGenerated,
-  ]);
+
+    setResults(newResults);
+    if (allResults.length > 0) {
+      onVoiceoverGenerated?.(allResults);
+    }
+  }, [scenes, playbackSpeed, results, onVoiceoverGenerated]);
 
   // --- Derived values -------------------------------------------------------
-  const selectedVoice = voices.find((v) => v.voice_id === selectedVoiceId);
-  const isGenerating = generatingAll || generatingSceneId !== null;
   const totalDurationMs = Array.from(results.values()).reduce(
     (sum, r) => sum + r.durationMs,
     0,
@@ -395,7 +301,7 @@ export default function VoiceoverPanel({
                 onClick={() => {
                   setVoicesError(null);
                   setVoicesLoading(true);
-                  getTTSVoices()
+                  getBrowserVoices()
                     .then((data) => {
                       setVoices(data);
                       if (data.length > 0 && !selectedVoiceId) {
@@ -438,16 +344,13 @@ export default function VoiceoverPanel({
             </Select>
           )}
 
-          {/* Voice preview */}
-          {selectedVoice?.preview_url && (
+          {/* Voice preview — speaks a sample sentence in the browser */}
+          {selectedVoiceId && (
             <Button
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => {
-                const preview = new Audio(selectedVoice.preview_url);
-                preview.play();
-              }}
+              onClick={() => previewVoice(selectedVoiceId)}
             >
               <Play className="mr-1 h-3 w-3" />
               Preview voice
@@ -485,41 +388,19 @@ export default function VoiceoverPanel({
         <Button
           className="w-full"
           onClick={generateForAll}
-          disabled={isGenerating || !selectedVoiceId || scenes.length === 0}
+          disabled={!selectedVoiceId || scenes.length === 0}
         >
-          {generatingAll ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating all...
-            </>
-          ) : (
-            <>
-              <Zap className="mr-2 h-4 w-4" />
-              Generate All Voiceovers
-            </>
-          )}
+          <Zap className="mr-2 h-4 w-4" />
+          Generate All Voiceovers
         </Button>
-
-        {/* Progress bar for batch generation */}
-        {generatingAll && generationProgress > 0 && (
-          <Progress value={generationProgress} className="h-2" />
-        )}
-
-        {/* ── Error message ──────────────────────────────────────────── */}
-        {generationError && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-            {generationError}
-          </div>
-        )}
 
         {/* ── Scene list ─────────────────────────────────────────────── */}
         <div className="space-y-3">
           {scenes.map((scene, index) => {
             const text = buildSceneText(scene);
             const result = results.get(scene.id);
-            const isThisGenerating = generatingSceneId === scene.id;
             const isThisPlaying = playingSceneId === scene.id;
-            const hasAudio = !!result?.audioUrl;
+            const hasTimestamps = !!result;
 
             return (
               <div
@@ -547,33 +428,31 @@ export default function VoiceoverPanel({
                       </span>
                     )}
 
-                    {/* Play / Pause button */}
-                    {hasAudio && (
+                    {/* Play / Stop button — speaks text via browser TTS */}
+                    {text && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0"
                         onClick={() => playScene(scene.id)}
                       >
-                        {isThisPlaying && audioRef.current && !audioRef.current.paused ? (
-                          <Pause className="h-3.5 w-3.5" />
+                        {isThisPlaying ? (
+                          <Square className="h-3.5 w-3.5" />
                         ) : (
                           <Play className="h-3.5 w-3.5" />
                         )}
                       </Button>
                     )}
 
-                    {/* Generate / Regenerate button */}
+                    {/* Generate timestamps button */}
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0"
-                      disabled={isGenerating || !selectedVoiceId || !text}
+                      disabled={!selectedVoiceId || !text}
                       onClick={() => generateForScene(scene)}
                     >
-                      {isThisGenerating ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : hasAudio ? (
+                      {hasTimestamps ? (
                         <RefreshCw className="h-3.5 w-3.5" />
                       ) : (
                         <Mic className="h-3.5 w-3.5" />
@@ -593,12 +472,7 @@ export default function VoiceoverPanel({
                   </p>
                 )}
 
-                {/* Playback progress bar */}
-                {isThisPlaying && (
-                  <Progress value={playbackProgress} className="h-1" />
-                )}
-
-                {/* Word timestamps / caption preview */}
+                {/* Word timestamps / caption preview during playback */}
                 {isThisPlaying &&
                   result?.wordTimestamps &&
                   result.wordTimestamps.length > 0 && (

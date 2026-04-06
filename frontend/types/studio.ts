@@ -27,7 +27,7 @@ export interface StudioProjectState {
   youtubeVideoId: string | null;
   status: StudioStatus;
   // AI settings
-  model: string;                // default "google/gemini-flash-1.5"
+  model: string;                // default "qwen/qwen3.6-plus:free"
   temperature: number;          // 0–1
   // Video settings
   resolution: "720p" | "1080p";
@@ -45,7 +45,7 @@ export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemp
   prompt: "Create a professional 28-second video resume",
   resumeText: "",
   status: "idle",
-  model: "google/gemini-flash-1.5",
+  model: "qwen/qwen3.6-plus:free",
   temperature: 0.7,
   resolution: "720p",
   aspectRatio: "16:9",
