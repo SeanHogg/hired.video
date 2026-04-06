@@ -63,8 +63,10 @@ export default function PublicVideoResume() {
     if (!videoId) return;
     apiClient
       .get(`/api/studio/public/${videoId}`)
-      .then((res) => {
-        const result = PublicVideoSchema.safeParse(res);
+      .then((res: any) => {
+        // apiClient wraps response — data may be nested under res.data or be res directly
+        const raw = res?.data ?? res;
+        const result = PublicVideoSchema.safeParse(raw);
         if (result.success) {
           setVideo(result.data);
           applyOgTags(result.data);
@@ -96,8 +98,14 @@ export default function PublicVideoResume() {
     );
   }
 
-  const embedSrc = video.youtubeVideoId
+  // Only use YouTube embed for real YouTube IDs (not fake yt_ prefixed ones)
+  const isRealYouTube = video.youtubeVideoId && !video.youtubeVideoId.startsWith("yt_");
+  const embedSrc = isRealYouTube
     ? `https://www.youtube.com/embed/${video.youtubeVideoId}?autoplay=0&rel=0`
+    : null;
+  // For non-YouTube videos, use the CDN URL directly (strip fake YouTube URLs)
+  const directVideoUrl = video.videoUrl && !video.videoUrl.includes("youtube.com/watch?v=yt_")
+    ? video.videoUrl
     : null;
 
   return (
@@ -146,9 +154,9 @@ export default function PublicVideoResume() {
               className="w-full h-full"
             />
           </div>
-        ) : video.videoUrl ? (
+        ) : directVideoUrl ? (
           <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-lg">
-            <video src={video.videoUrl} controls className="w-full h-full" />
+            <video src={directVideoUrl} controls className="w-full h-full" />
           </div>
         ) : video.thumbnailUrl ? (
           <img
@@ -156,7 +164,11 @@ export default function PublicVideoResume() {
             alt={video.title}
             className="w-full rounded-xl shadow-lg"
           />
-        ) : null}
+        ) : (
+          <div className="aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center">
+            <p className="text-muted-foreground">Video is being processed. Check back soon.</p>
+          </div>
+        )}
 
         {/* Description */}
         {video.description && (

@@ -703,13 +703,15 @@ function toProjectDto(
   // If the storyboard is a VideoScript (saved by save-draft), expose it as `script`
   const maybeScript = VideoScriptSchema.safeParse(project.storyboard);
   const script = maybeScript.success ? maybeScript.data : null;
+  // Strip fake yt_ IDs — only expose real YouTube data
+  const isFakeYt = linkedVideo?.youtubeVideoId?.startsWith("yt_");
   return {
     id: project.id,
     userId: project.userId,
     title: savedName || project.resumeText?.slice(0, 80) || "My Video Resume",
     status: mapStudioStatus(project.status),
-    youtubeVideoId: linkedVideo?.youtubeVideoId ?? null,
-    videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
+    youtubeVideoId: isFakeYt ? null : (linkedVideo?.youtubeVideoId ?? null),
+    videoUrl: (isFakeYt ? null : linkedVideo?.youtubeUrl) ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
     thumbnailUrl: linkedVideo?.thumbnailUrl ?? null,
     storyboard,
     script,
@@ -1270,13 +1272,19 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // Only serve videos that are explicitly marked public
   if (v.privacyStatus !== "public") return c.json(fail("NOT_FOUND", "Video not found"), 404);
 
+  // Prefer R2 CDN URL; only use YouTube URL if it's a real YouTube video
+  const isFakeYoutube = v.youtubeVideoId?.startsWith("yt_");
+  const realYoutubeUrl = isFakeYoutube ? null : v.youtubeUrl;
+  const realYoutubeId = isFakeYoutube ? null : v.youtubeVideoId;
+  const videoUrl = realYoutubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null);
+
   return c.json(ok({
     id: v.id,
     title: v.title || `${v.ownerName}'s Video Resume`,
     description: v.description,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
-    youtubeUrl: v.youtubeUrl,
-    youtubeVideoId: v.youtubeVideoId,
+    videoUrl,
+    youtubeUrl: realYoutubeUrl,
+    youtubeVideoId: realYoutubeId,
     thumbnailUrl: v.thumbnailUrl,
     ownerName: v.ownerName,
     ownerAvatar: v.ownerAvatar,

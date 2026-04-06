@@ -1041,9 +1041,9 @@ export default function StudioLayout() {
         </div>
       </div>
 
-      {linkedInOpen && state.youtubeVideoId && (
+      {linkedInOpen && (state.youtubeVideoId || state.projectId) && (
         <LinkedInPostModal
-          videoId={state.youtubeVideoId}
+          videoId={state.youtubeVideoId ?? state.projectId!}
           videoTitle={state.name}
           onClose={() => setLinkedInOpen(false)}
         />

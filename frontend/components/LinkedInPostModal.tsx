@@ -56,11 +56,18 @@ export default function LinkedInPostModal({ videoId, videoTitle, onClose }: Prop
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleShare() {
-    const summary = encodeURIComponent(post?.hook ?? videoTitle ?? "My video resume");
+  async function handleShare() {
+    // LinkedIn's share-offsite only supports the URL param — post text must be copied separately.
+    // Copy text to clipboard first, then open LinkedIn with the URL pre-filled.
+    const text = post?.fullPost ?? "";
+    if (text) {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }
     const url = encodeURIComponent(publicUrl);
     window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${url}&summary=${summary}`,
+      `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
       "_blank",
       "noopener,noreferrer",
     );
@@ -137,7 +144,7 @@ export default function LinkedInPostModal({ videoId, videoTitle, onClose }: Prop
             onClick={handleShare}
             disabled={!post}
           >
-            <ExternalLink className="w-4 h-4 mr-2" /> Post to LinkedIn
+            <ExternalLink className="w-4 h-4 mr-2" /> Copy & Open LinkedIn
           </Button>
         </div>
       </div>
