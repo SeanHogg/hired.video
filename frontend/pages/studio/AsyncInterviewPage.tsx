@@ -17,7 +17,7 @@ import {
   type AsyncInterview,
 } from "@/lib/services/studio-features-service";
 
-const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder"));
+const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder").then(m => ({ default: m.WebcamRecorder })));
 
 interface InterviewQuestion {
   id: string;

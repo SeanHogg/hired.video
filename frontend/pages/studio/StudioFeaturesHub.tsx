@@ -22,8 +22,8 @@ import { useAuth } from "@/lib/auth";
 
 // Lazy-load heavy components to keep initial bundle small
 const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
-const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder"));
-const Teleprompter = lazy(() => import("@/components/studio/Teleprompter"));
+const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder").then(m => ({ default: m.WebcamRecorder })));
+const Teleprompter = lazy(() => import("@/components/studio/Teleprompter").then(m => ({ default: m.Teleprompter })));
 const DeliveryCoach = lazy(() => import("@/components/studio/DeliveryCoach"));
 const CaptionEditor = lazy(() => import("@/components/studio/CaptionEditor"));
 const InterviewPractice = lazy(() => import("@/components/studio/InterviewPractice"));
@@ -105,7 +105,7 @@ export default function StudioFeaturesHub({
   const [isScrolling, setIsScrolling] = useState(false);
   const [teleprompterText, setTeleprompterText] = useState(scriptText ?? "");
 
-  const isRecruiter = user?.roles?.includes("recruiter") || user?.roles?.includes("admin");
+  const isRecruiter = user?.role === "recruiter" || user?.role === "admin";
 
   return (
     <div className="flex flex-col h-full">
