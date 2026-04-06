@@ -8,6 +8,7 @@ import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
 import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
+import { studioFeaturesRoutes } from "./routes/studio-features.js";
 
 import { authRoutes } from "./routes/auth.js";
 import { accountRoutes } from "./routes/account.js";
@@ -320,6 +321,7 @@ export function createApp() {
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   app.route("/api/admin/impersonate", superadminRoutes);
   app.route("/api/studio", studioRoutes);
+  app.route("/api/studio", studioFeaturesRoutes);
   app.route("/api/studio", linkedInPostRoutes);
   app.route("/api/og", ogRoutes);
   app.route("/api/youtube", youtubeRoutes);

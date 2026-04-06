@@ -50,6 +50,7 @@ import StudioSidebar from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioSettings from "./StudioSettings";
+import StudioFeaturesHub from "./StudioFeaturesHub";
 import TimelineEditor from "@/components/TimelineEditor";
 import LinkedInPostModal from "@/components/LinkedInPostModal";
 
@@ -379,6 +380,7 @@ export default function StudioLayout() {
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
   const [videoHeight, setVideoHeight] = useState(() => {
     const saved = localStorage.getItem("studio_video_height");
     return saved ? Math.max(80, parseInt(saved, 10)) : 160;
@@ -941,22 +943,67 @@ export default function StudioLayout() {
               )}
             </div>
 
-            {/* Prompt / Storyboard tabs — fills remaining space */}
-            <StudioEditor
-              tab={tab}
-              onTabChange={setTab}
-              state={state}
-              onStateChange={patchState}
-              showJD={showJD}
-              onToggleJD={() => setShowJD((v) => !v)}
-              onScriptChange={handleScriptChange}
-              focusedSceneId={focusedSceneId}
-              onSceneFocus={setFocusedSceneId}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-            />
+            {/* Prompt / Storyboard tabs — fills remaining space (when features closed) */}
+            {!featuresOpen && (
+              <StudioEditor
+                tab={tab}
+                onTabChange={setTab}
+                state={state}
+                onStateChange={patchState}
+                showJD={showJD}
+                onToggleJD={() => setShowJD((v) => !v)}
+                onScriptChange={handleScriptChange}
+                focusedSceneId={focusedSceneId}
+                onSceneFocus={setFocusedSceneId}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+              />
+            )}
+
+            {/* Advanced Features Hub toggle */}
+            <div className="shrink-0 border-t">
+              <button
+                type="button"
+                className={cn(
+                  "w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                  featuresOpen ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setFeaturesOpen((v) => !v)}
+              >
+                {featuresOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                Advanced Studio Features
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary ml-2">
+                  New
+                </span>
+              </button>
+            </div>
+
+            {/* Features Hub — fills remaining space when open */}
+            {featuresOpen && (
+              <div className="flex-1 overflow-hidden">
+                <StudioFeaturesHub
+                  projectId={state.projectId ?? undefined}
+                  videoId={state.youtubeVideoId ?? undefined}
+                  resumeText={state.resumeText}
+                  scriptText={state.script?.scenes.map((s) =>
+                    [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
+                  ).join(" ") ?? ""}
+                  scenes={state.script?.scenes.map((s) => ({
+                    id: s.id,
+                    title: s.title,
+                    text: typeof s.text === "string" ? s.text : s.text?.join(" "),
+                    items: s.items,
+                    skills: s.skills,
+                  }))}
+                  videoBlob={state.videoBlob}
+                  videoUrl={state.youtubeVideoId ? `https://www.youtube.com/watch?v=${state.youtubeVideoId}` : undefined}
+                  videoDurationSec={state.script?.video.duration}
+                  candidateName={state.name}
+                />
+              </div>
+            )}
           </div>
 
           {/* Right panel — export/publish actions + settings */}

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { count, eq, gte, sql, sum } from "drizzle-orm";
+import { count, eq, gte, sql, sum, desc } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
@@ -269,6 +270,134 @@ adminRoutes.post("/cancellation-requests/:requestId/reject", (c) => {
 });
 adminRoutes.get("/cancellation-stats", (c) => c.json(ok({ totalRequests: 0, pendingRequests: 0, approvedRequests: 0, rejectedRequests: 0, averageProcessingTime: 0 }), 200));
 adminRoutes.get("/refund-reasons", (c) => c.json(ok(refundReasons), 200));
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/billing/subscriptions — list all subscriptions with user + plan info
+// ---------------------------------------------------------------------------
+const BillingSearchSchema = z.object({
+	page: z.coerce.number().int().min(1).default(1),
+	limit: z.coerce.number().int().min(1).max(100).default(50),
+	search: z.string().optional(),
+	status: z.string().optional(),
+});
+
+adminRoutes.get("/billing/subscriptions", async (c) => {
+	const query = BillingSearchSchema.safeParse(c.req.query());
+	if (!query.success) return c.json({ error: { code: "BAD_REQUEST", message: query.error.issues[0].message } }, 400);
+
+	const db = getDb();
+	const { page, limit, search, status } = query.data;
+	const offset = (page - 1) * limit;
+
+	const conditions: ReturnType<typeof eq>[] = [];
+	if (status && status !== "all") conditions.push(eq(schema.subscriptions.status, status));
+
+	const baseWhere = conditions.length > 0 ? sql`${conditions.reduce((a, b) => sql`${a} AND ${b}`)}` : sql`1=1`;
+
+	// If there's a search term, filter by user name or email
+	const searchWhere = search
+		? sql`${baseWhere} AND (${schema.users.name} ILIKE ${"%" + search + "%"} OR ${schema.users.email} ILIKE ${"%" + search + "%"})`
+		: baseWhere;
+
+	const [rows, [{ total }]] = await Promise.all([
+		db
+			.select({
+				id: schema.subscriptions.id,
+				userId: schema.subscriptions.userId,
+				userName: schema.users.name,
+				userEmail: schema.users.email,
+				planId: schema.subscriptions.planId,
+				planName: schema.subscriptionPlans.name,
+				planSlug: schema.subscriptionPlans.slug,
+				priceMonthly: schema.subscriptionPlans.priceMonthly,
+				priceYearly: schema.subscriptionPlans.priceYearly,
+				status: schema.subscriptions.status,
+				billingInterval: schema.subscriptions.billingInterval,
+				currentPeriodStart: schema.subscriptions.currentPeriodStart,
+				currentPeriodEnd: schema.subscriptions.currentPeriodEnd,
+				cancelAtPeriodEnd: schema.subscriptions.cancelAtPeriodEnd,
+				canceledAt: schema.subscriptions.canceledAt,
+				trialEnd: schema.subscriptions.trialEnd,
+				createdAt: schema.subscriptions.createdAt,
+			})
+			.from(schema.subscriptions)
+			.innerJoin(schema.users, eq(schema.subscriptions.userId, schema.users.id))
+			.innerJoin(schema.subscriptionPlans, eq(schema.subscriptions.planId, schema.subscriptionPlans.id))
+			.where(searchWhere)
+			.orderBy(desc(schema.subscriptions.createdAt))
+			.limit(limit)
+			.offset(offset),
+		db
+			.select({ total: count() })
+			.from(schema.subscriptions)
+			.innerJoin(schema.users, eq(schema.subscriptions.userId, schema.users.id))
+			.where(searchWhere),
+	]);
+
+	// Compute summary metrics across all subscriptions (unfiltered)
+	const [activeRow, trialingRow, pastDueRow, canceledRow, mrrRow] = await Promise.all([
+		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active")),
+		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "trialing")),
+		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "past_due")),
+		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "canceled")),
+		db.select({ total: sum(schema.subscriptionPlans.priceMonthly) })
+			.from(schema.subscriptions)
+			.innerJoin(schema.subscriptionPlans, eq(schema.subscriptions.planId, schema.subscriptionPlans.id))
+			.where(sql`${schema.subscriptions.status} IN ('active', 'trialing')`),
+	]);
+
+	const mrr = Number(mrrRow[0]?.total ?? 0);
+
+	return c.json(ok({
+		subscriptions: rows,
+		total,
+		page,
+		limit,
+		summary: {
+			mrr,
+			arr: mrr * 12,
+			active: activeRow[0]?.n ?? 0,
+			trialing: trialingRow[0]?.n ?? 0,
+			pastDue: pastDueRow[0]?.n ?? 0,
+			canceled: canceledRow[0]?.n ?? 0,
+		},
+	}), 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/settings — read all system settings
+// ---------------------------------------------------------------------------
+adminRoutes.get("/settings", async (c) => {
+	const db = getDb();
+	const rows = await db.select().from(schema.systemSettings).orderBy(schema.systemSettings.key);
+	const settings: Record<string, string | null> = {};
+	for (const row of rows) settings[row.key] = row.value;
+	return c.json(ok(settings), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/admin/settings — upsert system settings (key-value pairs)
+// ---------------------------------------------------------------------------
+const SettingsUpdateSchema = z.record(z.string(), z.string().nullable());
+
+adminRoutes.put("/settings", async (c) => {
+	const body = SettingsUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
+	if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+
+	const db = getDb();
+	const entries = Object.entries(body.data);
+	for (const [key, value] of entries) {
+		await db
+			.insert(schema.systemSettings)
+			.values({ key, value, updatedAt: new Date() } as any)
+			.onConflictDoUpdate({
+				target: schema.systemSettings.key,
+				set: { value, updatedAt: new Date() } as any,
+			});
+	}
+
+	return c.json(ok({ updated: entries.length }), 200);
+});
 
 adminRoutes.all("*", (c) =>
 	c.json({ error: { code: "NOT_FOUND", message: "Admin route not found" } }, 404),

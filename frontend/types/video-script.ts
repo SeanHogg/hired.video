@@ -78,6 +78,46 @@ export interface VideoAudio {
   volume: number;
 }
 
+// ── TTS Voiceover ───────────────────────────────────────────────────────────
+
+export interface VoiceoverConfig {
+  enabled: boolean;
+  voiceId: string;
+  voiceName: string;
+  speed: number;           // 0.5 – 2.0
+  /** Per-scene audio URLs and word timestamps */
+  scenes: Record<string, SceneVoiceover>;
+}
+
+export interface SceneVoiceover {
+  audioUrl: string | null;
+  durationMs: number;
+  wordTimestamps: WordTimestamp[];
+}
+
+export interface WordTimestamp {
+  word: string;
+  start: number;
+  end: number;
+}
+
+// ── Captions ────────────────────────────────────────────────────────────────
+
+export type CaptionStyle = "standard" | "bold-pop" | "word-by-word" | "lower-thirds";
+
+export interface CaptionConfig {
+  enabled: boolean;
+  style: CaptionStyle;
+  cues: CaptionCue[];
+}
+
+export interface CaptionCue {
+  start: number;
+  end: number;
+  text: string;
+  words?: WordTimestamp[];
+}
+
 export interface VideoScript {
   video: {
     duration: number;           // total seconds

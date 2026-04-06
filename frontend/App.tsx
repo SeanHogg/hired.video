@@ -96,6 +96,8 @@ const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
 const VideoResumeWizardPage = lazy(() => import("./pages/VideoResumeWizardPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
+const ATSLandingPage = lazy(() => import("./pages/studio/ATSLandingPage"));
+const AsyncInterviewPage = lazy(() => import("./pages/studio/AsyncInterviewPage"));
 const ResumeRoast = lazy(() => import("./pages/ResumeRoast"));
 const PublicVideoResume = lazy(() => import("./pages/PublicVideoResume"));
 const JobDetail = lazy(() => import("./pages/JobDetail"));
@@ -577,6 +579,12 @@ const App = () => (
 
                       {/* Public video resume page */}
                       <Route path="/v/:videoId" element={<PublicVideoResume />} />
+
+                      {/* ATS-compatible shareable video resume landing page */}
+                      <Route path="/v/ats/:slug" element={<ATSLandingPage />} />
+
+                      {/* Async video interview — candidate view */}
+                      <Route path="/interview/:token" element={<AsyncInterviewPage />} />
 
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />

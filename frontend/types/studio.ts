@@ -1,4 +1,4 @@
-import type { VideoScript } from "./video-script";
+import type { VideoScript, VoiceoverConfig, CaptionConfig } from "./video-script";
 import type { CompiledVideo } from "../lib/compiler/types";
 
 export type StudioStatus =
@@ -34,6 +34,10 @@ export interface StudioProjectState {
   aspectRatio: "16:9" | "9:16" | "1:1";
   targetDuration: number;       // seconds
   motion: "minimal" | "moderate" | "cinematic";
+  // TTS voiceover
+  voiceover: VoiceoverConfig | null;
+  // Captions
+  captions: CaptionConfig | null;
 }
 
 export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "projectId" | "youtubeVideoId"> = {
@@ -47,4 +51,6 @@ export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemp
   aspectRatio: "16:9",
   targetDuration: 28,
   motion: "moderate",
+  voiceover: null,
+  captions: null,
 };
