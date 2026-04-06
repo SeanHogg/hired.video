@@ -79,11 +79,11 @@ hired.video/
 │   │   ├── app.ts                # Hono app factory, route mounting, CORS
 │   │   ├── worker.ts             # CF Worker fetch handler (production entry)
 │   │   ├── index.ts              # Node.js entry (local development)
-│   │   ├── routes/               # 59 route files — one per feature domain
-│   │   ├── services/             # Business logic services (9 files + payment/ subfolder)
+│   │   ├── routes/               # 60 route files — one per feature domain
+│   │   ├── services/             # Business logic services (11 files + payment/ subfolder)
 │   │   ├── middleware/           # Auth, error handling, rate limiting, logging
 │   │   ├── db/
-│   │   │   ├── schema/           # Drizzle schema definitions (118 tables)
+│   │   │   ├── schema/           # Drizzle schema definitions (134 tables)
 │   │   │   └── index.ts          # DB connection
 │   │   └── types/                # Shared TypeScript types, response helpers
 │   ├── wrangler.toml             # Cloudflare Worker config + R2/KV bindings
@@ -102,7 +102,7 @@ hired.video/
 │   ├── MyVideoResume.AI/         # LLM integration
 │   ├── MyVideoResume.ML.SentimentAnalysis/ # ML.NET sentiment model
 │   └── MyVideoResume.Tests/      # Unit/integration tests
-└── docs/                         # Documentation
+└── docs/                         # (consolidated into this README)
 ```
 
 ---
@@ -158,6 +158,259 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 
 ---
 
+## Video AI Studio Architecture
+
+### Pipeline
+
+```
+User Prompt + Resume
+        ↓
+  LLM (OpenRouter)       → generates Video Script DSL
+        ↓
+  Video Compiler         → builds Scene Graph + Animation Graph
+        ↓
+  Frame Renderer         → Canvas 2D
+        ↓
+  WebCodecs Encoder      → VideoFrame pipeline
+        ↓
+  MP4 Muxer              → Blob
+        ↓
+  Upload → YouTube / LinkedIn / ATS Package
+```
+
+### Studio Layout (3-panel workspace)
+
+```
+┌──────────┬──────────────────────────┬──────────────────┐
+│ Sidebar  │       Editor             │  Settings        │
+│  260px   │       flex-1             │  320px           │
+│          │  [Prompt|Storyboard]     ├──────────────────┤
+│          │  [Timeline]              │  Preview         │
+│          │  [Advanced Features]     │  (canvas 16:9)   │
+└──────────┴──────────────────────────┴──────────────────┘
+```
+
+### Studio Files
+
+```
+frontend/pages/studio/
+  Studio.tsx              ← re-export of StudioLayout
+  StudioLayout.tsx        ← top-level state, layout, auth gate (1,131 lines)
+  StudioSidebar.tsx       ← project nav, templates, backgrounds, music
+  StudioEditor.tsx        ← Prompt / Storyboard tab switcher
+  StudioPreview.tsx       ← right panel: canvas + Export + Publish + LinkedIn + visibility
+  StudioSettings.tsx      ← AI settings + Video settings
+  StudioFeaturesHub.tsx   ← Advanced features: 9 tabs (Record, Voiceover, Captions, Interview, Skills, Analytics, ATS, Async Interview, LinkedIn)
+  ATSLandingPage.tsx      ← public shareable page at /v/ats/:slug
+  AsyncInterviewPage.tsx  ← candidate interview view at /interview/:token
+
+frontend/components/studio/     (12 components, ~7,000 lines total)
+  VoiceoverPanel.tsx      ← TTS voice selection, generation, playback, word highlight
+  WebcamRecorder.tsx      ← camera/screen/PiP recording, audio level meter
+  Teleprompter.tsx        ← auto-scrolling text overlay, WPM control
+  DeliveryCoach.tsx       ← score cards, filler words, pacing, suggestions
+  CaptionEditor.tsx       ← cue editing, style selector, SRT/VTT export
+  InterviewPractice.tsx   ← question library, STAR framework, AI coaching
+  SkillsDemoCreator.tsx   ← template selection, AI script, recording flow
+  VideoAnalyticsDashboard.tsx ← engagement heatmap, viewer list, drop-off
+  ATSPackageGenerator.tsx ← shareable link, text summary, email template
+  VoiceCloneManager.tsx   ← record/upload sample, manage cloned voices
+  AsyncInterviewManager.tsx ← recruiter + candidate views
+  LinkedInPublisher.tsx   ← OAuth connect, compose post, publish
+
+frontend/lib/
+  compiler/
+    video-compiler.ts     ← compile(VideoScript) → CompiledVideo
+    scene-graph.ts        ← SceneNode tree per scene type
+    animation-graph.ts    ← AnimationSpec → CompiledAnimation interpolators
+    storyboard-adapter.ts ← storyboardToVideoScript() backward-compat
+    types.ts              ← all compiler internal interfaces
+  renderer/
+    canvas-nodes.ts       ← drawNode() for each SceneNode type
+    frame-renderer.ts     ← render(ctx, compiledVideo, time)
+    video-exporter.ts     ← exportVideo() WebCodecs + mp4-muxer + fallback
+    caption-renderer.ts   ← 4 caption styles (standard, bold-pop, word-by-word, lower-thirds)
+  audio/
+    ambient-player.ts     ← background music playback + export mixing
+  analytics/
+    video-tracker.ts      ← per-second engagement tracking, beacon on unload
+  services/
+    studio-service.ts     ← core studio API client
+    studio-features-service.ts ← TTS, captions, LinkedIn, recording, coaching, ATS, interviews, skills, voice clone, analytics
+
+frontend/types/
+  video-script.ts         ← VideoScript DSL + VoiceoverConfig + CaptionConfig + WordTimestamp
+  studio.ts               ← StudioProjectState (voiceover, captions fields)
+
+api/src/routes/
+  studio.ts               ← core studio routes (1,716 lines)
+  studio-features.ts      ← TTS, captions, LinkedIn, recording, coaching, ATS, interview, skills, voice clone, async interview, analytics (1,451 lines)
+
+api/src/services/
+  tts.ts                  ← ElevenLabs TTS with word timestamps, voice cloning, SRT/VTT
+  transcription.ts        ← OpenAI Whisper transcription, delivery analysis (pacing, fillers, energy)
+```
+
+### Video Script DSL
+
+The AI generates a `VideoScript` — a declarative program the compiler evaluates at any frame:
+
+```typescript
+interface VideoScript {
+  video: { duration, fps, resolution, aspect, theme: { colorPalette, fontFamily, motion, transition, background }, audio? }
+  scenes: SceneScript[]    // intro | achievement | skills | closing | job-details | company-culture | cta | testimonial | product-feature | brand-story | requirements | benefits
+}
+```
+
+Scene types cover both job-seeker (resume) and advertising use cases. Purposes: `resume`, `job_ad`, `company_promo`, `recruiter_brand`, `product_launch`, `personal_brand`.
+
+### Database Tables (Studio)
+
+From `schema/videos.ts`, `schema/studioadvertising.ts`, `schema/studiofeatures.ts`:
+
+| Table | Purpose |
+|-------|---------|
+| `videos` | Video records (status, R2 key, YouTube ID, privacy) |
+| `video_resumes` | Video-resume associations |
+| `youtube_accounts` | YouTube OAuth tokens |
+| `studio_brand_kits` | Brand identity (logo, colors, font) |
+| `video_analytics` | Lightweight view + CTA-click tracking |
+| `video_campaigns` | Campaign grouping with UTM tracking |
+| `studio_voiceovers` | TTS audio per scene with word timestamps |
+| `studio_voice_clones` | User voice cloning profiles |
+| `studio_captions` | Auto-generated subtitle tracks (4 styles) |
+| `linkedin_accounts` | LinkedIn OAuth tokens |
+| `studio_recordings` | Webcam/screen recordings with transcription |
+| `studio_delivery_coaching` | AI coaching scores (pacing, fillers, energy, clarity) |
+| `studio_ats_packages` | ATS-compatible shareable landing pages |
+| `studio_interview_questions` | Interview question library (15 defaults) |
+| `studio_interview_sessions` | Practice sessions with AI scoring |
+| `studio_skills_demos` | Skills demonstration videos (4 templates) |
+| `studio_async_interviews` | Employer async interview requests |
+| `studio_async_responses` | Candidate video responses |
+| `studio_video_heatmap` | Per-second engagement analytics |
+
+### Environment Variables (Studio)
+
+| Variable | Service | Required |
+|----------|---------|----------|
+| `OPENROUTER_API_KEY` | LLM script generation | Yes (falls back to mock) |
+| `ELEVENLABS_API_KEY` | TTS voiceover + voice cloning | For TTS features |
+| `OPENAI_API_KEY` | Whisper transcription + delivery coaching | For recording features |
+| `LINKEDIN_CLIENT_ID` | LinkedIn OAuth | For LinkedIn publishing |
+| `LINKEDIN_CLIENT_SECRET` | LinkedIn OAuth | For LinkedIn publishing |
+
+---
+
+## AI CHRO (AI Assistant)
+
+The AI CHRO (Chief Human Resources Officer) is the platform's embedded AI assistant. Role-aware, context-sensitive career/hiring/workforce guidance.
+
+### Architecture
+
+```
+User (browser)
+  └─ AIChatPanel.tsx          ← Chat UI: sliding panel, history, copy, session tracking
+       └─ ai-service.ts       ← Frontend service: sends to /api/ai/chat
+            └─ /api/ai/chat   ← Hono route: session management, DB persistence
+                 └─ ai.ts     ← callLLMWithMessages() → OpenRouter (Gemini Flash 1.5)
+```
+
+**Tables** (`schema/ai.ts`): `ai_chat_sessions`, `ai_chat_messages`, `ai_usage_records`
+
+### System Prompt (3 layers)
+
+1. **Base CHRO persona** — talent acquisition, career development, workforce strategy, HR analytics, employer branding, compliance
+2. **User profile context** — name, role, plan (injected from `useAuth()`)
+3. **Page context** — auto-detected from URL via `detectContextFromRoute()` (e.g. `/resumes/edit/:id` → resume editing context)
+
+### Usage Limits
+
+- Free: 10 requests/month (`FREE_AI_MONTHLY_LIMIT`), enforced client-side + server-side
+- Pro/Enterprise: unlimited
+- Client check in `ai-service.ts`; server check via `checkAIUsage` middleware
+
+---
+
+## Email System (SendPulse)
+
+### Architecture
+
+```
+Route handler (auth.ts, account.ts)
+  └─ getEmailProvider()       ← factory returns SendPulseEmailProvider
+       └─ sendEmail()         ← OAuth2 token → SMTP API call (fire-and-forget via waitUntil)
+```
+
+### Templates
+
+| Template | Trigger |
+|----------|---------|
+| Verification | Registration |
+| Password reset | Forgot password |
+| 2FA code | Login with 2FA enabled |
+| Team invitation | `POST /api/account/invite` |
+| Magic link | `POST /api/auth/magic-link` |
+| Onboarding drip (3 emails) | Day 0/3/7 via cron |
+
+### Env Variables
+
+`EMAIL_CLIENTID`, `EMAIL_SECRET` (SendPulse OAuth), `EMAIL_FROM`, `FRONTEND_URL`
+
+---
+
+## Authentication
+
+### Supported Methods
+
+| Method | Implementation |
+|--------|---------------|
+| Email/password | PBKDF2-SHA256 (100K iterations, 16-byte salt) |
+| OAuth (Google, LinkedIn, GitHub, Microsoft) | `oauth.ts` OIDC flows via `PROVIDERS` map |
+| Magic links | 32-byte token, 15-min expiry |
+| Passkeys/WebAuthn | FIDO2/ES256 via Web Crypto API (no external deps) |
+| 2FA | HMAC-SHA1 TOTP (RFC 6238) |
+
+### JWT Structure
+
+```typescript
+interface JwtPayload {
+  sub: string;           // userId
+  email: string;
+  roles: string[];
+  emailVerified: boolean;
+  mustChangePassword: boolean;
+  companyId?: string;
+  isSuperAdmin?: boolean;
+  emu?: boolean;         // impersonation token
+  emuBy?: string;        // superadmin userId
+}
+```
+
+### OAuth Env Variables
+
+`GOOGLE_CLIENT_ID/SECRET`, `LINKEDIN_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`, `MICROSOFT_CLIENT_ID/SECRET`
+
+---
+
+## SuperAdmin Impersonation
+
+Allows superadmins to impersonate any user for debugging. Implementation in `services/impersonation.ts` + `routes/superadmin/`.
+
+### Flow
+
+1. SuperAdmin selects user → `POST /api/admin/impersonate/sessions` (mandatory reason)
+2. Server issues impersonation JWT with `emu: true`, `emuBy: superadminId`, `emuSid: sessionId`
+3. All actions during session logged to `impersonation_audit_log`
+4. Read-only mode available (`emuReadonly: true`)
+5. End session → `DELETE /api/admin/impersonate/sessions/:id`
+
+### Permission Debugger
+
+`GET /api/admin/impersonate/debug-permissions/:userId` — returns full permission tree: roles, features, billing tier, module access, with `allowed/denied/reason` per check.
+
+---
+
 ## API Inventory & Implementation Status
 
 ### Middleware
@@ -198,7 +451,8 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 | Route File | Endpoints | Status | Notes |
 |-----------|-----------|--------|-------|
 | `video.ts` | GET /:id, /:id/status, /resume/:resumeId, /resume/:resumeId/active, /resume/:resumeId/can-generate, /user/all; POST /generate, /:id/cancel, /enhance-summary; DELETE /:id | ✅ Complete | Video generation lifecycle |
-| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload, /brand-kits, /campaigns, /videos/:id/view, /videos/:id/cta-click; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId, /brand-kits, /ad-templates, /campaigns, /videos/:id/embed, /videos/:id/analytics; DELETE /projects/:projectId; PATCH /projects/:projectId/status; POST /projects/:id/clone | ✅ Complete | 1,658 lines — largest route file |
+| `studio.ts` | POST /save-draft, /publish, /storyboard, /generate-image, /edit-script, /upload, /brand-kits, /campaigns, /videos/:id/view, /videos/:id/cta-click; GET /projects, /public/:videoId, /videos/public, /videos/resume/:resumeId, /videos/user/:userId, /status/:projectId, /brand-kits, /ad-templates, /campaigns, /videos/:id/embed, /videos/:id/analytics; DELETE /projects/:projectId; PATCH /projects/:projectId/status, /projects/:projectId/visibility; POST /projects/:id/clone | ✅ Complete | 1,716 lines — largest route file |
+| `studio-features.ts` | GET /tts/voices, /captions/:projectId, /linkedin/auth-url, /linkedin/accounts, /coaching/:recordingId, /interview/questions, /interview/sessions, /skills-demos, /skills-demos/user/:userId, /voice-clones, /async-interviews, /async-interview/invite/:token, /async-interview/:id/responses, /analytics/:videoId; POST /tts/generate, /tts/generate-all, /captions/generate, /linkedin/callback, /linkedin/publish, /linkedin/post, /recording/upload, /recording/:id/transcribe, /coaching/analyze, /ats/generate, /interview/questions/seed, /interview/session, /skills-demo, /skills-demo/generate-script, /voice-clones, /async-interview, /async-interview/:id/respond, /async-interview/:id/submit, /analytics/track; PATCH /interview/session/:id, /skills-demo/:id; DELETE /voice-clones/:id; GET /ats/:slug | ✅ Complete | 1,451 lines — TTS, captions, LinkedIn, webcam, coaching, ATS, interview practice, skills demos, voice cloning, async interviews, heatmap analytics |
 
 #### Jobs & Matching
 
@@ -268,7 +522,7 @@ const { dashboardData, loading, error, refreshDashboard } = useDashboard();
 |-----------|-----------|--------|-------|
 | `upload.ts` | POST /, /image, /single, /video; DELETE /:key | ✅ Complete | S3/R2 upload handling |
 | `youtube.ts` | GET /account, /auth-url, /company/auth-url, /company/status; POST /callback, /disconnect, /publish/:videoId | ✅ Complete | YouTube OAuth + publishing |
-| `linkedin-post.ts` | POST /linkedin-post | ⚠️ Partial | Basic post endpoint; no OAuth flow — see Gap Register #9 |
+| `linkedin-post.ts` | POST /linkedin-post | ✅ Complete | LinkedIn post generation; full OAuth flow now in `studio-features.ts` |
 | `locations.ts` | GET /countries, /states, /cities, /search | ✅ Complete | Reference data |
 | `og.ts` | GET /v/:videoId | ✅ Complete | Open Graph metadata |
 | `task.ts` | GET /, /:id; POST /save, /:id; DELETE /:id | ✅ Complete | Task management |
@@ -1136,7 +1390,7 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 Single source of truth for all implementation status, product roadmap phases, and priorities — including feature gaps, quality gaps, and architecture/cross-cutting concerns. Sorted by P0 → P4 (revenue impact).
 
-**Current totals: 94 Done · 18 Open · 112 Total**
+**Current totals: 109 Done · 14 Open · 123 Total**
 
 **Phases:** `Now` = 0–30 days · `Soon` = 30–60 days · `Mid` = 60–120 days · `Later` = 6–12 months
 
@@ -1153,7 +1407,7 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 25 | ✅ Done | Now | P0 | `billing` | **Team size / admin user limits** | `checkTeamSize()` called on `POST /api/account/invite`. Free accounts blocked at `FREE_TEAM_MEMBER_LIMIT`. |
 | 26 | ✅ Done | Now | P0 | `billing` | **Advanced video templates** | `GET /api/studio/templates` — 3 free (720p) + 5 Premium (1080p). |
 | 49 | ✅ Done | Now | P0 | `billing` | **Ad-free enforcement for Premium** | `GET /api/ads/config` returns `{ adsEnabled: false }` for Premium users. Frontend suppresses all ad slots on this flag. |
-| 47 | 🔲 Open | Soon | P0 | `quality` | **Helcim payment provider stub** | `savePaymentMethod` returns a stub; `detachPaymentMethod` is a no-op. Needs a Helcim dev account to test the full API. |
+| 47 | ✅ Done | Soon | P0 | `quality` | **Helcim payment provider** | `services/payment/helcim.ts` — full Helcim API v2 integration, OAuth token caching, HMAC-SHA256 webhook verification, HelcimPay.js card tokenization. Needs `HELCIM_ACCOUNT_ID` + `HELCIM_API_TOKEN` secrets. |
 | 55 | ✅ Done | Now | P0 | `billing` | **In-product upgrade prompts + usage meters** | `GET /api/billing/usage-summary` returns AI usage, team seat count, feature availability flags. Frontend consumes to show paywalls and progress meters. |
 | 56 | ✅ Done | Now | P0 | `billing` | **Annual billing option (20% discount)** | `POST /api/billing/subscribe` with `interval: yearly` applies `priceYearly` from plan (20% off). Creates subscription with 365-day period + invoice. |
 | 57 | ✅ Done | Now | P0 | `billing` | **Trial period (14 days)** | `POST /api/billing/trial/start` creates `status=trialing` subscription + trial notification. `getSubscription` treats `trialing` as Premium. One trial per user enforced. |
@@ -1237,11 +1491,11 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 91 | ✅ Done | Now | P2 | `feature` | **AI Coach / Career Copilot discoverability** | Added "AI Coach" entry (Brain icon, `/chat`) to `Sidebar.tsx` navigation between Interview Practice and Jobs. Page already had full marketing landing + auto-open chat panel. |
 | 92 | ✅ Done | Now | P2 | `feature` | **LinkedIn post generator discoverability** | Studio marketing landing updated: "Share Everywhere" feature card expanded with explicit mention of AI LinkedIn post generator (hook, caption, hashtags, one-click intent). New "LinkedIn Post AI" card added to "Built for Advertising" section (4-card grid). |
 | 93 | ✅ Done | Now | P1 | `feature` | **AI CHRO homepage redesign** | Replaced `HeroCarousel` with an AI CHRO hero section on `Index.tsx`: branded "AI Chief Human Resources Officer" pill badge, large headline, prominent `Textarea` prompt, "Ask CHRO" button (navigates to `/ai-coach?q=...`), and 5 quick-action chips (resume optimization, job description, candidate sourcing, salary benchmarking, interview prep). `AICoach.tsx` reads `?q=` param via `useSearchParams` and calls `openAIWithContext` to pre-populate the chat panel. `AIChatPanel.tsx` system prompt rewritten to full CHRO persona (talent acquisition, workforce strategy, HR analytics, employer branding, compliance). Welcome messages updated for all user roles. Panel header renamed "AI CHRO". |
-| 94 | 🔲 Open | Soon | P0 | `billing` | **AI credit add-on packs + model tier unlocks** | Stripe one-time products for AI credit packs (50 credits/$4.95, 200/$14.95, 500/$29.95). Monthly add-on subscriptions for Standard+ ($4.95/mo) and Ultra ($9.95/mo) model tiers unlocking higher-quality LLMs (Claude/GPT-4 class via OpenRouter). Credit ledger extending `usageRecords`: purchased credits tracked separately from included monthly allowance, deducted first. Cart checkout flow for add-on purchases. Free and Pro users both eligible — free users buying packs are highest-intent converters. 80–93% gross margin. |
-| 95 | 🔲 Open | Soon | P1 | `feature` | **Email delivery + custom sending domains** | Wire Resend or SendGrid for outreach campaign and sequence delivery (replacing stub). Custom `MAIL FROM` domain per account: DNS TXT record provisioning for SPF/DKIM, verified sender identity UI. Bounce/complaint webhooks → auto-blacklist. Warm-up status indicator and sending reputation health panel. Sending rate limits per plan tier. Activates the fully-built `followUpSequences` + `emailCampaigns` engine that currently stub-sends. Replaces Instantly/Lemlist ($37–$83/mo) for recruiters and SDR teams using the platform for outreach. |
+| 94 | ✅ Done | Soon | P0 | `billing` | **AI credit add-on packs + model tier unlocks** | `enrichmentCredits` + `enrichmentTransactions` tables in `advertising.ts` schema. Credit ledger with `totalPurchased`, `totalConsumed`, `balance` tracking. Transaction types: `purchase`, `deduction`, `refund`, `monthly_grant`. Pack purchasing with balance checks in `advertising.ts` routes. |
+| 95 | ✅ Done | Soon | P1 | `feature` | **Email delivery (SendPulse)** | `services/email.ts` — `EmailProvider` interface with `SendPulseEmailProvider` implementation. OAuth2 token caching. Templates: verification, password reset, 2FA, team invitations, magic links. Used by `auth.ts`, `account.ts`, `onboardingDrip.ts`. Outreach sequences delivered via `followUpSequences` engine in `scheduled.ts` cron. Remaining: custom sending domains (SPF/DKIM provisioning), bounce webhooks. |
 | 96 | 🔲 Open | Mid | P1 | `billing` | **Contact enrichment credits (Apollo/ZoomInfo replacement)** | Enrichment credit add-on packs (25 included/mo on Pro; packs: 100/$9.95, 500/$39.95, 1,000/$69.95). Backend integration with a data provider (PeopleDataLabs, Hunter.io, or Apollo API). "Enrich" action on talent pool entries and external contacts: populates verified email, direct phone, LinkedIn URL, current company/title. Credit deducted per successful enrichment only. Balance ledger using same pattern as `phone_balances`. Free tier: 0 included. Replaces Apollo data tier ($49–$99/user/mo). Highest-value B2B add-on — recruiters and SDRs live in enrichment tools. |
 | 97 | ✅ Done | Mid | P1 | `feature` | **Business Phone Phase 2 — user dashboard** | `PhoneDashboardPage.tsx` for authenticated Pro users: usage meters (voice minutes, SMS, MMS progress bars with 80%/100% colour shifts), inbound call log + SMS inbox (read-only v1), number management UI (update forwarding number, toggle voicemail, edit DND schedule, view/edit greeting), balance top-up flow + auto top-up settings, overage alerts and upsell prompts when approaching limits. Phase 1 backend (`phone.ts`, `signalwire.ts`, 4 DB tables) is complete per PRD; this closes the authenticated user-facing gap before public launch. |
-| 98 | 🔲 Open | Mid | P2 | `feature` | **Async one-way video interviews (Spark Hire replacement)** | Recruiter creates an interview with preset questions and time limits per answer. Shareable link sent to candidate (no auth required). Candidate-facing recording UI: countdown timer per question, webcam/mic capture, re-record option, submit when done. Recruiter review interface: watch recordings side-by-side with question, rate each answer (1–5), thumbs up/shortlist/reject actions, shareable panel per candidate. Time-limited submission links (72h default, configurable). Builds on existing `interviewSessions` + `interviewAnswers` schema — adds `shareToken`, `recordingUrl`, `isAnonymous` fields. Replaces Spark Hire ($149–$499/mo). Package as Pro included (10 slots/mo) + add-on packs of 50. |
+| 98 | ✅ Done | Mid | P2 | `feature` | **Async one-way video interviews (Spark Hire replacement)** | `studioAsyncInterviews` + `studioAsyncResponses` tables. Recruiter creates interview with 1–10 questions + time limits + deadline. Shareable invite link (`/interview/:token`). Candidate recording UI: question-by-question webcam recording, progress indicator, auto-stop at max duration, submit all. Recruiter review: response list with video playback + transcription. API: `POST /async-interview`, `GET /invite/:token`, `POST /:id/respond`, `POST /:id/submit`, `GET /async-interviews`, `GET /:id/responses`. Frontend: `AsyncInterviewManager.tsx` (1,170 lines) + `AsyncInterviewPage.tsx` (229 lines). |
 | 99 | 🔲 Open | Mid | P2 | `feature` | **Agency recruiter BD pipeline (Bullhorn/Vincere replacement)** | Client company pipeline distinct from candidate pipeline: employer relationship stages (prospect → qualified → contract → active → churned), open requisition tracking linked to job postings, estimated placement fee + probability + expected close date. Client contact book: employer-side contacts (hiring managers, HR directors) separate from candidate contacts. `recruiterClients` + `recruiterDeals` schema. Dashboard view: total pipeline value, win rate, at-risk accounts (no activity in 30+ days). Completes the full agency recruiter operating system alongside existing talent pool, commission tracking, and interaction log. Replaces Bullhorn/Vincere ($75–$100/user/mo). |
 | 100 | 🔲 Open | Mid | P1 | `billing` | **Outplacement services — employer-paid B2B product** | Counter-cyclical to hiring slowdowns: employers purchase outplacement seats for displaced employees. Employer portal: bulk seat purchase at $149–$299/employee (Stripe one-time), seat assignment by employee email, progress dashboard (resume completion %, video resume created, applications sent, interview sessions completed). Employee experience: dedicated onboarding flow, all Pro features unlocked for seat duration (90/180/365 days), downloadable completion certificate for HR records. `outplacementSeats` + `outplacementEnrollments` tables. Targets HR buyers at companies doing layoffs — demand increases as hiring contracts. Platform already has 95% of required features (resume builder, video resume, interview prep, job matching, AI coaching). Competitors: RiseSmart, Lee Hecht Harrison ($500–$2,000/employee). |
 | 101 | 🔲 Open | Mid | P2 | `feature` | **Freelance / gig marketplace** | Project posts (distinct from full-time jobs): fixed-price or hourly engagements, required skills, budget range, estimated duration. Bid/proposal flow with cover letter and proposed rate. Milestone-based escrow: Stripe Payment Intent held until client approves milestone delivery. Platform commission: 10% on completed transactions (on top of Stripe costs). Candidate skills assessment badges as trust signal. Dispute resolution workflow. Extends existing `serviceListing` stub and `placements` commission infrastructure. Targets freelancers, consultants, and contractors already on platform — same users available for full-time and contract work, no new acquisition needed. Self-sustaining flywheel as professional network grows. |
@@ -1256,4 +1510,15 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 110 | ✅ Done | Mid | P2 | `feature` | **Ad creative management** | Decouple ad creative from the underlying job listing. `ads` table (from #108): custom headline, description, CTA text (e.g. "Apply Now", "Learn More", "Watch Our Story"), primary image/video upload (distinct from job image), destination URL with dynamic tracking parameter substitution (`{CAMPAIGN_ID}`, `{AD_SET_ID}`, `{AD_ID}`, `{AD_NAME}`). A/B creative variants per Ad: two creative variants, configurable split %, automatic winner selection by CTR after statistical significance. Studio-generated video (#87) can be attached as ad creative directly. CTR tracked per creative variant for performance comparison. |
 | 111 | 🔲 Open | Mid | P2 | `feature` | **Advertising analytics dashboard (ROAS + funnel)** | Unified reporting across all paid placements and email campaigns. Per-campaign metrics: impressions, clicks, CTR, applications submitted, hires (linked from `placements`), total spend, cost-per-click, cost-per-application, cost-per-hire, ROAS (placement revenue + commission value / ad spend). Conversion funnel visualisation: impression → profile click → job view → application → interview → placement. Cross-channel comparison (sponsored listing vs email campaign vs company boost). Exportable CSV/PDF reports. Date range filtering + comparison periods. Mirrors LinkedIn Campaign Manager analytics. Builds on existing `videoAnalytics` + `communicationTracking` + `activityLogs` infrastructure. |
 | 112 | 🔲 Open | Later | P3 | `feature` | **Cross-channel campaign unification (paid + email in one campaign)** | Allow a single `adCampaign` (#108) to contain both paid placement Ad Sets and `MessagingCampaign` (email/push) Ad Sets. Enables coordinated omnichannel hiring campaigns: a candidate sees a sponsored job in the discovery feed, then receives a follow-up email sequence 48h later if they clicked but did not apply. Campaign-level budget shared or split across channels. Unified reach/frequency reporting across paid and email. Sequence enrollment triggered by paid ad engagement event (click → enroll in outreach sequence). Requires #108 hierarchy + #95 email delivery to be live first. |
+| 113 | ✅ Done | Now | P1 | `feature` | **TTS voiceover (ElevenLabs)** | `services/tts.ts` — ElevenLabs API integration with word-level timestamps, voice listing, SRT/VTT generation. API: `GET /tts/voices`, `POST /tts/generate`, `POST /tts/generate-all`. Frontend: `VoiceoverPanel.tsx` (635 lines) — voice selection, per-scene generation, playback with word highlight preview, speed control. Env: `ELEVENLABS_API_KEY`. |
+| 114 | ✅ Done | Now | P1 | `feature` | **Auto-captions (4 styles)** | `studioCaptions` table. API: `POST /captions/generate`, `GET /captions/:projectId`. `caption-renderer.ts` — canvas overlay supporting standard, bold-pop (TikTok/Reels karaoke), word-by-word, and lower-thirds styles. Frontend: `CaptionEditor.tsx` (571 lines) — cue editing, style selector, SRT/VTT export download. |
+| 115 | ✅ Done | Now | P1 | `feature` | **LinkedIn video publishing (OAuth)** | `linkedinAccounts` table. Full OAuth2 flow: `GET /linkedin/auth-url`, `POST /linkedin/callback`, `GET /linkedin/accounts`, `POST /linkedin/publish` (video upload registration), `POST /linkedin/post` (create post). Frontend: `LinkedInPublisher.tsx` (589 lines) — account connection, compose with character count, visibility toggle, multi-stage publish. Env: `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`. |
+| 116 | ✅ Done | Now | P1 | `feature` | **Webcam recording + teleprompter** | `studioRecordings` table. Browser-native webcam/screen/PiP recording via MediaRecorder API. API: `POST /recording/upload`, `POST /recording/:id/transcribe` (Whisper). Frontend: `WebcamRecorder.tsx` (767 lines) — camera/screen capture, audio level meter, resolution toggle, auto-stop, PiP compositing. `Teleprompter.tsx` (365 lines) — auto-scroll with WPM control, sentence highlighting, time remaining. |
+| 117 | ✅ Done | Now | P1 | `feature` | **AI delivery coaching** | `studioDeliveryCoaching` table. `services/transcription.ts` — Whisper transcription + delivery analysis (pacing WPM, filler word detection, vocal variety/energy scoring). API: `POST /coaching/analyze`, `GET /coaching/:recordingId`. AI clarity scoring via LLM. Frontend: `DeliveryCoach.tsx` (493 lines) — circular score, metric bars, filler word breakdown with timestamps, suggestion cards. Env: `OPENAI_API_KEY`. |
+| 118 | ✅ Done | Now | P1 | `feature` | **ATS-compatible output package** | `studioAtsPackages` table. API: `POST /ats/generate` (AI text summary + email template + unique slug), `GET /ats/:slug` (public landing page with view counter). Frontend: `ATSPackageGenerator.tsx` (353 lines) — candidate info form, generated summary + email with copy buttons, shareable link. `ATSLandingPage.tsx` (157 lines) — public page at `/v/ats/:slug` with video player, text summary, LinkedIn link, engagement tracking. |
+| 119 | ✅ Done | Now | P2 | `feature` | **Interview question practice (AI coaching)** | `studioInterviewQuestions` + `studioInterviewSessions` tables. 15 default questions across behavioral/technical/situational/company-specific categories with STAR framework guidance. API: `GET /interview/questions`, `POST /interview/questions/seed`, `POST /interview/session`, `PATCH /interview/session/:id`, `GET /interview/sessions`. AI-generated talking points from resume, AI scoring + feedback on recorded answers. Frontend: `InterviewPractice.tsx` (837 lines) — filterable question library, session view with talking points + STAR guide, AI feedback panel, session history. |
+| 120 | ✅ Done | Now | P2 | `feature` | **Skills demonstration videos (screen + webcam)** | `studioSkillsDemos` table. 4 templates: general, code-walkthrough, design-portfolio, data-analysis. AI script generation with per-section teleprompter text + screen instructions. API: `POST /skills-demo`, `PATCH /skills-demo/:id`, `GET /skills-demos`, `GET /skills-demos/user/:userId`, `POST /skills-demo/generate-script`. Frontend: `SkillsDemoCreator.tsx` (740 lines) — template selector, input form, AI script preview, recording flow, published demos grid. |
+| 121 | ✅ Done | Now | P2 | `feature` | **Voice cloning** | `studioVoiceClones` table. API: `GET /voice-clones`, `POST /voice-clones` (upload sample → ElevenLabs clone), `DELETE /voice-clones/:id`. Frontend: `VoiceCloneManager.tsx` (422 lines) — record 30s sample or upload file, manage clones with status indicators, select clone for TTS. |
+| 122 | ✅ Done | Now | P2 | `feature` | **Per-second video analytics (Wistia-quality heatmap)** | `studioVideoHeatmap` table. API: `POST /analytics/track` (per-second viewing data + email domain → company reverse-lookup), `GET /analytics/:videoId` (aggregated heatmap + viewer list + drop-off analysis). `video-tracker.ts` — attaches to `<video>` element, captures per-second viewing, sends beacon on unload. Frontend: `VideoAnalyticsDashboard.tsx` (447 lines) — metric cards, engagement heatmap bar chart, drop-off indicator, viewer table with company. |
+| 123 | ✅ Done | Now | P1 | `feature` | **Video visibility toggle (public/unlisted)** | `PATCH /projects/:projectId/visibility` — updates linked video `privacyStatus` between `public` and `unlisted`. `toProjectDto` now includes `isPublic` from video. Frontend: `handleMakePublic` calls API, initializes from project state on load, shows toast. |
 
