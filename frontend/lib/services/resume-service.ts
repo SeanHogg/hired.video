@@ -8,6 +8,7 @@ import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
+import { extractTextFromFile } from "@/lib/extract-text";
 
 // ============================================================================
 // SCHEMAS
@@ -576,8 +577,9 @@ export class ResumeService {
     data: ResumeData;
     confidence: number;
   }> {
-    const formData = new FormData();
-    formData.append("file", file);
+    // Extract text client-side (pdfjs-dist for PDFs, jszip for docx, etc.)
+    // so the CF Worker receives plain text instead of binary it can't parse.
+    const text = await extractTextFromFile(file);
 
     const response = await apiClient.request<{
       result: string;
@@ -586,8 +588,8 @@ export class ResumeService {
       "/api/resumes/parse",
       {
         method: "POST",
-        body: formData,
-        headers: {}, // Remove Content-Type to let browser set it for FormData
+        body: JSON.stringify({ content: text }),
+        headers: { "Content-Type": "application/json" },
       },
       z.object({
         result: z.string(),
