@@ -302,6 +302,109 @@ From `schema/videos.ts`, `schema/studioadvertising.ts`, `schema/studiofeatures.t
 
 ---
 
+## Video Studio Capability Assessment
+
+Evaluated against a feature specification for a fully browser-based general-purpose video editor comparable to Canva Video / CapCut. hired.video's studio is purpose-built for AI-driven video resume and employer content creation, not a traditional non-linear editor (NLE). The table below documents parity, partial coverage, and open gaps against that specification.
+
+**Summary: 19 ✅ fully implemented · 11 ⚠️ partial · 8 ❌ not implemented (38 capabilities total)**
+
+Open gaps are tracked in the [Consolidated Gap Register](#consolidated-gap-register) as entries #124–#133.
+
+### Core Requirements
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Timeline-based editor | ⚠️ Partial | Scene-level timeline exists in `StudioEditor.tsx`; storyboard scenes can be reordered. No clip-level drag-and-drop NLE timeline with frame-precise scrubbing. | #124 |
+| Video, audio, image, and text tracks | ⚠️ Partial | AI storyboard compiles multi-type canvas nodes (text, image, video) per scene; no manual multi-track lane UI. | — |
+| Clip trimming, splitting, merging, reordering | ❌ Not implemented | Scenes are AI-generated units; no in/out point trim, split-at-playhead, or merge tooling. | #124 |
+| Multi-layer editing with precision timing | ⚠️ Partial | `animation-graph.ts` supports per-node keyframe interpolation; no drag-to-reposition layer UI. | — |
+
+### Visual Editing Features
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Transitions and effects (fade, slide, zoom) | ⚠️ Partial | `transition` and `motion` fields in VideoScript DSL theme; animation interpolators in `animation-graph.ts`. No manual transition picker UI between scenes. | — |
+| Filters and color adjustments (brightness, contrast, saturation) | ❌ Not implemented | No CSS/WebGL filter controls on canvas output. | #125 |
+| Text overlays, subtitles, and animations | ✅ Done | `caption-renderer.ts` — 4 styles (standard, bold-pop, word-by-word, lower-thirds). Text scene nodes with animated entry/exit. `CaptionEditor.tsx` (571 lines). | — |
+| Canvas resizing (16:9, 9:16, 1:1) | ⚠️ Partial | `video.aspect` field in VideoScript DSL; preview renders 16:9. No UI-driven aspect ratio switcher for 9:16 or 1:1 social formats. | #133 |
+
+### Audio Capabilities
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Multi-track audio editing | ⚠️ Partial | Background music (`ambient-player.ts`) + per-scene voiceover tracks coexist; no visual multi-track mixer lane. | #129 |
+| Volume control and fade in/out | ❌ Not implemented | No per-clip or per-track volume envelope or fade handles. | #129 |
+| Voice-over recording | ✅ Done | `WebcamRecorder.tsx` (767 lines) — browser-native MediaRecorder. `VoiceoverPanel.tsx` (635 lines) — ElevenLabs TTS with word-level timestamps, speed control, playback preview. `Teleprompter.tsx` — auto-scroll + WPM control. | — |
+| Background music and sound effects | ✅ Done | `ambient-player.ts` — background track playback + export mixing. `StudioSidebar.tsx` — music library selection. | — |
+
+### AI-Powered Features
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Auto-generate subtitles/captions | ✅ Done | OpenAI Whisper transcription (`services/transcription.ts`). `POST /captions/generate`. 4 caption styles rendered by `caption-renderer.ts`. SRT/VTT export. | — |
+| Text-based editing via transcript | ❌ Not implemented | Whisper produces transcripts for coaching; no transcript-driven cut/edit workflow (Descript-style). | #126 |
+| Background removal (no green screen) | ❌ Not implemented | Not implemented. Would require MediaPipe Selfie Segmentation or similar WASM model. | #127 |
+| AI voiceovers | ✅ Done | ElevenLabs TTS with 100+ voices + voice cloning (`VoiceCloneManager.tsx`). Per-scene generation. `services/tts.ts`. | — |
+
+### Media & Assets
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| User uploads (video, audio, images) | ✅ Done | R2-backed upload routes (`routes/upload.ts`). `WebcamRecorder.tsx` supports file upload in addition to live recording. | — |
+| Stock media library integration | ❌ Not implemented | No Unsplash / Pexels / Pixabay / Storyblocks integration. Background images are bundled presets in `StudioSidebar`. | #128 |
+| Template system for common formats | ✅ Done | 3 free (720p) + 5 Premium (1080p) templates. 12 scene types. 6 purposes (`resume`, `job_ad`, `company_promo`, `recruiter_brand`, `product_launch`, `personal_brand`). `studioBrandKits` for brand consistency. | — |
+
+### Technical Stack
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Frontend: React / Next.js or similar | ✅ Done | React 18 + Vite. TypeScript throughout. Tailwind + shadcn/ui. | — |
+| Rendering: Canvas / WebGL / WebCodecs | ✅ Done | Canvas 2D (`frame-renderer.ts`), WebCodecs encoder (`video-exporter.ts`), Three.js / React Three Fiber for 3D elements. | — |
+| Media processing: FFmpeg WASM or server fallback | ✅ Done | WebCodecs API + `mp4-muxer` / `webm-muxer` — browser-native hardware-accelerated encoding without FFmpeg dependency. Superior performance profile. | — |
+| State management for timeline sync | ✅ Done | TanStack Query v5 for server state. `StudioLayout.tsx` (1,131 lines) owns local project state. | — |
+| Optional backend for rendering/export | ✅ Done | Hono on Cloudflare Workers. Studio routes 3,167 lines across `studio.ts` + `studio-features.ts`. | — |
+
+### Performance Requirements
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Smooth playback and scrubbing | ✅ Done | Canvas 2D `render(ctx, compiledVideo, time)` at target FPS. WebCodecs `VideoFrame` pipeline for encoding. | — |
+| Efficient memory handling for large files | ⚠️ Partial | WebCodecs streams frames without full decode into memory. No explicit documented chunking/pooling strategy for large uploads. | — |
+| Lazy loading and caching of media assets | ⚠️ Partial | Cloudflare R2 + CDN for assets. No explicit lazy-load or client-side LRU cache documented for timeline preview thumbnails. | — |
+
+### Export & Sharing
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Export to MP4 (H.264) | ✅ Done | `video-exporter.ts` — WebCodecs `VideoEncoder` (H.264) + `mp4-muxer`. WebM fallback via `webm-muxer`. | — |
+| Multiple resolutions (720p, 1080p, 4K) | ⚠️ Partial | 720p (free tier) and 1080p (Premium) confirmed. 4K not implemented. | #133 |
+| Direct sharing or download | ✅ Done | LinkedIn publish (`LinkedInPublisher.tsx`), ATS package shareable link (`ATSLandingPage.tsx`), visibility toggle (public/unlisted), embed code generation. | — |
+| Cloud save and project persistence | ⚠️ Partial | `studioProjects` table persists projects. No explicit autosave interval or version history documented. | #131 |
+
+### Collaboration (Optional)
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Real-time collaborative editing | ❌ Not implemented | Not implemented. SignalR hub infrastructure exists for notifications; studio state is single-user. | #130 |
+| Version history and autosave | ❌ Not implemented | Projects persist to DB; no diff-based version snapshots or timed autosave. | #131 |
+
+### Extensibility
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Plugin system for effects or tools | ❌ Not implemented | No hook or registry system for third-party studio plugins. | #132 |
+| API for integrations | ✅ Done | OpenAPI 3.1 spec at `GET /api/openapi.json`. YouTube, LinkedIn, ATS (Greenhouse/Lever/Workday), and calendar integrations live. | — |
+
+### UX Goals
+
+| Capability | Status | Implementation | Gap Register |
+|---|---|---|---|
+| Intuitive, beginner-friendly interface | ✅ Done | AI-driven storyboard generation from a single text prompt. 3-panel workspace. shadcn/ui component system. | — |
+| Fast load time, no installation required | ✅ Done | Vite bundle + Cloudflare Workers edge delivery. No desktop app required. | — |
+| Responsive design (desktop-first, tablet support) | ⚠️ Partial | Tailwind responsive utilities. Studio workspace is desktop-first; no documented tablet breakpoint layout for the editor panels. | — |
+
+---
+
 ## AI CHRO (AI Assistant)
 
 The AI CHRO (Chief Human Resources Officer) is the platform's embedded AI assistant. Role-aware, context-sensitive career/hiring/workforce guidance.
@@ -1390,7 +1493,7 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 Single source of truth for all implementation status, product roadmap phases, and priorities — including feature gaps, quality gaps, and architecture/cross-cutting concerns. Sorted by P0 → P4 (revenue impact).
 
-**Current totals: 109 Done · 14 Open · 123 Total**
+**Current totals: 109 Done · 24 Open · 133 Total**
 
 **Phases:** `Now` = 0–30 days · `Soon` = 30–60 days · `Mid` = 60–120 days · `Later` = 6–12 months
 
@@ -1521,4 +1624,14 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 121 | ✅ Done | Now | P2 | `feature` | **Voice cloning** | `studioVoiceClones` table. API: `GET /voice-clones`, `POST /voice-clones` (upload sample → ElevenLabs clone), `DELETE /voice-clones/:id`. Frontend: `VoiceCloneManager.tsx` (422 lines) — record 30s sample or upload file, manage clones with status indicators, select clone for TTS. |
 | 122 | ✅ Done | Now | P2 | `feature` | **Per-second video analytics (Wistia-quality heatmap)** | `studioVideoHeatmap` table. API: `POST /analytics/track` (per-second viewing data + email domain → company reverse-lookup), `GET /analytics/:videoId` (aggregated heatmap + viewer list + drop-off analysis). `video-tracker.ts` — attaches to `<video>` element, captures per-second viewing, sends beacon on unload. Frontend: `VideoAnalyticsDashboard.tsx` (447 lines) — metric cards, engagement heatmap bar chart, drop-off indicator, viewer table with company. |
 | 123 | ✅ Done | Now | P1 | `feature` | **Video visibility toggle (public/unlisted)** | `PATCH /projects/:projectId/visibility` — updates linked video `privacyStatus` between `public` and `unlisted`. `toProjectDto` now includes `isPublic` from video. Frontend: `handleMakePublic` calls API, initializes from project state on load, shows toast. |
+| 124 | 🔲 Open | Later | P2 | `feature` | **Frame-level NLE timeline (trim / split / merge / reorder)** | Clip-level drag-and-drop timeline editor: in/out point trimming via draggable handles, split-at-playhead, merge adjacent clips, multi-clip select + reorder. Requires a timeline component (e.g. custom canvas or `react-dnd` based) distinct from the current scene-level storyboard. Backend: `PATCH /studio/projects/:id/clips` for persisting clip boundaries. Brings the studio in line with CapCut / Canva Video for manual editing use cases. |
+| 125 | 🔲 Open | Mid | P2 | `feature` | **Visual filters and color adjustments** | Per-scene or per-clip brightness, contrast, saturation, hue-rotate, and warmth controls applied via CSS filter or WebGL shader on the Canvas 2D context. UI: filter panel in `StudioSettings.tsx` or a dedicated overlay on the preview canvas. Store adjustments in `storyboardScenes.filters` JSONB. Enables brand-consistent color grading without external tools. |
+| 126 | 🔲 Open | Later | P3 | `feature` | **Text-based editing via transcript (Descript-style)** | After Whisper transcription, render the full transcript as editable text. Deleting or editing a word automatically trims the corresponding video segment and removes the audio range. Requires aligning word-level timestamps (already generated by `services/tts.ts` and `services/transcription.ts`) to clip time ranges and applying cuts on export. `POST /studio/projects/:id/edit-by-transcript`. High-value for long-form recordings where finding specific segments is slow. |
+| 127 | 🔲 Open | Later | P2 | `feature` | **AI background removal (no green screen)** | Browser-side person segmentation using MediaPipe Selfie Segmentation WASM or TensorFlow.js BodyPix. Applied as a real-time mask during `WebcamRecorder.tsx` preview and baked into the exported `VideoFrame` stream. Replace background with solid colour, blur, or a custom image. Zero server round-trip — WASM model loaded once and cached. Closes the greenscreen gap for remote recording use cases (job seekers recording from home offices). |
+| 128 | 🔲 Open | Later | P3 | `feature` | **Stock media library integration** | Searchable, royalty-free media panel in `StudioSidebar.tsx`: images via Unsplash API (free tier), video B-roll via Pexels Video API, sound effects via Freesound or Pixabay Audio. Search results paginated; selected asset downloaded to R2 and injected as a scene node. Attribution handled automatically in export metadata. Optional: Storyblocks or Shutterstock for commercial-grade content behind Premium tier. |
+| 129 | 🔲 Open | Mid | P2 | `feature` | **Multi-track audio mixer with per-track volume and fade** | Visual mixer panel: separate lanes for voiceover, background music, and recorded audio. Per-lane volume slider (0–200%) and fade-in / fade-out envelope handles. Master output level meter. Export: `ambient-player.ts` already mixes background + voiceover at export time — extend to accept per-track gain parameters. Store mix settings in `studioProjects.audioMix` JSONB. Closes the volume-envelope gap against CapCut / Premiere audio tooling. |
+| 130 | 🔲 Open | Later | P3 | `feature` | **Real-time collaborative studio editing** | Multiple users editing the same `studioProject` simultaneously. Operational-transform or CRDT-based scene-list sync via Cloudflare Durable Objects (already in stack for potential real-time chat #41). Presence cursors and named-colour user indicators on the storyboard. Conflict-free reordering using fractional indexing on `scene.order`. Targets agency workflows and employer brand teams co-creating job-ad videos. |
+| 131 | 🔲 Open | Soon | P3 | `feature` | **Project version history and autosave** | Autosave: debounced `PATCH /studio/projects/:id` every 30 s on any storyboard mutation (already partial — add `lastAutosavedAt` field + toast indicator). Version snapshots: `studioProjectVersions` table storing full `storyboard` JSONB snapshots at deliberate save points or hourly. `GET /studio/projects/:id/versions` → list. `POST /studio/projects/:id/restore/:versionId` → roll back. 30-day retention, 50-version cap. Prevents data loss during long editing sessions. |
+| 132 | 🔲 Open | Later | P4 | `feature` | **Studio plugin / extension system** | Hook registry in the compiler pipeline: `registerScenePlugin(type, { compile, render, settingsUI })`. Plugins can add new SceneNode types, visual effects, or panel tabs. Plugin manifest loaded from `studioPlugins` table (URL, version, permissions). Sandboxed via iframe + postMessage for safety. Developer-facing API documented alongside OpenAPI spec. Enables community-built templates, brand kits, and integrations without core changes. |
+| 133 | 🔲 Open | Mid | P2 | `feature` | **Multiple aspect ratios and 4K export** | UI aspect-ratio switcher in `StudioSettings.tsx`: 16:9 (YouTube/LinkedIn), 9:16 (TikTok/Reels/Shorts), 1:1 (Instagram), 4:3 (legacy). `video.aspect` field already exists in VideoScript DSL — wire to a dropdown that re-renders the preview canvas and updates exported resolution. 4K (3840×2160) export gated to Premium via existing `requirePremium` pattern. Canvas scales all scene node coordinates proportionally on aspect change. |
 
