@@ -931,7 +931,7 @@ export default function ProductDashboard() {
                 />
                 <MetricCard
                   title="CAC"
-                  value={`$${dashboardData.saasMetrics.customerAcquisitionCost.toFixed(2)}`}
+                  value={`$${(dashboardData.saasMetrics.customerAcquisitionCost ?? 0).toFixed(2)}`}
                   icon={<TrendingUp className="h-4 w-4" />}
                   description="Customer Acquisition Cost"
                 />
