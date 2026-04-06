@@ -328,6 +328,11 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleFileDrop}
         />
+        {state.resumeText.length > 3000 && (
+          <p className="text-[10px] text-muted-foreground text-right mt-0.5">
+            {state.resumeText.length.toLocaleString()} characters
+          </p>
+        )}
       </div>
 
       {/* Direction prompt */}
@@ -394,12 +399,18 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
           )}
 
           {showJD && (
-            <Textarea
-              className="mt-2 h-32 text-xs resize-none"
-              placeholder="Paste the job description here. The AI will tailor your intro, achievements and skills to this role."
-              value={state.jobDescription ?? ""}
-              onChange={(e) => onStateChange({ jobDescription: e.target.value })}
-            />
+            <div className="mt-2">
+              <Textarea
+                className="h-32 text-xs resize-none"
+                placeholder="Paste the job description here. The AI will tailor your intro, achievements and skills to this role."
+                value={state.jobDescription ?? ""}
+                maxLength={4000}
+                onChange={(e) => onStateChange({ jobDescription: e.target.value })}
+              />
+              <p className="text-[10px] text-muted-foreground text-right mt-0.5">
+                {(state.jobDescription ?? "").length} / 4,000
+              </p>
+            </div>
           )}
         </div>
       )}

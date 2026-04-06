@@ -72,6 +72,8 @@ export default function StudioFeaturesHub({
   const [coachingResult, setCoachingResult] = useState<any>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const [teleprompterText, setTeleprompterText] = useState(scriptText ?? "");
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [captionStyle, setCaptionStyle] = useState<"standard" | "bold-pop" | "word-by-word" | "lower-thirds">("standard");
 
   return (
     <div className="flex flex-col h-full">
@@ -147,10 +149,10 @@ export default function StudioFeaturesHub({
           {activeTab === "captions" && (
             <CaptionEditor
               cues={[]}
-              style="standard"
-              onStyleChange={() => {}}
-              enabled={true}
-              onToggle={() => {}}
+              style={captionStyle}
+              onStyleChange={(s) => setCaptionStyle(s as typeof captionStyle)}
+              enabled={captionsEnabled}
+              onToggle={() => setCaptionsEnabled((v) => !v)}
             />
           )}
         </Suspense>
