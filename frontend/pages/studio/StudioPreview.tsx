@@ -100,6 +100,8 @@ export default function StudioPreview({
           currentTime={currentTime}
           onTimeUpdate={onTimeUpdate}
           audio={state.script?.video?.audio}
+          voiceover={state.voiceover}
+          sceneTimings={state.script?.scenes.map((s) => ({ id: s.id, start: s.start, duration: s.duration }))}
           className="w-full h-full"
         />
       ) : (
