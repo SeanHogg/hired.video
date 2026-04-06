@@ -665,6 +665,7 @@ export default function StudioLayout() {
     });
     setCompiledVideo(cv);
     setIsPublishedToProfile(p.status === "Published");
+    setIsPublic(p.isPublic ?? false);
     setTab(script ? "storyboard" : "prompt");
   }
 
@@ -705,8 +706,16 @@ export default function StudioLayout() {
     }
   }
 
-  function handleMakePublic(pub: boolean) {
+  async function handleMakePublic(pub: boolean) {
     setIsPublic(pub);
+    if (!state.projectId) return;
+    try {
+      await studioService.updateProjectVisibility(state.projectId, pub);
+      toast({ title: pub ? "Video is now public" : "Video is now unlisted" });
+    } catch (e: unknown) {
+      setIsPublic(!pub); // revert on failure
+      toast({ title: "Failed to update visibility", description: String(e), variant: "destructive" });
+    }
   }
 
   async function handleDeleteProject(id: string) {

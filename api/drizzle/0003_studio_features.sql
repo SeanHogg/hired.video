@@ -235,3 +235,50 @@ CREATE TABLE IF NOT EXISTS studio_video_heatmap (
 );
 CREATE INDEX IF NOT EXISTS idx_video_heatmap_video ON studio_video_heatmap(video_id);
 CREATE INDEX IF NOT EXISTS idx_video_heatmap_viewer ON studio_video_heatmap(viewer_id);
+
+-- 14. Studio Brand Kits (from studioadvertising.ts — previously unmigrated)
+CREATE TABLE IF NOT EXISTS studio_brand_kits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'My Brand',
+  logo_url TEXT,
+  primary_color TEXT NOT NULL DEFAULT '#2563eb',
+  secondary_color TEXT NOT NULL DEFAULT '#0f172a',
+  accent_color TEXT NOT NULL DEFAULT '#14b8a6',
+  font_family TEXT NOT NULL DEFAULT 'Inter',
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_studio_brand_kits_user ON studio_brand_kits(user_id);
+
+-- 15. Video Analytics (from studioadvertising.ts — previously unmigrated)
+CREATE TABLE IF NOT EXISTS video_analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id TEXT NOT NULL,
+  user_id TEXT,
+  event TEXT NOT NULL,
+  referrer TEXT,
+  campaign_id TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_video_analytics_video ON video_analytics(video_id);
+CREATE INDEX IF NOT EXISTS idx_video_analytics_event ON video_analytics(event);
+
+-- 16. Video Campaigns (from studioadvertising.ts — previously unmigrated)
+CREATE TABLE IF NOT EXISTS video_campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  video_ids JSONB NOT NULL DEFAULT '[]',
+  stats JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_video_campaigns_user ON video_campaigns(user_id);

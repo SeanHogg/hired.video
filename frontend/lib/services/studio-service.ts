@@ -121,6 +121,7 @@ export const StudioProjectSchema = z.object({
   resumeText: z.string().nullish(),
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
+  isPublic: z.boolean().optional().default(false),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
 });
@@ -361,6 +362,20 @@ export const studioService = {
     status: "draft" | "exported" | "published" | "processing" | "failed",
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.patch(`/api/studio/projects/${projectId}/status`, { status }, StudioProjectSchema);
+  },
+
+  /**
+   * Toggle a project's video visibility between public and unlisted.
+   */
+  async updateProjectVisibility(
+    projectId: string,
+    isPublic: boolean,
+  ): Promise<ApiSuccessResponse<StudioProject & { isPublic: boolean }>> {
+    return apiClient.patch(
+      `/api/studio/projects/${projectId}/visibility`,
+      { isPublic },
+      StudioProjectSchema.extend({ isPublic: z.boolean().optional() }),
+    );
   },
 
   /**

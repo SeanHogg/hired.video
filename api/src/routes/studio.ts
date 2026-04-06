@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
@@ -718,6 +718,7 @@ function toProjectDto(
     resumeText: project.resumeText ?? null,
     viewCount: analytics?.viewCount ?? 0,
     ctaClickCount: analytics?.ctaClickCount ?? 0,
+    isPublic: linkedVideo?.privacyStatus === "public",
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
   };
@@ -1038,6 +1039,49 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
   return c.json(ok(toProjectDto(updated)));
 });
 
+// ─── PATCH /projects/:projectId/visibility ───────────────────────────────────
+// Toggle a published video between public and unlisted.
+studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    isPublic: z.boolean(),
+  }).safeParse(body);
+
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(studioProjects)
+    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+    .limit(1);
+
+  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+
+  const privacyStatus = parsed.data.isPublic ? "public" : "unlisted";
+
+  // Update the linked video's privacy status
+  if (project.videoId) {
+    await db
+      .update(videos)
+      .set({ privacyStatus, isPublic: parsed.data.isPublic, updatedAt: new Date() } as any)
+      .where(and(eq(videos.id, project.videoId), eq(videos.userId, user.sub)));
+  }
+
+  const linkedVideo = project.videoId
+    ? (await db.select().from(videos).where(eq(videos.id, project.videoId)).limit(1))[0] ?? null
+    : null;
+
+  return c.json(ok({
+    ...toProjectDto(project, linkedVideo),
+    isPublic: parsed.data.isPublic,
+  }));
+});
+
 studioRoutes.get("/projects", async (c) => {
   const user = c.var.user;
   const db = getDb();
@@ -1191,9 +1235,16 @@ studioRoutes.get("/videos/public", async (c) => {
 
 // ─── GET /public/:videoId ──────────────────────────────────────────────────────
 // Returns public metadata for a single video. No auth required.
+// Accepts a UUID (videos.id) or a YouTube-style ID (videos.youtubeVideoId).
 studioRoutes.get("/public/:videoId", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
+
+  // Detect if the param is a valid UUID; if not, search by youtubeVideoId
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
+  const condition = isUuid
+    ? or(eq(videos.id, videoId), eq(videos.youtubeVideoId, videoId))
+    : eq(videos.youtubeVideoId, videoId);
 
   const rows = await db
     .select({
@@ -1213,7 +1264,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     .from(videos)
     .innerJoin(users, eq(videos.userId, users.id))
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(eq(videos.id, videoId))
+    .where(condition)
     .limit(1);
 
   if (!rows.length) return c.json(fail("NOT_FOUND", "Video not found"), 404);
