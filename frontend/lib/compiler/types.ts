@@ -25,6 +25,8 @@ export interface NodeStyle {
   padding: number;
   background?: string;
   borderRadius?: number;
+  borderColor?: string;
+  borderWidth?: number;
   blur?: number;
 }
 

@@ -246,8 +246,32 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
 
     case "overlay": {
       applyTransform(ctx, node.transform, cx, cy);
-      ctx.fillStyle = node.style.background ?? "#000000";
-      ctx.fillRect(-cx, -cy, width, height);
+      const isCard = !!(node.style.borderColor || node.style.borderRadius);
+      if (isCard) {
+        // Draw a centered card with rounded corners + optional border
+        const cardW = Math.round(width * 0.78);
+        const cardH = Math.round(height * 0.66);
+        const x = -cardW / 2;
+        const y = -cardH / 2;
+        const r = node.style.borderRadius ?? 18;
+        ctx.fillStyle = node.style.background ?? "rgba(0,0,0,0.5)";
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(x, y, cardW, cardH, r);
+        } else {
+          ctx.rect(x, y, cardW, cardH);
+        }
+        ctx.fill();
+        if (node.style.borderColor) {
+          ctx.strokeStyle = node.style.borderColor;
+          ctx.lineWidth = node.style.borderWidth ?? 2;
+          ctx.stroke();
+        }
+      } else {
+        // Full-canvas overlay (legacy path used by closing scene dimmer)
+        ctx.fillStyle = node.style.background ?? "#000000";
+        ctx.fillRect(-cx, -cy, width, height);
+      }
       break;
     }
 

@@ -531,6 +531,54 @@ function SceneCard({
         <span className="text-[10px] text-muted-foreground ml-1">Layout</span>
       </div>
 
+      {/* Text styling — text color + card background + card border */}
+      <div className="flex gap-2 items-center flex-wrap" onClick={(e) => e.stopPropagation()}>
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Text colour">
+          <span>Text</span>
+          <input
+            type="color"
+            value={scene.textColor ?? "#ffffff"}
+            onChange={(e) => onChange({ textColor: e.target.value })}
+            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Card background">
+          <span>Card</span>
+          <input
+            type="color"
+            value={(scene.cardBackgroundColor ?? "#000000").replace(/^rgba?\(.*\)$/, "#000000")}
+            onChange={(e) => {
+              // Default to ~50% alpha so text stays readable over backgrounds
+              const hex = e.target.value;
+              const r = parseInt(hex.slice(1, 3), 16);
+              const g = parseInt(hex.slice(3, 5), 16);
+              const b = parseInt(hex.slice(5, 7), 16);
+              onChange({ cardBackgroundColor: `rgba(${r},${g},${b},0.55)` });
+            }}
+            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Card border colour">
+          <span>Border</span>
+          <input
+            type="color"
+            value={scene.cardBorderColor ?? "#7c3aed"}
+            onChange={(e) => onChange({ cardBorderColor: e.target.value })}
+            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
+          />
+        </label>
+        {(scene.textColor || scene.cardBackgroundColor || scene.cardBorderColor) && (
+          <button
+            type="button"
+            title="Reset text styling"
+            className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+            onClick={() => onChange({ textColor: undefined, cardBackgroundColor: undefined, cardBorderColor: undefined })}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
       {/* Title */}
       <Input
         className="h-8 text-sm font-medium"

@@ -186,6 +186,7 @@ export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRece
                     alt={item.title ?? ""}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    crossOrigin="anonymous"
                   />
                   {item.mediaType === "video" && (
                     <Film className="absolute top-1 right-1 w-3 h-3 text-white drop-shadow" />
@@ -235,7 +236,7 @@ export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRece
                   className="group relative aspect-square rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
                 >
                   {isImage && r.cdnUrl ? (
-                    <img src={r.cdnUrl} alt={r.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
+                    <img src={r.cdnUrl} alt={r.title ?? ""} className="w-full h-full object-cover" loading="lazy" crossOrigin="anonymous" />
                   ) : (
                     // Video / audio / missing-cdn fallback — show icon placeholder
                     <div className="w-full h-full flex items-center justify-center bg-muted">

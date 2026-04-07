@@ -118,6 +118,12 @@ export interface SceneScript {
   };
   effects?: SceneEffect[];
   accentColor?: string;
+  /** Override the default text colour for title/subtitle/body text in this scene. */
+  textColor?: string;
+  /** Optional semi-transparent card behind the text — accepts any CSS color (with alpha). */
+  cardBackgroundColor?: string;
+  /** Optional border colour drawn around the text card. */
+  cardBorderColor?: string;
   backgroundImage?: string;
   backgroundImagePosition?: ImagePosition;
   sceneAudio?: string;

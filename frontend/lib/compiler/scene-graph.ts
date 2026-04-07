@@ -62,14 +62,37 @@ function makeNode(
   const spec = explicit ?? defaultAnim(theme.motion, animOrder);
   const animations = spec.type === "none" ? [] : compileAnimation(spec);
 
+  // Per-scene text colour override — applies to text and textGroup nodes only.
+  // The scene's `textColor` overrides any colour the builder passed in `style`.
+  const finalStyle: Partial<NodeStyle> =
+    (type === "text" || type === "textGroup") && scene.textColor
+      ? { ...style, color: scene.textColor }
+      : style;
+
   return {
     id: nodeId(type),
     type,
     transform: { ...identity(), ...transform },
-    style: baseStyle(theme, style),
+    style: baseStyle(theme, finalStyle),
     content,
     items,
     animations,
+  };
+}
+
+/** Optional translucent card behind text — drawn when scene.cardBackgroundColor or cardBorderColor is set. */
+function cardBackgroundNode(scene: SceneScript, theme: VideoTheme): SceneNode | null {
+  if (!scene.cardBackgroundColor && !scene.cardBorderColor) return null;
+  return {
+    id: nodeId("card"),
+    type: "overlay",
+    transform: identity(),
+    style: baseStyle(theme, {
+      background: scene.cardBackgroundColor ?? "rgba(0,0,0,0.4)",
+      borderRadius: 18, // forces "card" rendering mode in canvas-nodes
+      ...(scene.cardBorderColor ? { borderColor: scene.cardBorderColor, borderWidth: 2 } : {}),
+    }),
+    animations: [],
   };
 }
 
@@ -152,6 +175,9 @@ function buildIntroGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     nodes.push(particlesNode(theme));
   }
 
+  const card = cardBackgroundNode(scene, theme);
+  if (card) nodes.push(card);
+
   let order = 0;
   if (scene.title) {
     nodes.push(makeNode("text", scene.title, { y: -50 }, { fontSize: 52, fontWeight: "bold", textAlign: (scene.textAlign ?? "center") as TextAlign }, theme, scene, order++, "titleEnter"));
@@ -180,6 +206,9 @@ function buildAchievementGraph(scene: SceneScript, theme: VideoTheme): SceneNode
     nodes.push(particlesNode(theme));
   }
 
+  const card = cardBackgroundNode(scene, theme);
+  if (card) nodes.push(card);
+
   let order = 0;
   if (scene.title) {
     nodes.push(makeNode("text", scene.title, { y: -80 }, { fontSize: 38, fontWeight: "bold", textAlign: (scene.textAlign ?? "center") as TextAlign }, theme, scene, order++, "titleEnter"));
@@ -205,6 +234,9 @@ function buildSkillsGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   if (shouldAddParticles(theme, scene)) {
     nodes.push(particlesNode(theme));
   }
+
+  const card = cardBackgroundNode(scene, theme);
+  if (card) nodes.push(card);
 
   let order = 0;
   if (scene.title) {
@@ -239,6 +271,9 @@ function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     style: baseStyle(theme, { background: "#000000" }),
     animations: [],
   });
+
+  const card = cardBackgroundNode(scene, theme);
+  if (card) nodes.push(card);
 
   let order = 0;
   if (scene.title) {

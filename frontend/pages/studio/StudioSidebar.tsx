@@ -522,7 +522,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                   activeBg === "custom" ? "border-primary ring-1 ring-primary" : "border-transparent hover:border-primary/40"
                 }`}
               >
-                <img src={customBgUrl} className="w-full h-full object-cover" alt="Custom background" />
+                <img src={customBgUrl} className="w-full h-full object-cover" alt="Custom background" crossOrigin="anonymous" />
                 {activeBg === "custom" && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                     <Check className="w-3 h-3 text-white drop-shadow" />
@@ -646,6 +646,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                           src={s.backgroundImage}
                           alt=""
                           className="w-12 h-8 object-cover rounded border border-border shrink-0"
+                          crossOrigin="anonymous"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
                         <span className="flex-1 truncate text-muted-foreground">Image</span>
