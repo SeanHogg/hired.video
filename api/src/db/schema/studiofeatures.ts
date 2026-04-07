@@ -338,3 +338,107 @@ export const studioVideoHeatmap = pgTable(
     index("idx_video_heatmap_viewer").on(t.viewerId),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Stock Media Assets — content-addressed, deduplicated stock library cache.
+//
+// One row per unique asset hash. The first user to pick a given Unsplash /
+// Pexels / Pixabay item triggers the download into R2 at `stock/<sha256>.<ext>`;
+// every subsequent user references the same R2 object via the hash. The
+// `userStockMediaUsage` join table records per-user picks for credit
+// accounting, "recently used" lists, and licence audit trails — without
+// duplicating any bytes.
+// ---------------------------------------------------------------------------
+export const stockMediaAssets = pgTable(
+  "stock_media_assets",
+  {
+    hash:            text("hash").primaryKey(),         // sha256(file bytes), hex
+    provider:        text("provider").notNull(),         // unsplash | pexels | pixabay | freesound | storyblocks | shutterstock
+    providerAssetId: text("provider_asset_id").notNull(),// remote asset id at provider
+    mediaType:       text("media_type").notNull(),        // image | video | audio
+    mimeType:        text("mime_type").notNull(),
+    sizeBytes:       integer("size_bytes").notNull(),
+    width:           integer("width"),                    // images + video
+    height:          integer("height"),                   // images + video
+    durationMs:      integer("duration_ms"),              // video + audio
+    storageKey:      text("storage_key").notNull(),       // R2 key, e.g. "stock/<hash>.jpg"
+    cdnUrl:          text("cdn_url"),                     // public CDN URL
+    sourceUrl:       text("source_url").notNull(),        // provider download URL we fetched
+    title:           text("title"),
+    description:     text("description"),
+    author:          text("author"),                      // artist / photographer
+    authorUrl:       text("author_url"),
+    licence:         text("licence"),                     // e.g. "Unsplash", "Pexels", "CC0", "Storyblocks Standard"
+    attributionJson: jsonb("attribution_json"),           // structured attribution for export metadata
+    tags:            jsonb("tags"),                       // string[] — search keywords from provider
+    pickCount:       integer("pick_count").notNull().default(0), // total picks across all users
+    firstFetchedAt:  timestamp("first_fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    lastPickedAt:    timestamp("last_picked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_stock_media_provider").on(t.provider, t.providerAssetId),
+    index("idx_stock_media_type").on(t.mediaType),
+  ],
+);
+
+export const userStockMediaUsage = pgTable(
+  "user_stock_media_usage",
+  {
+    id:         uuid("id").primaryKey().defaultRandom(),
+    userId:     text("user_id").notNull(),
+    assetHash:  text("asset_hash").notNull(),             // FK -> stock_media_assets.hash
+    projectId:  text("project_id"),                        // optional studio project the asset was added to
+    sceneId:    text("scene_id"),
+    addedAt:    timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_user_stock_usage_user").on(t.userId),
+    index("idx_user_stock_usage_asset").on(t.assetHash),
+    index("idx_user_stock_usage_project").on(t.projectId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Project Version History (gap #131) — debounced autosave + restorable
+// snapshots of the storyboard JSONB. 30-day retention, 50 versions per
+// project enforced at write time.
+// ---------------------------------------------------------------------------
+export const studioProjectVersions = pgTable(
+  "studio_project_versions",
+  {
+    id:           uuid("id").primaryKey().defaultRandom(),
+    projectId:    text("project_id").notNull(),
+    userId:       text("user_id").notNull(),
+    versionNumber: integer("version_number").notNull(), // monotonically increasing per project
+    label:        text("label"),                          // optional user label or "autosave"
+    storyboard:   jsonb("storyboard").notNull(),          // full snapshot
+    isAutosave:   boolean("is_autosave").notNull().default(true),
+    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_versions_project").on(t.projectId),
+    index("idx_studio_versions_created").on(t.createdAt),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Video Chapters (gap #141) — YouTube-style markers + interactive TOC.
+// Auto-generated from scene boundaries on import; manually editable.
+// ---------------------------------------------------------------------------
+export const studioChapters = pgTable(
+  "studio_chapters",
+  {
+    id:           uuid("id").primaryKey().defaultRandom(),
+    projectId:    text("project_id").notNull(),
+    userId:       text("user_id").notNull(),
+    title:        text("title").notNull(),
+    startSeconds: real("start_seconds").notNull(),       // chapter starts here
+    thumbnailUrl: text("thumbnail_url"),                  // optional preview frame
+    orderIndex:   integer("order_index").notNull().default(0),
+    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:    timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_chapters_project").on(t.projectId),
+  ],
+);

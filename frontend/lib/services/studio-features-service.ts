@@ -484,3 +484,255 @@ export async function getVideoAnalytics(videoId: string): Promise<VideoAnalytics
   const res = await apiClient.get<VideoAnalytics>(`/api/studio/analytics/${videoId}`);
   return res.data;
 }
+
+// ─── Stock Media (gap #128) ─────────────────────────────────────────────────
+
+export type StockProvider = "unsplash" | "pexels" | "pixabay";
+export type StockMediaType = "image" | "video" | "audio";
+
+export interface StockSearchResult {
+  provider: StockProvider;
+  providerAssetId: string;
+  mediaType: StockMediaType;
+  thumbnailUrl: string;
+  previewUrl: string;
+  downloadUrl: string;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  title?: string;
+  description?: string;
+  author?: string;
+  authorUrl?: string;
+  licence: string;
+  tags?: string[];
+}
+
+export interface StockSearchResponse {
+  results: StockSearchResult[];
+  page: number;
+  perPage: number;
+}
+
+export interface StockPickResult {
+  hash: string;
+  cdnUrl: string | null;
+  storageKey: string;
+  mediaType: StockMediaType;
+  mimeType: string;
+  width?: number | null;
+  height?: number | null;
+  durationMs?: number | null;
+  attribution: {
+    provider: string;
+    author: string | null;
+    authorUrl: string | null;
+    licence: string;
+    sourceUrl: string;
+  };
+  /** "fresh" = first user to pick this asset; "provider-id" or "hash" = R2 hit avoided. */
+  dedup: "provider-id" | "hash" | "fresh";
+  storageBytesSaved: number;
+}
+
+export interface StockRecentItem {
+  hash: string;
+  cdnUrl: string | null;
+  mediaType: StockMediaType;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  title: string | null;
+  author: string | null;
+  licence: string | null;
+  addedAt: string;
+}
+
+export async function searchStockMedia(params: {
+  q: string;
+  type?: StockMediaType;
+  page?: number;
+  perPage?: number;
+}): Promise<StockSearchResponse> {
+  const qs = new URLSearchParams({ q: params.q });
+  if (params.type) qs.set("type", params.type);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.perPage) qs.set("perPage", String(params.perPage));
+  const res = await apiClient.get<StockSearchResponse>(`/api/studio/stock/search?${qs.toString()}`);
+  return res.data;
+}
+
+export async function pickStockMedia(item: StockSearchResult & {
+  projectId?: string;
+  sceneId?: string;
+}): Promise<StockPickResult> {
+  const res = await apiClient.post<StockPickResult>("/api/studio/stock/pick", {
+    provider: item.provider,
+    providerAssetId: item.providerAssetId,
+    downloadUrl: item.downloadUrl,
+    mediaType: item.mediaType,
+    title: item.title,
+    description: item.description,
+    author: item.author,
+    authorUrl: item.authorUrl,
+    licence: item.licence,
+    width: item.width,
+    height: item.height,
+    durationMs: item.durationMs,
+    tags: item.tags,
+    projectId: item.projectId,
+    sceneId: item.sceneId,
+  });
+  return res.data;
+}
+
+export async function getRecentStockMedia(limit = 20): Promise<StockRecentItem[]> {
+  const res = await apiClient.get<{ recent: StockRecentItem[] }>(`/api/studio/stock/recent?limit=${limit}`);
+  return res.data.recent;
+}
+
+export async function getStockMediaStats(): Promise<{
+  totalPicks: number;
+  uniqueAssetCount: number;
+  actualBytes: number;
+  naiveBytes: number;
+  bytesSaved: number;
+}> {
+  const res = await apiClient.get<{
+    totalPicks: number;
+    uniqueAssetCount: number;
+    actualBytes: number;
+    naiveBytes: number;
+    bytesSaved: number;
+  }>("/api/studio/stock/stats");
+  return res.data;
+}
+
+// ─── Project Versions (gap #131) ────────────────────────────────────────────
+
+export interface ProjectVersionMeta {
+  id: string;
+  versionNumber: number;
+  label: string | null;
+  isAutosave: boolean;
+  createdAt: string;
+}
+
+export interface ProjectVersionFull extends ProjectVersionMeta {
+  storyboard: unknown;
+}
+
+export async function createProjectVersion(
+  projectId: string,
+  storyboard: unknown,
+  opts: { label?: string; isAutosave?: boolean } = {},
+): Promise<ProjectVersionMeta & { prunedCount: number }> {
+  const res = await apiClient.post<ProjectVersionMeta & { prunedCount: number }>(
+    `/api/studio/projects/${projectId}/versions`,
+    { storyboard, label: opts.label, isAutosave: opts.isAutosave ?? true },
+  );
+  return res.data;
+}
+
+export async function listProjectVersions(projectId: string): Promise<ProjectVersionMeta[]> {
+  const res = await apiClient.get<{ versions: ProjectVersionMeta[] }>(
+    `/api/studio/projects/${projectId}/versions`,
+  );
+  return res.data.versions;
+}
+
+export async function getProjectVersion(projectId: string, versionId: string): Promise<ProjectVersionFull> {
+  const res = await apiClient.get<ProjectVersionFull>(
+    `/api/studio/projects/${projectId}/versions/${versionId}`,
+  );
+  return res.data;
+}
+
+export async function restoreProjectVersion(projectId: string, versionId: string): Promise<{
+  restoredVersion: ProjectVersionMeta;
+  storyboard: unknown;
+}> {
+  const res = await apiClient.post<{ restoredVersion: ProjectVersionMeta; storyboard: unknown }>(
+    `/api/studio/projects/${projectId}/versions/${versionId}/restore`,
+    {},
+  );
+  return res.data;
+}
+
+// ─── Video Chapters (gap #141) ──────────────────────────────────────────────
+
+export interface VideoChapter {
+  id: string;
+  projectId: string;
+  title: string;
+  startSeconds: number;
+  thumbnailUrl: string | null;
+  orderIndex: number;
+}
+
+export async function getChapters(projectId: string): Promise<VideoChapter[]> {
+  const res = await apiClient.get<{ chapters: VideoChapter[] }>(
+    `/api/studio/projects/${projectId}/chapters`,
+  );
+  return res.data.chapters;
+}
+
+export async function saveChapters(
+  projectId: string,
+  chapters: Array<{ title: string; startSeconds: number; thumbnailUrl?: string }>,
+): Promise<VideoChapter[]> {
+  const res = await apiClient.post<{ chapters: VideoChapter[] }>(
+    `/api/studio/projects/${projectId}/chapters`,
+    { chapters, replace: true },
+  );
+  return res.data.chapters;
+}
+
+export async function updateChapter(
+  id: string,
+  patch: { title?: string; startSeconds?: number; thumbnailUrl?: string | null },
+): Promise<VideoChapter> {
+  const res = await apiClient.patch<VideoChapter>(`/api/studio/chapters/${id}`, patch);
+  return res.data;
+}
+
+export async function deleteChapter(id: string): Promise<void> {
+  await apiClient.delete(`/api/studio/chapters/${id}`);
+}
+
+export async function getChaptersAsYoutubeText(projectId: string): Promise<{ text: string; count: number }> {
+  const res = await apiClient.get<{ text: string; count: number }>(
+    `/api/studio/projects/${projectId}/chapters/youtube`,
+  );
+  return res.data;
+}
+
+// ─── AI Script Rewriter (gap #144) ──────────────────────────────────────────
+
+export type ScriptRewriteMode = "shorten" | "lengthen" | "tone" | "persona";
+export type ScriptRewriteTone = "professional" | "conversational" | "enthusiastic" | "executive";
+export type ScriptRewritePersona = "job-seeker" | "recruiter" | "company-promo" | "personal-brand";
+
+export interface ScriptRewriteResult {
+  mode: ScriptRewriteMode;
+  sceneCount: number;
+  storyboard: { scenes: Array<Record<string, unknown>> };
+}
+
+export async function rewriteScript(params: {
+  projectId: string;
+  storyboard: unknown;
+  mode: ScriptRewriteMode;
+  targetSeconds?: number;
+  tone?: ScriptRewriteTone;
+  persona?: ScriptRewritePersona;
+  instructions?: string;
+}): Promise<ScriptRewriteResult> {
+  const { projectId, ...body } = params;
+  const res = await apiClient.post<ScriptRewriteResult>(
+    `/api/studio/projects/${projectId}/script/rewrite`,
+    body,
+  );
+  return res.data;
+}

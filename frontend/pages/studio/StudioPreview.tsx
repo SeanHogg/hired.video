@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
+import { videoFiltersToCss } from "@/types/video-script";
 
 interface Props {
   state: StudioProjectState;
@@ -84,6 +85,7 @@ export default function StudioPreview({
   };
 
   // Inner video canvas — same content in both layout modes
+  const filterCss = videoFiltersToCss(state.script?.video?.theme?.filters);
   const videoCanvas = (
     <div
       className="relative bg-black rounded-lg overflow-hidden"
@@ -91,6 +93,8 @@ export default function StudioPreview({
         aspectRatio: compiledVideo ? `${compiledVideo.width}/${compiledVideo.height}` : "16/9",
         // In height-fit mode: constrain by height, let width follow aspect ratio
         ...(showActions ? {} : { maxHeight: "100%", width: "auto", maxWidth: "100%" }),
+        // Visual filters / colour grading (gap #125)
+        filter: filterCss,
       }}
     >
       {compiledVideo ? (

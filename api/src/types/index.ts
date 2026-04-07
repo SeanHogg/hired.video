@@ -29,6 +29,10 @@ export interface Env {
   LINKEDIN_CLIENT_SECRET?: string;
   // Whisper / transcription
   OPENAI_API_KEY?: string;
+  // Stock media providers (gap #128 — content-addressed, deduplicated cache)
+  UNSPLASH_ACCESS_KEY?: string;
+  PEXELS_API_KEY?: string;
+  PIXABAY_API_KEY?: string;
   // Google AdSense
   ADSENSE_PUBLISHER_ID?: string;        // ca-pub-XXXXXXXXXXXXXXXX
   AD_SLOT_DASHBOARD_BANNER?: string;

@@ -21,9 +21,15 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/ai.js";
+import { callLLM, callLLMJson, getApiKey } from "../services/ai.js";
 import { generateSpeech, getVoices, cloneVoice, wordTimestampsToSrt, wordTimestampsToVtt } from "../services/tts.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/transcription.js";
+import {
+  searchStockMedia,
+  fetchAssetForHashing,
+  mediaTypeFromMime,
+  type StockMediaType,
+} from "../services/stockmedia.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 const {
@@ -31,7 +37,8 @@ const {
   linkedinAccounts, studioRecordings, studioDeliveryCoaching,
   studioAtsPackages, studioInterviewQuestions, studioInterviewSessions,
   studioSkillsDemos, studioAsyncInterviews, studioAsyncResponses,
-  studioVideoHeatmap,
+  studioVideoHeatmap, stockMediaAssets, userStockMediaUsage,
+  studioProjectVersions, studioChapters,
 } = schema;
 
 export const studioFeaturesRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -1526,4 +1533,621 @@ studioFeaturesRoutes.get("/analytics/:videoId", async (c) => {
       .sort((a, b) => b.views - a.views)
       .slice(0, 50),
   }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  12. STOCK MEDIA LIBRARY (Unsplash + Pexels + Pixabay) — gap #128
+// ██
+// ██  Content-addressed dedup: search results stream live from provider APIs;
+// ██  on pick we download once, hash the bytes (sha256), and only PUT to R2 if
+// ██  no row already exists for that hash. Per-user picks recorded in
+// ██  user_stock_media_usage so the same R2 object can back thousands of
+// ██  projects without duplication.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function providerKeys(c: any) {
+  return {
+    unsplash: c.env.UNSPLASH_ACCESS_KEY as string | undefined,
+    pexels:   c.env.PEXELS_API_KEY as string | undefined,
+    pixabay:  c.env.PIXABAY_API_KEY as string | undefined,
+  };
+}
+
+// GET /api/studio/stock/search?q=...&type=image|video&page=1&perPage=20
+studioFeaturesRoutes.get("/stock/search", async (c) => {
+  const q = c.req.query("q")?.trim();
+  if (!q) return c.json(fail("VALIDATION_ERROR", "q query param is required"), 400);
+  const typeParam = c.req.query("type") as StockMediaType | undefined;
+  const mediaType: StockMediaType = (typeParam === "video" || typeParam === "audio") ? typeParam : "image";
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
+  const perPage = Math.min(40, Math.max(1, parseInt(c.req.query("perPage") ?? "20", 10) || 20));
+
+  const keys = providerKeys(c);
+  if (!keys.unsplash && !keys.pexels && !keys.pixabay) {
+    return c.json(fail("STOCK_UNAVAILABLE", "No stock media providers configured. Set UNSPLASH_ACCESS_KEY, PEXELS_API_KEY, or PIXABAY_API_KEY."), 503);
+  }
+
+  try {
+    const response = await searchStockMedia(keys, { query: q, mediaType, page, perPage });
+    return c.json(ok(response));
+  } catch (err) {
+    console.error("[stock/search] error:", err);
+    return c.json(fail("STOCK_SEARCH_FAILED", `Stock media search failed: ${err}`), 500);
+  }
+});
+
+// POST /api/studio/stock/pick — user selects an asset from search results.
+// Body: { provider, providerAssetId, downloadUrl, mediaType, title?, description?,
+//         author?, authorUrl?, licence, width?, height?, durationMs?, tags?,
+//         projectId?, sceneId? }
+//
+// Dedup flow:
+//   1. Look up by (provider, providerAssetId) — if found, skip download entirely.
+//   2. Otherwise fetch the bytes, compute sha256, and check for an existing
+//      row by hash (handles cross-provider duplicates of the same image).
+//   3. Only PUT to R2 if neither lookup found a row.
+//   4. Always insert a per-user usage row referencing the asset hash.
+studioFeaturesRoutes.post("/stock/pick", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    provider:        z.enum(["unsplash", "pexels", "pixabay"]),
+    providerAssetId: z.string().min(1),
+    downloadUrl:     z.string().url(),
+    mediaType:       z.enum(["image", "video", "audio"]).default("image"),
+    title:           z.string().optional(),
+    description:     z.string().optional(),
+    author:          z.string().optional(),
+    authorUrl:       z.string().optional(),
+    licence:         z.string().min(1),
+    width:           z.number().int().positive().optional(),
+    height:          z.number().int().positive().optional(),
+    durationMs:      z.number().int().nonnegative().optional(),
+    tags:            z.array(z.string()).optional(),
+    projectId:       z.string().optional(),
+    sceneId:         z.string().optional(),
+  }).safeParse(body);
+
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  const p = parsed.data;
+  const db = getDb();
+
+  // Step 1: existing row by (provider, providerAssetId)?
+  let asset = (await db
+    .select()
+    .from(stockMediaAssets)
+    .where(and(
+      eq(stockMediaAssets.provider, p.provider),
+      eq(stockMediaAssets.providerAssetId, p.providerAssetId),
+    ))
+    .limit(1))[0];
+
+  let dedup: "provider-id" | "hash" | "fresh" = "provider-id";
+
+  if (!asset) {
+    // Step 2: fetch + hash bytes
+    let fetched;
+    try {
+      fetched = await fetchAssetForHashing(p.downloadUrl);
+    } catch (err) {
+      console.error("[stock/pick] download error:", err);
+      return c.json(fail("STOCK_DOWNLOAD_FAILED", `Failed to download asset: ${err}`), 502);
+    }
+
+    // Step 2b: existing row by hash (cross-provider duplicate)?
+    asset = (await db
+      .select()
+      .from(stockMediaAssets)
+      .where(eq(stockMediaAssets.hash, fetched.hash))
+      .limit(1))[0];
+
+    if (asset) {
+      dedup = "hash";
+    } else {
+      // Step 3: PUT to R2 (only path that ever writes bytes)
+      const uploaded = await uploadToStorage(
+        fetched.storageKey,
+        fetched.bytes,
+        fetched.mimeType,
+        { provider: p.provider, providerAssetId: p.providerAssetId, hash: fetched.hash },
+      );
+      if (!uploaded) {
+        return c.json(fail("STORAGE_UNAVAILABLE", "Object storage not configured"), 503);
+      }
+
+      const inferredMediaType = mediaTypeFromMime(fetched.mimeType);
+      const [inserted] = await db.insert(stockMediaAssets).values({
+        hash:            fetched.hash,
+        provider:        p.provider,
+        providerAssetId: p.providerAssetId,
+        mediaType:       inferredMediaType,
+        mimeType:        fetched.mimeType,
+        sizeBytes:       fetched.sizeBytes,
+        width:           p.width ?? null,
+        height:          p.height ?? null,
+        durationMs:      p.durationMs ?? null,
+        storageKey:      fetched.storageKey,
+        cdnUrl:          cdnUrl(fetched.storageKey),
+        sourceUrl:       p.downloadUrl,
+        title:           p.title ?? null,
+        description:     p.description ?? null,
+        author:          p.author ?? null,
+        authorUrl:       p.authorUrl ?? null,
+        licence:         p.licence,
+        attributionJson: {
+          provider: p.provider,
+          author:   p.author ?? null,
+          authorUrl: p.authorUrl ?? null,
+          licence:  p.licence,
+          sourceUrl: p.downloadUrl,
+        },
+        tags:            p.tags ?? [],
+        pickCount:       0,
+      } as any).returning();
+      asset = inserted;
+      dedup = "fresh";
+    }
+  }
+
+  // Step 4: bump pick counter + record per-user usage
+  await db.update(stockMediaAssets)
+    .set({
+      pickCount: sql`${stockMediaAssets.pickCount} + 1`,
+      lastPickedAt: new Date(),
+    } as any)
+    .where(eq(stockMediaAssets.hash, asset.hash));
+
+  await db.insert(userStockMediaUsage).values({
+    userId:    user.sub,
+    assetHash: asset.hash,
+    projectId: p.projectId ?? null,
+    sceneId:   p.sceneId ?? null,
+  } as any);
+
+  return c.json(ok({
+    hash:      asset.hash,
+    cdnUrl:    asset.cdnUrl,
+    storageKey: asset.storageKey,
+    mediaType: asset.mediaType,
+    mimeType:  asset.mimeType,
+    width:     asset.width,
+    height:    asset.height,
+    durationMs: asset.durationMs,
+    attribution: asset.attributionJson,
+    dedup,                      // "provider-id" | "hash" | "fresh"
+    storageBytesSaved: dedup === "fresh" ? 0 : asset.sizeBytes,
+  }), 201);
+});
+
+// GET /api/studio/stock/recent — current user's recently used stock assets
+studioFeaturesRoutes.get("/stock/recent", async (c) => {
+  const user = c.var.user;
+  const limit = Math.min(50, Math.max(1, parseInt(c.req.query("limit") ?? "20", 10) || 20));
+  const db = getDb();
+
+  const rows = await db
+    .select({
+      hash:       stockMediaAssets.hash,
+      cdnUrl:     stockMediaAssets.cdnUrl,
+      mediaType:  stockMediaAssets.mediaType,
+      mimeType:   stockMediaAssets.mimeType,
+      width:      stockMediaAssets.width,
+      height:     stockMediaAssets.height,
+      durationMs: stockMediaAssets.durationMs,
+      title:      stockMediaAssets.title,
+      author:     stockMediaAssets.author,
+      licence:    stockMediaAssets.licence,
+      addedAt:    userStockMediaUsage.addedAt,
+    })
+    .from(userStockMediaUsage)
+    .innerJoin(stockMediaAssets, eq(userStockMediaUsage.assetHash, stockMediaAssets.hash))
+    .where(eq(userStockMediaUsage.userId, user.sub))
+    .orderBy(desc(userStockMediaUsage.addedAt))
+    .limit(limit);
+
+  // Dedup by hash so the same asset appears once even if reused
+  const seen = new Set<string>();
+  const recent = rows.filter((r) => {
+    if (seen.has(r.hash)) return false;
+    seen.add(r.hash);
+    return true;
+  });
+
+  return c.json(ok({ recent }));
+});
+
+// GET /api/studio/stock/stats — admin-ish dedup stats for the current user
+studioFeaturesRoutes.get("/stock/stats", async (c) => {
+  const user = c.var.user;
+  const db = getDb();
+
+  const usageRows = await db
+    .select({
+      hash:      userStockMediaUsage.assetHash,
+      sizeBytes: stockMediaAssets.sizeBytes,
+    })
+    .from(userStockMediaUsage)
+    .innerJoin(stockMediaAssets, eq(userStockMediaUsage.assetHash, stockMediaAssets.hash))
+    .where(eq(userStockMediaUsage.userId, user.sub));
+
+  const totalPicks = usageRows.length;
+  const uniqueHashes = new Set(usageRows.map((r) => r.hash));
+  const uniqueAssetCount = uniqueHashes.size;
+
+  // Bytes that would have been stored without dedup vs. what is actually stored.
+  const byHash = new Map<string, number>();
+  for (const r of usageRows) byHash.set(r.hash, r.sizeBytes);
+  const actualBytes = Array.from(byHash.values()).reduce((a, b) => a + b, 0);
+  const naiveBytes = usageRows.reduce((a, r) => a + r.sizeBytes, 0);
+
+  return c.json(ok({
+    totalPicks,
+    uniqueAssetCount,
+    actualBytes,
+    naiveBytes,
+    bytesSaved: naiveBytes - actualBytes,
+  }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  13. PROJECT VERSION HISTORY + AUTOSAVE — gap #131
+// ██
+// ██  Debounced autosave creates a `studio_project_versions` snapshot row.
+// ██  Caps: 50 versions per project, 30-day retention. Restoring writes a
+// ██  new "restored from vN" row rather than mutating history.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const VERSIONS_PER_PROJECT_CAP = 50;
+const VERSION_RETENTION_DAYS = 30;
+
+// POST /api/studio/projects/:projectId/versions — create snapshot (autosave or manual)
+studioFeaturesRoutes.post("/projects/:projectId/versions", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    storyboard: z.unknown(),
+    label:      z.string().max(120).optional(),
+    isAutosave: z.boolean().optional(),
+  }).safeParse(body);
+
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+  if (parsed.data.storyboard == null) return c.json(fail("VALIDATION_ERROR", "storyboard required"), 400);
+
+  const db = getDb();
+
+  // Compute next version number
+  const [latest] = await db
+    .select({ versionNumber: studioProjectVersions.versionNumber })
+    .from(studioProjectVersions)
+    .where(eq(studioProjectVersions.projectId, projectId))
+    .orderBy(desc(studioProjectVersions.versionNumber))
+    .limit(1);
+  const nextNumber = (latest?.versionNumber ?? 0) + 1;
+
+  const [version] = await db.insert(studioProjectVersions).values({
+    projectId,
+    userId: user.sub,
+    versionNumber: nextNumber,
+    label: parsed.data.label ?? (parsed.data.isAutosave === false ? "manual" : "autosave"),
+    storyboard: parsed.data.storyboard,
+    isAutosave: parsed.data.isAutosave !== false,
+  } as any).returning();
+
+  // Enforce 50-version cap and 30-day retention by deleting old AUTOSAVE rows.
+  // Manual snapshots are preserved beyond the cap.
+  const allAutosaves = await db
+    .select({ id: studioProjectVersions.id, createdAt: studioProjectVersions.createdAt })
+    .from(studioProjectVersions)
+    .where(and(
+      eq(studioProjectVersions.projectId, projectId),
+      eq(studioProjectVersions.isAutosave, true),
+    ))
+    .orderBy(desc(studioProjectVersions.createdAt));
+
+  const cutoff = Date.now() - VERSION_RETENTION_DAYS * 86400 * 1000;
+  const toDelete = allAutosaves
+    .filter((v, i) => i >= VERSIONS_PER_PROJECT_CAP || (v.createdAt && v.createdAt.getTime() < cutoff))
+    .map((v) => v.id);
+
+  if (toDelete.length > 0) {
+    await db.delete(studioProjectVersions)
+      .where(inArray(studioProjectVersions.id, toDelete));
+  }
+
+  return c.json(ok({
+    id: version.id,
+    versionNumber: version.versionNumber,
+    label: version.label,
+    isAutosave: version.isAutosave,
+    createdAt: version.createdAt,
+    prunedCount: toDelete.length,
+  }), 201);
+});
+
+// GET /api/studio/projects/:projectId/versions — list snapshots
+studioFeaturesRoutes.get("/projects/:projectId/versions", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+
+  const versions = await db
+    .select({
+      id: studioProjectVersions.id,
+      versionNumber: studioProjectVersions.versionNumber,
+      label: studioProjectVersions.label,
+      isAutosave: studioProjectVersions.isAutosave,
+      createdAt: studioProjectVersions.createdAt,
+    })
+    .from(studioProjectVersions)
+    .where(and(
+      eq(studioProjectVersions.projectId, projectId),
+      eq(studioProjectVersions.userId, user.sub),
+    ))
+    .orderBy(desc(studioProjectVersions.versionNumber))
+    .limit(100);
+
+  return c.json(ok({ versions }));
+});
+
+// GET /api/studio/projects/:projectId/versions/:versionId — fetch full snapshot
+studioFeaturesRoutes.get("/projects/:projectId/versions/:versionId", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const versionId = c.req.param("versionId");
+  const db = getDb();
+
+  const [version] = await db
+    .select()
+    .from(studioProjectVersions)
+    .where(and(
+      eq(studioProjectVersions.id, versionId),
+      eq(studioProjectVersions.projectId, projectId),
+      eq(studioProjectVersions.userId, user.sub),
+    ))
+    .limit(1);
+
+  if (!version) return c.json(fail("NOT_FOUND", "Version not found"), 404);
+  return c.json(ok(version));
+});
+
+// POST /api/studio/projects/:projectId/versions/:versionId/restore
+// Returns the storyboard so the caller (StudioLayout) can re-hydrate state.
+// A new "restored from vN" version row is created marking the restore point.
+studioFeaturesRoutes.post("/projects/:projectId/versions/:versionId/restore", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const versionId = c.req.param("versionId");
+  const db = getDb();
+
+  const [source] = await db
+    .select()
+    .from(studioProjectVersions)
+    .where(and(
+      eq(studioProjectVersions.id, versionId),
+      eq(studioProjectVersions.projectId, projectId),
+      eq(studioProjectVersions.userId, user.sub),
+    ))
+    .limit(1);
+  if (!source) return c.json(fail("NOT_FOUND", "Version not found"), 404);
+
+  // Compute next version number
+  const [latest] = await db
+    .select({ versionNumber: studioProjectVersions.versionNumber })
+    .from(studioProjectVersions)
+    .where(eq(studioProjectVersions.projectId, projectId))
+    .orderBy(desc(studioProjectVersions.versionNumber))
+    .limit(1);
+  const nextNumber = (latest?.versionNumber ?? 0) + 1;
+
+  const [restored] = await db.insert(studioProjectVersions).values({
+    projectId,
+    userId: user.sub,
+    versionNumber: nextNumber,
+    label: `restored from v${source.versionNumber}`,
+    storyboard: source.storyboard,
+    isAutosave: false,
+  } as any).returning();
+
+  return c.json(ok({
+    restoredVersion: {
+      id: restored.id,
+      versionNumber: restored.versionNumber,
+      label: restored.label,
+      createdAt: restored.createdAt,
+    },
+    storyboard: source.storyboard,
+  }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  14. VIDEO CHAPTERS + TOC — gap #141
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/studio/projects/:projectId/chapters
+studioFeaturesRoutes.get("/projects/:projectId/chapters", async (c) => {
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+
+  const chapters = await db
+    .select()
+    .from(studioChapters)
+    .where(eq(studioChapters.projectId, projectId))
+    .orderBy(studioChapters.startSeconds);
+
+  return c.json(ok({ chapters }));
+});
+
+// POST /api/studio/projects/:projectId/chapters — create or replace full chapter list
+// Body: { chapters: Array<{ title, startSeconds, thumbnailUrl? }> }
+studioFeaturesRoutes.post("/projects/:projectId/chapters", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    chapters: z.array(z.object({
+      title:        z.string().min(1).max(120),
+      startSeconds: z.number().min(0),
+      thumbnailUrl: z.string().url().optional(),
+    })),
+    replace: z.boolean().default(true),
+  }).safeParse(body);
+
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+
+  const db = getDb();
+
+  if (parsed.data.replace) {
+    await db.delete(studioChapters).where(and(
+      eq(studioChapters.projectId, projectId),
+      eq(studioChapters.userId, user.sub),
+    ));
+  }
+
+  // Sort by startSeconds, assign orderIndex
+  const sorted = [...parsed.data.chapters].sort((a, b) => a.startSeconds - b.startSeconds);
+  if (sorted.length === 0) return c.json(ok({ chapters: [] }));
+
+  const inserted = await db.insert(studioChapters).values(
+    sorted.map((ch, i) => ({
+      projectId,
+      userId: user.sub,
+      title: ch.title,
+      startSeconds: ch.startSeconds,
+      thumbnailUrl: ch.thumbnailUrl ?? null,
+      orderIndex: i,
+    }) as any),
+  ).returning();
+
+  return c.json(ok({ chapters: inserted }), 201);
+});
+
+// PATCH /api/studio/chapters/:id — edit a single chapter
+studioFeaturesRoutes.patch("/chapters/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    title:        z.string().min(1).max(120).optional(),
+    startSeconds: z.number().min(0).optional(),
+    thumbnailUrl: z.string().url().nullable().optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+  if (parsed.data.startSeconds !== undefined) patch.startSeconds = parsed.data.startSeconds;
+  if (parsed.data.thumbnailUrl !== undefined) patch.thumbnailUrl = parsed.data.thumbnailUrl;
+
+  const [updated] = await db.update(studioChapters)
+    .set(patch as any)
+    .where(and(eq(studioChapters.id, id), eq(studioChapters.userId, user.sub)))
+    .returning();
+
+  if (!updated) return c.json(fail("NOT_FOUND", "Chapter not found"), 404);
+  return c.json(ok(updated));
+});
+
+// DELETE /api/studio/chapters/:id
+studioFeaturesRoutes.delete("/chapters/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const deleted = await db.delete(studioChapters)
+    .where(and(eq(studioChapters.id, id), eq(studioChapters.userId, user.sub)))
+    .returning({ id: studioChapters.id });
+  if (deleted.length === 0) return c.json(fail("NOT_FOUND", "Chapter not found"), 404);
+  return c.json(ok({ deleted: deleted[0].id }));
+});
+
+// GET /api/studio/projects/:projectId/chapters/youtube — formatted text for YouTube/LinkedIn
+studioFeaturesRoutes.get("/projects/:projectId/chapters/youtube", async (c) => {
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+  const chapters = await db
+    .select()
+    .from(studioChapters)
+    .where(eq(studioChapters.projectId, projectId))
+    .orderBy(studioChapters.startSeconds);
+
+  const lines = chapters.map((ch) => {
+    const total = Math.floor(ch.startSeconds);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const ts = h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+      : `${m}:${String(s).padStart(2, "0")}`;
+    return `${ts} ${ch.title}`;
+  });
+
+  return c.json(ok({ text: lines.join("\n"), count: chapters.length }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  15. AI SCRIPT REWRITER — gap #144
+// ██
+// ██  LLM rewrite of an existing storyboard: shorten, change tone, swap persona.
+// ██  Returns a new scene array preserving timing constraints.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    storyboard: z.unknown(),
+    mode: z.enum(["shorten", "lengthen", "tone", "persona"]),
+    targetSeconds: z.number().min(5).max(300).optional(),
+    tone: z.enum(["professional", "conversational", "enthusiastic", "executive"]).optional(),
+    persona: z.enum(["job-seeker", "recruiter", "company-promo", "personal-brand"]).optional(),
+    instructions: z.string().max(500).optional(),
+  }).safeParse(body);
+
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+
+  const apiKey = getApiKey(c.env);
+  if (!apiKey) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
+
+  const { mode, targetSeconds, tone, persona, instructions } = parsed.data;
+
+  const directive = (() => {
+    switch (mode) {
+      case "shorten":
+        return `Shorten the script to approximately ${targetSeconds ?? 20} total seconds. Preserve the most impactful scenes and trim wordy narration.`;
+      case "lengthen":
+        return `Expand the script to approximately ${targetSeconds ?? 45} total seconds. Add concrete examples, transitions, and supporting detail without inventing facts.`;
+      case "tone":
+        return `Rewrite all narration in a ${tone ?? "professional"} tone. Keep every scene's structure and timing identical — change only the words spoken.`;
+      case "persona":
+        return `Re-frame the script for a ${persona ?? "job-seeker"} audience. Adjust messaging, calls-to-action, and emphasis while keeping the same scene count and total duration.`;
+    }
+  })();
+
+  const systemPrompt = `You rewrite video storyboard scripts. You must return ONLY valid JSON matching the input shape. Never invent facts not present in the original. Preserve scene 'type', 'visual', and 'camera' fields exactly. You may rewrite 'title', 'subtitle', 'text', 'ctaText'. If shortening, you may remove scenes. If lengthening, you may insert new scenes that build on existing themes.`;
+  const userMessage = `Original storyboard:\n${JSON.stringify(parsed.data.storyboard, null, 2)}\n\nRewrite directive: ${directive}${instructions ? `\n\nAdditional instructions: ${instructions}` : ""}\n\nReturn JSON: { "scenes": [...] }`;
+
+  const RewriteSchema = z.object({
+    scenes: z.array(z.record(z.string(), z.unknown())),
+  });
+
+  try {
+    const rewritten = await callLLMJson(
+      apiKey,
+      { systemPrompt, userMessage, temperature: 0.6 },
+      RewriteSchema,
+    );
+
+    return c.json(ok({
+      mode,
+      sceneCount: rewritten.scenes.length,
+      storyboard: rewritten,
+      projectId,
+      userId: user.sub,
+    }));
+  } catch (err) {
+    console.error("[script/rewrite] error:", err);
+    return c.json(fail("AI_ERROR", `Script rewrite failed: ${err}`), 500);
+  }
 });

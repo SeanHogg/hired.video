@@ -1,7 +1,8 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle } from "lucide-react";
+import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library } from "lucide-react";
+import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -140,7 +141,7 @@ function loadCollapsed() {
     const raw = localStorage.getItem(SIDEBAR_PREFS_KEY);
     if (raw) return JSON.parse(raw) as Record<string, boolean>;
   } catch {}
-  return { contentTemplates: false, templates: false, backgrounds: false, theme: false, music: false };
+  return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, theme: false, music: false };
 }
 
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect }: Props) {
@@ -520,6 +521,30 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </>}
       </section>
 
+      {/* Stock Media Library — gap #128 (deduplicated cache) */}
+      <section className="px-3 pb-3 border-t pt-3">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
+          onClick={() => toggleSection("stockMedia")}
+        >
+          <Library className="w-3 h-3" /> <span className="flex-1 text-left">Stock Media</span>
+          {collapsed.stockMedia ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+        {!collapsed.stockMedia && (
+          <StockMediaPanel
+            projectId={activeProjectId ?? undefined}
+            onPick={(result) => {
+              if (result.cdnUrl && result.mediaType === "image") {
+                setCustomBgUrl(result.cdnUrl);
+                setActiveBg("custom");
+                onBackgroundSelect?.("custom", result.cdnUrl);
+              }
+            }}
+          />
+        )}
+      </section>
+
       {/* Theme */}
       {script?.video.theme && (
         <section className="px-3 pb-3 border-t pt-3">
@@ -581,6 +606,51 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 <SelectItem value="cinematic-fade">Cinematic Fade</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Filters / colour grading — gap #125 */}
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs text-muted-foreground">Filters</Label>
+              {script.video.theme.filters && (
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => patchTheme({ filters: undefined })}
+                  title="Reset all filters"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            {([
+              { key: "brightness", label: "Brightness", min: 0.5, max: 1.5, step: 0.05, def: 1 },
+              { key: "contrast",   label: "Contrast",   min: 0.5, max: 1.5, step: 0.05, def: 1 },
+              { key: "saturation", label: "Saturation", min: 0,   max: 2,   step: 0.05, def: 1 },
+              { key: "warmth",     label: "Warmth",     min: -100, max: 100, step: 5,    def: 0 },
+              { key: "blur",       label: "Blur",       min: 0,    max: 10,  step: 0.5,  def: 0 },
+            ] as const).map((cfg) => {
+              const current = (script.video.theme.filters as any)?.[cfg.key] ?? cfg.def;
+              return (
+                <div key={cfg.key} className="mb-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] text-muted-foreground">{cfg.label}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
+                      {Number(current).toFixed(cfg.step < 1 ? 2 : 0)}
+                    </span>
+                  </div>
+                  <Slider
+                    min={cfg.min}
+                    max={cfg.max}
+                    step={cfg.step}
+                    value={[current]}
+                    onValueChange={(v) => patchTheme({
+                      filters: { ...script.video.theme.filters, [cfg.key]: v[0] },
+                    })}
+                  />
+                </div>
+              );
+            })}
           </div>
           </>}
         </section>

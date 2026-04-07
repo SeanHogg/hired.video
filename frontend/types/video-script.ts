@@ -1,8 +1,8 @@
 // Video Script DSL — the AI-generated program that drives the video compiler.
 // Matches the JSON schema the LLM returns from POST /api/studio/storyboard.
 
-export type VideoResolution = "720p" | "1080p";
-export type VideoAspect = "16:9" | "9:16" | "1:1";
+export type VideoResolution = "720p" | "1080p" | "4k";
+export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3";
 export type MotionStyle = "minimal" | "moderate" | "cinematic";
 export type TransitionStyle = "cut" | "fade" | "slide" | "cinematic-fade";
 export type BackgroundStyle = "gradient" | "dark-tech-grid" | "particles" | "solid";
@@ -31,6 +31,49 @@ export interface VideoTheme {
   background: BackgroundStyle;
   /** Blob URL or data URL for a user-uploaded background image */
   customBackground?: string;
+  /** Visual filter / colour grading applied to the canvas output (gap #125). */
+  filters?: VideoFilters;
+}
+
+/**
+ * CSS filter values applied to the canvas at render time. All fields are
+ * optional; the renderer composes a `filter:` string only from the present
+ * values, so an empty object is equivalent to "no filter".
+ */
+export interface VideoFilters {
+  brightness?: number;   // 0..2 (1 = no change)
+  contrast?: number;     // 0..2 (1 = no change)
+  saturation?: number;   // 0..2 (1 = no change)
+  hueRotate?: number;    // degrees, -180..180
+  blur?: number;         // px, 0..20
+  /** "warmth" maps to a sepia + hue rotation combo (-100..100). */
+  warmth?: number;
+}
+
+/**
+ * Build a CSS `filter` string from VideoFilters. Returns "none" when no
+ * adjustments are present so callers can apply unconditionally.
+ */
+export function videoFiltersToCss(f: VideoFilters | undefined): string {
+  if (!f) return "none";
+  const parts: string[] = [];
+  if (f.brightness !== undefined && f.brightness !== 1)
+    parts.push(`brightness(${f.brightness})`);
+  if (f.contrast !== undefined && f.contrast !== 1)
+    parts.push(`contrast(${f.contrast})`);
+  if (f.saturation !== undefined && f.saturation !== 1)
+    parts.push(`saturate(${f.saturation})`);
+  if (f.hueRotate !== undefined && f.hueRotate !== 0)
+    parts.push(`hue-rotate(${f.hueRotate}deg)`);
+  if (f.blur !== undefined && f.blur > 0)
+    parts.push(`blur(${f.blur}px)`);
+  if (f.warmth !== undefined && f.warmth !== 0) {
+    // Positive warmth = warmer (yellow/orange tint), negative = cooler (blue).
+    const sepia = Math.min(0.4, Math.abs(f.warmth) / 250);
+    const hue = f.warmth > 0 ? 0 : 200;
+    parts.push(`sepia(${sepia}) hue-rotate(${hue}deg)`);
+  }
+  return parts.length > 0 ? parts.join(" ") : "none";
 }
 
 export interface AnimationSpec {

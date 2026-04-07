@@ -39,6 +39,7 @@ import { compile } from "@/lib/compiler/video-compiler";
 import { exportVideo } from "@/lib/renderer/video-exporter";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
+import StudioToolbar from "@/components/studio/StudioToolbar";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import { defaultStudioState } from "@/types/studio";
 
@@ -834,6 +835,24 @@ export default function StudioLayout() {
 
   // ── Save draft ─────────────────────────────────────────────────────────────
 
+  // ── Autosave + version history (gap #131) ──────────────────────────────────
+  // Debounced 30s after the last script mutation, snapshot the current
+  // storyboard into `studio_project_versions`. The route enforces 50-version
+  // cap + 30-day retention server-side.
+  const lastSnapshotRef = useRef<string>("");
+  useEffect(() => {
+    if (!state.projectId || !state.script) return;
+    const serialized = JSON.stringify(state.script);
+    if (serialized === lastSnapshotRef.current) return;
+    const handle = window.setTimeout(() => {
+      lastSnapshotRef.current = serialized;
+      import("@/lib/services/studio-features-service").then(({ createProjectVersion }) =>
+        createProjectVersion(state.projectId!, state.script, { isAutosave: true }).catch(() => {}),
+      );
+    }, 30_000);
+    return () => window.clearTimeout(handle);
+  }, [state.projectId, state.script]);
+
   async function handleSave() {
     setIsSaving(true);
     try {
@@ -922,6 +941,32 @@ export default function StudioLayout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            {/* Studio toolbar — version history, chapters, AI rewrite */}
+            <StudioToolbar
+              projectId={state.projectId}
+              storyboard={state.script}
+              sceneBoundaries={state.script?.scenes.map((s) => ({
+                start: s.start,
+                title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
+              }))}
+              onRestoreVersion={(storyboard) => {
+                const restored = storyboard as VideoScript | null;
+                if (restored) {
+                  pushHistory(restored);
+                  patchState({ script: restored });
+                  recompile(restored);
+                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
+                }
+              }}
+              onApplyRewrite={(scenes) => {
+                if (!state.script) return;
+                const updated = { ...state.script, scenes: scenes as any } as VideoScript;
+                pushHistory(updated);
+                patchState({ script: updated });
+                recompile(updated);
+                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+              }}
+            />
             {/* Video preview — height controlled by drag handle */}
             <div className="shrink-0 overflow-hidden border-b" style={{ height: videoHeight }}>
               <StudioPreview
