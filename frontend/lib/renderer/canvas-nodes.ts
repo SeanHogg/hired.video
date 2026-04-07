@@ -33,6 +33,44 @@ function getCachedImage(url: string): HTMLImageElement | null {
   return null;
 }
 
+// ─── Video cache ─────────────────────────────────────────────────────────────
+// Plays muted, looping videos that the canvas renderer reads frames from via
+// drawImage(video). crossOrigin="anonymous" is required for canvas-clean export.
+
+const _videoCache = new Map<string, HTMLVideoElement | "loading" | "error">();
+
+function getCachedVideo(url: string): HTMLVideoElement | null {
+  const cached = _videoCache.get(url);
+  if (cached === "error") return null;
+  if (cached && cached !== "loading") return cached;
+  if (!cached) {
+    _videoCache.set(url, "loading");
+    const video = document.createElement("video");
+    if (!url.startsWith("blob:") && !url.startsWith("data:")) {
+      video.crossOrigin = "anonymous";
+    }
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.autoplay = true;
+    video.preload = "auto";
+    video.src = url;
+    video.oncanplay = () => {
+      _videoCache.set(url, video);
+      // Browsers require a user gesture for unmuted autoplay, but muted videos
+      // can autoplay programmatically. We catch failures silently.
+      video.play().catch(() => {});
+    };
+    video.onerror = () => _videoCache.set(url, "error");
+  }
+  return null;
+}
+
+/** Returns true if URL has a video file extension or is from a known video provider. */
+function looksLikeVideo(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url) || /videos\.pexels\.com|player\.vimeo\.com|cdn\.pixabay\.com\/.*\.mp4/i.test(url);
+}
+
 // ─── Particle state (per-canvas) ─────────────────────────────────────────────
 
 interface Particle {
@@ -181,8 +219,35 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
   switch (node.type) {
     case "background": {
       const content = node.content ?? "";
-      if (content.startsWith("custom:")) {
+      if (content.startsWith("customVideo:")) {
+        const url = content.slice("customVideo:".length);
+        const video = getCachedVideo(url);
+        if (video && video.readyState >= 2 && video.videoWidth > 0) {
+          const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
+          const dw = video.videoWidth * scale;
+          const dh = video.videoHeight * scale;
+          ctx.drawImage(video, (width - dw) / 2, (height - dh) / 2, dw, dh);
+        } else {
+          ctx.fillStyle = "#111111";
+          ctx.fillRect(0, 0, width, height);
+        }
+      } else if (content.startsWith("custom:")) {
         const url = content.slice(7);
+        // Auto-detect: a URL that points to a video file should still play
+        // even when authored via the legacy "custom:" prefix.
+        if (looksLikeVideo(url)) {
+          const video = getCachedVideo(url);
+          if (video && video.readyState >= 2 && video.videoWidth > 0) {
+            const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
+            const dw = video.videoWidth * scale;
+            const dh = video.videoHeight * scale;
+            ctx.drawImage(video, (width - dw) / 2, (height - dh) / 2, dw, dh);
+          } else {
+            ctx.fillStyle = "#111111";
+            ctx.fillRect(0, 0, width, height);
+          }
+          break;
+        }
         const img = getCachedImage(url);
         if (img) {
           const kbScale2 = node.kenBurns ? (() => {
@@ -277,12 +342,32 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
 
     case "image": {
       const content = node.content ?? "";
-      const colonIdx = content.indexOf(":");
+      // Format:
+      //   "position:url"        — image (legacy)
+      //   "video:position:url"  — video
+      let isVideo = false;
+      let rest = content;
+      if (rest.startsWith("video:")) {
+        isVideo = true;
+        rest = rest.slice("video:".length);
+      }
+      const colonIdx = rest.indexOf(":");
       if (colonIdx === -1) break;
-      const position = content.slice(0, colonIdx);
-      const url = content.slice(colonIdx + 1);
-      const img = getCachedImage(url);
-      if (!img) break;
+      const position = rest.slice(0, colonIdx);
+      const url = rest.slice(colonIdx + 1);
+
+      // Auto-detect videos coming through the legacy "position:url" format too
+      const useVideo = isVideo || looksLikeVideo(url);
+      const img = useVideo ? null : getCachedImage(url);
+      const video = useVideo ? getCachedVideo(url) : null;
+      const sourceReady = useVideo
+        ? !!(video && video.readyState >= 2 && video.videoWidth > 0)
+        : !!img;
+      if (!sourceReady) break;
+
+      const sourceW = useVideo ? video!.videoWidth : img!.naturalWidth;
+      const sourceH = useVideo ? video!.videoHeight : img!.naturalHeight;
+      const drawSource: CanvasImageSource = useVideo ? video! : img!;
 
       ctx.globalAlpha = node.transform.alpha;
 
@@ -334,11 +419,11 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
         }
       }
 
-      // Cover-fit image within rect with Ken Burns applied
-      const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight) * kbScale;
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
-      ctx.drawImage(img, rect.x + (rect.w - dw) / 2 + kbOffsetX, rect.y + (rect.h - dh) / 2 + kbOffsetY, dw, dh);
+      // Cover-fit source within rect with Ken Burns applied
+      const scale = Math.max(rect.w / sourceW, rect.h / sourceH) * kbScale;
+      const dw = sourceW * scale;
+      const dh = sourceH * scale;
+      ctx.drawImage(drawSource, rect.x + (rect.w - dw) / 2 + kbOffsetX, rect.y + (rect.h - dh) / 2 + kbOffsetY, dw, dh);
 
       // Subtle dark shadow-border for non-full positions
       if (position !== "full" && position !== "half-left" && position !== "half-right") {

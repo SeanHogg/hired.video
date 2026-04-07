@@ -1085,6 +1085,19 @@ export default function StudioLayout() {
                 });
                 toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
               }}
+              onVoiceConfigChange={(cfg) => {
+                // Keep the global voiceover config in sync with the picker so
+                // VideoPreview's TTS playback uses the voice the user selected.
+                patchState({
+                  voiceover: {
+                    enabled: state.voiceover?.enabled ?? true,
+                    voiceId: cfg.voiceId,
+                    voiceName: cfg.voiceName,
+                    speed: cfg.speed,
+                    scenes: state.voiceover?.scenes ?? {},
+                  },
+                });
+              }}
             />
           </div>
 

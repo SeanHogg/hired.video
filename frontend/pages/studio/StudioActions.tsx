@@ -52,6 +52,7 @@ interface Props {
   onApplyRewrite: (scenes: Array<Record<string, unknown>>) => void;
   onApplyHook: (sceneZeroPatch: { title?: string; subtitle?: string; text?: string }) => void;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
+  onVoiceConfigChange?: (config: { voiceId: string; voiceName: string; speed: number }) => void;
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -88,7 +89,18 @@ export default function StudioActions({
   onApplyRewrite,
   onApplyHook,
   onVoiceoverGenerated,
+  onVoiceConfigChange,
 }: Props) {
+  // Edit a scene's narration text in place via the existing onScriptChange flow.
+  const handleSceneTextChange = (sceneId: string, text: string) => {
+    if (!script) return;
+    onScriptChange({
+      ...script,
+      scenes: script.scenes.map((s) =>
+        s.id === sceneId ? { ...s, text } : s,
+      ),
+    } as VideoScript);
+  };
   // Inline enhancement state
   const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -145,6 +157,8 @@ export default function StudioActions({
               scenes={scenes}
               projectId={projectId ?? undefined}
               onVoiceoverGenerated={(results) => onVoiceoverGenerated?.(results)}
+              onVoiceConfigChange={onVoiceConfigChange}
+              onSceneTextChange={handleSceneTextChange}
             />
           </Suspense>
         </ActionPanel>

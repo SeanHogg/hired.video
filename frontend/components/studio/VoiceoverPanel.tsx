@@ -55,6 +55,15 @@ interface Props {
   scenes: Scene[];
   projectId?: string;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
+  /** Fires whenever the user changes the voice or speed, so the parent
+   *  can keep the global voiceover config (used by VideoPreview) in sync. */
+  onVoiceConfigChange?: (config: {
+    voiceId: string;
+    voiceName: string;
+    speed: number;
+  }) => void;
+  /** Fires when the user edits a scene's narration text. */
+  onSceneTextChange?: (sceneId: string, text: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +95,8 @@ export default function VoiceoverPanel({
   scenes,
   projectId,
   onVoiceoverGenerated,
+  onVoiceConfigChange,
+  onSceneTextChange,
 }: Props) {
   // --- Voice selection state ------------------------------------------------
   const [voices, setVoices] = useState<TTSVoice[]>([]);
@@ -133,6 +144,25 @@ export default function VoiceoverPanel({
       cancelled = true;
     };
   }, []);
+
+  // --- Propagate voice + speed selection to parent --------------------------
+  // Without this, VideoPreview keeps using the stale default voice no matter
+  // what the user picks here. We stash the callback in a ref so the effect
+  // only re-fires when the actual voice or speed changes — not whenever the
+  // parent re-renders and produces a new callback identity.
+  const voiceConfigCbRef = useRef(onVoiceConfigChange);
+  useEffect(() => {
+    voiceConfigCbRef.current = onVoiceConfigChange;
+  }, [onVoiceConfigChange]);
+  useEffect(() => {
+    if (!selectedVoiceId || voices.length === 0) return;
+    const voice = voices.find((v) => v.voice_id === selectedVoiceId);
+    voiceConfigCbRef.current?.({
+      voiceId: selectedVoiceId,
+      voiceName: voice?.name ?? "Default",
+      speed: playbackSpeed,
+    });
+  }, [selectedVoiceId, playbackSpeed, voices]);
 
   // --- Cleanup speech on unmount --------------------------------------------
   useEffect(() => {
@@ -461,12 +491,15 @@ export default function VoiceoverPanel({
                   </div>
                 </div>
 
-                {/* Scene text preview */}
-                {text ? (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {text}
-                  </p>
-                ) : (
+                {/* Editable narration script */}
+                <textarea
+                  value={scene.text ?? text}
+                  onChange={(e) => onSceneTextChange?.(scene.id, e.target.value)}
+                  placeholder="Narration text for this scene…"
+                  rows={2}
+                  className="w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                {!onSceneTextChange && !text && (
                   <p className="text-xs text-muted-foreground/60 italic">
                     No text content for this scene
                   </p>

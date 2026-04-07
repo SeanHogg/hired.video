@@ -98,24 +98,37 @@ function cardBackgroundNode(scene: SceneScript, theme: VideoTheme): SceneNode | 
 
 // ─── Background helper ────────────────────────────────────────────────────────
 
-function backgroundNode(theme: VideoTheme, palette: string[], imageOverride?: string, position?: ImagePosition): SceneNode {
+function backgroundNode(theme: VideoTheme, palette: string[], scene: SceneScript): SceneNode {
   const primary = palette[0] ?? "#7c3aed";
   const secondary = palette[1] ?? "#2563eb";
 
-  // "full" (or no position) → image replaces the background entirely
-  const useImageAsBg = imageOverride && (!position || position === "full");
+  const sceneBgUrl = scene.backgroundImage;
+  const sceneBgType = scene.backgroundMediaType ?? "image";
+  const sceneBgPos = scene.backgroundImagePosition;
 
-  const bgContent = useImageAsBg
-    ? `custom:${imageOverride}`
-    : theme.customBackground
-    ? `custom:${theme.customBackground}`
-    : theme.background === "solid"
-    ? primary
-    : theme.background === "dark-tech-grid"
-    ? "dark-tech-grid:" + primary
-    : theme.background === "particles"
-    ? "particles:" + primary
-    : `gradient:${primary}:${secondary}`;
+  // Per-scene full-screen media takes priority over the global theme background.
+  // "full" (or no position) → media replaces the background entirely.
+  const useSceneAsBg = sceneBgUrl && (!sceneBgPos || sceneBgPos === "full");
+
+  let bgContent: string;
+  if (useSceneAsBg) {
+    bgContent = sceneBgType === "video"
+      ? `customVideo:${sceneBgUrl}`
+      : `custom:${sceneBgUrl}`;
+  } else if (theme.customBackground) {
+    const themeType = theme.customBackgroundType ?? "image";
+    bgContent = themeType === "video"
+      ? `customVideo:${theme.customBackground}`
+      : `custom:${theme.customBackground}`;
+  } else if (theme.background === "solid") {
+    bgContent = primary;
+  } else if (theme.background === "dark-tech-grid") {
+    bgContent = "dark-tech-grid:" + primary;
+  } else if (theme.background === "particles") {
+    bgContent = "particles:" + primary;
+  } else {
+    bgContent = `gradient:${primary}:${secondary}`;
+  }
 
   return {
     id: nodeId("background"),
@@ -127,17 +140,28 @@ function backgroundNode(theme: VideoTheme, palette: string[], imageOverride?: st
   };
 }
 
-/** Image overlay node for non-full positions. */
-function imageOverlayNode(url: string, position: ImagePosition, theme: VideoTheme, animation?: string): SceneNode {
+/** Image overlay node for non-full positions (legacy backgroundImage path). */
+function imageOverlayNode(url: string, position: ImagePosition, theme: VideoTheme, animation?: string, mediaType: "image" | "video" = "image"): SceneNode {
+  const content = mediaType === "video"
+    ? `video:${position}:${url}`
+    : `${position}:${url}`;
   return {
     id: nodeId("image"),
     type: "image",
     transform: identity(),
-    style: baseStyle(theme, { background: `${position}:${url}` }),
-    content: `${position}:${url}`,
+    style: baseStyle(theme, { background: content }),
+    content,
     kenBurns: animation && animation !== "none" ? animation : undefined,
     animations: [],
   };
+}
+
+/** New explicit overlay node — drawn on top of the scene background. */
+function overlayMediaNode(scene: SceneScript, theme: VideoTheme): SceneNode | null {
+  if (!scene.overlayMediaUrl) return null;
+  const position = scene.overlayMediaPosition ?? "full";
+  const mediaType = scene.overlayMediaType ?? "image";
+  return imageOverlayNode(scene.overlayMediaUrl, position, theme, scene.overlayMediaAnimation, mediaType);
 }
 
 /** Particles overlay — rendered on top of whatever the background is (including custom images). */
@@ -166,10 +190,14 @@ function buildIntroGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     ? [scene.accentColor, ...theme.colorPalette.slice(1)]
     : theme.colorPalette;
   const pos = scene.backgroundImagePosition;
-  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene)];
+  // Legacy: backgroundImage with a non-full position is treated as an overlay
   if (scene.backgroundImage && pos && pos !== "full") {
-    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation));
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation, scene.backgroundMediaType ?? "image"));
   }
+  // New: explicit overlay media (independent of the background)
+  const overlay = overlayMediaNode(scene, theme);
+  if (overlay) nodes.push(overlay);
 
   if (shouldAddParticles(theme, scene)) {
     nodes.push(particlesNode(theme));
@@ -197,10 +225,14 @@ function buildAchievementGraph(scene: SceneScript, theme: VideoTheme): SceneNode
     ? [scene.accentColor, ...theme.colorPalette.slice(1)]
     : theme.colorPalette;
   const pos = scene.backgroundImagePosition;
-  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene)];
+  // Legacy: backgroundImage with a non-full position is treated as an overlay
   if (scene.backgroundImage && pos && pos !== "full") {
-    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation));
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation, scene.backgroundMediaType ?? "image"));
   }
+  // New: explicit overlay media (independent of the background)
+  const overlay = overlayMediaNode(scene, theme);
+  if (overlay) nodes.push(overlay);
 
   if (shouldAddParticles(theme, scene)) {
     nodes.push(particlesNode(theme));
@@ -226,10 +258,14 @@ function buildSkillsGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     ? [scene.accentColor, ...theme.colorPalette.slice(1)]
     : theme.colorPalette;
   const pos = scene.backgroundImagePosition;
-  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene)];
+  // Legacy: backgroundImage with a non-full position is treated as an overlay
   if (scene.backgroundImage && pos && pos !== "full") {
-    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation));
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation, scene.backgroundMediaType ?? "image"));
   }
+  // New: explicit overlay media (independent of the background)
+  const overlay = overlayMediaNode(scene, theme);
+  if (overlay) nodes.push(overlay);
 
   if (shouldAddParticles(theme, scene)) {
     nodes.push(particlesNode(theme));
@@ -255,10 +291,14 @@ function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
     ? [scene.accentColor, ...theme.colorPalette.slice(1)]
     : theme.colorPalette;
   const pos = scene.backgroundImagePosition;
-  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene.backgroundImage, pos)];
+  const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene)];
+  // Legacy: backgroundImage with a non-full position is treated as an overlay
   if (scene.backgroundImage && pos && pos !== "full") {
-    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation));
+    nodes.push(imageOverlayNode(scene.backgroundImage, pos, theme, scene.imageAnimation, scene.backgroundMediaType ?? "image"));
   }
+  // New: explicit overlay media (independent of the background)
+  const overlay = overlayMediaNode(scene, theme);
+  if (overlay) nodes.push(overlay);
 
   if (shouldAddParticles(theme, scene)) {
     nodes.push(particlesNode(theme));

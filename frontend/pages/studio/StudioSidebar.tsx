@@ -150,6 +150,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
+  /** Where stock-media picks land: scene background, scene overlay, or all scenes (global theme background). */
+  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-overlay" | "all-scenes">("scene-background");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -217,24 +219,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     onBackgroundSelect?.(preset.value);
   }
 
-  /** Apply a stock media URL to the currently focused scene only. Returns false if nothing was applied. */
+  /** Apply a stock media URL based on the current target (scene-background / scene-overlay / all-scenes). */
   function applyMediaToTarget(cdnUrl: string, mediaType: "image" | "video" | "audio"): boolean {
-    if (!focusedSceneId || !script || !onScriptChange) {
-      // Refuse to apply — caller should show a message asking the user to focus a scene
-      return false;
-    }
-    if (mediaType === "image" || mediaType === "video") {
-      onScriptChange({
-        ...script,
-        scenes: script.scenes.map((s) =>
-          s.id === focusedSceneId
-            ? { ...s, backgroundImage: cdnUrl, backgroundImagePosition: s.backgroundImagePosition ?? "full" }
-            : s,
-        ),
-      });
-      return true;
-    }
+    if (!script || !onScriptChange) return false;
+
+    // Audio always goes to the focused scene's sceneAudio slot
     if (mediaType === "audio") {
+      if (!focusedSceneId) return false;
       onScriptChange({
         ...script,
         scenes: script.scenes.map((s) =>
@@ -245,22 +236,86 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
       });
       return true;
     }
-    return false;
-  }
 
-  /** Remove media from a scene */
-  function removeSceneMedia(sceneId: string, kind: "image" | "audio") {
-    if (!script || !onScriptChange) return;
+    // Image / video routing
+    if (mediaTarget === "all-scenes") {
+      // Global theme background — applies to all scenes that don't have their own
+      onScriptChange({
+        ...script,
+        video: {
+          ...script.video,
+          theme: {
+            ...script.video.theme,
+            customBackground: cdnUrl,
+            customBackgroundType: mediaType === "video" ? "video" : "image",
+          },
+        },
+      });
+      return true;
+    }
+
+    // Per-scene targets need a focused scene
+    if (!focusedSceneId) return false;
+
+    if (mediaTarget === "scene-overlay") {
+      onScriptChange({
+        ...script,
+        scenes: script.scenes.map((s) =>
+          s.id === focusedSceneId
+            ? {
+                ...s,
+                overlayMediaUrl: cdnUrl,
+                overlayMediaType: mediaType === "video" ? "video" : "image",
+                overlayMediaPosition: s.overlayMediaPosition ?? "half-right",
+              }
+            : s,
+        ),
+      });
+      return true;
+    }
+
+    // Default: scene-background
     onScriptChange({
       ...script,
       scenes: script.scenes.map((s) =>
-        s.id === sceneId
-          ? kind === "image"
-            ? { ...s, backgroundImage: undefined, backgroundImagePosition: undefined, imageAnimation: undefined }
-            : { ...s, sceneAudio: undefined, sceneAudioLabel: undefined }
+        s.id === focusedSceneId
+          ? {
+              ...s,
+              backgroundImage: cdnUrl,
+              backgroundMediaType: mediaType === "video" ? "video" : "image",
+              backgroundImagePosition: "full",
+            }
           : s,
       ),
     });
+    return true;
+  }
+
+  /** Remove media from a scene or theme. */
+  function removeSceneMedia(sceneId: string, kind: "background" | "overlay" | "audio") {
+    if (!script || !onScriptChange) return;
+    onScriptChange({
+      ...script,
+      scenes: script.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        if (kind === "background") return { ...s, backgroundImage: undefined, backgroundMediaType: undefined, backgroundImagePosition: undefined, imageAnimation: undefined };
+        if (kind === "overlay") return { ...s, overlayMediaUrl: undefined, overlayMediaType: undefined, overlayMediaPosition: undefined, overlayMediaAnimation: undefined };
+        return { ...s, sceneAudio: undefined, sceneAudioLabel: undefined };
+      }),
+    });
+  }
+
+  function removeGlobalBackground() {
+    if (!script || !onScriptChange) return;
+    onScriptChange({
+      ...script,
+      video: {
+        ...script.video,
+        theme: { ...script.video.theme, customBackground: undefined, customBackgroundType: undefined },
+      },
+    });
+    setCustomBgUrl(null);
+    setActiveBg(null);
   }
 
   async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -581,6 +636,28 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </button>
         {!collapsed.stockMedia && (
           <>
+            {/* Target toggle: where do picks go? */}
+            <div className="flex gap-1 mb-1.5">
+              {([
+                { value: "scene-background", label: "Background" },
+                { value: "scene-overlay",    label: "Overlay" },
+                { value: "all-scenes",       label: "All Scenes" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMediaTarget(opt.value)}
+                  className={`flex-1 text-[10px] font-medium px-1.5 py-1 rounded border transition-colors ${
+                    mediaTarget === opt.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {/* Status hint */}
             {(() => {
               const focusedScene = focusedSceneId
                 ? script?.scenes.find((s) => s.id === focusedSceneId)
@@ -588,16 +665,30 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               const focusedIdx = focusedScene
                 ? (script?.scenes.findIndex((s) => s.id === focusedSceneId) ?? -1) + 1
                 : 0;
-              return focusedScene ? (
-                <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
-                  <p className="text-primary font-semibold">
-                    Editing scene {focusedIdx}: {focusedScene.title ?? focusedScene.type}
-                  </p>
-                  <p className="text-muted-foreground leading-tight mt-0.5">
-                    Picked media will be added to this scene only.
-                  </p>
-                </div>
-              ) : (
+              if (mediaTarget === "all-scenes") {
+                return (
+                  <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
+                    <p className="text-primary font-semibold">All scenes</p>
+                    <p className="text-muted-foreground leading-tight mt-0.5">
+                      Picks will set the storyboard-wide background. Individual scene backgrounds override it.
+                    </p>
+                  </div>
+                );
+              }
+              if (focusedScene) {
+                const slot = mediaTarget === "scene-overlay" ? "overlay" : "background";
+                return (
+                  <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
+                    <p className="text-primary font-semibold">
+                      Scene {focusedIdx}: {focusedScene.title ?? focusedScene.type}
+                    </p>
+                    <p className="text-muted-foreground leading-tight mt-0.5">
+                      Picks will set this scene&apos;s {slot}.
+                    </p>
+                  </div>
+                );
+              }
+              return (
                 <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 mb-1.5 text-[10px] text-amber-700 dark:text-amber-400">
                   Click a scene in the storyboard first to target it.
                 </div>
@@ -619,8 +710,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         )}
       </section>
 
-      {/* Media in Use — per-scene inventory with remove buttons */}
-      {script && script.scenes.some((s) => s.backgroundImage || s.sceneAudio) && (
+      {/* Media in Use — per-scene + global inventory with remove buttons */}
+      {script && (script.video.theme.customBackground || script.scenes.some((s) => s.backgroundImage || s.overlayMediaUrl || s.sceneAudio)) && (
         <section className="px-3 pb-3 border-t pt-3">
           <button
             type="button"
@@ -632,8 +723,46 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           </button>
           {!collapsed.mediaInUse && (
             <ul className="flex flex-col gap-1.5">
+              {/* Global storyboard background */}
+              {script.video.theme.customBackground && (
+                <li className="rounded-md border border-primary/30 bg-primary/5 p-1.5 text-[10px]">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="font-semibold text-primary">All Scenes</span>
+                    <span className="text-muted-foreground/70">Storyboard background</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {script.video.theme.customBackgroundType === "video" ? (
+                      <div className="w-12 h-8 rounded border border-border shrink-0 flex items-center justify-center bg-muted">
+                        <Music2 className="w-3 h-3 text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <img
+                        src={script.video.theme.customBackground}
+                        alt=""
+                        className="w-12 h-8 object-cover rounded border border-border shrink-0"
+                        crossOrigin="anonymous"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    )}
+                    <span className="flex-1 truncate text-muted-foreground">
+                      {script.video.theme.customBackgroundType === "video" ? "Video" : "Image"}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remove storyboard background"
+                      className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
+                      onClick={removeGlobalBackground}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </li>
+              )}
+              {/* Per-scene media */}
               {script.scenes.map((s, i) => {
-                if (!s.backgroundImage && !s.sceneAudio) return null;
+                if (!s.backgroundImage && !s.overlayMediaUrl && !s.sceneAudio) return null;
+                const isVideoBg = s.backgroundMediaType === "video";
+                const isVideoOverlay = s.overlayMediaType === "video";
                 return (
                   <li key={s.id} className="rounded-md border border-border bg-card p-1.5 text-[10px]">
                     <div className="flex items-center gap-1.5 mb-1">
@@ -642,19 +771,55 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     </div>
                     {s.backgroundImage && (
                       <div className="flex items-center gap-1.5">
-                        <img
-                          src={s.backgroundImage}
-                          alt=""
-                          className="w-12 h-8 object-cover rounded border border-border shrink-0"
-                          crossOrigin="anonymous"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                        <span className="flex-1 truncate text-muted-foreground">Image</span>
+                        {isVideoBg ? (
+                          <div className="w-12 h-8 rounded border border-border shrink-0 flex items-center justify-center bg-muted">
+                            <Music2 className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <img
+                            src={s.backgroundImage}
+                            alt=""
+                            className="w-12 h-8 object-cover rounded border border-border shrink-0"
+                            crossOrigin="anonymous"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        )}
+                        <span className="flex-1 truncate text-muted-foreground">
+                          Background ({isVideoBg ? "video" : "image"})
+                        </span>
                         <button
                           type="button"
-                          title="Remove image"
+                          title="Remove background"
                           className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
-                          onClick={() => removeSceneMedia(s.id, "image")}
+                          onClick={() => removeSceneMedia(s.id, "background")}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    {s.overlayMediaUrl && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {isVideoOverlay ? (
+                          <div className="w-12 h-8 rounded border border-border shrink-0 flex items-center justify-center bg-muted">
+                            <Music2 className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <img
+                            src={s.overlayMediaUrl}
+                            alt=""
+                            className="w-12 h-8 object-cover rounded border border-border shrink-0"
+                            crossOrigin="anonymous"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        )}
+                        <span className="flex-1 truncate text-muted-foreground">
+                          Overlay ({isVideoOverlay ? "video" : "image"})
+                        </span>
+                        <button
+                          type="button"
+                          title="Remove overlay"
+                          className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
+                          onClick={() => removeSceneMedia(s.id, "overlay")}
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>

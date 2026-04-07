@@ -2226,7 +2226,7 @@ studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
     title: z.string().min(1).max(120),
-    description: z.string().max(500).optional(),
+    description: z.string().max(500).nullable().optional(),
     positionSeconds: z.number().min(0),
     fields: z.array(z.object({
       key: z.string().min(1),
@@ -2236,7 +2236,7 @@ studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
       options: z.array(z.string()).optional(), // for select
     })).min(1),
     requireToContinue: z.boolean().default(true),
-    redirectUrl: z.string().url().optional(),
+    redirectUrl: z.string().url().nullable().optional(),
     submitButtonText: z.string().max(40).optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);

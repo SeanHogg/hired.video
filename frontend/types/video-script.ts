@@ -29,8 +29,10 @@ export interface VideoTheme {
   motion: MotionStyle;
   transition: TransitionStyle;
   background: BackgroundStyle;
-  /** Blob URL or data URL for a user-uploaded background image */
+  /** URL for a user-uploaded background that applies to ALL scenes (image or video). */
   customBackground?: string;
+  /** Type of customBackground media — defaults to "image" for backwards compatibility. */
+  customBackgroundType?: "image" | "video";
   /** Visual filter / colour grading applied to the canvas output (gap #125). */
   filters?: VideoFilters;
 }
@@ -124,8 +126,20 @@ export interface SceneScript {
   cardBackgroundColor?: string;
   /** Optional border colour drawn around the text card. */
   cardBorderColor?: string;
+  /** URL of the scene's full-screen background media (image or video). */
   backgroundImage?: string;
+  /** Type of backgroundImage media — defaults to "image" for backwards compatibility. */
+  backgroundMediaType?: "image" | "video";
+  /** Legacy: positioning for `backgroundImage` when used as overlay. New code uses `overlayMediaUrl` instead. */
   backgroundImagePosition?: ImagePosition;
+  /** URL of an overlay media (image or video) drawn on top of the background. */
+  overlayMediaUrl?: string;
+  /** Type of overlay media. */
+  overlayMediaType?: "image" | "video";
+  /** Position of the overlay (full | half-left | half-right | corners). */
+  overlayMediaPosition?: ImagePosition;
+  /** Optional Ken-Burns animation for image overlays. */
+  overlayMediaAnimation?: ImageAnimation;
   sceneAudio?: string;
   sceneAudioLabel?: string;
   textAlign?: TextAlign;

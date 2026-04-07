@@ -44,6 +44,7 @@ interface Props {
   onApplyRewrite?: (scenes: Array<Record<string, unknown>>) => void;
   onApplyHook?: (sceneZeroPatch: { title?: string; subtitle?: string; text?: string }) => void;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
+  onVoiceConfigChange?: (config: { voiceId: string; voiceName: string; speed: number }) => void;
 }
 
 /** First-tab label per content template */
@@ -63,6 +64,7 @@ export default function StudioEditor({
   contentTemplate,
   currentTimeSec, videoUrl,
   onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
+  onVoiceConfigChange,
 }: Props) {
   const firstLabel = getFirstTabLabel(contentTemplate);
 
@@ -168,6 +170,7 @@ export default function StudioEditor({
             onApplyRewrite={onApplyRewrite ?? (() => {})}
             onApplyHook={onApplyHook ?? (() => {})}
             onVoiceoverGenerated={onVoiceoverGenerated}
+            onVoiceConfigChange={onVoiceConfigChange}
           />
         )}
 
