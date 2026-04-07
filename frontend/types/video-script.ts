@@ -122,6 +122,33 @@ export interface VideoAudio {
   label: string;
   /** 0–1 */
   volume: number;
+  /** Multi-track mixer settings (gap #129). Per-lane gain + fade envelopes. */
+  mix?: AudioMixConfig;
+}
+
+/**
+ * Per-lane audio mix settings. The `ambient-player.ts` exporter consumes
+ * these during the final render pass to apply gain + fade-in/out envelopes
+ * to each track independently. Lanes are summed to a master output that
+ * also has its own master gain.
+ */
+export interface AudioMixConfig {
+  /** Master output gain applied after all lanes are summed (0..2). */
+  masterGain?: number;
+  music?: AudioLaneConfig;
+  voiceover?: AudioLaneConfig;
+  recording?: AudioLaneConfig;
+}
+
+export interface AudioLaneConfig {
+  /** Lane gain 0..2 (1 = unity, >1 = boost). */
+  gain?: number;
+  /** Fade-in duration in seconds. */
+  fadeInSec?: number;
+  /** Fade-out duration in seconds. */
+  fadeOutSec?: number;
+  /** Mute lane entirely without losing settings. */
+  muted?: boolean;
 }
 
 // ── TTS Voiceover ───────────────────────────────────────────────────────────

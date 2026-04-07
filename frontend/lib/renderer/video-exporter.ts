@@ -182,24 +182,60 @@ async function exportMediaRecorderWithAudio(
   const audioCtx = new AudioContext();
   const audioDest = audioCtx.createMediaStreamDestination();
 
-  // Play ambient music if a real track is selected
+  // Multi-track mixer (gap #129) — per-lane GainNodes feed a master gain
+  // before the destination. Each lane optionally applies its own fade-in /
+  // fade-out envelope using `setValueAtTime` + `linearRampToValueAtTime`.
+  const mix = audio.mix;
+  const masterGainNode = audioCtx.createGain();
+  masterGainNode.gain.value = mix?.masterGain ?? 1;
+  masterGainNode.connect(audioDest);
+
+  function buildLane(
+    laneCfg: { gain?: number; fadeInSec?: number; fadeOutSec?: number; muted?: boolean } | undefined,
+    baseGain: number,
+  ): GainNode {
+    const node = audioCtx.createGain();
+    const peak = laneCfg?.muted ? 0 : (laneCfg?.gain ?? 1) * baseGain;
+    const now = audioCtx.currentTime;
+    const fadeIn = laneCfg?.fadeInSec ?? 0;
+    const fadeOut = laneCfg?.fadeOutSec ?? 0;
+
+    if (fadeIn > 0) {
+      node.gain.setValueAtTime(0, now);
+      node.gain.linearRampToValueAtTime(peak, now + fadeIn);
+    } else {
+      node.gain.setValueAtTime(peak, now);
+    }
+    if (fadeOut > 0) {
+      const fadeStart = now + Math.max(0, totalDuration - fadeOut);
+      node.gain.setValueAtTime(peak, fadeStart);
+      node.gain.linearRampToValueAtTime(0, now + totalDuration);
+    }
+    node.connect(masterGainNode);
+    return node;
+  }
+
+  // Music lane
   const hasAmbientTrack = audio.track && audio.track !== "none";
+  const musicLane = buildLane(mix?.music, audio.volume ?? 0.6);
   const exportPlayer = new AmbientPlayer();
   if (hasAmbientTrack) {
-    exportPlayer.playToDestination(audio.track, audio.volume ?? 0.6, audioCtx, audioDest);
+    // Lane gain replaces the previous direct masterGain wiring; the player
+    // now writes into musicLane instead of audioDest.
+    exportPlayer.playToDestination(audio.track, 1, audioCtx, musicLane);
   } else {
-    // Create a silent oscillator so the audio destination stream stays active
-    // (MediaRecorder needs at least one active audio source)
+    // Silent oscillator on the master so MediaRecorder stays active.
     const silence = audioCtx.createOscillator();
     const silenceGain = audioCtx.createGain();
     silenceGain.gain.value = 0;
     silence.connect(silenceGain);
-    silenceGain.connect(audioDest);
+    silenceGain.connect(masterGainNode);
     silence.start();
   }
 
-  // Schedule voiceover audio buffers at each scene's start time
+  // Voiceover lane
   if (opts.voiceover?.enabled && opts.sceneTimings) {
+    const voLane = buildLane(mix?.voiceover, 1);
     for (const timing of opts.sceneTimings) {
       const sceneVo = opts.voiceover.scenes[timing.id];
       if (!sceneVo?.audioUrl) continue;
@@ -207,7 +243,7 @@ async function exportMediaRecorderWithAudio(
       if (!buffer) continue;
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
-      source.connect(audioDest);
+      source.connect(voLane);
       source.start(audioCtx.currentTime + timing.start);
     }
   }

@@ -140,6 +140,115 @@ advertisingRoutes.delete("/boosts/:id", async (c) => {
   return c.json(ok({ cancelled: true }));
 });
 
+// ─── Company Boosts (gap #107) ────────────────────────────────────────────────
+
+const CreateCompanyBoostSchema = z.object({
+  companyId:     z.string().uuid(),
+  placementType: z.enum(["directory_featured", "dashboard_spotlight", "discovery_feed", "all"]),
+  pricingModel:  z.enum(["flat", "cpm"]),
+  budgetCents:   z.number().int().min(1000), // minimum $10
+  durationDays:  z.number().int().min(1).max(90),
+});
+
+// GET /api/advertising/company-boosts — list current user's company boosts
+advertisingRoutes.get("/company-boosts", async (c) => {
+  const userId = uid(c);
+  const db = getDb();
+  const boosts = await db
+    .select()
+    .from(schema.companyBoosts)
+    .where(eq(schema.companyBoosts.userId, userId))
+    .orderBy(desc(schema.companyBoosts.createdAt));
+
+  // Enrich with company names
+  const ids = [...new Set(boosts.map((b) => b.companyId))];
+  let nameMap: Record<string, string> = {};
+  if (ids.length > 0) {
+    const rows = await db.select({ id: schema.companyProfiles.id, name: schema.companyProfiles.name })
+      .from(schema.companyProfiles);
+    nameMap = Object.fromEntries(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r.name]));
+  }
+
+  return c.json(ok(boosts.map((b) => ({ ...b, companyName: nameMap[b.companyId] ?? "Company" }))));
+});
+
+// POST /api/advertising/company-boosts — create a new company boost
+advertisingRoutes.post("/company-boosts", async (c) => {
+  const userId = uid(c);
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = CreateCompanyBoostSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } }, 400);
+  }
+  const { companyId, placementType, pricingModel, budgetCents, durationDays } = parsed.data;
+  const db = getDb();
+
+  // Verify company ownership
+  const [company] = await db.select().from(schema.companyProfiles)
+    .where(and(eq(schema.companyProfiles.id, companyId), eq(schema.companyProfiles.ownerId, userId)))
+    .limit(1);
+  if (!company) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Company not found or not owned by you" } }, 404);
+
+  const endsAt = new Date();
+  endsAt.setDate(endsAt.getDate() + durationDays);
+
+  const [boost] = await db.insert(schema.companyBoosts).values({
+    companyId,
+    userId,
+    placementType,
+    pricingModel,
+    budgetCents,
+    endsAt,
+    rateUnitCents: pricingModel === "flat" ? Math.round(budgetCents / durationDays) : 500,
+  } as any).returning();
+
+  // Mark company as featured
+  await db.update(schema.companyProfiles)
+    .set({ featured: true, featuredUntil: endsAt, featuredRankBoost: 10, updatedAt: new Date() } as any)
+    .where(eq(schema.companyProfiles.id, companyId));
+
+  return c.json(ok(boost), 201);
+});
+
+// PATCH /api/advertising/company-boosts/:id/pause
+advertisingRoutes.patch("/company-boosts/:id/pause", async (c) => {
+  const userId = uid(c);
+  const db = getDb();
+  const [boost] = await db.update(schema.companyBoosts)
+    .set({ status: "paused", updatedAt: new Date() } as any)
+    .where(and(eq(schema.companyBoosts.id, c.req.param("id")), eq(schema.companyBoosts.userId, userId)))
+    .returning();
+  if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
+  return c.json(ok(boost));
+});
+
+// PATCH /api/advertising/company-boosts/:id/resume
+advertisingRoutes.patch("/company-boosts/:id/resume", async (c) => {
+  const userId = uid(c);
+  const db = getDb();
+  const [boost] = await db.update(schema.companyBoosts)
+    .set({ status: "active", updatedAt: new Date() } as any)
+    .where(and(eq(schema.companyBoosts.id, c.req.param("id")), eq(schema.companyBoosts.userId, userId)))
+    .returning();
+  if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
+  return c.json(ok(boost));
+});
+
+// DELETE /api/advertising/company-boosts/:id — cancel + unfeature the company
+advertisingRoutes.delete("/company-boosts/:id", async (c) => {
+  const userId = uid(c);
+  const db = getDb();
+  const [boost] = await db.select().from(schema.companyBoosts)
+    .where(and(eq(schema.companyBoosts.id, c.req.param("id")), eq(schema.companyBoosts.userId, userId)))
+    .limit(1);
+  if (!boost) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Boost not found" } }, 404);
+
+  await db.update(schema.companyBoosts).set({ status: "cancelled", updatedAt: new Date() } as any).where(eq(schema.companyBoosts.id, boost.id));
+  await db.update(schema.companyProfiles).set({ featured: false, featuredUntil: null, featuredRankBoost: 0, updatedAt: new Date() } as any).where(eq(schema.companyProfiles.id, boost.companyId));
+
+  return c.json(ok({ cancelled: true }));
+});
+
 // ─── Ad Campaigns (gap #108) ──────────────────────────────────────────────────
 
 const CreateCampaignSchema = z.object({
@@ -452,4 +561,126 @@ advertisingRoutes.post("/enrichment/enrich", async (c) => {
   };
 
   return c.json(ok(enriched));
+});
+
+// ─── Advertising Analytics Dashboard (gap #111) ───────────────────────────────
+// Unified ROAS + funnel reporting across paid placements (jobBoosts +
+// companyBoosts + adCampaigns) and email/messaging campaigns. Joins
+// `placements` to compute hires + revenue attribution.
+
+advertisingRoutes.get("/analytics/dashboard", async (c) => {
+  const userId = uid(c);
+  const db = getDb();
+
+  const fromDays = Math.min(365, Math.max(1, parseInt(c.req.query("days") ?? "30", 10) || 30));
+  const fromDate = new Date(Date.now() - fromDays * 86400_000);
+
+  // ─── Job boosts ────────────────────────────────────────────────────────────
+  const jb = await db.select().from(schema.jobBoosts)
+    .where(and(
+      eq(schema.jobBoosts.userId, userId),
+      sql`${schema.jobBoosts.createdAt} >= ${fromDate}`,
+    ));
+
+  const jbStats = {
+    count: jb.length,
+    impressions: jb.reduce((a, b) => a + (b.impressions ?? 0), 0),
+    clicks: jb.reduce((a, b) => a + (b.clicks ?? 0), 0),
+    applications: jb.reduce((a, b) => a + (b.applications ?? 0), 0),
+    spentCents: jb.reduce((a, b) => a + (b.spentCents ?? 0), 0),
+    budgetCents: jb.reduce((a, b) => a + (b.budgetCents ?? 0), 0),
+  };
+
+  // ─── Company boosts ────────────────────────────────────────────────────────
+  const cb = await db.select().from(schema.companyBoosts)
+    .where(and(
+      eq(schema.companyBoosts.userId, userId),
+      sql`${schema.companyBoosts.createdAt} >= ${fromDate}`,
+    ));
+
+  const cbStats = {
+    count: cb.length,
+    impressions: cb.reduce((a, b) => a + (b.impressions ?? 0), 0),
+    clicks: cb.reduce((a, b) => a + (b.clicks ?? 0), 0),
+    follows: cb.reduce((a, b) => a + (b.follows ?? 0), 0),
+    spentCents: cb.reduce((a, b) => a + (b.spentCents ?? 0), 0),
+    budgetCents: cb.reduce((a, b) => a + (b.budgetCents ?? 0), 0),
+  };
+
+  // ─── Ad campaigns (#108) ───────────────────────────────────────────────────
+  const camp = await db.select().from(schema.adCampaigns)
+    .where(and(
+      eq(schema.adCampaigns.userId, userId),
+      sql`${schema.adCampaigns.createdAt} >= ${fromDate}`,
+    ));
+
+  const campStats = {
+    count: camp.length,
+    spentCents: camp.reduce((a, b) => a + (b.spentCents ?? 0), 0),
+    budgetCents: camp.reduce((a, b) => a + (b.budgetCents ?? 0), 0),
+    activeCount: camp.filter((c) => c.status === "active").length,
+  };
+
+  // ─── Hires + revenue (placements #50/#51) ──────────────────────────────────
+  const hires = await db.select().from(schema.placements)
+    .where(and(
+      eq(schema.placements.recruiterId, userId as any),
+      sql`${schema.placements.createdAt} >= ${fromDate}`,
+    ));
+
+  const totalHires = hires.length;
+  const totalFeeCents = hires.reduce(
+    (a, h) => a + (h.fee ? Math.round(parseFloat(String(h.fee)) * 100) : 0),
+    0,
+  );
+  const totalCommissionCents = hires.reduce(
+    (a, h) => a + (h.commissionAmount ? Math.round(parseFloat(String(h.commissionAmount)) * 100) : 0),
+    0,
+  );
+
+  // ─── Aggregates ────────────────────────────────────────────────────────────
+  const totalSpentCents = jbStats.spentCents + cbStats.spentCents + campStats.spentCents;
+  const totalImpressions = jbStats.impressions + cbStats.impressions;
+  const totalClicks = jbStats.clicks + cbStats.clicks;
+  const totalApplications = jbStats.applications;
+
+  const ctrPct = ctr(totalImpressions, totalClicks);
+  const cpc = costPerClick(totalSpentCents, totalClicks);
+  const cpaCents = totalApplications > 0 ? Math.round(totalSpentCents / totalApplications) : null;
+  const cphCents = totalHires > 0 ? Math.round(totalSpentCents / totalHires) : null;
+
+  // ROAS = (placement fee revenue) / ad spend
+  const roas = totalSpentCents > 0 ? Math.round((totalFeeCents / totalSpentCents) * 100) / 100 : null;
+
+  // Funnel
+  const funnel = [
+    { stage: "Impressions", count: totalImpressions },
+    { stage: "Clicks",      count: totalClicks },
+    { stage: "Applications", count: totalApplications },
+    { stage: "Hires",        count: totalHires },
+  ];
+
+  return c.json(ok({
+    rangeDays: fromDays,
+    sources: {
+      jobBoosts: jbStats,
+      companyBoosts: cbStats,
+      campaigns: campStats,
+    },
+    aggregates: {
+      totalSpentCents,
+      totalImpressions,
+      totalClicks,
+      totalApplications,
+      totalHires,
+      totalFeeCents,
+      totalCommissionCents,
+      ctrPct,
+      cpc,
+      cpaCents,
+      cphCents,
+      roas,
+    },
+    funnel,
+  }));
 });

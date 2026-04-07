@@ -24,6 +24,10 @@ export const companyProfiles = pgTable("company_profiles", {
   headquarters: varchar("headquarters", { length: 255 }),
   isVerified: boolean("is_verified").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  // gap #107 — self-serve featured company profile boost
+  featured: boolean("featured").default(false).notNull(),
+  featuredUntil: timestamp("featured_until", { withTimezone: true }),
+  featuredRankBoost: integer("featured_rank_boost").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

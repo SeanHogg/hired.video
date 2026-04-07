@@ -42,6 +42,36 @@ export const jobBoosts = pgTable("job_boosts", {
 ]);
 
 // ---------------------------------------------------------------------------
+// Company Boosts — self-serve featured company profile placement (gap #107)
+// Mirrors `jobBoosts` but targets a `companyProfiles` row instead of a job.
+// Surfaces the company in directory featured slots, dashboard spotlight,
+// and discovery-feed company cards based on `placementType`.
+// ---------------------------------------------------------------------------
+export const companyBoosts = pgTable("company_boosts", {
+  id:                    uuid("id").primaryKey().defaultRandom(),
+  companyId:             text("company_id").notNull(),
+  userId:                text("user_id").notNull(),                 // owner who paid
+  placementType:         text("placement_type").notNull(),           // directory_featured | dashboard_spotlight | discovery_feed | all
+  pricingModel:          text("pricing_model").notNull(),            // flat | cpm
+  budgetCents:           integer("budget_cents").notNull(),
+  spentCents:            integer("spent_cents").notNull().default(0),
+  rateUnitCents:         integer("rate_unit_cents").notNull().default(500),
+  status:                text("status").notNull().default("active"), // active | paused | completed | cancelled
+  impressions:           integer("impressions").notNull().default(0),
+  clicks:                integer("clicks").notNull().default(0),
+  follows:               integer("follows").notNull().default(0),    // company-page follows attributed
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  startsAt:              timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
+  endsAt:                timestamp("ends_at", { withTimezone: true }),
+  createdAt:             timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:             timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_company_boosts_company").on(t.companyId),
+  index("idx_company_boosts_user").on(t.userId),
+  index("idx_company_boosts_status").on(t.status),
+]);
+
+// ---------------------------------------------------------------------------
 // Ad Campaigns — Level 1: strategic objective grouping (gap #108)
 // ---------------------------------------------------------------------------
 export const adCampaigns = pgTable("ad_campaigns", {

@@ -949,3 +949,37 @@ export async function selectThumbnail(projectId: string, thumbnailId: string): P
   );
   return res.data;
 }
+
+// ─── AI Hook Optimizer (gap #143) ───────────────────────────────────────────
+
+export interface HookVariant {
+  label: string;
+  title?: string;
+  subtitle?: string;
+  text?: string;
+  rationale: string;
+}
+
+export interface HookOptimizerResult {
+  projectId: string;
+  diagnosis: string;
+  variants: HookVariant[];
+  retention: {
+    earlyDropPct: number | null;
+    topDropOffSecond: number | null;
+    sampleSize: number;
+  };
+}
+
+export async function optimizeHook(params: {
+  projectId: string;
+  storyboard: unknown;
+  videoId?: string;
+}): Promise<HookOptimizerResult> {
+  const { projectId, ...body } = params;
+  const res = await apiClient.post<HookOptimizerResult>(
+    `/api/studio/projects/${projectId}/hook/optimize`,
+    body,
+  );
+  return res.data;
+}

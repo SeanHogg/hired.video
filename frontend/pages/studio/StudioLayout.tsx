@@ -943,10 +943,12 @@ export default function StudioLayout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            {/* Studio toolbar — version history, chapters, AI rewrite, forms, review, thumbnails */}
+            {/* Studio toolbar — version history, chapters, AI rewrite, hook, mixer, forms, review, thumbnails */}
             <StudioToolbar
               projectId={state.projectId}
               storyboard={state.script}
+              script={state.script}
+              onScriptChange={handleScriptChange}
               sceneBoundaries={state.script?.scenes.map((s) => ({
                 start: s.start,
                 title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
@@ -970,6 +972,19 @@ export default function StudioLayout() {
                 patchState({ script: updated });
                 recompile(updated);
                 toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+              }}
+              onApplyHook={(patch) => {
+                if (!state.script || state.script.scenes.length === 0) return;
+                const next = {
+                  ...state.script,
+                  scenes: state.script.scenes.map((s, i) =>
+                    i === 0 ? { ...s, ...patch } : s,
+                  ),
+                } as VideoScript;
+                pushHistory(next);
+                patchState({ script: next });
+                recompile(next);
+                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
               }}
             />
             {/* Video preview — height controlled by drag handle */}
