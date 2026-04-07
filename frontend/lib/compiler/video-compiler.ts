@@ -48,20 +48,28 @@ export function compile(script: VideoScript): CompiledVideo {
   const { width, height } = resolveSize(video.resolution, video.aspect);
   const theme = video.theme;
 
-  const compiledScenes: CompiledScene[] = scenes.map((scene) => ({
-    id: scene.id,
-    type: scene.type,
-    start: scene.start,
-    duration: scene.duration,
-    background: sceneBackground(theme),
-    contentPosition: scene.contentPosition,
-    nodes: buildSceneGraph(scene, theme),
-  }));
+  // NLE behaviour (gap #124): treat the scene array as the canonical edit
+  // order and recompute `start` from cumulative durations. This makes split,
+  // merge, trim, and reorder operations transparent to downstream renderers
+  // — they only need to mutate the array and update `duration`. Legacy
+  // projects whose scene order matches their `start` order are unaffected.
+  let cursor = 0;
+  const compiledScenes: CompiledScene[] = scenes.map((scene) => {
+    const start = cursor;
+    cursor += scene.duration;
+    return {
+      id: scene.id,
+      type: scene.type,
+      start,
+      duration: scene.duration,
+      background: sceneBackground(theme),
+      contentPosition: scene.contentPosition,
+      nodes: buildSceneGraph(scene, theme),
+      transitionIn: scene.transitionIn,
+    };
+  });
 
-  // Ensure scenes are time-sorted
-  compiledScenes.sort((a, b) => a.start - b.start);
-
-  const totalDuration = video.duration;
+  const totalDuration = cursor || video.duration;
 
   return {
     totalDuration,

@@ -169,7 +169,7 @@ export function render(
 
   const scene = compiledVideo.getSceneAt(time);
   const progress = sceneProgress(scene, time);
-  const transition = compiledVideo.transition ?? "fade";
+  const themeTransition = compiledVideo.transition ?? "fade";
 
   // Find adjacent scene for transitions that need two frames
   const elapsed = time - scene.start;
@@ -182,6 +182,13 @@ export function render(
     ? compiledVideo.scenes[sceneIndex - 1]
     : null;
   const adjacentScene = nextScene ?? prevScene;
+
+  // Per-boundary transition override (gap #124): when exiting toward N+1
+  // we use N+1's `transitionIn`; when entering from prev, this scene's own
+  // `transitionIn` wins. Both fall back to the theme default.
+  const transition = isExiting && nextScene?.transitionIn
+    ? nextScene.transitionIn
+    : (!isExiting && scene.transitionIn) || themeTransition;
 
   switch (transition) {
     case "cut": {

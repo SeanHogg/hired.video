@@ -91,8 +91,20 @@ export interface SceneEffect {
 export interface SceneScript {
   id: string;
   start: number;                // absolute seconds from video start
-  duration: number;
+  duration: number;             // visible duration AFTER trim (= sourceDuration - inPoint - (sourceDuration - outPoint))
   type: SceneType;
+  /**
+   * NLE trim points (gap #124). When `inPoint` and `outPoint` are set, the
+   * scene plays only the slice [inPoint, outPoint) of its full source. When
+   * absent the scene plays in full (back-compat with AI-generated scenes).
+   * `sourceDuration` is the original untrimmed duration; we keep it so trim
+   * handles can be re-extended without losing content.
+   */
+  inPoint?: number;
+  outPoint?: number;
+  sourceDuration?: number;
+  /** Per-boundary transition into THIS scene (overrides theme default). */
+  transitionIn?: TransitionStyle;
   title?: string;
   subtitle?: string;
   text?: string | string[];

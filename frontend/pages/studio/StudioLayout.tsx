@@ -40,6 +40,7 @@ import { exportVideo } from "@/lib/renderer/video-exporter";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import StudioToolbar from "@/components/studio/StudioToolbar";
+import NLETimeline from "@/components/studio/NLETimeline";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import { defaultStudioState } from "@/types/studio";
 
@@ -1034,12 +1035,11 @@ export default function StudioLayout() {
               </button>
               {timelineOpen && (
                 state.script ? (
-                  <TimelineEditor
+                  <NLETimeline
                     script={state.script}
+                    onScriptChange={handleScriptChange}
                     currentTime={currentTime}
                     onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
-                    focusedSceneId={focusedSceneId}
-                    onSceneFocus={(id) => { setFocusedSceneId(id); setTab("storyboard"); }}
                   />
                 ) : (
                   <div className="px-5 py-3 text-xs text-muted-foreground">

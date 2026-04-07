@@ -80,6 +80,8 @@ export interface CompiledScene {
   /** Background fill: CSS colour or "gradient:…" token. */
   background: string;
   contentPosition?: "top" | "center" | "bottom";
+  /** Per-boundary entry transition (gap #124). Falls back to theme default if absent. */
+  transitionIn?: "cut" | "fade" | "slide" | "cinematic-fade";
 }
 
 export interface CompiledVideo {
