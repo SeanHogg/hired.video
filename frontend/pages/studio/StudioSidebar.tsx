@@ -113,6 +113,8 @@ interface Props {
   contentTemplate?: ContentTemplate;
   /** Called when user selects a content template */
   onContentTemplateSelect?: (template: ContentTemplate) => void;
+  /** Currently focused scene id (in storyboard editor) — when set, stock media picks insert into that scene */
+  focusedSceneId?: string;
 }
 
 const STATUS_COLOUR: Record<string, string> = {
@@ -144,7 +146,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -532,16 +534,54 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           {collapsed.stockMedia ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
         {!collapsed.stockMedia && (
-          <StockMediaPanel
-            projectId={activeProjectId ?? undefined}
-            onPick={(result) => {
-              if (result.cdnUrl && result.mediaType === "image") {
-                setCustomBgUrl(result.cdnUrl);
-                setActiveBg("custom");
-                onBackgroundSelect?.("custom", result.cdnUrl);
-              }
-            }}
-          />
+          <>
+            {focusedSceneId && (
+              <p className="text-[10px] text-primary mb-1.5 px-1">
+                Picks will be added to the selected scene
+              </p>
+            )}
+            {!focusedSceneId && (
+              <p className="text-[10px] text-muted-foreground mb-1.5 px-1">
+                Picks will set the global background. Click a scene in the storyboard to target it.
+              </p>
+            )}
+            <StockMediaPanel
+              projectId={activeProjectId ?? undefined}
+              sceneId={focusedSceneId}
+              onPick={(result) => {
+                if (!result.cdnUrl) return;
+                // If a scene is focused, insert the media into that scene
+                if (focusedSceneId && script && onScriptChange) {
+                  if (result.mediaType === "image") {
+                    onScriptChange({
+                      ...script,
+                      scenes: script.scenes.map((s) =>
+                        s.id === focusedSceneId
+                          ? { ...s, backgroundImage: result.cdnUrl, backgroundImagePosition: s.backgroundImagePosition ?? "full" }
+                          : s,
+                      ),
+                    });
+                  } else if (result.mediaType === "audio") {
+                    onScriptChange({
+                      ...script,
+                      scenes: script.scenes.map((s) =>
+                        s.id === focusedSceneId
+                          ? { ...s, sceneAudio: result.cdnUrl, sceneAudioLabel: "Stock audio" }
+                          : s,
+                      ),
+                    });
+                  }
+                  return;
+                }
+                // No scene focused — fall back to global background (image only)
+                if (result.mediaType === "image") {
+                  setCustomBgUrl(result.cdnUrl);
+                  setActiveBg("custom");
+                  onBackgroundSelect?.("custom", result.cdnUrl);
+                }
+              }}
+            />
+          </>
         )}
       </section>
 

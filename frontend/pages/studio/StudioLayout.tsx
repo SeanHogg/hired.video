@@ -941,6 +941,7 @@ export default function StudioLayout() {
             onScriptChange={handleScriptChange}
             contentTemplate={contentTemplate}
             onContentTemplateSelect={handleContentTemplateSelect}
+            focusedSceneId={focusedSceneId}
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
