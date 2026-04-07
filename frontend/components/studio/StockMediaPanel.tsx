@@ -52,6 +52,7 @@ export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRece
   const [pickingKey, setPickingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastPick, setLastPick] = useState<StockPickResult | null>(null);
+  const [recentFeedback, setRecentFeedback] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load recently-used assets on mount.
@@ -146,6 +147,14 @@ export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRece
         </div>
       )}
 
+      {/* Recent pick feedback */}
+      {recentFeedback && (
+        <div className="rounded-md border border-green-500/40 bg-green-500/5 px-2 py-1.5 text-[11px] flex items-center gap-1.5">
+          <Check className="w-3 h-3 text-green-600" />
+          <span className="font-medium truncate">Added "{recentFeedback}" to scene.</span>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
           {error}
@@ -217,7 +226,11 @@ export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRece
                 <button
                   key={r.hash}
                   type="button"
-                  onClick={() => onPickRecent?.(r)}
+                  onClick={() => {
+                    onPickRecent?.(r);
+                    setRecentFeedback(r.title || "Asset");
+                    setTimeout(() => setRecentFeedback(null), 2500);
+                  }}
                   title={`${r.title ?? ""} · ${r.author ?? ""} (${r.licence ?? ""})`}
                   className="group relative aspect-square rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
                 >

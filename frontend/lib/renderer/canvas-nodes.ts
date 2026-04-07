@@ -19,6 +19,13 @@ function getCachedImage(url: string): HTMLImageElement | null {
   if (!cached) {
     _imgCache.set(url, "loading");
     const img = new Image();
+    // crossOrigin must be set BEFORE src for the request to include the
+    // CORS Origin header. Without this, external images taint the canvas
+    // and break captureStream() during MediaRecorder export.
+    // Skip for blob:/data: URLs which are same-origin by definition.
+    if (!url.startsWith("blob:") && !url.startsWith("data:")) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => _imgCache.set(url, img);
     img.onerror = () => _imgCache.set(url, "error"); // stop retrying on failure
     img.src = url;
