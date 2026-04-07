@@ -366,29 +366,65 @@ export default function StudioPreview({
                       <ExternalLink className="w-3 h-3" /> View Profile
                     </a>
                   )}
-                  {isPublished && (
-                    <>
-                      <div className="flex items-center justify-between pt-0.5">
-                        <div className="flex items-center gap-1.5">
-                          {isPublic
-                            ? <Globe className="w-3 h-3 text-emerald-400" />
-                            : <Lock className="w-3 h-3 text-muted-foreground" />}
-                          <Label htmlFor="studio-public-toggle" className="text-[11px] cursor-pointer">
-                            {isPublic ? "Public page on" : "Make public"}
-                          </Label>
-                        </div>
-                        <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
+                  {/* Visibility toggle — once a video exists, the user can flip public/unlisted */}
+                  {hasVideo && (
+                    <div className="flex items-center justify-between pt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        {isPublic
+                          ? <Globe className="w-3 h-3 text-emerald-400" />
+                          : <Lock className="w-3 h-3 text-muted-foreground" />}
+                        <Label htmlFor="studio-public-toggle" className="text-[11px] cursor-pointer">
+                          {isPublic ? "Public page on" : "Make public"}
+                        </Label>
                       </div>
-                      {/* Share on X — use hired.video public URL, not YouTube */}
-                      <Button size="sm" variant="secondary" className="w-full h-7 text-xs" asChild>
+                      <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
+                    </div>
+                  )}
+                  {/* Public page URL with copy button — always shown when public */}
+                  {hasVideo && isPublic && state.projectId && (
+                    <div className="flex items-center gap-1 pt-0.5">
+                      <Input
+                        readOnly
+                        className="h-7 text-[10px] flex-1 font-mono"
+                        value={`https://hired.video/v/${state.projectId}`}
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[10px] shrink-0"
+                        title="Copy public URL"
+                        onClick={() => navigator.clipboard.writeText(`https://hired.video/v/${state.projectId}`)}
+                      >
+                        Copy
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[10px] shrink-0"
+                        title="Open public page"
+                        asChild
+                      >
                         <a
-                          href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=${encodeURIComponent(`https://hired.video/v/${state.youtubeVideoId ?? state.projectId ?? ""}`)}`}
-                          target="_blank" rel="noopener noreferrer"
+                          href={`https://hired.video/v/${state.projectId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                          <Share2 className="w-3 h-3 mr-1" /> Share on X
+                          <ExternalLink className="w-3 h-3" />
                         </a>
                       </Button>
-                    </>
+                    </div>
+                  )}
+                  {/* Share on X — use hired.video public URL */}
+                  {hasVideo && isPublic && (
+                    <Button size="sm" variant="secondary" className="w-full h-7 text-xs" asChild>
+                      <a
+                        href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=${encodeURIComponent(`https://hired.video/v/${state.projectId ?? ""}`)}`}
+                        target="_blank" rel="noopener noreferrer"
+                      >
+                        <Share2 className="w-3 h-3 mr-1" /> Share on X
+                      </a>
+                    </Button>
                   )}
                 </>
               )}

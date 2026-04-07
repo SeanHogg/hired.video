@@ -1377,11 +1377,28 @@ studioRoutes.get("/public/:videoId", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
 
-  // Detect if the param is a valid UUID; if not, search by youtubeVideoId
+  // The :videoId param can be any of:
+  //   - videos.id (UUID)
+  //   - videos.youtubeVideoId (string)
+  //   - studioProjects.id (UUID — what the studio "Copy URL" button uses)
+  //
+  // We resolve studioProjects.id → videos.id first if it matches a project,
+  // then fall through to the existing video-id / youtube-id lookup.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
-  const condition = isUuid
-    ? or(eq(videos.id, videoId), eq(videos.youtubeVideoId, videoId))
-    : eq(videos.youtubeVideoId, videoId);
+  let resolvedVideoId: string | null = null;
+  if (isUuid) {
+    const [proj] = await db
+      .select({ videoId: studioProjects.videoId })
+      .from(studioProjects)
+      .where(eq(studioProjects.id, videoId))
+      .limit(1);
+    if (proj?.videoId) resolvedVideoId = proj.videoId;
+  }
+  const condition = resolvedVideoId
+    ? eq(videos.id, resolvedVideoId)
+    : isUuid
+      ? or(eq(videos.id, videoId), eq(videos.youtubeVideoId, videoId))
+      : eq(videos.youtubeVideoId, videoId);
 
   const rows = await db
     .select({
