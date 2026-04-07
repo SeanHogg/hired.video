@@ -39,7 +39,8 @@ export type SceneNodeType =
   | "skillBubble"
   | "overlay"
   | "particles"
-  | "image";
+  | "image"
+  | "element";
 
 export interface SceneNode {
   id: string;
@@ -55,6 +56,8 @@ export interface SceneNode {
   textRevealProgress?: number;
   /** Ken Burns animation key for image nodes */
   kenBurns?: string;
+  /** Free-form scene element data (only set when type === "element"). */
+  element?: import("../../types/video-script").SceneElement;
 }
 
 // ─── Animations ──────────────────────────────────────────────────────────────

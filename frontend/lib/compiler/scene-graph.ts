@@ -329,15 +329,33 @@ function buildClosingGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   return nodes;
 }
 
+/** Convert each free-form scene element into a render node. Z-ordered ascending. */
+function buildElementNodes(scene: SceneScript, theme: VideoTheme): SceneNode[] {
+  if (!scene.sceneElements?.length) return [];
+  // Sort by z (default 0) so higher z values draw on top
+  const sorted = [...scene.sceneElements].sort((a, b) => (a.z ?? 0) - (b.z ?? 0));
+  return sorted.map((el): SceneNode => ({
+    id: nodeId("element"),
+    type: "element",
+    transform: identity(),
+    style: baseStyle(theme),
+    element: el,
+    animations: [],
+  }));
+}
+
 // ─── Public entry point ───────────────────────────────────────────────────────
 
 export function buildSceneGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   _nodeIdCounter = 0; // reset per scene for deterministic IDs
+  let baseNodes: SceneNode[];
   switch (scene.type) {
-    case "intro":       return buildIntroGraph(scene, theme);
-    case "achievement": return buildAchievementGraph(scene, theme);
-    case "skills":      return buildSkillsGraph(scene, theme);
-    case "closing":     return buildClosingGraph(scene, theme);
-    default:            return buildIntroGraph(scene, theme);
+    case "intro":       baseNodes = buildIntroGraph(scene, theme); break;
+    case "achievement": baseNodes = buildAchievementGraph(scene, theme); break;
+    case "skills":      baseNodes = buildSkillsGraph(scene, theme); break;
+    case "closing":     baseNodes = buildClosingGraph(scene, theme); break;
+    default:            baseNodes = buildIntroGraph(scene, theme); break;
   }
+  // Append free-form elements LAST so they draw on top of the canonical layout
+  return [...baseNodes, ...buildElementNodes(scene, theme)];
 }

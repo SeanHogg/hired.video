@@ -1,13 +1,14 @@
 // VideoPreview.tsx — canvas RAF loop calling frameRenderer.render().
 // When an audio track is provided it is played/paused in sync with the video.
-// When voiceover is enabled, browser TTS speaks each scene's text at the right time.
+// When voiceover is enabled, the configured TTS engine (Web Speech / Kokoro
+// / Piper / VibeVoice) speaks each scene's text at the right time.
 
 import { useEffect, useRef, useCallback } from "react";
 import { render } from "@/lib/renderer/frame-renderer";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoAudio, VoiceoverConfig } from "@/types/video-script";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
-import { speak, stopSpeaking } from "@/lib/services/browser-tts";
+import { speakWithEngine, stopEngine, type TtsEngineId } from "@/lib/services/tts-engines";
 
 interface SceneTiming {
   id: string;
@@ -72,14 +73,22 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
       const timing = sceneTimings.find((s) => s.id === activeSceneId);
       const text = timing?.text;
       if (text) {
-        const cancel = speak({
+        const engine = (voiceover.engine as TtsEngineId | undefined) ?? "web-speech";
+        // speakWithEngine is async (WebGPU engines load lazily). We don't
+        // await it inside the effect — instead, we capture the cancel as
+        // soon as it resolves. If the user has already moved off this
+        // scene by then, the cancel still works.
+        speakWithEngine(engine, {
           text,
-          voiceId: voiceover.voiceId !== "browser-default" ? voiceover.voiceId : undefined,
-          rate: voiceover.speed ?? 1,
+          voiceId: voiceover.voiceId !== "browser-default" ? voiceover.voiceId : "",
+          speed: voiceover.speed ?? 1,
           onEnd: () => { voCancelRef.current = null; },
           onError: () => { voCancelRef.current = null; },
+        }).then((cancel) => {
+          voCancelRef.current = cancel;
+        }).catch(() => {
+          voCancelRef.current = null;
         });
-        voCancelRef.current = cancel;
       }
       voActiveRef.current = activeSceneId;
     } else if (!activeSceneId && voActiveRef.current) {
@@ -120,7 +129,7 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
   useEffect(() => {
     return () => {
       getAmbientPlayer().stop();
-      stopSpeaking();
+      stopEngine();
       if (voCancelRef.current) { voCancelRef.current(); voCancelRef.current = null; }
     };
   }, []);

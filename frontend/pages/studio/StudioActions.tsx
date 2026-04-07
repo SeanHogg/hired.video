@@ -52,7 +52,12 @@ interface Props {
   onApplyRewrite: (scenes: Array<Record<string, unknown>>) => void;
   onApplyHook: (sceneZeroPatch: { title?: string; subtitle?: string; text?: string }) => void;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
-  onVoiceConfigChange?: (config: { voiceId: string; voiceName: string; speed: number }) => void;
+  onVoiceConfigChange?: (config: {
+    engine: "web-speech" | "kokoro" | "piper" | "vibevoice";
+    voiceId: string;
+    voiceName: string;
+    speed: number;
+  }) => void;
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {

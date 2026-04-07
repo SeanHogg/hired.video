@@ -150,8 +150,8 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
-  /** Where stock-media picks land: scene background, scene overlay, or all scenes (global theme background). */
-  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-overlay" | "all-scenes">("scene-background");
+  /** Where stock-media picks land. */
+  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-element" | "all-scenes">("scene-background");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -257,17 +257,26 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     // Per-scene targets need a focused scene
     if (!focusedSceneId) return false;
 
-    if (mediaTarget === "scene-overlay") {
+    if (mediaTarget === "scene-element") {
+      // Append a new free-form element at a sensible default position
+      const focused = script.scenes.find((s) => s.id === focusedSceneId);
+      const existingCount = focused?.sceneElements?.length ?? 0;
+      // Slight cascade so multiple adds don't pile on top of each other
+      const offset = (existingCount % 5) * 4;
+      const newEl = {
+        id: `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        kind: mediaType === "video" ? "video" as const : "image" as const,
+        url: cdnUrl,
+        box: { x: 10 + offset, y: 10 + offset, w: 40, h: 40 },
+        fit: "cover" as const,
+        z: existingCount,
+        style: { borderRadius: 8 },
+      };
       onScriptChange({
         ...script,
         scenes: script.scenes.map((s) =>
           s.id === focusedSceneId
-            ? {
-                ...s,
-                overlayMediaUrl: cdnUrl,
-                overlayMediaType: mediaType === "video" ? "video" : "image",
-                overlayMediaPosition: s.overlayMediaPosition ?? "half-right",
-              }
+            ? { ...s, sceneElements: [...(s.sceneElements ?? []), newEl] }
             : s,
         ),
       });
@@ -640,7 +649,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             <div className="flex gap-1 mb-1.5">
               {([
                 { value: "scene-background", label: "Background" },
-                { value: "scene-overlay",    label: "Overlay" },
+                { value: "scene-element",    label: "Add Element" },
                 { value: "all-scenes",       label: "All Scenes" },
               ] as const).map((opt) => (
                 <button
@@ -676,14 +685,17 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 );
               }
               if (focusedScene) {
-                const slot = mediaTarget === "scene-overlay" ? "overlay" : "background";
+                const description =
+                  mediaTarget === "scene-element"
+                    ? "Picks will be added as a new element you can position freely."
+                    : "Picks will replace this scene's full background.";
                 return (
                   <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
                     <p className="text-primary font-semibold">
                       Scene {focusedIdx}: {focusedScene.title ?? focusedScene.type}
                     </p>
                     <p className="text-muted-foreground leading-tight mt-0.5">
-                      Picks will set this scene&apos;s {slot}.
+                      {description}
                     </p>
                   </div>
                 );

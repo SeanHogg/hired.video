@@ -571,6 +571,138 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
       break;
     }
 
+    case "element": {
+      const el = node.element;
+      if (!el) break;
+      // Compute pixel rect from percent-based box
+      const px = (el.box.x / 100) * width;
+      const py = (el.box.y / 100) * height;
+      const pw = (el.box.w / 100) * width;
+      const ph = (el.box.h / 100) * height;
+      const padding = el.style?.padding ?? 0;
+      const radius = el.style?.borderRadius ?? 0;
+
+      ctx.globalAlpha = node.transform.alpha;
+
+      // Optional rotation around the box's center
+      if (el.rotation && el.rotation !== 0) {
+        const ccx = px + pw / 2;
+        const ccy = py + ph / 2;
+        ctx.translate(ccx, ccy);
+        ctx.rotate((el.rotation * Math.PI) / 180);
+        ctx.translate(-ccx, -ccy);
+      }
+
+      // Draw container background and border (if any)
+      if (el.style?.backgroundColor || el.style?.borderColor) {
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(px, py, pw, ph, radius);
+        } else {
+          ctx.rect(px, py, pw, ph);
+        }
+        if (el.style?.backgroundColor) {
+          ctx.fillStyle = el.style.backgroundColor;
+          ctx.fill();
+        }
+        if (el.style?.borderColor) {
+          ctx.strokeStyle = el.style.borderColor;
+          ctx.lineWidth = el.style.borderWidth ?? 2;
+          ctx.stroke();
+        }
+      }
+
+      // Inner content area (after padding)
+      const ix = px + padding;
+      const iy = py + padding;
+      const iw = pw - padding * 2;
+      const ih = ph - padding * 2;
+
+      if (el.kind === "text") {
+        const fontSize = el.fontSize ?? 24;
+        const fontWeight = el.fontWeight ?? "normal";
+        const fontFamily = el.fontFamily ?? "Inter, sans-serif";
+        const align: CanvasTextAlign = (el.align ?? "left") as CanvasTextAlign;
+        const vAlign = el.verticalAlign ?? "middle";
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = el.color ?? "#ffffff";
+        ctx.textAlign = align;
+        ctx.textBaseline = "middle";
+
+        // Wrap text within iw
+        const paragraphs = el.text.split("\n");
+        const lines = paragraphs.flatMap((p) => p.trim() ? wrapText(ctx, p, iw) : [""]);
+        const lineH = fontSize * 1.3;
+        const totalH = lines.length * lineH;
+
+        const tx = align === "left" ? ix : align === "right" ? ix + iw : ix + iw / 2;
+        const ty0 = vAlign === "top"
+          ? iy + lineH / 2
+          : vAlign === "bottom"
+          ? iy + ih - totalH + lineH / 2
+          : iy + (ih - totalH) / 2 + lineH / 2;
+
+        // Clip to box so text doesn't overflow visually
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(px, py, pw, ph, radius);
+        } else {
+          ctx.rect(px, py, pw, ph);
+        }
+        ctx.clip();
+        lines.forEach((l, i) => {
+          ctx.fillText(l, tx, ty0 + i * lineH);
+        });
+        ctx.restore();
+      } else if (el.kind === "image" || el.kind === "video") {
+        const useVideo = el.kind === "video" || (el.kind === "image" && looksLikeVideo(el.url));
+        const img = useVideo ? null : getCachedImage(el.url);
+        const video = useVideo ? getCachedVideo(el.url) : null;
+        const sourceReady = useVideo
+          ? !!(video && video.readyState >= 2 && video.videoWidth > 0)
+          : !!img;
+        if (!sourceReady) {
+          // Loading placeholder
+          ctx.fillStyle = "rgba(255,255,255,0.05)";
+          ctx.fillRect(ix, iy, iw, ih);
+          break;
+        }
+        const sourceW = useVideo ? video!.videoWidth : img!.naturalWidth;
+        const sourceH = useVideo ? video!.videoHeight : img!.naturalHeight;
+        const drawSource: CanvasImageSource = useVideo ? video! : img!;
+
+        // Clip to rounded rect
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(ix, iy, iw, ih, Math.max(0, radius - padding));
+        } else {
+          ctx.rect(ix, iy, iw, ih);
+        }
+        ctx.clip();
+
+        const fit = (el as { fit?: "cover" | "contain" | "fill" }).fit ?? "cover";
+        let dw: number, dh: number, dx: number, dy: number;
+        if (fit === "fill") {
+          dw = iw; dh = ih; dx = ix; dy = iy;
+        } else {
+          const scale = fit === "contain"
+            ? Math.min(iw / sourceW, ih / sourceH)
+            : Math.max(iw / sourceW, ih / sourceH);
+          dw = sourceW * scale;
+          dh = sourceH * scale;
+          dx = ix + (iw - dw) / 2;
+          dy = iy + (ih - dh) / 2;
+        }
+        ctx.drawImage(drawSource, dx, dy, dw, dh);
+        ctx.restore();
+      }
+      // "audio" elements are silent at draw time — they're handled by the
+      // audio mixer / preview player; nothing to render visually.
+      break;
+    }
+
     default:
       break;
   }

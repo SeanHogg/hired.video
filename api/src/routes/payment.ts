@@ -291,6 +291,14 @@ async function dispatchWebhookEvent(
       if (payload.billingReason === "subscription_create") {
         await recordAffiliateConversion(db, userId, payload.amount ?? 0, payload.currency ?? "USD");
       }
+      // Voice Clone Marketplace: when a one-off charge for voice clones
+      // succeeds, the Stripe payment_intent / Helcim transaction will carry
+      // metadata.voice_clone_ids = "id1,id2,..." set by the cart finalize
+      // call. Once provider one-off charges are normalised into the
+      // NormalizedWebhookPayload (see services/payment/types.ts), parse that
+      // metadata here and call grantVoiceClonePurchaseLicense() per item.
+      // For now, the synchronous /api/studio/voice-clones/cart-checkout
+      // route handles license granting at cart finalization time.
       break;
     }
 

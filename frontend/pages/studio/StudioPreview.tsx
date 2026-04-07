@@ -32,6 +32,8 @@ interface Props {
   onLinkedInPublish: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
+  /** Optional download local copy action (premium-feeling — purely a convenience). */
+  onDownloadLocal?: () => void;
   /** Callback for the Generate button in the action stepper */
   onGenerate?: () => void;
   /** Show video canvas + playback controls (default: true) */
@@ -50,13 +52,16 @@ function formatTime(s: number): string {
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime, exportProgress,
   onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
-  onLinkedInPublish, onMakePublic, isPublic,
+  onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal,
   onGenerate,
   showVideo = true, showActions = true, className,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
-  const hasVideo = state.videoBlob != null;
+  // hasVideo is true after either a fresh export (videoBlob) OR a previously
+  // uploaded video (videoUrl persisted on the project) — so Step 3 stays
+  // available after a refresh.
+  const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;
   const isPublished = isPublishedToProfile || hasYoutube;
   const totalDuration = compiledVideo?.totalDuration ?? 0;
@@ -292,11 +297,32 @@ export default function StudioPreview({
 
               {n === 2 && (
                 <>
-                  {state.status === "exporting" && <Progress value={exportProgress * 100} className="h-1" />}
-                  <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onExport} disabled={!compiledVideo || busy}>
-                    <Download className="w-3 h-3 mr-1.5" />
-                    {state.videoBlob ? "Re-generate Video" : "Generate Video"}
+                  {(state.status === "exporting" || state.status === "uploading") && (
+                    <Progress value={exportProgress * 100} className="h-1" />
+                  )}
+                  <Button size="sm" className="w-full h-7 text-xs" onClick={onExport} disabled={!compiledVideo || busy}>
+                    <Sparkles className="w-3 h-3 mr-1.5" />
+                    {hasVideo ? "Re-generate Video" : "Generate Video"}
                   </Button>
+                  {/* Download local copy — optional convenience after the video exists */}
+                  {hasVideo && onDownloadLocal && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs"
+                      onClick={onDownloadLocal}
+                      disabled={busy}
+                      title="Download a local copy of the video file"
+                    >
+                      <Download className="w-3 h-3 mr-1.5" />
+                      Download
+                    </Button>
+                  )}
+                  {hasVideo && (
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Saved to your library — Step 3 keeps it shareable.
+                    </p>
+                  )}
                 </>
               )}
 

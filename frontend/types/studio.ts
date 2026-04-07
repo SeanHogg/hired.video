@@ -23,7 +23,12 @@ export interface StudioProjectState {
   /** Full template VideoScript — theme is re-applied after each regeneration */
   activeTemplate: VideoScript | null;
   compiledVideo: CompiledVideo | null;
+  /** Local exported blob — transient, only set after a fresh export. Optional for paid users. */
   videoBlob: Blob | null;
+  /** Hosted video URL (R2 CDN or YouTube) — persisted server-side, restored on project load. */
+  videoUrl: string | null;
+  /** Public thumbnail URL (R2 CDN) — restored on project load. */
+  thumbnailUrl: string | null;
   projectId: string | null;
   youtubeVideoId: string | null;
   status: StudioStatus;
@@ -43,7 +48,7 @@ export interface StudioProjectState {
   captions: CaptionConfig | null;
 }
 
-export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "projectId" | "youtubeVideoId"> = {
+export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "videoUrl" | "thumbnailUrl" | "projectId" | "youtubeVideoId"> = {
   name: "New Video Resume",
   prompt: "Create a professional 28-second video resume",
   resumeText: "",

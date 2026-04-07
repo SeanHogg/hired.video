@@ -785,6 +785,178 @@ export default function TermsOfService() {
                 </CardContent>
               </Card>
 
+              <Card id="voice-marketplace" className="border-primary/30">
+                <CardHeader>
+                  <CardTitle>9a. Voice Marketplace &mdash; Creator Terms</CardTitle>
+                  <CardDescription>
+                    Applies to anyone who uploads, lists, or sells a voice clone through hired.video.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                      How it works
+                    </h4>
+                    <p className="text-blue-700 dark:text-blue-300 text-sm">
+                      The Voice Marketplace lets creators upload a short
+                      recording of their voice, store it privately in their
+                      account, and optionally publish it as a buyable asset
+                      that other users can license to generate AI voiceovers in
+                      their own videos. Voice synthesis runs entirely in the
+                      buyer's browser using on-device WebGPU models &mdash; we
+                      never run a cloning model on our servers.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">
+                      Voice ownership and consent (mandatory)
+                    </h4>
+                    <p className="text-muted-foreground mb-2">
+                      By uploading a voice sample to hired.video you represent
+                      and warrant that:
+                    </p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4 text-sm">
+                      <li>
+                        The voice in the recording is <strong>your own voice</strong>, or you have
+                        explicit written permission from the natural person whose voice it is
+                        to upload, store, distribute, and license it through hired.video.
+                      </li>
+                      <li>
+                        You will not upload a recording of any third party (including
+                        celebrities, politicians, deceased persons, or other public figures)
+                        without their documented, contemporaneous consent.
+                      </li>
+                      <li>
+                        You will not upload a recording of a minor for any reason.
+                      </li>
+                      <li>
+                        You will not use, list, or sell a voice in a way that is intended to
+                        deceive a listener into believing the speaker is a real person who
+                        did not in fact say the synthesized words, including but not limited
+                        to political deepfakes, fraud, impersonation, or harassment.
+                      </li>
+                      <li>
+                        You will respect all applicable right-of-publicity, privacy, and
+                        biometric data laws, including BIPA (Illinois), CCPA/CPRA
+                        (California), GDPR (EEA/UK), and equivalent regimes.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Visibility &mdash; private by default</h4>
+                    <p className="text-muted-foreground text-sm">
+                      Every voice clone you upload is <strong>private to your account</strong> by
+                      default. It is never shown to other users, never returned by search, and
+                      never appears in the marketplace catalog unless you explicitly toggle the
+                      <em> List on the Voice Marketplace</em> switch in the Voice Cloning panel
+                      and accept these Creator Terms a second time at the moment of publishing.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Pricing and revenue split</h4>
+                    <p className="text-muted-foreground text-sm mb-2">
+                      You set your own price in U.S. dollars. You may choose any non-negative
+                      price, including zero (free). Each sale is split as follows:
+                    </p>
+                    <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4 text-sm">
+                      <li>
+                        <strong>Creator share:</strong> 80% of the gross sale price.
+                      </li>
+                      <li>
+                        <strong>hired.video platform fee:</strong> 20% of the gross sale price,
+                        used to cover storage, content delivery, payment processing, fraud
+                        detection, and platform operations.
+                      </li>
+                    </ul>
+                    <p className="text-muted-foreground text-sm mt-2">
+                      The split applicable to a given sale is the split in effect at the time
+                      the buyer's payment was authorized; subsequent changes to the platform
+                      fee do not retroactively alter completed sales. The split is recorded
+                      per-row on every license grant for full audit transparency.
+                    </p>
+                    <p className="text-muted-foreground text-sm mt-2">
+                      Payments to creators are denominated in USD and processed through our
+                      payment provider on a periodic basis subject to our standard payout
+                      thresholds. We may withhold a payout where we have a good-faith belief
+                      that a sale is fraudulent, that the underlying voice was uploaded in
+                      violation of these terms, or where required by law.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">License you grant to hired.video</h4>
+                    <p className="text-muted-foreground text-sm">
+                      For any voice clone you publish to the Voice Marketplace (visibility =
+                      "public"), you grant hired.video a worldwide, non-exclusive,
+                      royalty-bearing license to: (1) host the reference audio sample in our
+                      object storage; (2) display the listing in our marketplace catalog,
+                      including the homepage media catalog and search results; (3) deliver the
+                      reference audio to buyers who have a valid license under
+                      <em> "License you grant to buyers"</em> below; and (4) use a short
+                      pre-rendered preview clip of your voice in marketing material relating
+                      to the Voice Marketplace itself. This license terminates when you
+                      unpublish the listing or delete the clone, except as required to
+                      preserve audit records of completed sales.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">License buyers receive</h4>
+                    <p className="text-muted-foreground text-sm">
+                      A successful purchase grants the buyer a personal, worldwide,
+                      non-exclusive, non-transferable, perpetual license to synthesize new
+                      speech in your voice using the in-browser TTS engines provided by
+                      hired.video, solely for use within the buyer's own videos and content
+                      created on the Services. Buyers may not redistribute the reference audio
+                      sample, sub-license your voice, or use it to train another AI model.
+                      Buyers must not use a licensed voice to create content that violates
+                      these Terms (deepfakes, impersonation, harassment, illegal activity,
+                      etc.). hired.video may revoke a buyer's license without refund if the
+                      buyer breaches these restrictions.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Right to take down</h4>
+                    <p className="text-muted-foreground text-sm">
+                      You can unpublish or delete any of your voice clones at any time. We
+                      reserve the right to unpublish, delist, or permanently remove any voice
+                      clone &mdash; and to terminate associated buyer licenses &mdash; where
+                      we receive a credible report of a rights violation, where we believe
+                      the upload violates these Creator Terms, where required by law or
+                      court order, or where the voice is being used to harm others. We will
+                      make reasonable efforts to notify the affected creator and buyers when
+                      practical.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Indemnification</h4>
+                    <p className="text-muted-foreground text-sm">
+                      You agree to defend, indemnify, and hold harmless hired.video and Fix
+                      Faster LLC from and against any claim, demand, liability, damage, loss,
+                      cost, or expense (including reasonable attorneys' fees) arising out of
+                      or related to your upload, listing, or sale of any voice clone in
+                      breach of these Creator Terms, including without limitation any claim
+                      brought by a person whose voice you uploaded without authorization.
+                    </p>
+                  </div>
+
+                  <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
+                    <p className="text-red-700 dark:text-red-300 text-sm">
+                      <strong>Zero tolerance.</strong> Uploading a third party's voice
+                      without consent, or using a licensed voice to impersonate or deceive,
+                      will result in immediate removal of the listing, termination of your
+                      account, forfeiture of any pending payouts attributable to the
+                      offending listing, and where appropriate referral to law enforcement.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>10. Social Media</CardTitle>

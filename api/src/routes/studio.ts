@@ -900,6 +900,8 @@ studioRoutes.post("/upload", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Missing video file"), 400);
   }
 
+  const db = getDb();
+
   // Gap #133: 4K export gated to Premium
   if (resolution === "4k") {
     const sub = await getSubscription(user.sub);
@@ -908,7 +910,34 @@ studioRoutes.post("/upload", async (c) => {
     }
   }
 
-  const db = getDb();
+  // Free-tier video quota: free accounts get 1 video, Premium is unlimited.
+  // Only enforce when this would create a *new* video (i.e., the target
+  // project doesn't already have a videoId — re-uploads to the same project
+  // replace the existing video and don't count against the quota).
+  {
+    const sub = await getSubscription(user.sub);
+    if (!sub.isPremium) {
+      // Count distinct projects that already have a videoId, excluding the
+      // project we're about to update (if any). If that count >= 1, the
+      // user has already used their free video.
+      const owned = await db
+        .select({ id: studioProjects.id, videoId: studioProjects.videoId })
+        .from(studioProjects)
+        .where(eq(studioProjects.userId, user.sub));
+      const otherWithVideo = owned.filter(
+        (p) => p.videoId != null && (!maybeProjectId || p.id !== maybeProjectId),
+      );
+      if (otherWithVideo.length >= 1) {
+        return c.json(
+          fail(
+            "QUOTA_EXCEEDED",
+            "Free accounts can publish 1 video. Upgrade to Premium for unlimited videos.",
+          ),
+          402,
+        );
+      }
+    }
+  }
 
   let project: typeof studioProjects.$inferSelect | undefined;
   if (maybeProjectId) {
@@ -946,20 +975,44 @@ studioRoutes.post("/upload", async (c) => {
 
   const projectResumeId = maybeResumeId ?? project.resumeId ?? null;
 
-  const [video] = await db
-    .insert(videos)
-    .values({
-      userId: user.sub,
-      status: "Queued",
-      r2Key,
-      title,
-      resumeId: projectResumeId,
-    } as any)
-    .returning();
+  // If the project already has a video, mark the old r2Key for cleanup and
+  // reuse the same videos row so privacyStatus + isPublic settings persist.
+  let video: typeof videos.$inferSelect | null = null;
+  if (project.videoId) {
+    const [existingVideo] = await db
+      .select()
+      .from(videos)
+      .where(and(eq(videos.id, project.videoId), eq(videos.userId, user.sub)))
+      .limit(1);
+    if (existingVideo) {
+      const [updated] = await db
+        .update(videos)
+        .set({ r2Key, status: "Completed", title, resumeId: projectResumeId, updatedAt: new Date() } as any)
+        .where(eq(videos.id, existingVideo.id))
+        .returning();
+      video = updated;
+    }
+  }
+  if (!video) {
+    const [created] = await db
+      .insert(videos)
+      .values({
+        userId: user.sub,
+        status: "Completed",
+        r2Key,
+        title,
+        resumeId: projectResumeId,
+      } as any)
+      .returning();
+    video = created;
+  }
 
+  // Mark the project as Published so it shows up on the user's profile.
+  // The user can still flip videos.privacyStatus via the Make Public toggle
+  // to also expose it on the homepage public feed.
   const [updatedProject] = await db
     .update(studioProjects)
-    .set({ status: "video_uploaded", videoId: video.id, resumeId: projectResumeId, updatedAt: new Date() } as any)
+    .set({ status: "published", videoId: video.id, resumeId: projectResumeId, updatedAt: new Date() } as any)
     .where(eq(studioProjects.id, project.id))
     .returning();
 

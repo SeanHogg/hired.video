@@ -145,7 +145,95 @@ export interface SceneScript {
   textAlign?: TextAlign;
   contentPosition?: ContentPosition;
   imageAnimation?: ImageAnimation;
+  /** Free-form element list — replaces fixed slots once populated. Each element
+   *  is independently positioned/sized within the canvas (% coordinates). */
+  sceneElements?: SceneElement[];
 }
+
+// ─── Free-form scene elements ───────────────────────────────────────────────
+
+/** Position + size as percentages of the canvas (0–100). */
+export interface ElementBox {
+  /** Left edge as % of canvas width. */
+  x: number;
+  /** Top edge as % of canvas height. */
+  y: number;
+  /** Width as % of canvas width. */
+  w: number;
+  /** Height as % of canvas height. */
+  h: number;
+}
+
+/** Visual styling shared by all element kinds. */
+export interface ElementStyle {
+  /** Background fill colour (CSS, supports rgba). */
+  backgroundColor?: string;
+  /** Border colour. */
+  borderColor?: string;
+  /** Border width in pixels. */
+  borderWidth?: number;
+  /** Border radius in pixels. */
+  borderRadius?: number;
+  /** Padding inside the box, in pixels. */
+  padding?: number;
+}
+
+interface BaseElement {
+  id: string;
+  /** Bounding box as % of canvas. */
+  box: ElementBox;
+  /** Visual styling for the element's container. */
+  style?: ElementStyle;
+  /** Z-order: higher draws on top. */
+  z?: number;
+  /** Optional rotation in degrees. */
+  rotation?: number;
+}
+
+export interface TextElement extends BaseElement {
+  kind: "text";
+  text: string;
+  fontSize?: number;
+  fontWeight?: "normal" | "bold";
+  fontFamily?: string;
+  color?: string;
+  align?: TextAlign;
+  /** Vertical alignment within the box. */
+  verticalAlign?: "top" | "middle" | "bottom";
+}
+
+export interface ImageElement extends BaseElement {
+  kind: "image";
+  url: string;
+  /** How the image fits within its box. */
+  fit?: "cover" | "contain" | "fill";
+  /** Optional Ken-Burns animation. */
+  animation?: ImageAnimation;
+}
+
+export interface VideoElement extends BaseElement {
+  kind: "video";
+  url: string;
+  fit?: "cover" | "contain" | "fill";
+  /** Mute the video (default true so multiple videos don't cacophony). */
+  muted?: boolean;
+  /** Loop the video (default true). */
+  loop?: boolean;
+}
+
+export interface AudioElement extends BaseElement {
+  kind: "audio";
+  url: string;
+  label?: string;
+  volume?: number;
+}
+
+/** Discriminated union of all supported element kinds. */
+export type SceneElement =
+  | TextElement
+  | ImageElement
+  | VideoElement
+  | AudioElement;
 
 export interface VideoAudio {
   /** Preset key or "custom" */
@@ -187,6 +275,16 @@ export interface AudioLaneConfig {
 
 export interface VoiceoverConfig {
   enabled: boolean;
+  /**
+   * TTS engine that synthesizes the voiceover. All four engines run 100%
+   * client-side.
+   *   - "web-speech" : built-in browser speechSynthesis (free, no download)
+   *   - "kokoro"     : Kokoro-82M WebGPU model (~80MB, exportable PCM)
+   *   - "piper"      : Piper WebGPU per-voice models (smaller, exportable)
+   *   - "vibevoice"  : VibeVoice cloning model — requires a licensed
+   *                    voice clone (owned or purchased from the marketplace)
+   */
+  engine?: "web-speech" | "kokoro" | "piper" | "vibevoice";
   voiceId: string;
   voiceName: string;
   speed: number;           // 0.5 – 2.0

@@ -82,6 +82,8 @@ function makeInitialState(): StudioProjectState {
     activeTemplate: null,
     compiledVideo: null,
     videoBlob: null,
+    videoUrl: null,
+    thumbnailUrl: null,
     projectId: null,
     youtubeVideoId: null,
   };
@@ -584,6 +586,8 @@ export default function StudioLayout() {
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
+  // Step 2: render the video and upload it to R2 in one go. Downloading a
+  // local copy is now an optional, separate action (handleDownloadLocal).
 
   async function handleExport() {
     if (!compiledVideo) return;
@@ -591,48 +595,19 @@ export default function StudioLayout() {
     setExportProgress(0);
 
     try {
+      // 1. Render the canvas to a blob (in-memory)
       const blob = await exportVideo(compiledVideo, {
-        onProgress: setExportProgress,
+        onProgress: (p) => setExportProgress(p * 0.6), // first 60% = render
         audio: state.script?.video?.audio,
         voiceover: state.voiceover,
         sceneTimings: state.script?.scenes.map((s) => ({ id: s.id, start: s.start })),
       });
-      patchState({ videoBlob: blob, status: "ready" });
+      patchState({ videoBlob: blob, status: "uploading" });
+      setExportProgress(0.65);
 
-      // Auto-download — use correct extension based on container format
-      const ext = blob.type.includes("webm") ? "webm" : "mp4";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${state.name.replace(/\s+/g, "-")}.${ext}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-
-      toast({ title: "Export complete", description: "Your video has been downloaded." });
-
-      // Update project status to Exported if saved
-      if (state.projectId) {
-        studioService.updateProjectStatus(state.projectId, "exported").then((r) => {
-          if (r.data) {
-            setProjects((prev) => prev.map((p) => p.id === r.data!.id ? r.data! : p));
-          }
-        }).catch(() => {});
-      }
-    } catch (e: unknown) {
-      patchState({ status: "error" });
-      toast({ title: "Export failed", description: String(e), variant: "destructive" });
-    }
-  }
-
-  // ── Publish ────────────────────────────────────────────────────────────────
-
-  async function handlePublish() {
-    if (!state.videoBlob) return;
-    patchState({ status: "uploading" });
-
-    try {
+      // 2. Upload to R2 immediately so the user keeps the result after refresh
       const uploadRes = await studioService.uploadVideo(
-        state.videoBlob,
+        blob,
         state.name,
         state.projectId ?? undefined,
         state.resumeId,
@@ -640,11 +615,69 @@ export default function StudioLayout() {
       );
       if (!uploadRes.data) throw new Error("Upload failed");
 
-      const projectId = uploadRes.data.id;
-      patchState({ projectId, status: "publishing" });
+      // 3. Persist the hosted URL into state so Step 3 (Share) keeps working
+      // after a page refresh (because it'll be re-restored from p.videoUrl).
+      patchState({
+        projectId: uploadRes.data.id,
+        videoUrl: uploadRes.data.videoUrl ?? null,
+        thumbnailUrl: uploadRes.data.thumbnailUrl ?? null,
+        status: "ready",
+      });
+      setExportProgress(1);
 
+      // The upload endpoint marks the project status as "published" so it
+      // immediately appears on the user's profile page.
+      setIsPublishedToProfile(true);
+
+      // 4. Refresh the recent projects list so the new entry appears
+      setProjects((prev) => {
+        const without = prev.filter((p) => p.id !== uploadRes.data!.id);
+        return [uploadRes.data!, ...without];
+      });
+
+      toast({ title: "Video ready", description: "Saved to your library and published to your profile." });
+    } catch (e: unknown) {
+      patchState({ status: "error" });
+      const msg = String(e);
+      if (/PREMIUM_REQUIRED/i.test(msg)) {
+        toast({ title: "Premium required", description: "4K export requires a Premium subscription.", variant: "destructive" });
+      } else if (/QUOTA_EXCEEDED/i.test(msg)) {
+        toast({ title: "Free limit reached", description: "Free accounts can publish 1 video. Upgrade for unlimited.", variant: "destructive" });
+      } else {
+        toast({ title: "Export failed", description: msg, variant: "destructive" });
+      }
+    }
+  }
+
+  // ── Download local copy (optional, post-export) ────────────────────────────
+
+  function handleDownloadLocal() {
+    // Prefer the in-memory blob (fresh export); fall back to the hosted URL.
+    if (state.videoBlob) {
+      const ext = state.videoBlob.type.includes("webm") ? "webm" : "mp4";
+      const url = URL.createObjectURL(state.videoBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${state.name.replace(/\s+/g, "-")}.${ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      return;
+    }
+    if (state.videoUrl) {
+      // Open the hosted URL in a new tab — the browser will download it
+      window.open(state.videoUrl, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  // ── Publish to YouTube ─────────────────────────────────────────────────────
+
+  async function handlePublish() {
+    if (!state.projectId) return;
+    patchState({ status: "publishing" });
+
+    try {
       const pubRes = await studioService.publishVideo(
-        projectId,
+        state.projectId,
         { title: state.name, description: "", privacyStatus: isPublic ? "public" : "unlisted" },
         state.resumeId,
       );
@@ -654,7 +687,7 @@ export default function StudioLayout() {
         youtubeVideoId: pubRes.data.youtubeVideoId,
         status: "done",
       });
-      toast({ title: "Published!", description: "Your video is live." });
+      toast({ title: "Published to YouTube!", description: "Your video is live." });
     } catch (e: unknown) {
       patchState({ status: "error" });
       toast({ title: "Publish failed", description: String(e), variant: "destructive" });
@@ -689,6 +722,10 @@ export default function StudioLayout() {
       name: p.title,
       projectId: p.id,
       youtubeVideoId: p.youtubeVideoId ?? null,
+      // Restore the persisted hosted URL so users keep their published video
+      // after a refresh — Step 3 (Share) needs this.
+      videoUrl: p.videoUrl ?? null,
+      thumbnailUrl: p.thumbnailUrl ?? null,
       script,
       resumeText: p.resumeText ?? "",
       prompt: p.prompt ?? defaultStudioState.prompt,
@@ -778,40 +815,24 @@ export default function StudioLayout() {
   }
 
   async function handlePublishToProfile() {
-    if (!state.videoBlob && !state.projectId) return;
+    // The Generate Video step already uploads + marks the project published.
+    // This handler is a safety net for projects loaded from a draft state, or
+    // for re-publishing after the user toggled the project back to draft.
+    if (!state.projectId) {
+      toast({ title: "Generate the video first", description: "Use Step 2 to render and publish your video." });
+      return;
+    }
     try {
-      patchState({ status: "uploading" });
-      let projectId = state.projectId;
-
-      // Upload video blob if we have one (creates a proper video record with r2Key)
-      if (state.videoBlob) {
-        const uploadRes = await studioService.uploadVideo(
-          state.videoBlob,
-          state.name,
-          projectId ?? undefined,
-          state.resumeId,
-          state.resolution,
-        );
-        if (!uploadRes.data) throw new Error("Upload failed");
-        projectId = uploadRes.data.id;
-        patchState({ projectId });
-      } else if (!projectId) {
-        // No blob, no project — save draft first (sanitize blob: URLs before persisting)
-        const saveRes = await studioService.saveDraft(state.name, state.resumeText, state.script ? sanitizeScriptForSave(state.script) : null);
-        if (!saveRes.data) throw new Error("Save failed");
-        projectId = saveRes.data.id;
-        patchState({ projectId });
-      }
-
-      const res = await studioService.updateProjectStatus(projectId!, "published");
+      const res = await studioService.updateProjectStatus(state.projectId, "published");
       if (res.data) {
-        setProjects((prev) => prev.map((p) => p.id === res.data!.id ? res.data! : p));
+        setProjects((prev) => {
+          const without = prev.filter((p) => p.id !== res.data!.id);
+          return [res.data!, ...without];
+        });
         setIsPublishedToProfile(true);
-        patchState({ status: "done" });
         toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
       }
     } catch (e: unknown) {
-      patchState({ status: "error" });
       toast({ title: "Publish failed", description: String(e), variant: "destructive" });
     }
   }
@@ -977,6 +998,7 @@ export default function StudioLayout() {
                 onLinkedInPublish={() => setLinkedInPublishOpen(true)}
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
+                onDownloadLocal={handleDownloadLocal}
                 showActions={false}
                 className="w-full h-full"
               />
@@ -1087,10 +1109,13 @@ export default function StudioLayout() {
               }}
               onVoiceConfigChange={(cfg) => {
                 // Keep the global voiceover config in sync with the picker so
-                // VideoPreview's TTS playback uses the voice the user selected.
+                // VideoPreview's TTS playback uses the engine + voice the user
+                // selected (and so the export pipeline picks up the right
+                // engine when it renders the final audio track).
                 patchState({
                   voiceover: {
                     enabled: state.voiceover?.enabled ?? true,
+                    engine: cfg.engine,
                     voiceId: cfg.voiceId,
                     voiceName: cfg.voiceName,
                     speed: cfg.speed,
@@ -1119,6 +1144,7 @@ export default function StudioLayout() {
               onLinkedInPublish={() => setLinkedInPublishOpen(true)}
               onMakePublic={handleMakePublic}
               isPublic={isPublic}
+              onDownloadLocal={handleDownloadLocal}
               onGenerate={handleGenerate}
               showVideo={false}
             />

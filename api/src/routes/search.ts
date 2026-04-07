@@ -6,7 +6,7 @@ import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getPublicJobs, JobEntity } from "../services/job.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones } = schema;
 
 export const searchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -69,6 +69,34 @@ function toResumeItem(resume: typeof resumeInformation.$inferSelect) {
   };
 }
 
+function toVoiceItem(clone: typeof studioVoiceClones.$inferSelect) {
+  // Voice clone listings appear in the homepage media catalog as type "voice".
+  // The cart consumes priceCents directly via the embedded `voice` field.
+  return {
+    id: clone.id,
+    type: "voice" as const,
+    title: clone.name,
+    name: clone.name,
+    description: clone.description ?? "",
+    summary: clone.description ?? "",
+    createdAt: clone.createdAt.toISOString(),
+    updatedAt: clone.updatedAt.toISOString(),
+    voice: {
+      id: clone.id,
+      previewAudioUrl: clone.previewAudioUrl ?? null,
+      priceCents: clone.priceCents,
+      currency: clone.currency,
+      language: clone.language ?? null,
+      gender: clone.gender ?? null,
+      accent: clone.accent ?? null,
+      listingSlug: clone.listingSlug ?? null,
+      creatorId: clone.userId,
+      playCount: clone.playCount,
+      purchaseCount: clone.purchaseCount,
+    },
+  };
+}
+
 // Unified search endpoint used by frontend.
 // Supports category filtering (jobs/people/companies/resumes) and a default "all".
 searchRoutes.get("/public", async (c) => {
@@ -88,6 +116,7 @@ searchRoutes.get("/public", async (c) => {
   const includeCompanies = category === "all" || category === "companies";
   const includePeople = category === "all" || category === "people";
   const includeResumes = category === "all" || category === "resumes";
+  const includeVoices = category === "all" || category === "voices";
 
   const jobsPromise = includeJobs
     ? getPublicJobs({
@@ -142,11 +171,28 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof resumeInformation.$inferSelect[]);
 
-  const [jobs, companies, people, resumes] = await Promise.all([
+  // Voice marketplace listings — only public clones; rank by recency.
+  const voicesWhere = search
+    ? and(eq(studioVoiceClones.visibility, "public"), or(
+        ilike(studioVoiceClones.name, `%${search}%`),
+        ilike(studioVoiceClones.description, `%${search}%`),
+      ))
+    : eq(studioVoiceClones.visibility, "public");
+  const voicesPromise = includeVoices
+    ? db
+        .select()
+        .from(studioVoiceClones)
+        .where(voicesWhere)
+        .orderBy(desc(studioVoiceClones.createdAt))
+        .limit(100)
+    : Promise.resolve([] as typeof studioVoiceClones.$inferSelect[]);
+
+  const [jobs, companies, people, resumes, voices] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
     resumesPromise,
+    voicesPromise,
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
@@ -155,6 +201,7 @@ searchRoutes.get("/public", async (c) => {
     ...companies.map(toCompanyItem),
     ...people.map(({ user, profile }) => toPeopleItem(user, profile ?? null)),
     ...resumes.map(toResumeItem),
+    ...voices.map(toVoiceItem),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
 

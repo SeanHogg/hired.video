@@ -14,6 +14,8 @@ import {
   Users,
   BarChart3,
   FileText,
+  Mic,
+  ShoppingCart,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -26,6 +28,7 @@ import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import VideoCard from "@/components/VideoCard";
+import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
 import SearchBar from "@/components/SearchBar";
 
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -370,6 +373,34 @@ export default function Index() {
               resumeId: resumeId,
               isFeatured: item.isFeatured || false,
             };
+          case "voice": {
+            // Voice clone marketplace listing — sellable, plays a preview.
+            const v = (item as any).voice;
+            if (!v) return null;
+            return {
+              id: item.id,
+              name: item.name || item.title || "Voice",
+              title: item.name || item.title || "Voice",
+              summary: item.summary || item.description || `${v.gender ?? ""} ${v.accent ?? ""} voice`.trim(),
+              views: v.playCount || 0,
+              type: "voice" as const,
+              contentType: "voice" as const,
+              profession: "Voice Creator",
+              company: "Voice Marketplace",
+              createdAt: item.createdAt || new Date().toISOString(),
+              // Voice-specific properties consumed by the voice card / cart add
+              voiceCloneId: v.id,
+              previewAudioUrl: v.previewAudioUrl,
+              priceCents: v.priceCents,
+              currency: v.currency,
+              language: v.language,
+              gender: v.gender,
+              accent: v.accent,
+              listingSlug: v.listingSlug,
+              creatorId: v.creatorId,
+              purchaseCount: v.purchaseCount,
+            };
+          }
           default:
             return null;
         }
@@ -449,6 +480,7 @@ export default function Index() {
     { id: "resumes", label: "Resumes", icon: User },
     { id: "jobs", label: "Jobs", icon: Briefcase },
     { id: "media", label: "Media", icon: Play },
+    { id: "voices", label: "Voices", icon: Mic },
   ];
 
   const allContentItems = contentItems;
@@ -771,7 +803,9 @@ export default function Index() {
                               ? "Media"
                               : selectedCategory === "jobs"
                                 ? "Jobs"
-                                : "Content"}
+                                : selectedCategory === "voices"
+                                  ? "Voices"
+                                  : "Content"}
                   </h2>
 
                   {/* View Toggle - Inline with heading */}
@@ -812,6 +846,16 @@ export default function Index() {
                 {viewMode === "grid" ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                     {paginatedItems.map((item, index) => {
+                      // Voice marketplace listings get a dedicated card with
+                      // inline preview playback and an add-to-cart button.
+                      if ((item as any).type === "voice") {
+                        return (
+                          <VoiceMarketplaceCard
+                            key={item.id}
+                            item={item as any}
+                          />
+                        );
+                      }
                       // Use the pre-created card renderer (it's a function, not an object)
                       return allSectionRenderer(item, index);
                     })}

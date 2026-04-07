@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import type { VideoScript, SceneScript, SceneType, ImagePosition } from "@/types/video-script";
 import { studioService } from "@/lib/services/studio-service";
+import SceneElementsGallery from "@/components/studio/SceneElementsGallery";
 
 interface Props {
   script: VideoScript;
@@ -628,6 +629,14 @@ function SceneCard({
           onClick={(e) => e.stopPropagation()}
         />
       )}
+
+      {/* Free-form scene elements (text/image/video/audio) */}
+      <div className="border-t pt-2 mt-1">
+        <SceneElementsGallery
+          elements={scene.sceneElements ?? []}
+          onChange={(els) => onChange({ sceneElements: els })}
+        />
+      </div>
     </div>
   );
 }

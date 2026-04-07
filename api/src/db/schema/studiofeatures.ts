@@ -37,8 +37,8 @@ export const studioVoiceovers = pgTable(
     userId:      text("user_id").notNull(),
     projectId:   text("project_id"),
     sceneId:     text("scene_id"),              // null = full-video voiceover
-    provider:    text("provider").notNull().default("elevenlabs"), // elevenlabs | openai | browser
-    voiceId:     text("voice_id").notNull(),     // ElevenLabs voice ID
+    provider:    text("provider").notNull().default("vibevoice"), // vibevoice | kokoro | piper | web-speech
+    voiceId:     text("voice_id").notNull(),     // engine-specific voice ID (web-speech voiceURI, kokoro voice key, or studioVoiceClones.id)
     voiceName:   text("voice_name"),
     text:        text("text").notNull(),          // script text spoken
     audioUrl:    text("audio_url"),               // R2/S3 URL to the generated audio
@@ -55,7 +55,14 @@ export const studioVoiceovers = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// Voice Clones — user's cloned voice profiles
+// Voice Clones — user-owned voice profiles, optionally listed in the
+// Voice Marketplace.
+//
+// The reference audio sample is stored in object storage. Synthesis happens
+// 100% client-side via WebGPU TTS engines (Kokoro / Piper / VibeVoice) — the
+// backend never runs a model. Listed clones become buyable items in the
+// homepage media catalog and the shopping cart; non-listed clones remain
+// strictly private to their owner.
 // ---------------------------------------------------------------------------
 export const studioVoiceClones = pgTable(
   "studio_voice_clones",
@@ -63,15 +70,88 @@ export const studioVoiceClones = pgTable(
     id:              uuid("id").primaryKey().defaultRandom(),
     userId:          text("user_id").notNull(),
     name:            text("name").notNull().default("My Voice"),
-    provider:        text("provider").notNull().default("elevenlabs"),
-    externalVoiceId: text("external_voice_id"),   // ElevenLabs cloned voice ID
-    sampleAudioUrl:  text("sample_audio_url"),     // reference recording URL
+    description:     text("description"),
+    /** Engine the sample is intended for at synthesis time. */
+    provider:        text("provider").notNull().default("vibevoice"),
+    /** Reference audio in object storage. */
+    sampleAudioUrl:  text("sample_audio_url"),
     sampleAudioKey:  text("sample_audio_key"),
-    status:          text("status").notNull().default("pending"), // pending | processing | ready | failed
+    /** Optional short pre-rendered preview, generated client-side at publish time. */
+    previewAudioUrl: text("preview_audio_url"),
+    previewAudioKey: text("preview_audio_key"),
+    status:          text("status").notNull().default("ready"), // ready | failed
+    /**
+     * Marketplace fields. A clone defaults to `private` and never appears in
+     * public listings unless the owner explicitly publishes it. Once
+     * `visibility = 'public'`, the row becomes a listing in the homepage media
+     * catalog and is buyable through the shopping cart.
+     */
+    visibility:      text("visibility").notNull().default("private"), // private | unlisted | public
+    listingSlug:     text("listing_slug").unique(),                    // public catalog URL slug
+    /** Creator-set price. 0 = free (still requires the buyer to "claim" a license). */
+    priceCents:      integer("price_cents").notNull().default(0),
+    currency:        text("currency").notNull().default("USD"),
+    /**
+     * Platform fee taken on each sale, in basis points (10000 = 100%).
+     * Stored per-row so historical sales remain auditable if the global rate
+     * changes. Default 2000 = 20% platform fee, 80% to creator.
+     */
+    platformFeeBps:  integer("platform_fee_bps").notNull().default(2000),
+    /** Optional descriptive tags surfaced in the marketplace. */
+    language:        text("language"),     // e.g. "en-US"
+    gender:          text("gender"),       // "male" | "female" | "nonbinary" | null
+    accent:          text("accent"),       // free-form: "british", "southern", etc.
+    /**
+     * Consent record. Required to publish: the creator attests this is their
+     * own voice or they have rights to license it. We snapshot the user agent
+     * and timestamp for auditability.
+     */
+    consentAgreedAt: timestamp("consent_agreed_at", { withTimezone: true }),
+    consentIp:       text("consent_ip"),
+    consentUa:       text("consent_ua"),
+    /** Marketplace stats. */
+    playCount:       integer("play_count").notNull().default(0),
+    purchaseCount:   integer("purchase_count").notNull().default(0),
     createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_studio_voice_clones_user").on(t.userId)],
+  (t) => [
+    index("idx_studio_voice_clones_user").on(t.userId),
+    index("idx_studio_voice_clones_visibility").on(t.visibility),
+    index("idx_studio_voice_clones_slug").on(t.listingSlug),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Voice Clone Licenses — grants of usage rights for a voice clone.
+//
+// One row = "this user has the right to synthesize speech from this voice
+// clone." Sources:
+//   • 'owner'    — the creator of the clone (auto-granted on creation)
+//   • 'free'     — buyer claimed a free public listing
+//   • 'purchase' — buyer paid via the cart; granted on Stripe/Helcim webhook
+// The frontend's TTS engine refuses to use a clone unless a matching row
+// exists. The pair (user_id, voice_clone_id) is unique.
+// ---------------------------------------------------------------------------
+export const studioVoiceCloneLicenses = pgTable(
+  "studio_voice_clone_licenses",
+  {
+    id:               uuid("id").primaryKey().defaultRandom(),
+    userId:           text("user_id").notNull(),
+    voiceCloneId:     uuid("voice_clone_id").notNull(),
+    source:           text("source").notNull(),     // 'owner' | 'free' | 'purchase'
+    pricePaidCents:   integer("price_paid_cents").notNull().default(0),
+    creatorCutCents:  integer("creator_cut_cents").notNull().default(0),
+    platformCutCents: integer("platform_cut_cents").notNull().default(0),
+    /** Payment provider reference (Stripe payment intent or Helcim transaction). */
+    paymentRef:       text("payment_ref"),
+    grantedAt:        timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_voice_clone_licenses_user").on(t.userId),
+    index("idx_studio_voice_clone_licenses_clone").on(t.voiceCloneId),
+    index("uq_studio_voice_clone_licenses_pair").on(t.userId, t.voiceCloneId),
+  ],
 );
 
 // ---------------------------------------------------------------------------

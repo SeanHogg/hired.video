@@ -29,3 +29,5 @@ export * from "./services.js";
 export * from "./advertising.js";
 export * from "./phone.js";
 export * from "./studiofeatures.js";
+export * from "./creators.js";
+export * from "./legal.js";

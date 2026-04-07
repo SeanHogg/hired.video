@@ -22,8 +22,6 @@ export interface Env {
   HELCIM_ACCOUNT_ID?: string;
   HELCIM_API_TOKEN?: string;
   HELCIM_WEBHOOK_TOKEN?: string;
-  // ElevenLabs (TTS + voice cloning)
-  ELEVENLABS_API_KEY?: string;
   // LinkedIn OAuth (video publishing)
   LINKEDIN_CLIENT_ID?: string;
   LINKEDIN_CLIENT_SECRET?: string;

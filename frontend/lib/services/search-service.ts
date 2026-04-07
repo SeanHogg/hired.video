@@ -10,9 +10,26 @@ import { apiClient } from "../api-client";
 // SCHEMAS
 // ============================================================================
 
+/** Embedded voice clone marketplace data when item.type === "voice". */
+export const VoiceListingSchema = z.object({
+  id: z.string(),
+  previewAudioUrl: z.string().nullable().optional(),
+  priceCents: z.number().int().min(0),
+  currency: z.string(),
+  language: z.string().nullable().optional(),
+  gender: z.string().nullable().optional(),
+  accent: z.string().nullable().optional(),
+  listingSlug: z.string().nullable().optional(),
+  creatorId: z.string(),
+  playCount: z.number().int().default(0),
+  purchaseCount: z.number().int().default(0),
+});
+export type VoiceListing = z.infer<typeof VoiceListingSchema>;
+
 export const SearchResultItemSchema = z.object({
   id: z.string(),
-  type: z.enum(["job", "resume", "people", "company", "media"]),
+  type: z.enum(["job", "resume", "people", "company", "media", "voice"]),
+  voice: VoiceListingSchema.optional(),
   title: z.string().default("").optional(),
   name: z.string().default("").optional(),
   summary: z.string().default("").optional(),
@@ -58,7 +75,7 @@ export const SearchResponseSchema = z.object({
 export const SearchFiltersSchema = z.object({
   search: z.string().optional(),
   category: z
-    .enum(["all", "jobs", "resumes", "people", "companies", "media"])
+    .enum(["all", "jobs", "resumes", "people", "companies", "media", "voices"])
     .optional(),
   location: z.string().optional(),
   industry: z.string().optional(),
@@ -144,6 +161,7 @@ export class SearchService {
         isPublic: z.boolean().optional().nullable(),
         templateName: z.string().optional().nullable(),
         isFeatured: z.boolean().default(false),
+        voice: VoiceListingSchema.optional(),
       });
 
       const UnifiedSearchResponseSchema = z.object({
@@ -166,7 +184,8 @@ export class SearchService {
       // Transform the unified response to our SearchResponse format
       const items: SearchResultItem[] = unifiedData.items.map((item) => ({
         id: item.id,
-        type: item.type as "job" | "company" | "people" | "resume" | "media",
+        type: item.type as "job" | "company" | "people" | "resume" | "media" | "voice",
+        ...(item.type === "voice" && item.voice ? { voice: item.voice } : {}),
         title: item.title,
         summary: item.description || item.summary || "",
         description: item.description || item.summary || "",

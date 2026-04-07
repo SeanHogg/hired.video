@@ -6,8 +6,12 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  /** "plan" = subscription upgrade; "service" = provider service offering */
-  type: "plan" | "service";
+  /**
+   * "plan"        = subscription upgrade
+   * "service"     = provider service offering
+   * "voice_clone" = creator-owned voice from the Voice Marketplace
+   */
+  type: "plan" | "service" | "voice_clone";
   // Plan-specific (optional for service items)
   billingCycle?: "monthly" | "annual";
   users?: number;
@@ -15,6 +19,15 @@ export interface CartItem {
   serviceId?: string;
   providerId?: string;
   providerName?: string;
+  // Voice-clone-specific
+  voiceCloneId?: string;
+  /** Listing creator (used by checkout to compute creator/platform split). */
+  creatorId?: string;
+  /** Platform fee at the time of add — locked in so the displayed split
+   *  matches what gets charged even if the listing's fee changes later. */
+  platformFeeBps?: number;
+  /** Short preview audio shown in the cart drawer. */
+  previewAudioUrl?: string;
 }
 
 interface CartState {
@@ -57,8 +70,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         (item) => item.id === action.payload.id,
       );
       if (existingItem) {
-        // Service items: replace rather than increment (one service per cart slot)
-        if (action.payload.type === "service") {
+        // Service and voice-clone items: one license per cart slot — never
+        // increment quantity, since you can't "buy two licenses" for the
+        // same voice or service.
+        if (action.payload.type === "service" || action.payload.type === "voice_clone") {
           return { ...state, items: state.items };
         }
         return {

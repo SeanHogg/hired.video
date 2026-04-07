@@ -1,0 +1,996 @@
+/**
+ * Creators / Promo Video Marketplace (gap #101)
+ *
+ * Routes:
+ *   Creator profile
+ *     POST   /api/creators/opt-in                — opt-in & accept terms (creates creator profile)
+ *     PATCH  /api/creators/me                    — update creator profile
+ *     GET    /api/creators/me                    — get own creator profile
+ *     POST   /api/creators/me/payout             — link payout account ref
+ *     GET    /api/creators/public/:userId        — public creator profile + portfolio + reviews
+ *     GET    /api/creators/browse                — discovery list (rating-sorted)
+ *
+ *   Portfolio
+ *     GET    /api/creators/portfolio             — own items
+ *     POST   /api/creators/portfolio             — create item
+ *     PUT    /api/creators/portfolio/:id         — update item
+ *     DELETE /api/creators/portfolio/:id         — delete item
+ *     POST   /api/creators/portfolio/:id/feature — set as featured (clears other)
+ *     GET    /api/creators/portfolio/public/:userId — public gallery for any user
+ *
+ *   Promo projects
+ *     POST   /api/creators/projects                       — create project from inquiry
+ *     GET    /api/creators/projects                       — list (creator or customer view)
+ *     GET    /api/creators/projects/:id                   — single project + revisions
+ *     POST   /api/creators/projects/:id/revisions         — submit a new revision
+ *     POST   /api/creators/projects/:id/revisions/:revId/decision — approve / request changes
+ *     POST   /api/creators/projects/:id/buy-extra-revision        — purchase extra revision
+ *     POST   /api/creators/projects/:id/accept                    — accept delivery, release escrow
+ *     POST   /api/creators/projects/:id/dispute                   — open dispute
+ *     POST   /api/creators/projects/:id/review                    — leave review (customer only)
+ */
+
+import { Hono } from "hono";
+import { eq, and, or, desc, sql } from "drizzle-orm";
+import type { Variables } from "../types/index.js";
+import { success, error } from "../types/index.js";
+import { getDb, schema } from "../db/index.js";
+import { getSubscription } from "../services/billing.js";
+import { hasAcceptedCurrentLegalDoc } from "./legal.js";
+
+const {
+  creatorProfiles,
+  portfolioItems,
+  promoProjects,
+  promoProjectRevisions,
+  promoProjectExtraRevisionPurchases,
+  promoProjectReviews,
+  serviceInquiries,
+  serviceOfferings,
+  conversations,
+  conversationParticipants,
+  studioReviewComments,
+  userProfiles,
+  users,
+  notifications,
+} = schema;
+
+const DEFAULT_PLATFORM_FEE_BPS = 1500; // 15%
+const CREATOR_TERMS_KIND = "creator_terms";
+const ESCROW_AUTO_RELEASE_DAYS = 7;
+const INCLUDED_REVISIONS = 3;
+
+export const creatorRoutes = new Hono<{ Variables: Variables }>();
+
+function uid(c: any): string | null {
+  return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+function requireAuth(c: any): string | Response {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  return userId;
+}
+
+async function notify(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  type: string,
+  title: string,
+  message: string,
+  data?: Record<string, unknown>,
+) {
+  await db
+    .insert(notifications)
+    .values({ userId, type, title, message, data: data ?? null } as any)
+    .catch(() => undefined);
+}
+
+function calcFees(priceCents: number, feeBps: number) {
+  const platformFeeCents = Math.round((priceCents * feeBps) / 10000);
+  const creatorCutCents = priceCents - platformFeeCents;
+  return { platformFeeCents, creatorCutCents };
+}
+
+async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
+  const [row] = await db
+    .select()
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, userId))
+    .limit(1);
+  return row ?? null;
+}
+
+// ===========================================================================
+// Creator profile
+// ===========================================================================
+
+// POST /opt-in — activate creator profile.
+//
+// Gates (in order):
+//   1. Authenticated user
+//   2. Active paid subscription ($9.95/mo Creator plan or higher) — required
+//      to take leads. Acceptance is verified via shared getSubscription helper
+//      which returns isPremium=true for any non-free plan.
+//   3. Current Creator Terms acceptance recorded in legal_document_acceptances.
+//      The frontend opt-in flow must POST /api/legal/accept with the current
+//      creator_terms documentId BEFORE calling this endpoint.
+creatorRoutes.post("/opt-in", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+
+  const body = await c.req.json().catch(() => ({})) as {
+    displayName?: string;
+    tagline?: string;
+    bio?: string;
+    categories?: string[];
+    languages?: string[];
+  };
+
+  const db = getDb();
+
+  // Gate: paid subscription
+  const sub = await getSubscription(userId);
+  if (!sub.isPremium) {
+    return c.json(
+      error(
+        "UPGRADE_REQUIRED",
+        "Becoming a creator requires a paid Creator subscription ($9.95/mo). Please upgrade before opting in.",
+      ),
+      402,
+    );
+  }
+
+  // Gate: current Creator Terms acceptance
+  const accepted = await hasAcceptedCurrentLegalDoc(db, userId, CREATOR_TERMS_KIND);
+  if (!accepted) {
+    return c.json(
+      error(
+        "TERMS_NOT_ACCEPTED",
+        "You must accept the current Creator Terms before opting in. Call POST /api/legal/accept with the current creator_terms documentId first.",
+      ),
+      400,
+    );
+  }
+
+  const now = new Date();
+  const existing = await getCreator(db, userId);
+  if (existing) {
+    const [updated] = await db
+      .update(creatorProfiles)
+      .set({
+        isActive: true,
+        displayName: body.displayName ?? existing.displayName,
+        tagline: body.tagline ?? existing.tagline,
+        bio: body.bio ?? existing.bio,
+        categories: body.categories ?? existing.categories,
+        languages: body.languages ?? existing.languages,
+        updatedAt: now,
+      } as any)
+      .where(eq(creatorProfiles.userId, userId))
+      .returning();
+    // Mirror flag onto userProfiles for backward compatibility
+    await db.update(userProfiles).set({ providesServices: true, updatedAt: now } as any).where(eq(userProfiles.userId, userId));
+    return c.json(success(updated), 200);
+  }
+
+  const [created] = await db
+    .insert(creatorProfiles)
+    .values({
+      userId,
+      isActive: true,
+      displayName: body.displayName ?? null,
+      tagline: body.tagline ?? null,
+      bio: body.bio ?? null,
+      categories: body.categories ?? [],
+      languages: body.languages ?? [],
+      platformFeeBps: DEFAULT_PLATFORM_FEE_BPS,
+    } as any)
+    .returning();
+  await db.update(userProfiles).set({ providesServices: true, updatedAt: now } as any).where(eq(userProfiles.userId, userId));
+  return c.json(success(created), 201);
+});
+
+// GET /me — own creator profile
+creatorRoutes.get("/me", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const row = await getCreator(db, userId);
+  return c.json(success(row), 200);
+});
+
+// PATCH /me — update creator profile fields
+creatorRoutes.patch("/me", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const db = getDb();
+  const existing = await getCreator(db, userId);
+  if (!existing) return c.json(error("NOT_FOUND", "Opt in first via /opt-in"), 404);
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  for (const k of [
+    "displayName", "tagline", "bio", "categories", "languages",
+    "defaultPriceCents", "extraRevisionPriceCents", "averageDeliveryDays",
+    "isActive",
+  ] as const) {
+    if (k in body) patch[k] = (body as any)[k];
+  }
+
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set(patch as any)
+    .where(eq(creatorProfiles.userId, userId))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// POST /me/payout — link payout account
+creatorRoutes.post("/me/payout", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as {
+    provider?: string;
+    accountId?: string;
+    country?: string;
+    currency?: string;
+  };
+  if (!body.provider || !body.accountId) {
+    return c.json(error("VALIDATION_ERROR", "provider and accountId are required"), 400);
+  }
+  const db = getDb();
+  const existing = await getCreator(db, userId);
+  if (!existing) return c.json(error("NOT_FOUND", "Opt in first via /opt-in"), 404);
+
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set({
+      payoutProvider: body.provider,
+      payoutAccountId: body.accountId,
+      payoutOnboardedAt: new Date(),
+      payoutCountry: body.country ?? null,
+      payoutCurrency: body.currency ?? "USD",
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(creatorProfiles.userId, userId))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// GET /browse — public discovery list
+creatorRoutes.get("/browse", async (c) => {
+  const db = getDb();
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
+  const category = c.req.query("category");
+
+  const baseConds = [eq(creatorProfiles.isActive, true)];
+  // Category filter on jsonb categories array
+  if (category) {
+    baseConds.push(sql`${creatorProfiles.categories} ? ${category}`);
+  }
+
+  const rows = await db
+    .select({
+      creator: creatorProfiles,
+      user: { id: users.id, name: users.name },
+      profile: { avatarUrl: userProfiles.avatarUrl, headline: userProfiles.headline },
+    })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .leftJoin(userProfiles, eq(creatorProfiles.userId, userProfiles.userId))
+    .where(and(...baseConds))
+    .orderBy(desc(creatorProfiles.averageRating), desc(creatorProfiles.completedProjectsCount))
+    .limit(limit);
+
+  return c.json(success(rows), 200);
+});
+
+// GET /public/:userId — public creator profile + portfolio + recent reviews
+creatorRoutes.get("/public/:userId", async (c) => {
+  const db = getDb();
+  const targetId = c.req.param("userId");
+
+  const [creator] = await db
+    .select()
+    .from(creatorProfiles)
+    .where(and(eq(creatorProfiles.userId, targetId), eq(creatorProfiles.isActive, true)))
+    .limit(1);
+  if (!creator) return c.json(error("NOT_FOUND", "Creator not found"), 404);
+
+  const [portfolio, reviews, profile] = await Promise.all([
+    db
+      .select()
+      .from(portfolioItems)
+      .where(and(eq(portfolioItems.userId, targetId), eq(portfolioItems.isPublic, true)))
+      .orderBy(desc(portfolioItems.isFeatured), portfolioItems.sortOrder, desc(portfolioItems.createdAt)),
+    db
+      .select({
+        review: promoProjectReviews,
+        customer: { id: users.id, name: users.name },
+      })
+      .from(promoProjectReviews)
+      .innerJoin(users, eq(promoProjectReviews.customerId, users.id))
+      .where(and(eq(promoProjectReviews.creatorId, targetId), eq(promoProjectReviews.isPublic, true)))
+      .orderBy(desc(promoProjectReviews.createdAt))
+      .limit(20),
+    db
+      .select({ avatarUrl: userProfiles.avatarUrl, headline: userProfiles.headline })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, targetId))
+      .limit(1),
+  ]);
+
+  return c.json(
+    success({
+      creator,
+      profile: profile[0] ?? null,
+      portfolio,
+      reviews,
+    }),
+    200,
+  );
+});
+
+// ===========================================================================
+// Portfolio
+// ===========================================================================
+
+// GET /portfolio — own items
+creatorRoutes.get("/portfolio", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(portfolioItems)
+    .where(eq(portfolioItems.userId, userId))
+    .orderBy(desc(portfolioItems.isFeatured), portfolioItems.sortOrder, desc(portfolioItems.createdAt));
+  return c.json(success(rows), 200);
+});
+
+// GET /portfolio/public/:userId — public gallery (no auth)
+creatorRoutes.get("/portfolio/public/:userId", async (c) => {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(portfolioItems)
+    .where(and(eq(portfolioItems.userId, c.req.param("userId")), eq(portfolioItems.isPublic, true)))
+    .orderBy(desc(portfolioItems.isFeatured), portfolioItems.sortOrder, desc(portfolioItems.createdAt));
+  return c.json(success(rows), 200);
+});
+
+// POST /portfolio — create item
+creatorRoutes.post("/portfolio", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as {
+    title?: string;
+    description?: string;
+    mediaType?: string;
+    mediaUrl?: string;
+    thumbnailUrl?: string;
+    durationMs?: number;
+    category?: string;
+    tags?: string[];
+    isPublic?: boolean;
+  };
+  if (!body.title?.trim() || !body.mediaUrl || !body.mediaType) {
+    return c.json(error("VALIDATION_ERROR", "title, mediaUrl, mediaType are required"), 400);
+  }
+  if (!["video", "image"].includes(body.mediaType)) {
+    return c.json(error("VALIDATION_ERROR", "mediaType must be 'video' or 'image'"), 400);
+  }
+  const db = getDb();
+  const [row] = await db
+    .insert(portfolioItems)
+    .values({
+      userId,
+      title: body.title.trim(),
+      description: body.description ?? null,
+      mediaType: body.mediaType,
+      mediaUrl: body.mediaUrl,
+      thumbnailUrl: body.thumbnailUrl ?? null,
+      durationMs: body.durationMs ?? null,
+      category: body.category ?? null,
+      tags: body.tags ?? [],
+      isPublic: body.isPublic ?? true,
+      source: "upload",
+    } as any)
+    .returning();
+  return c.json(success(row), 201);
+});
+
+// PUT /portfolio/:id — update item
+creatorRoutes.put("/portfolio/:id", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(portfolioItems)
+    .where(and(eq(portfolioItems.id, c.req.param("id")), eq(portfolioItems.userId, userId)))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Portfolio item not found"), 404);
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  for (const k of ["title", "description", "thumbnailUrl", "category", "tags", "isPublic", "sortOrder"] as const) {
+    if (k in body) patch[k] = (body as any)[k];
+  }
+  const [updated] = await db
+    .update(portfolioItems)
+    .set(patch as any)
+    .where(eq(portfolioItems.id, c.req.param("id")))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// DELETE /portfolio/:id
+creatorRoutes.delete("/portfolio/:id", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: portfolioItems.id })
+    .from(portfolioItems)
+    .where(and(eq(portfolioItems.id, c.req.param("id")), eq(portfolioItems.userId, userId)))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Portfolio item not found"), 404);
+  await db.delete(portfolioItems).where(eq(portfolioItems.id, c.req.param("id")));
+  return c.json(success({ deleted: true }), 200);
+});
+
+// POST /portfolio/:id/feature — set as featured (clears other featured items first)
+creatorRoutes.post("/portfolio/:id/feature", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const [item] = await db
+    .select()
+    .from(portfolioItems)
+    .where(and(eq(portfolioItems.id, c.req.param("id")), eq(portfolioItems.userId, userId)))
+    .limit(1);
+  if (!item) return c.json(error("NOT_FOUND", "Portfolio item not found"), 404);
+
+  // Clear existing featured flag (partial unique index requires this)
+  await db
+    .update(portfolioItems)
+    .set({ isFeatured: false, updatedAt: new Date() } as any)
+    .where(and(eq(portfolioItems.userId, userId), eq(portfolioItems.isFeatured, true)));
+
+  const [updated] = await db
+    .update(portfolioItems)
+    .set({ isFeatured: true, updatedAt: new Date() } as any)
+    .where(eq(portfolioItems.id, c.req.param("id")))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// ===========================================================================
+// Promo projects
+// ===========================================================================
+
+// POST /projects — create a promo project from an inquiry
+// Body: { inquiryId, title, briefResumeId?, briefJobId?, briefNotes?, briefAssets?, conversationId? }
+creatorRoutes.post("/projects", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as {
+    inquiryId?: string;
+    title?: string;
+    briefResumeId?: string;
+    briefJobId?: string;
+    briefNotes?: string;
+    briefAssets?: Array<{ url: string; type: string; name?: string }>;
+    conversationId?: string;
+  };
+  if (!body.inquiryId || !body.title?.trim()) {
+    return c.json(error("VALIDATION_ERROR", "inquiryId and title are required"), 400);
+  }
+
+  const db = getDb();
+  const [inquiry] = await db
+    .select()
+    .from(serviceInquiries)
+    .where(eq(serviceInquiries.id, body.inquiryId))
+    .limit(1);
+  if (!inquiry) return c.json(error("NOT_FOUND", "Inquiry not found"), 404);
+
+  // Only the customer (fromUserId) can convert their own inquiry into a project
+  if (inquiry.fromUserId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the buyer can create the project"), 403);
+  }
+
+  const [offering] = await db
+    .select()
+    .from(serviceOfferings)
+    .where(eq(serviceOfferings.id, inquiry.serviceId))
+    .limit(1);
+  if (!offering) return c.json(error("NOT_FOUND", "Service offering missing"), 404);
+
+  const creator = await getCreator(db, inquiry.providerId);
+  if (!creator || !creator.isActive) {
+    return c.json(error("CREATOR_INACTIVE", "Creator is not currently accepting projects"), 400);
+  }
+  if (!creator.payoutAccountId) {
+    return c.json(error("CREATOR_NO_PAYOUT", "Creator has not configured payout — cannot accept paid orders"), 400);
+  }
+  // Real-time subscription check — a lapsed Creator subscription must block
+  // new orders even if isActive hasn't been reconciled yet.
+  const creatorSub = await getSubscription(inquiry.providerId);
+  if (!creatorSub.isPremium) {
+    return c.json(error("CREATOR_SUBSCRIPTION_LAPSED", "Creator subscription is no longer active"), 400);
+  }
+
+  const priceCents = offering.priceCents ?? 0;
+  const feeBps = creator.platformFeeBps ?? DEFAULT_PLATFORM_FEE_BPS;
+  const { platformFeeCents, creatorCutCents } = calcFees(priceCents, feeBps);
+
+  // Auto-create a 1:1 conversation if one wasn't passed in
+  let conversationId = body.conversationId ?? null;
+  if (!conversationId) {
+    const [conv] = await db
+      .insert(conversations)
+      .values({
+        subject: `Promo project: ${body.title.trim()}`,
+        type: "promo_project",
+      } as any)
+      .returning();
+    conversationId = conv.id;
+    await db.insert(conversationParticipants).values([
+      { conversationId, userId: inquiry.fromUserId, role: "customer" } as any,
+      { conversationId, userId: inquiry.providerId, role: "creator" } as any,
+    ]);
+  }
+
+  const [project] = await db
+    .insert(promoProjects)
+    .values({
+      customerId: inquiry.fromUserId,
+      creatorId: inquiry.providerId,
+      inquiryId: inquiry.id,
+      serviceOfferingId: offering.id,
+      conversationId,
+      title: body.title.trim(),
+      briefResumeId: body.briefResumeId ?? null,
+      briefJobId: body.briefJobId ?? null,
+      briefNotes: body.briefNotes ?? null,
+      briefAssets: body.briefAssets ?? [],
+      status: "brief",
+      revisionsAllowed: INCLUDED_REVISIONS,
+      revisionsUsed: 0,
+      priceCents,
+      currency: "USD",
+      platformFeeBps: feeBps,
+      platformFeeCents,
+      creatorCutCents,
+      // Payment is recorded on a separate /pay endpoint once Helcim/Stripe wires up.
+      // For v1 we mark as paid immediately if priceCents=0 (free/quote).
+      paidAt: priceCents === 0 ? new Date() : null,
+    } as any)
+    .returning();
+
+  // Mark inquiry accepted
+  await db
+    .update(serviceInquiries)
+    .set({ status: "accepted", updatedAt: new Date() } as any)
+    .where(eq(serviceInquiries.id, inquiry.id));
+
+  await notify(
+    db,
+    inquiry.providerId,
+    "promo_project_created",
+    `New promo project: ${project.title}`,
+    `A customer has started a promo project with you.`,
+    { projectId: project.id },
+  );
+
+  return c.json(success(project), 201);
+});
+
+// GET /projects — list, filtered by role (creator | customer)
+creatorRoutes.get("/projects", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const role = c.req.query("role"); // "creator" | "customer"
+  const where =
+    role === "creator"
+      ? eq(promoProjects.creatorId, userId)
+      : role === "customer"
+        ? eq(promoProjects.customerId, userId)
+        : or(eq(promoProjects.creatorId, userId), eq(promoProjects.customerId, userId));
+  const rows = await db
+    .select()
+    .from(promoProjects)
+    .where(where)
+    .orderBy(desc(promoProjects.createdAt));
+  return c.json(success(rows), 200);
+});
+
+// GET /projects/:id — single project + revisions + comments
+creatorRoutes.get("/projects/:id", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.creatorId !== userId && project.customerId !== userId) {
+    return c.json(error("FORBIDDEN", "Not a participant"), 403);
+  }
+  const [revisions, comments] = await Promise.all([
+    db
+      .select()
+      .from(promoProjectRevisions)
+      .where(eq(promoProjectRevisions.projectId, project.id))
+      .orderBy(promoProjectRevisions.revisionNumber),
+    project.studioProjectId
+      ? db
+          .select()
+          .from(studioReviewComments)
+          .where(eq(studioReviewComments.projectId, project.studioProjectId))
+          .orderBy(desc(studioReviewComments.createdAt))
+      : Promise.resolve([]),
+  ]);
+  return c.json(success({ project, revisions, comments }), 200);
+});
+
+// POST /projects/:id/revisions — creator submits a new revision
+creatorRoutes.post("/projects/:id/revisions", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as {
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    storyboardSnapshot?: unknown;
+    durationMs?: number;
+    creatorNotes?: string;
+  };
+  if (!body.videoUrl) {
+    return c.json(error("VALIDATION_ERROR", "videoUrl is required"), 400);
+  }
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.creatorId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the creator can submit revisions"), 403);
+  }
+  if (project.status === "accepted" || project.status === "cancelled" || project.status === "refunded") {
+    return c.json(error("INVALID_STATE", `Project is ${project.status}`), 400);
+  }
+  if (project.revisionsUsed >= project.revisionsAllowed) {
+    return c.json(
+      error("REVISION_LIMIT", "Revision limit reached. Customer must purchase an extra revision."),
+      402,
+    );
+  }
+
+  const nextNumber = project.revisionsUsed + 1;
+  const isPaidExtra = nextNumber > INCLUDED_REVISIONS;
+
+  const [rev] = await db
+    .insert(promoProjectRevisions)
+    .values({
+      projectId: project.id,
+      revisionNumber: nextNumber,
+      isPaidExtra,
+      videoUrl: body.videoUrl,
+      thumbnailUrl: body.thumbnailUrl ?? null,
+      storyboardSnapshot: body.storyboardSnapshot ?? null,
+      durationMs: body.durationMs ?? null,
+      creatorNotes: body.creatorNotes ?? null,
+    } as any)
+    .returning();
+
+  await db
+    .update(promoProjects)
+    .set({
+      revisionsUsed: nextNumber,
+      status: "delivered",
+      deliveredVideoUrl: body.videoUrl,
+      deliveredAt: new Date(),
+      autoReleaseAt: new Date(Date.now() + ESCROW_AUTO_RELEASE_DAYS * 24 * 60 * 60 * 1000),
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(promoProjects.id, project.id));
+
+  await notify(
+    db,
+    project.customerId,
+    "promo_revision_submitted",
+    `Revision ${nextNumber} delivered: ${project.title}`,
+    `Your creator submitted revision ${nextNumber} for review.`,
+    { projectId: project.id, revisionId: rev.id },
+  );
+
+  return c.json(success(rev), 201);
+});
+
+// POST /projects/:id/revisions/:revId/decision — customer approves / requests changes
+creatorRoutes.post("/projects/:id/revisions/:revId/decision", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as { decision?: string; feedback?: string };
+  if (!body.decision || !["approved", "changes_requested"].includes(body.decision)) {
+    return c.json(error("VALIDATION_ERROR", "decision must be 'approved' or 'changes_requested'"), 400);
+  }
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.customerId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the customer can decide on revisions"), 403);
+  }
+  const [rev] = await db
+    .select()
+    .from(promoProjectRevisions)
+    .where(and(eq(promoProjectRevisions.id, c.req.param("revId")), eq(promoProjectRevisions.projectId, project.id)))
+    .limit(1);
+  if (!rev) return c.json(error("NOT_FOUND", "Revision not found"), 404);
+
+  await db
+    .update(promoProjectRevisions)
+    .set({
+      customerDecision: body.decision,
+      customerFeedback: body.feedback ?? null,
+      decidedAt: new Date(),
+    } as any)
+    .where(eq(promoProjectRevisions.id, rev.id));
+
+  // If approved, transition to delivered (already delivered, just leave the
+  // status). The customer must call /accept to release escrow.
+  // If changes_requested, return to in_progress.
+  if (body.decision === "changes_requested") {
+    await db
+      .update(promoProjects)
+      .set({ status: "in_progress", updatedAt: new Date() } as any)
+      .where(eq(promoProjects.id, project.id));
+  }
+
+  await notify(
+    db,
+    project.creatorId,
+    "promo_revision_decision",
+    `Revision ${rev.revisionNumber} ${body.decision === "approved" ? "approved" : "needs changes"}`,
+    body.feedback ?? "",
+    { projectId: project.id, revisionId: rev.id },
+  );
+
+  return c.json(success({ ok: true }), 200);
+});
+
+// POST /projects/:id/buy-extra-revision — customer pays for an additional revision
+creatorRoutes.post("/projects/:id/buy-extra-revision", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.customerId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the customer can purchase revisions"), 403);
+  }
+  if (project.status === "accepted" || project.status === "cancelled" || project.status === "refunded") {
+    return c.json(error("INVALID_STATE", `Project is ${project.status}`), 400);
+  }
+  const creator = await getCreator(db, project.creatorId);
+  if (!creator) return c.json(error("NOT_FOUND", "Creator profile missing"), 404);
+
+  const priceCents = creator.extraRevisionPriceCents > 0
+    ? creator.extraRevisionPriceCents
+    : Math.max(Math.round(project.priceCents * 0.25), 500); // default = 25% of base, min $5
+  const feeBps = project.platformFeeBps;
+  const { platformFeeCents, creatorCutCents } = calcFees(priceCents, feeBps);
+
+  const [purchase] = await db
+    .insert(promoProjectExtraRevisionPurchases)
+    .values({
+      projectId: project.id,
+      customerId: userId,
+      priceCents,
+      currency: project.currency,
+      platformFeeBps: feeBps,
+      platformFeeCents,
+      creatorCutCents,
+      paidAt: new Date(), // payment provider integration handled separately
+      revisionsAdded: 1,
+    } as any)
+    .returning();
+
+  await db
+    .update(promoProjects)
+    .set({ revisionsAllowed: project.revisionsAllowed + 1, updatedAt: new Date() } as any)
+    .where(eq(promoProjects.id, project.id));
+
+  await notify(
+    db,
+    project.creatorId,
+    "promo_extra_revision_purchased",
+    `Extra revision purchased: ${project.title}`,
+    `Customer purchased an extra revision.`,
+    { projectId: project.id, purchaseId: purchase.id },
+  );
+
+  return c.json(success(purchase), 201);
+});
+
+// POST /projects/:id/accept — customer accepts delivery, escrow released
+creatorRoutes.post("/projects/:id/accept", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as { portfolioConsent?: boolean };
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.customerId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the customer can accept delivery"), 403);
+  }
+  if (project.status === "accepted") {
+    return c.json(success(project), 200);
+  }
+  if (!project.deliveredAt) {
+    return c.json(error("INVALID_STATE", "Nothing delivered to accept yet"), 400);
+  }
+
+  const now = new Date();
+  await db
+    .update(promoProjects)
+    .set({
+      status: "accepted",
+      acceptedAt: now,
+      escrowReleasedAt: now,
+      portfolioConsent: body.portfolioConsent ?? false,
+      updatedAt: now,
+    } as any)
+    .where(eq(promoProjects.id, project.id));
+
+  // Update creator aggregates
+  await db
+    .update(creatorProfiles)
+    .set({
+      completedProjectsCount: sql`${creatorProfiles.completedProjectsCount} + 1`,
+      totalEarnedCents: sql`${creatorProfiles.totalEarnedCents} + ${project.creatorCutCents}`,
+      updatedAt: now,
+    } as any)
+    .where(eq(creatorProfiles.userId, project.creatorId));
+
+  // Auto-add to portfolio if customer consented
+  if (body.portfolioConsent && project.deliveredVideoUrl) {
+    await db
+      .insert(portfolioItems)
+      .values({
+        userId: project.creatorId,
+        title: project.title,
+        mediaType: "video",
+        mediaUrl: project.deliveredVideoUrl,
+        source: "promo_project",
+        sourcePromoProjectId: project.id,
+        customerConsent: true,
+        isPublic: true,
+      } as any)
+      .catch(() => undefined);
+  }
+
+  await notify(
+    db,
+    project.creatorId,
+    "promo_project_accepted",
+    `Project accepted: ${project.title}`,
+    `Funds released. Time to celebrate.`,
+    { projectId: project.id },
+  );
+
+  return c.json(success({ accepted: true }), 200);
+});
+
+// POST /projects/:id/dispute — open dispute (manual admin resolution)
+creatorRoutes.post("/projects/:id/dispute", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as { reason?: string };
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.customerId !== userId && project.creatorId !== userId) {
+    return c.json(error("FORBIDDEN", "Not a participant"), 403);
+  }
+  await db
+    .update(promoProjects)
+    .set({ status: "disputed", updatedAt: new Date() } as any)
+    .where(eq(promoProjects.id, project.id));
+
+  // Notify the other party + flag for admin via notification
+  const otherParty = userId === project.customerId ? project.creatorId : project.customerId;
+  await notify(db, otherParty, "promo_project_disputed", `Project disputed: ${project.title}`, body.reason ?? "", { projectId: project.id });
+
+  return c.json(success({ disputed: true }), 200);
+});
+
+// POST /projects/:id/review — customer leaves review after acceptance
+creatorRoutes.post("/projects/:id/review", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as {
+    rating?: number;
+    title?: string;
+    body?: string;
+    communicationScore?: number;
+    qualityScore?: number;
+    timelinessScore?: number;
+    isPublic?: boolean;
+  };
+  if (!body.rating || body.rating < 1 || body.rating > 5) {
+    return c.json(error("VALIDATION_ERROR", "rating must be 1..5"), 400);
+  }
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(promoProjects)
+    .where(eq(promoProjects.id, c.req.param("id")))
+    .limit(1);
+  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
+  if (project.customerId !== userId) {
+    return c.json(error("FORBIDDEN", "Only the customer can review"), 403);
+  }
+  if (project.status !== "accepted") {
+    return c.json(error("INVALID_STATE", "Project must be accepted before reviewing"), 400);
+  }
+
+  const [review] = await db
+    .insert(promoProjectReviews)
+    .values({
+      projectId: project.id,
+      customerId: project.customerId,
+      creatorId: project.creatorId,
+      rating: body.rating,
+      title: body.title ?? null,
+      body: body.body ?? null,
+      communicationScore: body.communicationScore ?? null,
+      qualityScore: body.qualityScore ?? null,
+      timelinessScore: body.timelinessScore ?? null,
+      isPublic: body.isPublic ?? true,
+    } as any)
+    .returning();
+
+  // Recalculate creator average rating
+  const [agg] = await db
+    .select({
+      avg: sql<number>`avg(${promoProjectReviews.rating})`,
+      cnt: sql<number>`count(*)::int`,
+    })
+    .from(promoProjectReviews)
+    .where(eq(promoProjectReviews.creatorId, project.creatorId));
+  await db
+    .update(creatorProfiles)
+    .set({ averageRating: agg?.avg ?? null, ratingCount: agg?.cnt ?? 0, updatedAt: new Date() } as any)
+    .where(eq(creatorProfiles.userId, project.creatorId));
+
+  return c.json(success(review), 201);
+});
+
+creatorRoutes.all("*", (c) =>
+  c.json({ error: { code: "NOT_FOUND", message: "Creator route not found" } }, 404),
+);

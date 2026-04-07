@@ -22,6 +22,66 @@ const SceneEffectSchema = z.object({
   intensity: z.number(),
 });
 
+// Free-form scene elements (text/image/video/audio with % positioning)
+const ElementBoxSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+});
+
+const ElementStyleSchema = z.object({
+  backgroundColor: z.string().optional(),
+  borderColor: z.string().optional(),
+  borderWidth: z.number().optional(),
+  borderRadius: z.number().optional(),
+  padding: z.number().optional(),
+}).optional();
+
+const BaseElementFields = {
+  id: z.string(),
+  box: ElementBoxSchema,
+  style: ElementStyleSchema,
+  z: z.number().optional(),
+  rotation: z.number().optional(),
+};
+
+const SceneElementSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...BaseElementFields,
+    kind: z.literal("text"),
+    text: z.string(),
+    fontSize: z.number().optional(),
+    fontWeight: z.enum(["normal", "bold"]).optional(),
+    fontFamily: z.string().optional(),
+    color: z.string().optional(),
+    align: z.enum(["left", "center", "right"]).optional(),
+    verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
+  }),
+  z.object({
+    ...BaseElementFields,
+    kind: z.literal("image"),
+    url: z.string(),
+    fit: z.enum(["cover", "contain", "fill"]).optional(),
+    animation: z.enum(["none", "zoom-in", "zoom-out", "pan-left", "pan-right"]).optional(),
+  }),
+  z.object({
+    ...BaseElementFields,
+    kind: z.literal("video"),
+    url: z.string(),
+    fit: z.enum(["cover", "contain", "fill"]).optional(),
+    muted: z.boolean().optional(),
+    loop: z.boolean().optional(),
+  }),
+  z.object({
+    ...BaseElementFields,
+    kind: z.literal("audio"),
+    url: z.string(),
+    label: z.string().optional(),
+    volume: z.number().optional(),
+  }),
+]);
+
 export const SceneScriptSchema = z.object({
   id: z.string(),
   start: z.number(),
@@ -56,6 +116,7 @@ export const SceneScriptSchema = z.object({
   sceneAudioLabel: z.string().optional(),
   textAlign: z.enum(["left","center","right"]).optional(),
   contentPosition: z.enum(["top","center","bottom"]).optional(),
+  sceneElements: z.array(SceneElementSchema).optional(),
 });
 
 export const VideoScriptSchema = z.object({

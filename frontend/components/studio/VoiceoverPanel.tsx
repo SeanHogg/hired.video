@@ -22,15 +22,19 @@ import {
   RefreshCw,
   Zap,
   Square,
+  Cpu,
 } from "lucide-react";
 import type { TTSVoice, WordTimestamp } from "@/lib/services/studio-features-service";
+import { estimateWordTimestamps } from "@/lib/services/browser-tts";
 import {
-  getBrowserVoices,
-  estimateWordTimestamps,
-  speak,
-  stopSpeaking,
-  previewVoice,
-} from "@/lib/services/browser-tts";
+  TTS_ENGINES,
+  type TtsEngineId,
+  getEngineVoices,
+  speakWithEngine,
+  stopEngine,
+  isEngineAvailable,
+  isWebGPUAvailable,
+} from "@/lib/services/tts-engines";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,9 +59,11 @@ interface Props {
   scenes: Scene[];
   projectId?: string;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
-  /** Fires whenever the user changes the voice or speed, so the parent
-   *  can keep the global voiceover config (used by VideoPreview) in sync. */
+  /** Fires whenever the user changes the engine, voice, or speed, so the
+   *  parent can keep the global voiceover config (used by VideoPreview) in
+   *  sync. */
   onVoiceConfigChange?: (config: {
+    engine: TtsEngineId;
     voiceId: string;
     voiceName: string;
     speed: number;
@@ -98,7 +104,8 @@ export default function VoiceoverPanel({
   onVoiceConfigChange,
   onSceneTextChange,
 }: Props) {
-  // --- Voice selection state ------------------------------------------------
+  // --- Engine + voice selection state ---------------------------------------
+  const [engine, setEngine] = useState<TtsEngineId>("web-speech");
   const [voices, setVoices] = useState<TTSVoice[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(true);
   const [voicesError, setVoicesError] = useState<string | null>(null);
@@ -115,35 +122,31 @@ export default function VoiceoverPanel({
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const cancelSpeechRef = useRef<(() => void) | null>(null);
 
-  // --- Fetch browser voices on mount ----------------------------------------
+  // --- Fetch voices whenever the engine changes ----------------------------
   useEffect(() => {
     let cancelled = false;
-
     async function loadVoices() {
       try {
         setVoicesLoading(true);
         setVoicesError(null);
-        const data = await getBrowserVoices();
+        const data = await getEngineVoices(engine);
         if (cancelled) return;
         setVoices(data);
-        if (data.length > 0) {
-          setSelectedVoiceId(data[0].voice_id);
-        }
+        // Reset to the first voice of the new engine. Don't preserve the
+        // previous voiceId — it almost certainly won't exist on the new engine.
+        setSelectedVoiceId(data[0]?.voice_id ?? "");
       } catch (err) {
         if (cancelled) return;
-        setVoicesError(
-          err instanceof Error ? err.message : "Failed to load voices",
-        );
+        setVoicesError(err instanceof Error ? err.message : "Failed to load voices");
       } finally {
         if (!cancelled) setVoicesLoading(false);
       }
     }
-
     loadVoices();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [engine]);
 
   // --- Propagate voice + speed selection to parent --------------------------
   // Without this, VideoPreview keeps using the stale default voice no matter
@@ -158,16 +161,17 @@ export default function VoiceoverPanel({
     if (!selectedVoiceId || voices.length === 0) return;
     const voice = voices.find((v) => v.voice_id === selectedVoiceId);
     voiceConfigCbRef.current?.({
+      engine,
       voiceId: selectedVoiceId,
       voiceName: voice?.name ?? "Default",
       speed: playbackSpeed,
     });
-  }, [selectedVoiceId, playbackSpeed, voices]);
+  }, [engine, selectedVoiceId, playbackSpeed, voices]);
 
   // --- Cleanup speech on unmount --------------------------------------------
   useEffect(() => {
     return () => {
-      stopSpeaking();
+      stopEngine();
       cancelSpeechRef.current = null;
     };
   }, []);
@@ -175,15 +179,14 @@ export default function VoiceoverPanel({
   // --- Playback helpers -----------------------------------------------------
 
   const stopPlayback = useCallback(() => {
-    stopSpeaking();
+    stopEngine();
     cancelSpeechRef.current = null;
     setPlayingSceneId(null);
     setActiveWordIndex(-1);
   }, []);
 
   const playScene = useCallback(
-    (sceneId: string) => {
-      const result = results.get(sceneId);
+    async (sceneId: string) => {
       const scene = scenes.find((s) => s.id === sceneId);
       const text = scene ? buildSceneText(scene) : "";
       if (!text) return;
@@ -194,34 +197,38 @@ export default function VoiceoverPanel({
         return;
       }
 
-      // Stop any current playback first
       stopPlayback();
-
       setPlayingSceneId(sceneId);
       setActiveWordIndex(-1);
 
-      const cancel = speak({
-        text,
-        voiceId: selectedVoiceId || undefined,
-        rate: playbackSpeed,
-        onBoundary: (wordIndex) => {
-          setActiveWordIndex(wordIndex);
-        },
-        onEnd: () => {
-          setPlayingSceneId(null);
-          setActiveWordIndex(-1);
-          cancelSpeechRef.current = null;
-        },
-        onError: () => {
-          setPlayingSceneId(null);
-          setActiveWordIndex(-1);
-          cancelSpeechRef.current = null;
-        },
-      });
-
-      cancelSpeechRef.current = cancel;
+      // speakWithEngine is async (engines lazy-load on first use). Capture
+      // the cancel function as soon as it's available so a stop request that
+      // arrives mid-load still works.
+      try {
+        const cancel = await speakWithEngine(engine, {
+          text,
+          voiceId: selectedVoiceId,
+          speed: playbackSpeed,
+          onBoundary: (wordIndex) => setActiveWordIndex(wordIndex),
+          onEnd: () => {
+            setPlayingSceneId(null);
+            setActiveWordIndex(-1);
+            cancelSpeechRef.current = null;
+          },
+          onError: () => {
+            setPlayingSceneId(null);
+            setActiveWordIndex(-1);
+            cancelSpeechRef.current = null;
+          },
+        });
+        cancelSpeechRef.current = cancel;
+      } catch (err) {
+        setPlayingSceneId(null);
+        setActiveWordIndex(-1);
+        setVoicesError(err instanceof Error ? err.message : "Playback failed");
+      }
     },
-    [playingSceneId, playbackSpeed, results, scenes, selectedVoiceId, stopPlayback],
+    [engine, playingSceneId, playbackSpeed, scenes, selectedVoiceId, stopPlayback],
   );
 
   // --- Generation handlers --------------------------------------------------
@@ -311,6 +318,53 @@ export default function VoiceoverPanel({
       </CardHeader>
 
       <CardContent className="space-y-5">
+        {/* ── Engine selector ────────────────────────────────────────── */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+            <Cpu className="h-3.5 w-3.5" />
+            Engine
+          </label>
+          <Select value={engine} onValueChange={(v) => setEngine(v as TtsEngineId)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TTS_ENGINES.map((eng) => {
+                const available = isEngineAvailable(eng.id);
+                return (
+                  <SelectItem
+                    key={eng.id}
+                    value={eng.id}
+                    disabled={!available}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{eng.label}</span>
+                      {eng.modelSizeMb > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          ~{eng.modelSizeMb}MB
+                        </Badge>
+                      )}
+                      {!available && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          unavailable
+                        </Badge>
+                      )}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            {TTS_ENGINES.find((e) => e.id === engine)?.description}
+            {engine !== "web-speech" && !isWebGPUAvailable() && (
+              <span className="block text-destructive">
+                WebGPU not available — falling back to Browser engine.
+              </span>
+            )}
+          </p>
+        </div>
+
         {/* ── Voice selector ─────────────────────────────────────────── */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-muted-foreground">
@@ -331,18 +385,14 @@ export default function VoiceoverPanel({
                 onClick={() => {
                   setVoicesError(null);
                   setVoicesLoading(true);
-                  getBrowserVoices()
+                  getEngineVoices(engine)
                     .then((data) => {
                       setVoices(data);
-                      if (data.length > 0 && !selectedVoiceId) {
-                        setSelectedVoiceId(data[0].voice_id);
-                      }
+                      setSelectedVoiceId(data[0]?.voice_id ?? "");
                     })
                     .catch((e) =>
                       setVoicesError(
-                        e instanceof Error
-                          ? e.message
-                          : "Failed to load voices",
+                        e instanceof Error ? e.message : "Failed to load voices",
                       ),
                     )
                     .finally(() => setVoicesLoading(false));
@@ -374,13 +424,20 @@ export default function VoiceoverPanel({
             </Select>
           )}
 
-          {/* Voice preview — speaks a sample sentence in the browser */}
+          {/* Voice preview — speaks a sample sentence with the chosen engine */}
           {selectedVoiceId && (
             <Button
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => previewVoice(selectedVoiceId)}
+              onClick={() => {
+                stopEngine();
+                speakWithEngine(engine, {
+                  text: "Hi! This is a quick preview of how I sound.",
+                  voiceId: selectedVoiceId,
+                  speed: 1,
+                }).catch(() => {});
+              }}
             >
               <Play className="mr-1 h-3 w-3" />
               Preview voice
