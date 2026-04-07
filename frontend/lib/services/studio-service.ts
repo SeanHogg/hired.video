@@ -54,8 +54,8 @@ export const VideoScriptSchema = z.object({
   video: z.object({
     duration: z.number(),
     fps: z.number().default(30),
-    resolution: z.enum(["720p", "1080p"]),
-    aspect: z.enum(["16:9", "9:16", "1:1"]),
+    resolution: z.enum(["720p", "1080p", "4k"]),
+    aspect: z.enum(["16:9", "9:16", "1:1", "4:3"]),
     purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
     theme: z.object({
       colorPalette: z.array(z.string()),
@@ -235,7 +235,7 @@ export interface GenerateStoryboardParams {
   model?: string;
   temperature?: number;
   targetDuration?: number;
-  resolution?: "720p" | "1080p";
+  resolution?: "720p" | "1080p" | "4k";
   motion?: "minimal" | "moderate" | "cinematic";
   purpose?: StudioPurpose;
 }
