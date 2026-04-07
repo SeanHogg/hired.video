@@ -126,8 +126,10 @@ export function isEngineAvailable(engine: TtsEngineId): boolean {
       return typeof window !== "undefined" && "speechSynthesis" in window;
     case "kokoro":
     case "piper":
-    case "vibevoice":
       return isWebGPUAvailable();
+    case "vibevoice":
+      // Disabled until a hosted ESM bundle exists — see VIBEVOICE_CDN.
+      return VIBEVOICE_AVAILABLE && isWebGPUAvailable();
     default:
       return false;
   }
@@ -145,7 +147,10 @@ const PIPER_CDN = "https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0
 // VibeVoice doesn't have a stable npm package yet; we expect a hosted ESM
 // bundle. This URL is a placeholder pinned to a specific revision so it can
 // be swapped without touching call sites.
-const VIBEVOICE_CDN = "https://cdn.jsdelivr.net/gh/microsoft/VibeVoice@web-esm/dist/vibevoice.esm.js";
+// VibeVoice has no published web ESM bundle yet. When a stable hosted bundle
+// becomes available, set this URL and flip VIBEVOICE_AVAILABLE to true.
+const VIBEVOICE_CDN = "";
+const VIBEVOICE_AVAILABLE = false;
 
 // ---------------------------------------------------------------------------
 // Internal: lazily-resolved engine instances
@@ -205,6 +210,9 @@ async function loadPiper(): Promise<PiperInstance> {
 async function loadVibeVoice(): Promise<VibeVoiceInstance> {
   if (vibevoiceInstance) return vibevoiceInstance;
   if (!isWebGPUAvailable()) throw new Error("VibeVoice requires WebGPU");
+  if (!VIBEVOICE_AVAILABLE || !VIBEVOICE_CDN) {
+    throw new Error("VibeVoice is not yet available — no hosted ESM bundle published.");
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod = (await import(/* @vite-ignore */ VIBEVOICE_CDN)) as any;
   const VibeVoice = mod.VibeVoice ?? mod.default;

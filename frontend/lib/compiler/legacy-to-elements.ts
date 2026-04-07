@@ -151,16 +151,15 @@ export function legacySceneToElements(scene: SceneScript): SceneElement[] {
     });
   }
 
-  // skills → comma-separated, bottom
+  // skills → ChipsElement (rendered as styled pill chips)
   if (scene.skills?.length) {
     elements.push({
       id: makeId("el-skills"),
-      kind: "text",
-      text: scene.skills.join(" • "),
+      kind: "chips",
+      chips: [...scene.skills],
       box: textBox("bottom"),
       fontSize: 22,
-      fontWeight: "bold",
-      ...baseTextStyle,
+      direction: "row",
       z: z++,
     });
   }

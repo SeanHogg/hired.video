@@ -697,6 +697,78 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
         }
         ctx.drawImage(drawSource, dx, dy, dw, dh);
         ctx.restore();
+      } else if (el.kind === "chips") {
+        const fontSize = el.fontSize ?? 22;
+        const fontFamily = el.fontFamily ?? "Inter, sans-serif";
+        const chipBg = el.chipColor ?? "rgba(16,185,129,0.20)";
+        const chipFg = el.textColor ?? "#6ee7b7";
+        const direction = el.direction ?? "row";
+        ctx.font = `600 ${fontSize}px ${fontFamily}`;
+        ctx.textBaseline = "middle";
+
+        const padX = Math.round(fontSize * 0.55);
+        const padY = Math.round(fontSize * 0.35);
+        const gap = Math.round(fontSize * 0.45);
+        const chipH = fontSize + padY * 2;
+        const chipR = chipH / 2;
+
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(px, py, pw, ph, radius);
+        } else {
+          ctx.rect(px, py, pw, ph);
+        }
+        ctx.clip();
+
+        if (direction === "column") {
+          // Stack vertically, centered horizontally
+          let cy = iy;
+          for (const chip of el.chips) {
+            if (!chip) continue;
+            const w = ctx.measureText(chip).width + padX * 2;
+            const cx0 = ix + (iw - w) / 2;
+            ctx.beginPath();
+            if (typeof ctx.roundRect === "function") {
+              ctx.roundRect(cx0, cy, w, chipH, chipR);
+            } else {
+              ctx.rect(cx0, cy, w, chipH);
+            }
+            ctx.fillStyle = chipBg;
+            ctx.fill();
+            ctx.fillStyle = chipFg;
+            ctx.textAlign = "center";
+            ctx.fillText(chip, cx0 + w / 2, cy + chipH / 2);
+            cy += chipH + gap;
+            if (cy > iy + ih) break;
+          }
+        } else {
+          // Wrap horizontally
+          let cx0 = ix;
+          let cy = iy;
+          for (const chip of el.chips) {
+            if (!chip) continue;
+            const w = ctx.measureText(chip).width + padX * 2;
+            if (cx0 + w > ix + iw && cx0 > ix) {
+              cx0 = ix;
+              cy += chipH + gap;
+            }
+            if (cy + chipH > iy + ih) break;
+            ctx.beginPath();
+            if (typeof ctx.roundRect === "function") {
+              ctx.roundRect(cx0, cy, w, chipH, chipR);
+            } else {
+              ctx.rect(cx0, cy, w, chipH);
+            }
+            ctx.fillStyle = chipBg;
+            ctx.fill();
+            ctx.fillStyle = chipFg;
+            ctx.textAlign = "center";
+            ctx.fillText(chip, cx0 + w / 2, cy + chipH / 2);
+            cx0 += w + gap;
+          }
+        }
+        ctx.restore();
       }
       // "audio" elements are silent at draw time — they're handled by the
       // audio mixer / preview player; nothing to render visually.

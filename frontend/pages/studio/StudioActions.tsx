@@ -106,6 +106,39 @@ export default function StudioActions({
       ),
     } as VideoScript);
   };
+
+  // Attach a published voiceover (already uploaded as a hosted wav) to a
+  // scene as an audio media element. The element lives in scene.sceneElements
+  // alongside images/text/chips, so users see + manage it from the unified
+  // gallery in the storyboard editor.
+  const handlePublishVoiceoverToScene = (
+    sceneId: string,
+    audioUrl: string,
+    _durationMs: number,
+    label: string,
+  ) => {
+    if (!script) return;
+    const audioEl = {
+      id: `el-vo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      kind: "audio" as const,
+      url: audioUrl,
+      label,
+      volume: 1,
+      box: { x: 0, y: 0, w: 0, h: 0 },
+    };
+    onScriptChange({
+      ...script,
+      scenes: script.scenes.map((s) => {
+        if (s.id !== sceneId) return s;
+        // Replace any prior voiceover audio element on this scene rather than
+        // stacking them — the user expects "publish" to update, not append.
+        const existing = (s.sceneElements ?? []).filter(
+          (e) => !(e.kind === "audio" && e.label?.startsWith("Voiceover")),
+        );
+        return { ...s, sceneElements: [...existing, audioEl] };
+      }),
+    } as VideoScript);
+  };
   // Inline enhancement state
   const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -164,6 +197,7 @@ export default function StudioActions({
               onVoiceoverGenerated={(results) => onVoiceoverGenerated?.(results)}
               onVoiceConfigChange={onVoiceConfigChange}
               onSceneTextChange={handleSceneTextChange}
+              onPublishToScene={handlePublishVoiceoverToScene}
             />
           </Suspense>
         </ActionPanel>

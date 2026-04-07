@@ -2,14 +2,12 @@
 // Any edit triggers onScriptChange which the parent recompiles immediately.
 
 import { useState, useRef } from "react";
-import { Minus, Plus, X, Trash2, ChevronUp, ChevronDown, Sparkles, Loader2, ImagePlus, Upload, Music } from "lucide-react";
+import { Minus, Plus, Trash2, ChevronUp, ChevronDown, Sparkles, Loader2, ImagePlus, Music } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
-import type { VideoScript, SceneScript, SceneType, ImagePosition } from "@/types/video-script";
+import type { VideoScript, SceneScript, SceneType, ImageElement } from "@/types/video-script";
 import { studioService } from "@/lib/services/studio-service";
 import SceneElementsGallery from "@/components/studio/SceneElementsGallery";
 
@@ -23,144 +21,7 @@ interface Props {
   onSelectedElementChange?: (id: string | null) => void;
 }
 
-// ─── Skill chips ─────────────────────────────────────────────────────────────
-
-function SkillChips({
-  skills,
-  onChange,
-}: {
-  skills: string[];
-  onChange: (s: string[]) => void;
-}) {
-  const [draft, setDraft] = useState("");
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const [editVal, setEditVal] = useState("");
-  const MAX = 8;
-
-  function add(raw: string) {
-    const s = raw.trim();
-    if (s && !skills.includes(s) && skills.length < MAX) {
-      onChange([...skills, s]);
-    }
-    setDraft("");
-  }
-
-  function startEdit(i: number) {
-    setEditingIdx(i);
-    setEditVal(skills[i]);
-  }
-
-  function commitEdit() {
-    if (editingIdx === null) return;
-    const s = editVal.trim();
-    if (s && s !== skills[editingIdx]) {
-      const next = [...skills];
-      next[editingIdx] = s;
-      onChange(next);
-    }
-    setEditingIdx(null);
-    setEditVal("");
-  }
-
-  return (
-    <div onClick={(e) => e.stopPropagation()}>
-      {/* Chips */}
-      {skills.length > 0 && (
-        <div className="flex flex-col gap-1.5 mb-2">
-          {skills.map((s, i) => (
-            editingIdx === i ? (
-              <input
-                key={s + i}
-                autoFocus
-                className="w-full h-7 px-2 text-xs bg-background border border-primary rounded focus:outline-none"
-                value={editVal}
-                onChange={(e) => setEditVal(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
-                  if (e.key === "Escape") { setEditingIdx(null); setEditVal(""); }
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <div
-                key={s}
-                className="flex items-center justify-between px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs cursor-pointer hover:bg-emerald-500/30 transition-colors"
-                onDoubleClick={(e) => { e.stopPropagation(); startEdit(i); }}
-                title="Double-click to edit"
-              >
-                <span className="truncate flex-1">{s}</span>
-                <button
-                  type="button"
-                  className="ml-1.5 hover:text-white transition-colors shrink-0"
-                  onClick={(e) => { e.stopPropagation(); onChange(skills.filter((_, idx) => idx !== i)); }}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )
-          ))}
-        </div>
-      )}
-      {/* Add input */}
-      <input
-        className="w-full h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary disabled:opacity-40"
-        placeholder={skills.length >= MAX ? "Max 8 skills reached" : "Add skill — press Enter or comma"}
-        disabled={skills.length >= MAX}
-        value={draft}
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v.endsWith(",")) {
-            add(v.slice(0, -1));
-          } else {
-            setDraft(v);
-          }
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); add(draft); }
-          if (e.key === "Backspace" && !draft && skills.length > 0) {
-            onChange(skills.slice(0, -1));
-          }
-        }}
-      />
-      <p className="text-[10px] text-muted-foreground mt-1">{skills.length}/{MAX} skills · double-click chip to edit</p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TEXT_ALIGNS: { value: "left" | "center" | "right"; icon: string; label: string }[] = [
-  { value: "left",   icon: "⬤◻◻", label: "Left" },
-  { value: "center", icon: "◻⬤◻", label: "Center" },
-  { value: "right",  icon: "◻◻⬤", label: "Right" },
-];
-
-const CONTENT_POSITIONS: { value: "top" | "center" | "bottom"; icon: string; label: string }[] = [
-  { value: "top",    icon: "▲", label: "Top" },
-  { value: "center", icon: "■", label: "Center" },
-  { value: "bottom", icon: "▼", label: "Bottom" },
-];
-
-const IMAGE_ANIMATIONS: { value: string; label: string }[] = [
-  { value: "none",      label: "Static" },
-  { value: "zoom-in",   label: "Zoom In" },
-  { value: "zoom-out",  label: "Zoom Out" },
-  { value: "pan-left",  label: "Pan Left" },
-  { value: "pan-right", label: "Pan Right" },
-];
-
-const IMAGE_POSITIONS: { value: ImagePosition; label: string; icon: string }[] = [
-  { value: "full",        label: "Full",          icon: "⬛" },
-  { value: "half-left",   label: "Half Left",     icon: "◧" },
-  { value: "half-right",  label: "Half Right",    icon: "◨" },
-  { value: "small-left",  label: "Small Left",    icon: "▐" },
-  { value: "small-right", label: "Small Right",   icon: "▌" },
-  { value: "corner-tl",   label: "Corner TL",     icon: "◸" },
-  { value: "corner-tr",   label: "Corner TR",     icon: "◹" },
-  { value: "corner-bl",   label: "Corner BL",     icon: "◺" },
-  { value: "corner-br",   label: "Corner BR",     icon: "◻" },
-];
+// ─── AI image prompt presets ────────────────────────────────────────────────
 
 const SCENE_IMAGE_BASE: Record<SceneType, string> = {
   intro: "Professional portrait background, modern office environment, soft directional lighting, cinematic depth of field",
@@ -176,18 +37,6 @@ const SCENE_IMAGE_BASE: Record<SceneType, string> = {
   requirements: "Checklist visualization, organized requirements, structured layout, professional clarity",
   benefits: "Uplifting benefit icons, positive growth, bright optimistic palette, rewarding atmosphere",
 };
-
-function buildScenePrompt(scene: SceneScript): string {
-  const parts: string[] = [];
-  if (scene.title) parts.push(scene.title);
-  if (scene.subtitle) parts.push(scene.subtitle);
-  if (scene.text) parts.push(Array.isArray(scene.text) ? scene.text.join(" ") : scene.text);
-  if (scene.items?.length) parts.push(scene.items.slice(0, 2).join(", "));
-  if (scene.skills?.length) parts.push(scene.skills.slice(0, 4).join(", "));
-  const context = parts.map(p => p.trim()).filter(Boolean).join(" · ").slice(0, 200);
-  const base = SCENE_IMAGE_BASE[scene.type];
-  return context ? `${base}. Subject context: ${context}` : base;
-}
 
 const TYPE_COLOURS: Record<SceneType, string> = {
   intro:              "bg-violet-500/20 text-violet-300",
@@ -231,33 +80,53 @@ function SceneCard({
   selectedElementId?: string | null;
   onSelectedElementChange?: (id: string | null) => void;
 }) {
-  const items  = scene.items?.join("\n")  ?? "";
-  const textVal = Array.isArray(scene.text) ? scene.text.join("\n") : (scene.text ?? "");
-
   const [showImagePrompt, setShowImagePrompt] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatingImage, setGeneratingImage] = useState(false);
   const imageUploadRef = useRef<HTMLInputElement>(null);
   const audioUploadRef = useRef<HTMLInputElement>(null);
 
+  function makeImageElement(url: string): ImageElement {
+    return {
+      id: `el-img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      kind: "image",
+      url,
+      box: { x: 0, y: 0, w: 100, h: 100 },
+      fit: "cover",
+      z: (scene.sceneElements?.length ?? 0),
+    };
+  }
+
+  function pushElement(el: ImageElement) {
+    onChange({ sceneElements: [...(scene.sceneElements ?? []), el] });
+  }
+
+  function replaceElementUrl(elementId: string, url: string) {
+    onChange({
+      sceneElements: (scene.sceneElements ?? []).map((e) =>
+        e.id === elementId ? { ...e, url } : e,
+      ),
+    });
+  }
+
   async function handleGenerateImage() {
     if (!imagePrompt.trim()) return;
     setGeneratingImage(true);
     try {
-      // Merge scene context (name, role, text) into the prompt so the AI has
-      // relevant subject info even when the user only describes the visual style.
-      const contextParts: string[] = [];
-      if (scene.title) contextParts.push(scene.title);
-      if (scene.subtitle) contextParts.push(scene.subtitle);
-      if (scene.text) contextParts.push(Array.isArray(scene.text) ? scene.text.slice(0,1).join(" ") : scene.text.slice(0, 120));
-      if (scene.skills?.length) contextParts.push(scene.skills.slice(0, 3).join(", "));
-      const sceneCtx = contextParts.filter(Boolean).join(" · ").slice(0, 200);
+      // Pull subject context from text elements so the AI has relevant info
+      // even when the user only describes the visual style.
+      const contextParts = (scene.sceneElements ?? [])
+        .filter((e): e is import("@/types/video-script").TextElement => e.kind === "text")
+        .map((e) => e.text)
+        .filter(Boolean);
+      const sceneCtx = contextParts.join(" · ").slice(0, 200);
       const fullPrompt = sceneCtx
         ? `${imagePrompt.trim()} — Scene: ${sceneCtx}`
         : imagePrompt.trim();
       const res = await studioService.generateImage(fullPrompt);
       const dataUrl = res.data.imageUrl;
-      onChange({ backgroundImage: dataUrl });
+      const newEl = makeImageElement(dataUrl);
+      pushElement(newEl);
       setShowImagePrompt(false);
       // Upload the generated image to persistent storage in the background
       if (dataUrl.startsWith("data:")) {
@@ -267,7 +136,7 @@ function SceneCard({
           const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
           const file = new File([bytes], "scene-bg.png", { type: mime });
           const uploadRes = await studioService.uploadSceneImage(file);
-          onChange({ backgroundImage: uploadRes.data.url });
+          replaceElementUrl(newEl.id, uploadRes.data.url);
         } catch {
           // Upload failed — data URL stays (functional until page reload)
         }
@@ -284,16 +153,27 @@ function SceneCard({
     if (!file) return;
     // Show a preview immediately via blob URL while uploading to persistent storage
     const blobUrl = URL.createObjectURL(file);
-    onChange({ backgroundImage: blobUrl });
+    const newEl = makeImageElement(blobUrl);
+    pushElement(newEl);
     e.target.value = "";
     try {
       const res = await studioService.uploadSceneImage(file);
       // Replace the ephemeral blob URL with the persistent CDN URL
-      onChange({ backgroundImage: res.data.url });
+      replaceElementUrl(newEl.id, res.data.url);
       URL.revokeObjectURL(blobUrl);
     } catch {
       // Upload failed — blob URL stays (functional until page reload)
     }
+  }
+
+  function buildSceneAIPrompt(): string {
+    const parts = (scene.sceneElements ?? [])
+      .filter((e): e is import("@/types/video-script").TextElement => e.kind === "text")
+      .map((e) => e.text.trim())
+      .filter(Boolean);
+    const context = parts.join(" · ").slice(0, 200);
+    const base = SCENE_IMAGE_BASE[scene.type];
+    return context ? `${base}. Subject context: ${context}` : base;
   }
 
   async function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -360,120 +240,45 @@ function SceneCard({
         </div>
       </div>
 
-      {/* AI Image */}
+      {/* Add-media row: AI image · upload image · upload audio */}
       <div onClick={(e) => e.stopPropagation()}>
-        {scene.backgroundImage ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="relative group">
-              <img
-                src={scene.backgroundImage}
-                alt="Scene background"
-                className="w-full h-16 object-cover rounded-md border border-border"
-              />
-              <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-md">
-                <button
-                  type="button"
-                  className="text-[10px] text-white px-2 py-0.5 bg-primary/80 rounded hover:bg-primary"
-                  onClick={() => { setShowImagePrompt(true); setImagePrompt(buildScenePrompt(scene)); }}
-                >
-                  Regenerate
-                </button>
-                <button
-                  type="button"
-                  className="text-[10px] text-white px-2 py-0.5 bg-primary/80 rounded hover:bg-primary"
-                  onClick={() => imageUploadRef.current?.click()}
-                >
-                  Replace
-                </button>
-                <button
-                  type="button"
-                  className="text-[10px] text-white px-2 py-0.5 bg-red-500/80 rounded hover:bg-red-500"
-                  onClick={() => onChange({ backgroundImage: undefined, backgroundImagePosition: undefined })}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-            {/* Position picker */}
-            <div className="flex flex-wrap gap-1">
-              {IMAGE_POSITIONS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  title={p.label}
-                  className={`flex items-center justify-center w-7 h-7 rounded text-sm border transition-colors ${
-                    (scene.backgroundImagePosition ?? "full") === p.value
-                      ? "border-primary bg-primary/20 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
-                  onClick={() => onChange({ backgroundImagePosition: p.value })}
-                >
-                  {p.icon}
-                </button>
-              ))}
-            </div>
-            {/* Ken Burns animation */}
-            <div className="flex gap-1 flex-wrap mt-1">
-              {IMAGE_ANIMATIONS.map((a) => (
-                <button
-                  key={a.value}
-                  type="button"
-                  title={a.label}
-                  className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
-                    (scene.imageAnimation ?? "none") === a.value
-                      ? "border-primary bg-primary/20 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40"
-                  }`}
-                  onClick={() => onChange({ imageAnimation: a.value as import("@/types/video-script").ImageAnimation })}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex gap-1.5">
-            {/* AI generate */}
-            <button
-              type="button"
-              className="flex-1 flex items-center justify-center gap-1.5 h-7 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
-              onClick={() => { setShowImagePrompt((v) => !v); if (!imagePrompt) setImagePrompt(buildScenePrompt(scene)); }}
-            >
-              <Sparkles className="w-3 h-3" /> AI Image
-            </button>
-            {/* Upload image */}
-            <button
-              type="button"
-              title="Upload image"
-              className="flex items-center justify-center gap-1 h-7 px-2 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
-              onClick={() => imageUploadRef.current?.click()}
-            >
-              <ImagePlus className="w-3 h-3" />
-            </button>
-            {/* Upload audio */}
-            <button
-              type="button"
-              title={scene.sceneAudio ? `Audio: ${scene.sceneAudioLabel ?? "custom"}` : "Upload scene audio"}
-              className={`flex items-center justify-center gap-1 h-7 px-2 text-xs border border-dashed rounded-md transition-colors ${
-                scene.sceneAudio
-                  ? "border-emerald-500/60 text-emerald-400 hover:border-red-400 hover:text-red-400"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
-              onClick={() => {
-                if (scene.sceneAudio) {
-                  onChange({ sceneAudio: undefined, sceneAudioLabel: undefined });
-                } else {
-                  audioUploadRef.current?.click();
-                }
-              }}
-            >
-              <Music className="w-3 h-3" />
-            </button>
-            <input ref={audioUploadRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a" className="sr-only" onChange={handleAudioUpload} />
-          </div>
-        )}
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            className="flex-1 flex items-center justify-center gap-1.5 h-7 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
+            onClick={() => { setShowImagePrompt((v) => !v); if (!imagePrompt) setImagePrompt(buildSceneAIPrompt()); }}
+          >
+            <Sparkles className="w-3 h-3" /> AI Image
+          </button>
+          <button
+            type="button"
+            title="Upload image"
+            className="flex items-center justify-center gap-1 h-7 px-2 text-xs text-muted-foreground border border-dashed border-border rounded-md hover:border-primary/40 hover:text-foreground transition-colors"
+            onClick={() => imageUploadRef.current?.click()}
+          >
+            <ImagePlus className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            title={scene.sceneAudio ? `Audio: ${scene.sceneAudioLabel ?? "custom"}` : "Upload scene audio"}
+            className={`flex items-center justify-center gap-1 h-7 px-2 text-xs border border-dashed rounded-md transition-colors ${
+              scene.sceneAudio
+                ? "border-emerald-500/60 text-emerald-400 hover:border-red-400 hover:text-red-400"
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            }`}
+            onClick={() => {
+              if (scene.sceneAudio) {
+                onChange({ sceneAudio: undefined, sceneAudioLabel: undefined });
+              } else {
+                audioUploadRef.current?.click();
+              }
+            }}
+          >
+            <Music className="w-3 h-3" />
+          </button>
+          <input ref={audioUploadRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a" className="sr-only" onChange={handleAudioUpload} />
+        </div>
 
-        {/* Hidden file input — always mounted so imageUploadRef is valid even when an image is shown */}
         <input ref={imageUploadRef} type="file" accept="image/*" className="sr-only" onChange={handleImageUpload} />
 
         {showImagePrompt && (
@@ -481,7 +286,7 @@ function SceneCard({
             <input
               autoFocus
               className="flex-1 h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary min-w-0"
-              placeholder="Describe the background…"
+              placeholder="Describe the image…"
               value={imagePrompt}
               onChange={(e) => setImagePrompt(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleGenerateImage(); if (e.key === "Escape") setShowImagePrompt(false); }}
@@ -497,145 +302,6 @@ function SceneCard({
           </div>
         )}
       </div>
-
-      {/* Text layout controls */}
-      <div className="flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
-        {/* Text alignment */}
-        <div className="flex gap-0.5">
-          {TEXT_ALIGNS.map((a) => (
-            <button
-              key={a.value}
-              type="button"
-              title={`Align ${a.label}`}
-              className={`w-7 h-6 flex items-center justify-center rounded text-xs border transition-colors ${
-                (scene.textAlign ?? "center") === a.value
-                  ? "border-primary bg-primary/20 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40"
-              }`}
-              onClick={() => onChange({ textAlign: a.value })}
-            >
-              {a.value === "left" ? "L" : a.value === "right" ? "R" : "C"}
-            </button>
-          ))}
-        </div>
-        {/* Content position */}
-        <div className="flex gap-0.5">
-          {CONTENT_POSITIONS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              title={`Position ${p.label}`}
-              className={`w-7 h-6 flex items-center justify-center rounded text-xs border transition-colors ${
-                (scene.contentPosition ?? "center") === p.value
-                  ? "border-primary bg-primary/20 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40"
-              }`}
-              onClick={() => onChange({ contentPosition: p.value })}
-            >
-              {p.icon}
-            </button>
-          ))}
-        </div>
-        <span className="text-[10px] text-muted-foreground ml-1">Layout</span>
-      </div>
-
-      {/* Text styling — text color + card background + card border */}
-      <div className="flex gap-2 items-center flex-wrap" onClick={(e) => e.stopPropagation()}>
-        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Text colour">
-          <span>Text</span>
-          <input
-            type="color"
-            value={scene.textColor ?? "#ffffff"}
-            onChange={(e) => onChange({ textColor: e.target.value })}
-            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
-          />
-        </label>
-        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Card background">
-          <span>Card</span>
-          <input
-            type="color"
-            value={(scene.cardBackgroundColor ?? "#000000").replace(/^rgba?\(.*\)$/, "#000000")}
-            onChange={(e) => {
-              // Default to ~50% alpha so text stays readable over backgrounds
-              const hex = e.target.value;
-              const r = parseInt(hex.slice(1, 3), 16);
-              const g = parseInt(hex.slice(3, 5), 16);
-              const b = parseInt(hex.slice(5, 7), 16);
-              onChange({ cardBackgroundColor: `rgba(${r},${g},${b},0.55)` });
-            }}
-            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
-          />
-        </label>
-        <label className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-pointer" title="Card border colour">
-          <span>Border</span>
-          <input
-            type="color"
-            value={scene.cardBorderColor ?? "#7c3aed"}
-            onChange={(e) => onChange({ cardBorderColor: e.target.value })}
-            className="w-6 h-6 rounded border border-border bg-transparent p-0 cursor-pointer"
-          />
-        </label>
-        {(scene.textColor || scene.cardBackgroundColor || scene.cardBorderColor) && (
-          <button
-            type="button"
-            title="Reset text styling"
-            className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
-            onClick={() => onChange({ textColor: undefined, cardBackgroundColor: undefined, cardBorderColor: undefined })}
-          >
-            Reset
-          </button>
-        )}
-      </div>
-
-      {/* Title */}
-      <Input
-        className="h-8 text-sm font-medium"
-        placeholder="Title"
-        value={scene.title ?? ""}
-        onChange={(e) => onChange({ title: e.target.value })}
-        onClick={(e) => e.stopPropagation()}
-      />
-
-      {/* Subtitle */}
-      {(scene.type === "intro" || scene.type === "closing") && (
-        <Input
-          className="h-7 text-xs"
-          placeholder="Subtitle"
-          value={scene.subtitle ?? ""}
-          onChange={(e) => onChange({ subtitle: e.target.value })}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
-
-      {/* Items (achievement) */}
-      {scene.type === "achievement" && (
-        <Textarea
-          className="text-xs h-20 resize-none"
-          placeholder="One achievement per line"
-          value={items}
-          onChange={(e) => onChange({ items: e.target.value.split("\n").filter(Boolean) })}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
-
-      {/* Skills — individual chip tags */}
-      {scene.type === "skills" && (
-        <SkillChips
-          skills={scene.skills ?? []}
-          onChange={(s) => onChange({ skills: s })}
-        />
-      )}
-
-      {/* Text / body (all types) */}
-      {(scene.type !== "achievement" && scene.type !== "skills") && textVal !== undefined && (
-        <Textarea
-          className="text-xs h-14 resize-none"
-          placeholder="Body text (optional)"
-          value={textVal}
-          onChange={(e) => onChange({ text: e.target.value })}
-          onClick={(e) => e.stopPropagation()}
-        />
-      )}
 
       {/* Free-form scene elements (text/image/video/audio) */}
       <div className="border-t pt-2 mt-1">
@@ -684,13 +350,26 @@ export default function StoryboardEditor({ script, onScriptChange, focusedSceneI
   }
 
   function addScene() {
+    const id = `scene-${Date.now()}`;
     const newScene: SceneScript = {
-      id: `scene-${Date.now()}`,
+      id,
       start: 0,
       duration: 7,
       type: "achievement",
-      title: "New Scene",
-      items: [],
+      sceneElements: [
+        {
+          id: `el-title-${Date.now().toString(36)}`,
+          kind: "text",
+          text: "New Scene",
+          box: { x: 5, y: 38, w: 90, h: 24 },
+          fontSize: 36,
+          fontWeight: "bold",
+          color: "#ffffff",
+          align: "center",
+          verticalAlign: "middle",
+          z: 0,
+        },
+      ],
     };
     applyScenes([...script.scenes, newScene]);
   }

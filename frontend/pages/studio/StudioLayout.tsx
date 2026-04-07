@@ -577,6 +577,11 @@ export default function StudioLayout() {
         };
       }
 
+      // Migrate legacy fields → sceneElements so the editor shows the unified
+      // element gallery from first paint. The backend generator still emits
+      // legacy title/subtitle/text/etc; we convert them client-side.
+      script = migrateScriptToElements(script) as typeof script;
+
       // Seed undo history with the fresh generation
       historyRef.current = [script];
       historyIdxRef.current = 0;
@@ -734,7 +739,9 @@ export default function StudioLayout() {
   }
 
   function handleProjectSelect(p: import("@/lib/services/studio-service").StudioProject) {
-    const script = p.script ?? null;
+    // Migrate legacy fields → sceneElements on load so the editor shows the
+    // unified element gallery for projects saved before the refactor.
+    const script = p.script ? (migrateScriptToElements(p.script) as VideoScript) : null;
     const cv = script ? recompile(script) : null;
     // Restore purpose — check saved _purpose, then video.purpose, fallback to "resume"
     const savedPurpose = (p.purpose ?? script?.video?.purpose ?? "resume") as typeof state.purpose;

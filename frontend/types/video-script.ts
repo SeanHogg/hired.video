@@ -228,12 +228,31 @@ export interface AudioElement extends BaseElement {
   volume?: number;
 }
 
+/**
+ * A list of short labels rendered as styled chips/pills.
+ * Use for skills, tags, tools, technologies, etc. — anything where the
+ * "list of small tokens" visual is more useful than running text.
+ */
+export interface ChipsElement extends BaseElement {
+  kind: "chips";
+  chips: string[];
+  fontSize?: number;
+  fontFamily?: string;
+  /** Chip background colour (default: rgba(16,185,129,0.20)) */
+  chipColor?: string;
+  /** Chip text colour (default: #6ee7b7) */
+  textColor?: string;
+  /** Layout direction — "row" wraps horizontally, "column" stacks vertically. */
+  direction?: "row" | "column";
+}
+
 /** Discriminated union of all supported element kinds. */
 export type SceneElement =
   | TextElement
   | ImageElement
   | VideoElement
-  | AudioElement;
+  | AudioElement
+  | ChipsElement;
 
 export interface VideoAudio {
   /** Preset key or "custom" */

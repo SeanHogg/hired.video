@@ -7,14 +7,14 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Type, Image as ImageIcon, Film, Music2, Trash2, Video as VideoIcon,
-  ArrowUp, ArrowDown, X, Search, Loader2, Library,
+  ArrowUp, ArrowDown, X, Search, Loader2, Library, Tags,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type {
-  SceneElement, TextElement, ImageElement, VideoElement, AudioElement,
+  SceneElement, TextElement, ImageElement, VideoElement, AudioElement, ChipsElement,
 } from "@/types/video-script";
 import {
   searchStockMedia, pickStockMedia,
@@ -115,6 +115,19 @@ function defaultAudio(url = "", label = "Audio"): AudioElement {
   };
 }
 
+function defaultChips(): ChipsElement {
+  return {
+    id: makeId(),
+    kind: "chips",
+    chips: ["React", "TypeScript", "Node.js"],
+    box: { x: 5, y: 65, w: 90, h: 25 },
+    fontSize: 22,
+    chipColor: "rgba(16,185,129,0.20)",
+    textColor: "#6ee7b7",
+    direction: "row",
+  };
+}
+
 export default function SceneElementsGallery({
   elements, onChange, selectedElementId, onSelectedElementChange,
 }: Props) {
@@ -180,6 +193,7 @@ export default function SceneElementsGallery({
       {showAdd && (
         <div className="grid grid-cols-2 gap-1.5 p-2 rounded-md border border-border bg-muted/30">
           <AddBtn icon={Type} label="Text" onClick={() => addElement(defaultText())} />
+          <AddBtn icon={Tags} label="Skills" onClick={() => addElement(defaultChips())} />
           <AddBtn icon={ImageIcon} label="Image" onClick={() => addElement(defaultImage())} />
           <AddBtn icon={Film} label="Video" onClick={() => addElement(defaultVideo())} />
           <AddBtn icon={Music2} label="Audio" onClick={() => addElement(defaultAudio())} />
@@ -268,6 +282,12 @@ function ElementThumb({
       {element.kind === "audio" && (
         <div className="w-full h-full flex items-center justify-center bg-muted"><Music2 className="w-4 h-4 text-muted-foreground" /></div>
       )}
+      {element.kind === "chips" && (
+        <div className="w-full h-full flex items-center justify-center bg-muted gap-0.5">
+          <Tags className="w-3 h-3 text-emerald-400" />
+          <span className="text-[8px] text-muted-foreground">{element.chips.length}</span>
+        </div>
+      )}
       <div className="absolute top-0 right-0 flex opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
@@ -293,6 +313,145 @@ function ElementThumb({
         >
           <Trash2 className="w-2.5 h-2.5" />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Chips editor body — pill-style add/edit/remove ─────────────────────────
+
+function ChipsEditorBody({
+  element,
+  onChange,
+}: {
+  element: ChipsElement;
+  onChange: (patch: Partial<ChipsElement>) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState("");
+  const MAX = 12;
+  const chips = element.chips;
+
+  function add(raw: string) {
+    const s = raw.trim();
+    if (s && !chips.includes(s) && chips.length < MAX) {
+      onChange({ chips: [...chips, s] });
+    }
+    setDraft("");
+  }
+
+  function startEdit(i: number) {
+    setEditingIdx(i);
+    setEditVal(chips[i]);
+  }
+
+  function commitEdit() {
+    if (editingIdx === null) return;
+    const s = editVal.trim();
+    if (s && s !== chips[editingIdx]) {
+      const next = [...chips];
+      next[editingIdx] = s;
+      onChange({ chips: next });
+    }
+    setEditingIdx(null);
+    setEditVal("");
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Pill chips list — same visual as the legacy SkillChips component */}
+      {chips.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {chips.map((s, i) => (
+            editingIdx === i ? (
+              <input
+                key={s + i}
+                autoFocus
+                className="w-full h-7 px-2 text-xs bg-background border border-primary rounded focus:outline-none"
+                value={editVal}
+                onChange={(e) => setEditVal(e.target.value)}
+                onBlur={commitEdit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); commitEdit(); }
+                  if (e.key === "Escape") { setEditingIdx(null); setEditVal(""); }
+                }}
+              />
+            ) : (
+              <div
+                key={s}
+                className="flex items-center justify-between px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs cursor-pointer hover:bg-emerald-500/30 transition-colors"
+                onDoubleClick={(e) => { e.stopPropagation(); startEdit(i); }}
+                title="Double-click to edit"
+              >
+                <span className="truncate flex-1">{s}</span>
+                <button
+                  type="button"
+                  className="ml-1.5 hover:text-white transition-colors shrink-0"
+                  onClick={(e) => { e.stopPropagation(); onChange({ chips: chips.filter((_, idx) => idx !== i) }); }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )
+          ))}
+        </div>
+      )}
+
+      {/* Add input */}
+      <input
+        className="w-full h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary disabled:opacity-40"
+        placeholder={chips.length >= MAX ? `Max ${MAX} chips reached` : "Add chip — Enter or comma"}
+        disabled={chips.length >= MAX}
+        value={draft}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v.endsWith(",")) {
+            add(v.slice(0, -1));
+          } else {
+            setDraft(v);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); add(draft); }
+          if (e.key === "Backspace" && !draft && chips.length > 0) {
+            onChange({ chips: chips.slice(0, -1) });
+          }
+        }}
+      />
+      <p className="text-[10px] text-muted-foreground">{chips.length}/{MAX} · double-click to edit</p>
+
+      {/* Style controls */}
+      <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+        <label className="flex flex-col gap-0.5">
+          <span className="text-muted-foreground">Size</span>
+          <Input
+            type="number"
+            value={element.fontSize ?? 22}
+            onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+            className="h-6 text-[10px]"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-muted-foreground">Text</span>
+          <input
+            type="color"
+            value={element.textColor ?? "#6ee7b7"}
+            onChange={(e) => onChange({ textColor: e.target.value })}
+            className="h-6 w-full rounded border border-border bg-transparent"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-muted-foreground">Layout</span>
+          <select
+            value={element.direction ?? "row"}
+            onChange={(e) => onChange({ direction: e.target.value as "row" | "column" })}
+            className="h-6 text-[10px] rounded border border-border bg-transparent"
+          >
+            <option value="row">Row (wrap)</option>
+            <option value="column">Column (stack)</option>
+          </select>
+        </label>
       </div>
     </div>
   );
@@ -468,6 +627,13 @@ function ElementEditor({
             className="h-6 text-[10px]"
           />
         </>
+      )}
+
+      {element.kind === "chips" && (
+        <ChipsEditorBody
+          element={element}
+          onChange={(patch) => onChange(patch as Partial<SceneElement>)}
+        />
       )}
 
       {/* Position & size */}

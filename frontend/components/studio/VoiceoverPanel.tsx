@@ -23,6 +23,7 @@ import {
   Zap,
   Square,
   Cpu,
+  Upload,
 } from "lucide-react";
 import type { TTSVoice, WordTimestamp } from "@/lib/services/studio-features-service";
 import { estimateWordTimestamps } from "@/lib/services/browser-tts";
@@ -34,7 +35,10 @@ import {
   stopEngine,
   isEngineAvailable,
   isWebGPUAvailable,
+  renderToPcm,
+  pcmToWav,
 } from "@/lib/services/tts-engines";
+import { studioService } from "@/lib/services/studio-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,6 +74,9 @@ interface Props {
   }) => void;
   /** Fires when the user edits a scene's narration text. */
   onSceneTextChange?: (sceneId: string, text: string) => void;
+  /** Fires when the user publishes a rendered voiceover to a scene. The
+   *  parent should attach this as an audio element on the matching scene. */
+  onPublishToScene?: (sceneId: string, audioUrl: string, durationMs: number, label: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +110,7 @@ export default function VoiceoverPanel({
   onVoiceoverGenerated,
   onVoiceConfigChange,
   onSceneTextChange,
+  onPublishToScene,
 }: Props) {
   // --- Engine + voice selection state ---------------------------------------
   const [engine, setEngine] = useState<TtsEngineId>("web-speech");
@@ -121,6 +129,9 @@ export default function VoiceoverPanel({
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const cancelSpeechRef = useRef<(() => void) | null>(null);
+
+  // --- Publish state — sceneId currently being rendered+uploaded ------------
+  const [publishingSceneId, setPublishingSceneId] = useState<string | null>(null);
 
   // --- Fetch voices whenever the engine changes ----------------------------
   useEffect(() => {
@@ -260,6 +271,38 @@ export default function VoiceoverPanel({
       onVoiceoverGenerated?.([voiceoverResult]);
     },
     [playbackSpeed, onVoiceoverGenerated],
+  );
+
+  // Render TTS to a wav file, upload it, and notify the parent so it can
+  // attach the result as an audio element on the scene. Browser TTS can't be
+  // rendered to a file — only WebGPU engines (Kokoro / Piper / VibeVoice).
+  const publishToScene = useCallback(
+    async (scene: Scene) => {
+      if (!onPublishToScene) return;
+      const text = buildSceneText(scene);
+      if (!text || !selectedVoiceId) return;
+      if (engine === "web-speech") {
+        setVoicesError("Switch to Kokoro or Piper to publish a voiceover file.");
+        return;
+      }
+      setPublishingSceneId(scene.id);
+      try {
+        const { pcm, sampleRate } = await renderToPcm(engine, text, selectedVoiceId, playbackSpeed);
+        const wavBlob = pcmToWav(pcm, sampleRate);
+        const file = new File([wavBlob], `voiceover-${scene.id}.wav`, { type: "audio/wav" });
+        const uploadRes = await studioService.uploadSceneAudio(file);
+        const audioUrl = uploadRes.data.url;
+        const durationMs = Math.round((pcm.length / sampleRate) * 1000);
+        const voice = voices.find((v) => v.voice_id === selectedVoiceId);
+        const label = `Voiceover · ${voice?.name ?? "TTS"}`;
+        onPublishToScene(scene.id, audioUrl, durationMs, label);
+      } catch (err) {
+        setVoicesError(err instanceof Error ? err.message : "Publish failed");
+      } finally {
+        setPublishingSceneId(null);
+      }
+    },
+    [engine, selectedVoiceId, playbackSpeed, voices, onPublishToScene],
   );
 
   const generateForAll = useCallback(() => {
@@ -545,6 +588,33 @@ export default function VoiceoverPanel({
                         <Mic className="h-3.5 w-3.5" />
                       )}
                     </Button>
+
+                    {/* Publish to scene — renders WAV, uploads, attaches as
+                        an audio element on the scene. Hidden when the parent
+                        doesn't supply a publish handler. */}
+                    {onPublishToScene && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title={engine === "web-speech"
+                          ? "Switch to Kokoro/Piper to publish a file"
+                          : "Publish voiceover to scene as audio element"}
+                        disabled={
+                          !selectedVoiceId ||
+                          !text ||
+                          engine === "web-speech" ||
+                          publishingSceneId === scene.id
+                        }
+                        onClick={() => publishToScene(scene)}
+                      >
+                        {publishingSceneId === scene.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
