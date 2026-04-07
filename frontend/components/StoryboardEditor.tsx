@@ -18,6 +18,9 @@ interface Props {
   onScriptChange: (s: VideoScript) => void;
   focusedSceneId?: string;
   onSceneFocus?: (id: string) => void;
+  /** Element selected on the canvas — opens the matching scene's element editor. */
+  selectedElementId?: string | null;
+  onSelectedElementChange?: (id: string | null) => void;
 }
 
 // ─── Skill chips ─────────────────────────────────────────────────────────────
@@ -212,6 +215,8 @@ function SceneCard({
   onDelete,
   onMoveUp,
   onMoveDown,
+  selectedElementId,
+  onSelectedElementChange,
 }: {
   scene: SceneScript;
   focused: boolean;
@@ -223,6 +228,8 @@ function SceneCard({
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  selectedElementId?: string | null;
+  onSelectedElementChange?: (id: string | null) => void;
 }) {
   const items  = scene.items?.join("\n")  ?? "";
   const textVal = Array.isArray(scene.text) ? scene.text.join("\n") : (scene.text ?? "");
@@ -635,13 +642,19 @@ function SceneCard({
         <SceneElementsGallery
           elements={scene.sceneElements ?? []}
           onChange={(els) => onChange({ sceneElements: els })}
+          selectedElementId={
+            selectedElementId && (scene.sceneElements ?? []).some((e) => e.id === selectedElementId)
+              ? selectedElementId
+              : null
+          }
+          onSelectedElementChange={onSelectedElementChange}
         />
       </div>
     </div>
   );
 }
 
-export default function StoryboardEditor({ script, onScriptChange, focusedSceneId, onSceneFocus }: Props) {
+export default function StoryboardEditor({ script, onScriptChange, focusedSceneId, onSceneFocus, selectedElementId, onSelectedElementChange }: Props) {
   function applyScenes(scenes: SceneScript[]) {
     let cursor = 0;
     const restarted = scenes.map((s) => {
@@ -698,6 +711,8 @@ export default function StoryboardEditor({ script, onScriptChange, focusedSceneI
             onDelete={() => deleteScene(i)}
             onMoveUp={() => moveScene(i, -1)}
             onMoveDown={() => moveScene(i, 1)}
+            selectedElementId={selectedElementId}
+            onSelectedElementChange={onSelectedElementChange}
           />
         ))}
       </div>

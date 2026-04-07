@@ -348,6 +348,19 @@ function buildElementNodes(scene: SceneScript, theme: VideoTheme): SceneNode[] {
 
 export function buildSceneGraph(scene: SceneScript, theme: VideoTheme): SceneNode[] {
   _nodeIdCounter = 0; // reset per scene for deterministic IDs
+
+  // If the scene has migrated to the new sceneElements model, render only
+  // the theme background + the elements. The legacy text/image nodes are
+  // skipped since the elements own all the visual content.
+  if (scene.sceneElements && scene.sceneElements.length > 0) {
+    const effectivePalette = scene.accentColor
+      ? [scene.accentColor, ...theme.colorPalette.slice(1)]
+      : theme.colorPalette;
+    const nodes: SceneNode[] = [backgroundNode(theme, effectivePalette, scene)];
+    if (shouldAddParticles(theme, scene)) nodes.push(particlesNode(theme));
+    return [...nodes, ...buildElementNodes(scene, theme)];
+  }
+
   let baseNodes: SceneNode[];
   switch (scene.type) {
     case "intro":       baseNodes = buildIntroGraph(scene, theme); break;
@@ -356,6 +369,6 @@ export function buildSceneGraph(scene: SceneScript, theme: VideoTheme): SceneNod
     case "closing":     baseNodes = buildClosingGraph(scene, theme); break;
     default:            baseNodes = buildIntroGraph(scene, theme); break;
   }
-  // Append free-form elements LAST so they draw on top of the canonical layout
+  // Legacy path: render canonical layout + any additive elements on top
   return [...baseNodes, ...buildElementNodes(scene, theme)];
 }

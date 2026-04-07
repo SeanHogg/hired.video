@@ -37,6 +37,9 @@ interface Props {
   onUndo?: () => void;
   onRedo?: () => void;
   contentTemplate?: ContentTemplate;
+  // Element selection (drives the canvas drag overlay <-> editor link)
+  selectedElementId?: string | null;
+  onSelectedElementChange?: (id: string | null) => void;
   // Actions tab handlers
   currentTimeSec?: number;
   videoUrl?: string | null;
@@ -67,6 +70,7 @@ export default function StudioEditor({
   onScriptChange, focusedSceneId, onSceneFocus,
   canUndo, canRedo, onUndo, onRedo,
   contentTemplate,
+  selectedElementId, onSelectedElementChange,
   currentTimeSec, videoUrl,
   onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
   onVoiceConfigChange,
@@ -146,6 +150,8 @@ export default function StudioEditor({
             onScriptChange={onScriptChange}
             focusedSceneId={focusedSceneId}
             onSceneFocus={onSceneFocus}
+            selectedElementId={selectedElementId}
+            onSelectedElementChange={onSelectedElementChange}
           />
         )}
 

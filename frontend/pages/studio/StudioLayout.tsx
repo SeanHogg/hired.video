@@ -36,6 +36,7 @@ import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { studioService } from "@/lib/services/studio-service";
 import { compile } from "@/lib/compiler/video-compiler";
+import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
 import { exportVideo } from "@/lib/renderer/video-exporter";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
@@ -379,9 +380,15 @@ export default function StudioLayout() {
   const [exportProgress, setExportProgress] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [isPublishedToProfile, setIsPublishedToProfile] = useState(false);
+  /** True after the user has actually used a Step 3 share action. Reset on
+   *  Create New / load project, set when the user clicks any share button. */
+  const [hasShared, setHasShared] = useState(false);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
   const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
+  /** Element selected for editing — drives both the canvas overlay highlight
+   *  and the inline editor inside the storyboard scene card. */
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   // Auto-focus the first scene when a script becomes available, so the Stock
   // Media panel has a target. The user can click any other scene to switch.
@@ -594,13 +601,30 @@ export default function StudioLayout() {
     patchState({ status: "exporting" });
     setExportProgress(0);
 
+    // Migrate legacy scenes to the new sceneElements model on first export.
+    // This is a one-way migration so users editing legacy projects get the
+    // new unified element controls. The compiler keeps rendering correctly
+    // because element nodes inherit the same canonical layout positions.
+    let workingScript = state.script;
+    if (workingScript) {
+      const needsMigration = workingScript.scenes.some(
+        (s) => !s.sceneElements || s.sceneElements.length === 0,
+      );
+      if (needsMigration) {
+        const migrated = migrateScriptToElements(workingScript);
+        workingScript = migrated as typeof workingScript;
+        patchState({ script: workingScript });
+        recompile(workingScript);
+      }
+    }
+
     try {
       // 1. Render the canvas to a blob (in-memory)
       const blob = await exportVideo(compiledVideo, {
         onProgress: (p) => setExportProgress(p * 0.6), // first 60% = render
-        audio: state.script?.video?.audio,
+        audio: workingScript?.video?.audio,
         voiceover: state.voiceover,
-        sceneTimings: state.script?.scenes.map((s) => ({ id: s.id, start: s.start })),
+        sceneTimings: workingScript?.scenes.map((s) => ({ id: s.id, start: s.start })),
       });
       patchState({ videoBlob: blob, status: "uploading" });
       setExportProgress(0.65);
@@ -674,6 +698,7 @@ export default function StudioLayout() {
   async function handlePublish() {
     if (!state.projectId) return;
     patchState({ status: "publishing" });
+    setHasShared(true);
 
     try {
       const pubRes = await studioService.publishVideo(
@@ -703,6 +728,8 @@ export default function StudioLayout() {
     setCurrentTime(0);
     setPlaying(false);
     setIsPublic(false);
+    setIsPublishedToProfile(false);
+    setHasShared(false);
     setContentTemplate("resume");
   }
 
@@ -736,6 +763,9 @@ export default function StudioLayout() {
     setCompiledVideo(cv);
     setIsPublishedToProfile(p.status === "Published");
     setIsPublic(p.isPublic ?? false);
+    // Loading a project doesn't count as a fresh share — leave the Step 3
+    // checkmark off until the user actually clicks a share action.
+    setHasShared(false);
     setTab(script ? "storyboard" : "prompt");
   }
 
@@ -778,6 +808,7 @@ export default function StudioLayout() {
 
   async function handleMakePublic(pub: boolean) {
     setIsPublic(pub);
+    if (pub) setHasShared(true);
     if (!state.projectId) return;
     try {
       await studioService.updateProjectVisibility(state.projectId, pub);
@@ -830,6 +861,7 @@ export default function StudioLayout() {
           return [res.data!, ...without];
         });
         setIsPublishedToProfile(true);
+        setHasShared(true);
         toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
       }
     } catch (e: unknown) {
@@ -890,6 +922,42 @@ export default function StudioLayout() {
     }, 30_000);
     return () => window.clearTimeout(handle);
   }, [state.projectId, state.script]);
+
+  // ── Element overlay helpers ──────────────────────────────────────────────
+  // The currently focused scene drives the canvas drag-overlay so users can
+  // edit the elements they're working on. Falls back to the scene at the
+  // current playback time if no scene is explicitly focused.
+  const overlayScene = state.script?.scenes.find((s) => s.id === focusedSceneId)
+    ?? state.script?.scenes.find((s) => currentTime >= s.start && currentTime < s.start + s.duration)
+    ?? state.script?.scenes[0]
+    ?? null;
+
+  function handleUpdateElementBox(elementId: string, box: import("@/types/video-script").ElementBox) {
+    if (!state.script || !overlayScene) return;
+    const next = {
+      ...state.script,
+      scenes: state.script.scenes.map((s) =>
+        s.id === overlayScene.id
+          ? {
+              ...s,
+              sceneElements: (s.sceneElements ?? []).map((el) =>
+                el.id === elementId ? { ...el, box } : el,
+              ),
+            }
+          : s,
+      ),
+    };
+    handleScriptChange(next);
+  }
+
+  /** Selecting an element on the canvas also focuses its scene so the
+   *  storyboard sidebar opens the right card editor. */
+  function handleSelectElement(id: string | null) {
+    setSelectedElementId(id);
+    if (id && overlayScene && overlayScene.id !== focusedSceneId) {
+      setFocusedSceneId(overlayScene.id);
+    }
+  }
 
   async function handleSave() {
     setIsSaving(true);
@@ -995,10 +1063,15 @@ export default function StudioLayout() {
                 onPublishToProfile={handlePublishToProfile}
                 isPublishedToProfile={isPublishedToProfile}
                 profileUrl={user?.id ? `/people/${user.id}` : undefined}
-                onLinkedInPublish={() => setLinkedInPublishOpen(true)}
+                onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
                 onDownloadLocal={handleDownloadLocal}
+                hasShared={hasShared}
+                overlayElements={overlayScene?.sceneElements}
+                selectedElementId={selectedElementId}
+                onSelectElement={handleSelectElement}
+                onUpdateElementBox={handleUpdateElementBox}
                 showActions={false}
                 className="w-full h-full"
               />
@@ -1058,6 +1131,8 @@ export default function StudioLayout() {
               onUndo={handleUndo}
               onRedo={handleRedo}
               contentTemplate={contentTemplate}
+              selectedElementId={selectedElementId}
+              onSelectedElementChange={setSelectedElementId}
               currentTimeSec={currentTime}
               videoUrl={null}
               onRestoreVersion={(storyboard) => {
@@ -1141,10 +1216,11 @@ export default function StudioLayout() {
               onPublishToProfile={handlePublishToProfile}
               isPublishedToProfile={isPublishedToProfile}
               profileUrl={user?.id ? `/people/${user.id}` : undefined}
-              onLinkedInPublish={() => setLinkedInPublishOpen(true)}
+              onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
               onMakePublic={handleMakePublic}
               isPublic={isPublic}
               onDownloadLocal={handleDownloadLocal}
+              hasShared={hasShared}
               onGenerate={handleGenerate}
               showVideo={false}
             />

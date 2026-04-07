@@ -4,10 +4,10 @@
 // with a (+) button to add new ones. Clicking a thumbnail opens an inline
 // editor for that element's content, position, size, and styling.
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus, Type, Image as ImageIcon, Film, Music2, Trash2, Video as VideoIcon,
-  ArrowUp, ArrowDown, X,
+  ArrowUp, ArrowDown, X, Search, Loader2, Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -16,10 +16,49 @@ import { Label } from "@/components/ui/label";
 import type {
   SceneElement, TextElement, ImageElement, VideoElement, AudioElement,
 } from "@/types/video-script";
+import {
+  searchStockMedia, pickStockMedia,
+  type StockSearchResult, type StockMediaType,
+} from "@/lib/services/studio-features-service";
+import { studioService } from "@/lib/services/studio-service";
+
+// ─── Preset position layouts (% of canvas) ──────────────────────────────────
+
+interface PositionPreset {
+  value: string;
+  label: string;
+  icon: string;
+  box: { x: number; y: number; w: number; h: number };
+}
+
+const POSITION_PRESETS: PositionPreset[] = [
+  { value: "full",        label: "Full",         icon: "■", box: { x: 0,  y: 0,  w: 100, h: 100 } },
+  { value: "half-left",   label: "Half left",    icon: "◧", box: { x: 0,  y: 0,  w: 50,  h: 100 } },
+  { value: "half-right",  label: "Half right",   icon: "◨", box: { x: 50, y: 0,  w: 50,  h: 100 } },
+  { value: "small-left",  label: "Small left",   icon: "◐", box: { x: 5,  y: 20, w: 42,  h: 60 } },
+  { value: "small-right", label: "Small right",  icon: "◑", box: { x: 53, y: 20, w: 42,  h: 60 } },
+  { value: "corner-tl",   label: "Top left",     icon: "◸", box: { x: 3,  y: 3,  w: 36,  h: 36 } },
+  { value: "corner-tr",   label: "Top right",    icon: "◹", box: { x: 61, y: 3,  w: 36,  h: 36 } },
+  { value: "corner-bl",   label: "Bottom left",  icon: "◺", box: { x: 3,  y: 61, w: 36,  h: 36 } },
+  { value: "corner-br",   label: "Bottom right", icon: "◻", box: { x: 61, y: 61, w: 36,  h: 36 } },
+];
+
+// ─── Ken-Burns animation options ────────────────────────────────────────────
+
+const KEN_BURNS = [
+  { value: "none",      label: "Static" },
+  { value: "zoom-in",   label: "Zoom In" },
+  { value: "zoom-out",  label: "Zoom Out" },
+  { value: "pan-left",  label: "Pan Left" },
+  { value: "pan-right", label: "Pan Right" },
+] as const;
 
 interface Props {
   elements: SceneElement[];
   onChange: (next: SceneElement[]) => void;
+  /** Optional controlled selection — when set, the editor opens for this element. */
+  selectedElementId?: string | null;
+  onSelectedElementChange?: (id: string | null) => void;
 }
 
 function makeId(): string {
@@ -76,9 +115,21 @@ function defaultAudio(url = "", label = "Audio"): AudioElement {
   };
 }
 
-export default function SceneElementsGallery({ elements, onChange }: Props) {
+export default function SceneElementsGallery({
+  elements, onChange, selectedElementId, onSelectedElementChange,
+}: Props) {
   const [showAdd, setShowAdd] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [internalEditingId, setInternalEditingId] = useState<string | null>(null);
+
+  // Controlled vs uncontrolled selection
+  const editingId = selectedElementId !== undefined ? selectedElementId : internalEditingId;
+  function setEditingId(id: string | null) {
+    if (selectedElementId !== undefined) {
+      onSelectedElementChange?.(id);
+    } else {
+      setInternalEditingId(id);
+    }
+  }
 
   function addElement(el: SceneElement) {
     onChange([...elements, { ...el, z: (elements.length || 0) }]);
@@ -304,17 +355,75 @@ function ElementEditor({
               </select>
             </label>
           </div>
+
+          {/* Preset positions for text — same layouts as images */}
+          <div>
+            <Label className="text-[10px] text-muted-foreground">Position</Label>
+            <div className="grid grid-cols-9 gap-0.5 mt-0.5">
+              {POSITION_PRESETS.map((p) => {
+                const matches = element.box.x === p.box.x && element.box.y === p.box.y && element.box.w === p.box.w && element.box.h === p.box.h;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    title={p.label}
+                    className={`h-6 flex items-center justify-center text-xs rounded border transition-colors ${
+                      matches
+                        ? "border-primary bg-primary/20 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    }`}
+                    onClick={() => onChange({ box: p.box } as Partial<SceneElement>)}
+                  >
+                    {p.icon}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
 
       {(element.kind === "image" || element.kind === "video") && (
         <>
-          <Input
-            placeholder="Media URL"
-            value={element.url}
-            onChange={(e) => onChange({ url: e.target.value } as Partial<typeof element>)}
-            className="h-6 text-[10px]"
+          <InlineStockPicker
+            kind={element.kind}
+            currentUrl={element.url}
+            onPick={(url) => onChange({ url } as Partial<typeof element>)}
           />
+
+          {/* AI image generation — image elements only */}
+          {element.kind === "image" && (
+            <AIImageGenerator
+              onGenerated={(url) => onChange({ url } as Partial<ImageElement>)}
+            />
+          )}
+
+          {/* Preset positions — quick layout (Full / Half / Corner) */}
+          <div>
+            <Label className="text-[10px] text-muted-foreground">Position</Label>
+            <div className="grid grid-cols-9 gap-0.5 mt-0.5">
+              {POSITION_PRESETS.map((p) => {
+                const matches = element.box.x === p.box.x && element.box.y === p.box.y && element.box.w === p.box.w && element.box.h === p.box.h;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    title={p.label}
+                    className={`h-6 flex items-center justify-center text-xs rounded border transition-colors ${
+                      matches
+                        ? "border-primary bg-primary/20 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    }`}
+                    onClick={() => onChange({ box: p.box } as Partial<SceneElement>)}
+                  >
+                    {p.icon}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fit + animation row */}
           <div className="grid grid-cols-2 gap-1.5 text-[10px]">
             <label className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">Fit</span>
@@ -328,6 +437,18 @@ function ElementEditor({
                 <option value="fill">Fill</option>
               </select>
             </label>
+            {element.kind === "image" && (
+              <label className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground">Animation</span>
+                <select
+                  value={(element as ImageElement).animation ?? "none"}
+                  onChange={(e) => onChange({ animation: e.target.value as ImageElement["animation"] } as Partial<ImageElement>)}
+                  className="h-6 text-[10px] rounded border border-border bg-transparent"
+                >
+                  {KEN_BURNS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                </select>
+              </label>
+            )}
           </div>
         </>
       )}
@@ -433,6 +554,216 @@ function ElementEditor({
             </button>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── AI image generator ────────────────────────────────────────────────────
+
+function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleGenerate() {
+    if (!prompt.trim()) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const res = await studioService.generateImage(prompt.trim());
+      if (res.data?.imageUrl) {
+        onGenerated(res.data.imageUrl);
+        setOpen(false);
+        setPrompt("");
+      }
+    } catch (e: unknown) {
+      setError(String(e));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="w-full flex items-center justify-center gap-1.5 h-6 text-[10px] text-muted-foreground border border-dashed border-border rounded hover:border-primary/40 hover:text-foreground transition-colors"
+        onClick={() => setOpen(true)}
+      >
+        <Plus className="w-3 h-3" /> Generate with AI
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5 rounded border border-border p-1.5">
+      <div className="flex items-center gap-1">
+        <Input
+          autoFocus
+          placeholder="Describe the image…"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleGenerate();
+            if (e.key === "Escape") setOpen(false);
+          }}
+          className="h-6 text-[10px]"
+        />
+        <button
+          type="button"
+          disabled={generating || !prompt.trim()}
+          onClick={handleGenerate}
+          className="h-6 px-2 text-[10px] rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
+        >
+          {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Go"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null); }}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Inline stock picker ────────────────────────────────────────────────────
+
+function InlineStockPicker({
+  kind, currentUrl, onPick,
+}: {
+  kind: "image" | "video";
+  currentUrl: string;
+  onPick: (url: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<StockSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [picking, setPicking] = useState<string | null>(null);
+  const [showUrl, setShowUrl] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) { setResults([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await searchStockMedia({ q: query, type: kind as StockMediaType, perPage: 12 });
+        setResults(res.results);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, kind]);
+
+  async function handlePick(item: StockSearchResult) {
+    const key = `${item.provider}:${item.providerAssetId}`;
+    setPicking(key);
+    try {
+      const result = await pickStockMedia({ ...item });
+      if (result.cdnUrl) onPick(result.cdnUrl);
+    } catch {
+      // silent — keep current url
+    } finally {
+      setPicking(null);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {/* Current source thumbnail */}
+      {currentUrl && (
+        <div className="flex items-center gap-1.5">
+          {kind === "image" ? (
+            <img
+              src={currentUrl}
+              alt=""
+              className="w-12 h-8 object-cover rounded border border-border"
+              crossOrigin="anonymous"
+              onError={(e) => (e.target as HTMLImageElement).style.display = "none"}
+            />
+          ) : (
+            <div className="w-12 h-8 rounded border border-border flex items-center justify-center bg-muted">
+              <Film className="w-3 h-3 text-muted-foreground" />
+            </div>
+          )}
+          <span className="flex-1 text-[10px] text-muted-foreground truncate">Current source</span>
+          <button
+            type="button"
+            className="text-[10px] text-muted-foreground hover:text-foreground underline"
+            onClick={() => setShowUrl((v) => !v)}
+          >
+            {showUrl ? "Hide URL" : "Edit URL"}
+          </button>
+        </div>
+      )}
+
+      {/* Manual URL fallback */}
+      {(showUrl || !currentUrl) && (
+        <Input
+          placeholder={`Paste ${kind} URL or search below`}
+          value={currentUrl}
+          onChange={(e) => onPick(e.target.value)}
+          className="h-6 text-[10px]"
+        />
+      )}
+
+      {/* Stock search bar */}
+      <div className="relative">
+        <Library className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+        <Input
+          placeholder={`Search Unsplash, Pexels, Pixabay…`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-6 text-[10px] pl-6"
+        />
+        {loading && <Loader2 className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-muted-foreground" />}
+      </div>
+
+      {/* Results grid */}
+      {results.length > 0 && (
+        <div className="grid grid-cols-4 gap-1 max-h-32 overflow-y-auto">
+          {results.map((item) => {
+            const key = `${item.provider}:${item.providerAssetId}`;
+            const isPicking = picking === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={isPicking}
+                onClick={() => handlePick(item)}
+                title={`${item.title ?? ""} · ${item.author ?? ""}`}
+                className="group relative aspect-square rounded overflow-hidden border border-border hover:border-primary transition-colors"
+              >
+                <img
+                  src={item.thumbnailUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  crossOrigin="anonymous"
+                />
+                {item.mediaType === "video" && (
+                  <Film className="absolute top-0.5 right-0.5 w-2.5 h-2.5 text-white drop-shadow" />
+                )}
+                {isPicking && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <Loader2 className="w-3 h-3 text-white animate-spin" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

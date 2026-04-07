@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
+import type { SceneElement, ElementBox } from "@/types/video-script";
 import { videoFiltersToCss } from "@/types/video-script";
 
 interface Props {
@@ -34,6 +35,16 @@ interface Props {
   isPublic: boolean;
   /** Optional download local copy action (premium-feeling — purely a convenience). */
   onDownloadLocal?: () => void;
+  /** True after the user has actually used a Step 3 share action — drives the green check. */
+  hasShared?: boolean;
+  /** Free-form scene elements for the currently visible scene (drives the drag overlay). */
+  overlayElements?: SceneElement[];
+  /** Currently selected element id (drives overlay highlight + editor selection). */
+  selectedElementId?: string | null;
+  /** Called when the user clicks an element on the canvas. */
+  onSelectElement?: (id: string | null) => void;
+  /** Called as the user drags or resizes an element. */
+  onUpdateElementBox?: (id: string, box: ElementBox) => void;
   /** Callback for the Generate button in the action stepper */
   onGenerate?: () => void;
   /** Show video canvas + playback controls (default: true) */
@@ -52,7 +63,8 @@ function formatTime(s: number): string {
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime, exportProgress,
   onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
-  onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal,
+  onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal, hasShared,
+  overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
   onGenerate,
   showVideo = true, showActions = true, className,
 }: Props) {
@@ -63,7 +75,6 @@ export default function StudioPreview({
   // available after a refresh.
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;
-  const isPublished = isPublishedToProfile || hasYoutube;
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const canGenerate = state.resumeText.trim().length > 50;
 
@@ -120,6 +131,10 @@ export default function StudioPreview({
               s.skills ? `Skills: ${s.skills.join(", ")}` : undefined,
             ].filter(Boolean).join(" "),
           }))}
+          overlayElements={overlayElements}
+          selectedElementId={selectedElementId}
+          onSelectElement={onSelectElement}
+          onUpdateElementBox={onUpdateElementBox}
           className="w-full h-full"
         />
       ) : (
@@ -255,9 +270,11 @@ export default function StudioPreview({
       {/* Action stepper */}
       {showActions && <div className="flex flex-col overflow-y-auto">
         {([
-          { n: 1, title: "Generate Script", done: !!state.script,   active: !state.script || state.status === "generating" },
-          { n: 2, title: "Export Video",    done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
-          { n: 3, title: "Share",           done: isPublished, active: !!state.videoBlob || isPublished },
+          { n: 1, title: "Generate Script", done: !!state.script, active: !state.script || state.status === "generating" },
+          { n: 2, title: "Export Video",    done: hasVideo,        active: !!state.script && !hasVideo && state.status !== "generating" },
+          // Step 3 only turns green once the user has *actually* used a share action.
+          // Just being published-to-profile from Step 2 is no longer enough.
+          { n: 3, title: "Share",           done: !!hasShared,     active: hasVideo && !hasShared },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
             {/* Step badge */}
@@ -366,7 +383,7 @@ export default function StudioPreview({
                       <ExternalLink className="w-3 h-3" /> View Profile
                     </a>
                   )}
-                  {/* Visibility toggle — once a video exists, the user can flip public/unlisted */}
+                                                                                                                                                                                                                                                                                                                                                                                                      {/* Visibility toggle — once a video exists, the user can flip public/unlisted */}
                   {hasVideo && (
                     <div className="flex items-center justify-between pt-0.5">
                       <div className="flex items-center gap-1.5">

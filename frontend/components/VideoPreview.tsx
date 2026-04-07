@@ -6,9 +6,10 @@
 import { useEffect, useRef, useCallback } from "react";
 import { render } from "@/lib/renderer/frame-renderer";
 import type { CompiledVideo } from "@/lib/compiler/types";
-import type { VideoAudio, VoiceoverConfig } from "@/types/video-script";
+import type { VideoAudio, VoiceoverConfig, SceneElement, ElementBox } from "@/types/video-script";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { speakWithEngine, stopEngine, type TtsEngineId } from "@/lib/services/tts-engines";
+import CanvasElementOverlay from "@/components/studio/CanvasElementOverlay";
 
 interface SceneTiming {
   id: string;
@@ -27,9 +28,20 @@ interface Props {
   audio?: VideoAudio;
   voiceover?: VoiceoverConfig | null;
   sceneTimings?: SceneTiming[];
+  /** Free-form elements for the currently visible scene (for the drag overlay). */
+  overlayElements?: SceneElement[];
+  /** Currently selected element id (for the drag overlay). */
+  selectedElementId?: string | null;
+  /** Called when the user clicks an element on the canvas (or empty space → null). */
+  onSelectElement?: (id: string | null) => void;
+  /** Called as the user drags or resizes an element. */
+  onUpdateElementBox?: (id: string, box: ElementBox) => void;
 }
 
-export default function VideoPreview({ compiledVideo, playing, currentTime, onTimeUpdate, className, audio, voiceover, sceneTimings }: Props) {
+export default function VideoPreview({
+  compiledVideo, playing, currentTime, onTimeUpdate, className, audio, voiceover, sceneTimings,
+  overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
+}: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const rafRef      = useRef<number>(0);
   const timeRef     = useRef(currentTime);
@@ -173,12 +185,34 @@ export default function VideoPreview({ compiledVideo, playing, currentTime, onTi
   const width  = compiledVideo?.width  ?? 1280;
   const height = compiledVideo?.height ?? 720;
 
+  // Show the drag overlay only when the user has elements + edit handlers wired
+  const hasOverlay = !!(overlayElements && overlayElements.length > 0 && onSelectElement && onUpdateElementBox);
+
+  if (!hasOverlay) {
+    return (
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className={className ?? "w-full rounded-lg bg-black"}
+      />
+    );
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className={className ?? "w-full rounded-lg bg-black"}
-    />
+    <div className={`relative ${className ?? "w-full rounded-lg bg-black"}`}>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className="w-full h-full block"
+      />
+      <CanvasElementOverlay
+        elements={overlayElements!}
+        selectedId={selectedElementId ?? null}
+        onSelect={onSelectElement!}
+        onUpdateBox={onUpdateElementBox!}
+      />
+    </div>
   );
 }
