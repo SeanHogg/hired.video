@@ -39,7 +39,6 @@ import { compile } from "@/lib/compiler/video-compiler";
 import { exportVideo } from "@/lib/renderer/video-exporter";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
-import StudioToolbar from "@/components/studio/StudioToolbar";
 import NLETimeline from "@/components/studio/NLETimeline";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import { defaultStudioState } from "@/types/studio";
@@ -52,7 +51,6 @@ import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioSettings from "./StudioSettings";
-import StudioFeaturesHub from "./StudioFeaturesHub";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -382,9 +380,12 @@ export default function StudioLayout() {
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
   const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
+
+  // Auto-focus the first scene when a script becomes available, so the Stock
+  // Media panel has a target. The user can click any other scene to switch.
+  // Also clears focus if the focused scene no longer exists (e.g. after regenerate).
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [featuresOpen, setFeaturesOpen] = useState(false);
   const [videoHeight, setVideoHeight] = useState(() => {
     const saved = localStorage.getItem("studio_video_height");
     return saved ? Math.max(80, parseInt(saved, 10)) : 160;
@@ -497,6 +498,19 @@ export default function StudioLayout() {
       if (r.data) setProjects(r.data);
     }).catch(() => {});
   }, [user]);
+
+  // Sync focused scene to current script — auto-focus first scene if none, or
+  // clear stale focus when the script no longer contains the focused id.
+  useEffect(() => {
+    const scenes = state.script?.scenes;
+    if (!scenes || scenes.length === 0) {
+      if (focusedSceneId !== undefined) setFocusedSceneId(undefined);
+      return;
+    }
+    if (!focusedSceneId || !scenes.some((s) => s.id === focusedSceneId)) {
+      setFocusedSceneId(scenes[0].id);
+    }
+  }, [state.script, focusedSceneId]);
 
   // ── Generate ───────────────────────────────────────────────────────────────
 
@@ -945,50 +959,6 @@ export default function StudioLayout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            {/* Studio toolbar — version history, chapters, AI rewrite, hook, mixer, forms, review, thumbnails */}
-            <StudioToolbar
-              projectId={state.projectId}
-              storyboard={state.script}
-              script={state.script}
-              onScriptChange={handleScriptChange}
-              sceneBoundaries={state.script?.scenes.map((s) => ({
-                start: s.start,
-                title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
-              }))}
-              videoUrl={(state as any).videoUrl ?? null}
-              durationSec={state.script?.video?.duration}
-              currentTimeSec={currentTime}
-              onRestoreVersion={(storyboard) => {
-                const restored = storyboard as VideoScript | null;
-                if (restored) {
-                  pushHistory(restored);
-                  patchState({ script: restored });
-                  recompile(restored);
-                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
-                }
-              }}
-              onApplyRewrite={(scenes) => {
-                if (!state.script) return;
-                const updated = { ...state.script, scenes: scenes as any } as VideoScript;
-                pushHistory(updated);
-                patchState({ script: updated });
-                recompile(updated);
-                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
-              }}
-              onApplyHook={(patch) => {
-                if (!state.script || state.script.scenes.length === 0) return;
-                const next = {
-                  ...state.script,
-                  scenes: state.script.scenes.map((s, i) =>
-                    i === 0 ? { ...s, ...patch } : s,
-                  ),
-                } as VideoScript;
-                pushHistory(next);
-                patchState({ script: next });
-                recompile(next);
-                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
-              }}
-            />
             {/* Video preview — height controlled by drag handle */}
             <div className="shrink-0 overflow-hidden border-b" style={{ height: videoHeight }}>
               <StudioPreview
@@ -1050,76 +1020,72 @@ export default function StudioLayout() {
               )}
             </div>
 
-            {/* Prompt / Storyboard editor — same flow for all templates */}
-            {!featuresOpen && (
-              <StudioEditor
-                tab={tab}
-                onTabChange={setTab}
-                state={state}
-                onStateChange={patchState}
-                showJD={showJD}
-                onToggleJD={() => setShowJD((v) => !v)}
-                onScriptChange={handleScriptChange}
-                focusedSceneId={focusedSceneId}
-                onSceneFocus={setFocusedSceneId}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                contentTemplate={contentTemplate}
-              />
-            )}
-
-            {/* Advanced Enhancements toggle */}
-            <div className="shrink-0 border-t">
-              <button
-                type="button"
-                className={cn(
-                  "w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
-                  featuresOpen ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setFeaturesOpen((v) => !v)}
-              >
-                {featuresOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                Advanced Enhancements
-              </button>
-            </div>
-
-            {/* Enhancements Hub — fills remaining space when open */}
-            {featuresOpen && (
-              <div className="flex-1 overflow-hidden">
-                <StudioFeaturesHub
-                  scriptText={state.script?.scenes.map((s) =>
-                    [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
-                  ).join(" ") ?? ""}
-                  scenes={state.script?.scenes.map((s) => ({
-                    id: s.id,
-                    title: s.title,
-                    text: typeof s.text === "string" ? s.text : s.text?.join(" "),
-                    items: s.items,
-                    skills: s.skills,
-                  }))}
-                  projectId={state.projectId ?? undefined}
-                  onVoiceoverGenerated={(results) => {
-                    // Store voiceover results keyed by scene ID
-                    const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
-                    for (const r of results) {
-                      scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
-                    }
-                    patchState({
-                      voiceover: {
-                        enabled: true,
-                        voiceId: state.voiceover?.voiceId ?? "browser-default",
-                        voiceName: state.voiceover?.voiceName ?? "Default",
-                        speed: state.voiceover?.speed ?? 1,
-                        scenes,
-                      },
-                    });
-                    toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
-                  }}
-                />
-              </div>
-            )}
+            {/* Prompt / Storyboard / Actions editor — same flow for all templates */}
+            <StudioEditor
+              tab={tab}
+              onTabChange={setTab}
+              state={state}
+              onStateChange={patchState}
+              showJD={showJD}
+              onToggleJD={() => setShowJD((v) => !v)}
+              onScriptChange={handleScriptChange}
+              focusedSceneId={focusedSceneId}
+              onSceneFocus={setFocusedSceneId}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              contentTemplate={contentTemplate}
+              currentTimeSec={currentTime}
+              videoUrl={null}
+              onRestoreVersion={(storyboard) => {
+                const restored = storyboard as VideoScript | null;
+                if (restored) {
+                  pushHistory(restored);
+                  patchState({ script: restored });
+                  recompile(restored);
+                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
+                }
+              }}
+              onApplyRewrite={(scenes) => {
+                if (!state.script) return;
+                const updated = { ...state.script, scenes: scenes as any } as VideoScript;
+                pushHistory(updated);
+                patchState({ script: updated });
+                recompile(updated);
+                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+              }}
+              onApplyHook={(patch) => {
+                if (!state.script || state.script.scenes.length === 0) return;
+                const next = {
+                  ...state.script,
+                  scenes: state.script.scenes.map((s, i) =>
+                    i === 0 ? { ...s, ...patch } : s,
+                  ),
+                } as VideoScript;
+                pushHistory(next);
+                patchState({ script: next });
+                recompile(next);
+                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
+              }}
+              onVoiceoverGenerated={(results) => {
+                // Store voiceover results keyed by scene ID
+                const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
+                for (const r of results) {
+                  scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
+                }
+                patchState({
+                  voiceover: {
+                    enabled: true,
+                    voiceId: state.voiceover?.voiceId ?? "browser-default",
+                    voiceName: state.voiceover?.voiceName ?? "Default",
+                    speed: state.voiceover?.speed ?? 1,
+                    scenes,
+                  },
+                });
+                toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
+              }}
+            />
           </div>
 
           {/* Right panel — export/publish actions + settings */}

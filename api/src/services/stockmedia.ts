@@ -166,11 +166,21 @@ async function searchPixabay(
   return (json.hits ?? []).map((h: any): StockSearchResult => {
     if (mt === "video") {
       const v = h.videos?.medium ?? h.videos?.small ?? h.videos?.large;
+      // Pixabay video thumbnails: prefer the per-video `thumbnail` field, then userImageURL,
+      // then a constructed Vimeo URL using `picture_id` if available.
+      const thumb =
+        h.videos?.tiny?.thumbnail ||
+        h.videos?.small?.thumbnail ||
+        h.videos?.medium?.thumbnail ||
+        h.userImageURL ||
+        (h.picture_id ? `https://i.vimeocdn.com/video/${h.picture_id}_295x166.jpg` : null) ||
+        // Final fallback — a 1×1 transparent pixel keeps the layout valid
+        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>";
       return {
         provider: "pixabay",
         providerAssetId: String(h.id),
         mediaType: "video",
-        thumbnailUrl: `https://i.vimeocdn.com/video/${h.picture_id}_295x166.jpg`,
+        thumbnailUrl: thumb,
         previewUrl: v?.url,
         downloadUrl: (h.videos?.large ?? v)?.url,
         width: v?.width,

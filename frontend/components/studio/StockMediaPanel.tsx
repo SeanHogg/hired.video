@@ -34,6 +34,8 @@ interface StockMediaPanelProps {
   sceneId?: string;
   /** Called once a pick is finalised — receives the CDN URL ready to drop into a scene. */
   onPick?: (result: StockPickResult) => void;
+  /** Called when a previously-picked (recently used) asset is clicked. */
+  onPickRecent?: (item: StockRecentItem) => void;
 }
 
 const TYPE_OPTIONS: Array<{ value: StockMediaType; label: string; icon: typeof ImageIcon }> = [
@@ -41,7 +43,7 @@ const TYPE_OPTIONS: Array<{ value: StockMediaType; label: string; icon: typeof I
   { value: "video", label: "Video",  icon: Film },
 ];
 
-export default function StockMediaPanel({ projectId, sceneId, onPick }: StockMediaPanelProps) {
+export default function StockMediaPanel({ projectId, sceneId, onPick, onPickRecent }: StockMediaPanelProps) {
   const [query, setQuery] = useState("");
   const [mediaType, setMediaType] = useState<StockMediaType>("image");
   const [results, setResults] = useState<StockSearchResult[]>([]);
@@ -209,20 +211,39 @@ export default function StockMediaPanel({ projectId, sceneId, onPick }: StockMed
             Recently used
           </div>
           <div className="grid grid-cols-3 gap-1.5">
-            {recent.map((r) => (
-              <div
-                key={r.hash}
-                title={`${r.title ?? ""} · ${r.author ?? ""} (${r.licence ?? ""})`}
-                className="relative aspect-square rounded-md overflow-hidden border border-border"
-              >
-                {r.cdnUrl && (
-                  <img src={r.cdnUrl} alt={r.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
-                )}
-                {r.mediaType === "video" && (
-                  <Film className="absolute top-1 right-1 w-3 h-3 text-white drop-shadow" />
-                )}
-              </div>
-            ))}
+            {recent.map((r) => {
+              const isImage = r.mediaType === "image";
+              return (
+                <button
+                  key={r.hash}
+                  type="button"
+                  onClick={() => onPickRecent?.(r)}
+                  title={`${r.title ?? ""} · ${r.author ?? ""} (${r.licence ?? ""})`}
+                  className="group relative aspect-square rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                >
+                  {isImage && r.cdnUrl ? (
+                    <img src={r.cdnUrl} alt={r.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    // Video / audio / missing-cdn fallback — show icon placeholder
+                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                      {r.mediaType === "video" ? (
+                        <Film className="w-5 h-5 text-muted-foreground" />
+                      ) : (
+                        <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+                  {r.mediaType === "video" && isImage && (
+                    <Film className="absolute top-1 right-1 w-3 h-3 text-white drop-shadow" />
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <span className="opacity-0 group-hover:opacity-100 text-[10px] text-white font-medium">
+                      Use
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

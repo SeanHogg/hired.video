@@ -1,18 +1,26 @@
 // StudioEditor.tsx — tab switcher that adapts per content template.
 //
-// Resume / Personal Brand  →  Prompt  | Storyboard
-// Skills Demo               →  Setup   | Storyboard
-// Job Ad / Company Promo    →  Job Details | Storyboard
+// Resume / Personal Brand  →  Prompt  | Storyboard | Actions
+// Skills Demo               →  Setup   | Storyboard | Actions
+// Job Ad / Company Promo    →  Job Details | Storyboard | Actions
 
 import { Undo2, Redo2 } from "lucide-react";
 import PromptEditor from "@/components/PromptEditor";
 import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import StoryboardEditor from "@/components/StoryboardEditor";
+import StudioActions from "./StudioActions";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import type { ContentTemplate } from "./StudioSidebar";
 
-export type EditorTab = "prompt" | "storyboard";
+export type EditorTab = "prompt" | "storyboard" | "actions";
+
+interface VoiceoverResult {
+  sceneId: string;
+  audioUrl: string | null;
+  durationMs: number;
+  wordTimestamps: Array<{ word: string; start: number; end: number }>;
+}
 
 interface Props {
   tab: EditorTab;
@@ -29,6 +37,13 @@ interface Props {
   onUndo?: () => void;
   onRedo?: () => void;
   contentTemplate?: ContentTemplate;
+  // Actions tab handlers
+  currentTimeSec?: number;
+  videoUrl?: string | null;
+  onRestoreVersion?: (storyboard: unknown) => void;
+  onApplyRewrite?: (scenes: Array<Record<string, unknown>>) => void;
+  onApplyHook?: (sceneZeroPatch: { title?: string; subtitle?: string; text?: string }) => void;
+  onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
 }
 
 /** First-tab label per content template */
@@ -46,6 +61,8 @@ export default function StudioEditor({
   onScriptChange, focusedSceneId, onSceneFocus,
   canUndo, canRedo, onUndo, onRedo,
   contentTemplate,
+  currentTimeSec, videoUrl,
+  onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
 }: Props) {
   const firstLabel = getFirstTabLabel(contentTemplate);
 
@@ -56,6 +73,7 @@ export default function StudioEditor({
         {([
           { id: "prompt" as EditorTab,     label: firstLabel },
           { id: "storyboard" as EditorTab, label: "Storyboard" },
+          { id: "actions" as EditorTab,    label: "Actions" },
         ]).map((t) => (
           <button
             key={t.id}
@@ -121,6 +139,35 @@ export default function StudioEditor({
             onScriptChange={onScriptChange}
             focusedSceneId={focusedSceneId}
             onSceneFocus={onSceneFocus}
+          />
+        )}
+
+        {tab === "actions" && (
+          <StudioActions
+            projectId={state.projectId}
+            script={state.script}
+            onScriptChange={onScriptChange}
+            sceneBoundaries={state.script?.scenes.map((s) => ({
+              start: s.start,
+              title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
+            }))}
+            videoUrl={videoUrl}
+            durationSec={state.script?.video?.duration}
+            currentTimeSec={currentTimeSec}
+            scenes={state.script?.scenes.map((s) => ({
+              id: s.id,
+              title: s.title,
+              text: typeof s.text === "string" ? s.text : s.text?.join(" "),
+              items: s.items,
+              skills: s.skills,
+            }))}
+            scriptText={state.script?.scenes.map((s) =>
+              [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
+            ).join(" ") ?? ""}
+            onRestoreVersion={onRestoreVersion ?? (() => {})}
+            onApplyRewrite={onApplyRewrite ?? (() => {})}
+            onApplyHook={onApplyHook ?? (() => {})}
+            onVoiceoverGenerated={onVoiceoverGenerated}
           />
         )}
 

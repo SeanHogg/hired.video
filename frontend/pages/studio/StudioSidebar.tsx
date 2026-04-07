@@ -143,7 +143,7 @@ function loadCollapsed() {
     const raw = localStorage.getItem(SIDEBAR_PREFS_KEY);
     if (raw) return JSON.parse(raw) as Record<string, boolean>;
   } catch {}
-  return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, theme: false, music: false };
+  return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId }: Props) {
@@ -215,6 +215,52 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   function handleBgPreset(preset: BgPreset) {
     setActiveBg(preset.value);
     onBackgroundSelect?.(preset.value);
+  }
+
+  /** Apply a stock media URL to the currently focused scene only. Returns false if nothing was applied. */
+  function applyMediaToTarget(cdnUrl: string, mediaType: "image" | "video" | "audio"): boolean {
+    if (!focusedSceneId || !script || !onScriptChange) {
+      // Refuse to apply — caller should show a message asking the user to focus a scene
+      return false;
+    }
+    if (mediaType === "image" || mediaType === "video") {
+      onScriptChange({
+        ...script,
+        scenes: script.scenes.map((s) =>
+          s.id === focusedSceneId
+            ? { ...s, backgroundImage: cdnUrl, backgroundImagePosition: s.backgroundImagePosition ?? "full" }
+            : s,
+        ),
+      });
+      return true;
+    }
+    if (mediaType === "audio") {
+      onScriptChange({
+        ...script,
+        scenes: script.scenes.map((s) =>
+          s.id === focusedSceneId
+            ? { ...s, sceneAudio: cdnUrl, sceneAudioLabel: "Stock audio" }
+            : s,
+        ),
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /** Remove media from a scene */
+  function removeSceneMedia(sceneId: string, kind: "image" | "audio") {
+    if (!script || !onScriptChange) return;
+    onScriptChange({
+      ...script,
+      scenes: script.scenes.map((s) =>
+        s.id === sceneId
+          ? kind === "image"
+            ? { ...s, backgroundImage: undefined, backgroundImagePosition: undefined, imageAnimation: undefined }
+            : { ...s, sceneAudio: undefined, sceneAudioLabel: undefined }
+          : s,
+      ),
+    });
   }
 
   async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -535,55 +581,105 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </button>
         {!collapsed.stockMedia && (
           <>
-            {focusedSceneId && (
-              <p className="text-[10px] text-primary mb-1.5 px-1">
-                Picks will be added to the selected scene
-              </p>
-            )}
-            {!focusedSceneId && (
-              <p className="text-[10px] text-muted-foreground mb-1.5 px-1">
-                Picks will set the global background. Click a scene in the storyboard to target it.
-              </p>
-            )}
+            {(() => {
+              const focusedScene = focusedSceneId
+                ? script?.scenes.find((s) => s.id === focusedSceneId)
+                : null;
+              const focusedIdx = focusedScene
+                ? (script?.scenes.findIndex((s) => s.id === focusedSceneId) ?? -1) + 1
+                : 0;
+              return focusedScene ? (
+                <div className="rounded-md border border-primary/40 bg-primary/5 px-2 py-1.5 mb-1.5 text-[10px]">
+                  <p className="text-primary font-semibold">
+                    Editing scene {focusedIdx}: {focusedScene.title ?? focusedScene.type}
+                  </p>
+                  <p className="text-muted-foreground leading-tight mt-0.5">
+                    Picked media will be added to this scene only.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 mb-1.5 text-[10px] text-amber-700 dark:text-amber-400">
+                  Click a scene in the storyboard first to target it.
+                </div>
+              );
+            })()}
             <StockMediaPanel
               projectId={activeProjectId ?? undefined}
               sceneId={focusedSceneId}
               onPick={(result) => {
                 if (!result.cdnUrl) return;
-                // If a scene is focused, insert the media into that scene
-                if (focusedSceneId && script && onScriptChange) {
-                  if (result.mediaType === "image") {
-                    onScriptChange({
-                      ...script,
-                      scenes: script.scenes.map((s) =>
-                        s.id === focusedSceneId
-                          ? { ...s, backgroundImage: result.cdnUrl, backgroundImagePosition: s.backgroundImagePosition ?? "full" }
-                          : s,
-                      ),
-                    });
-                  } else if (result.mediaType === "audio") {
-                    onScriptChange({
-                      ...script,
-                      scenes: script.scenes.map((s) =>
-                        s.id === focusedSceneId
-                          ? { ...s, sceneAudio: result.cdnUrl, sceneAudioLabel: "Stock audio" }
-                          : s,
-                      ),
-                    });
-                  }
-                  return;
-                }
-                // No scene focused — fall back to global background (image only)
-                if (result.mediaType === "image") {
-                  setCustomBgUrl(result.cdnUrl);
-                  setActiveBg("custom");
-                  onBackgroundSelect?.("custom", result.cdnUrl);
-                }
+                applyMediaToTarget(result.cdnUrl, result.mediaType);
+              }}
+              onPickRecent={(item) => {
+                if (!item.cdnUrl) return;
+                applyMediaToTarget(item.cdnUrl, item.mediaType);
               }}
             />
           </>
         )}
       </section>
+
+      {/* Media in Use — per-scene inventory with remove buttons */}
+      {script && script.scenes.some((s) => s.backgroundImage || s.sceneAudio) && (
+        <section className="px-3 pb-3 border-t pt-3">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
+            onClick={() => toggleSection("mediaInUse")}
+          >
+            <ImagePlus className="w-3 h-3" /> <span className="flex-1 text-left">Media in Use</span>
+            {collapsed.mediaInUse ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          {!collapsed.mediaInUse && (
+            <ul className="flex flex-col gap-1.5">
+              {script.scenes.map((s, i) => {
+                if (!s.backgroundImage && !s.sceneAudio) return null;
+                return (
+                  <li key={s.id} className="rounded-md border border-border bg-card p-1.5 text-[10px]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="font-semibold text-muted-foreground">Scene {i + 1}</span>
+                      <span className="truncate text-muted-foreground/70">{s.title ?? s.type}</span>
+                    </div>
+                    {s.backgroundImage && (
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={s.backgroundImage}
+                          alt=""
+                          className="w-12 h-8 object-cover rounded border border-border shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <span className="flex-1 truncate text-muted-foreground">Image</span>
+                        <button
+                          type="button"
+                          title="Remove image"
+                          className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
+                          onClick={() => removeSceneMedia(s.id, "image")}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    {s.sceneAudio && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Music2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="flex-1 truncate text-muted-foreground">{s.sceneAudioLabel ?? "Audio"}</span>
+                        <button
+                          type="button"
+                          title="Remove audio"
+                          className="shrink-0 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-colors"
+                          onClick={() => removeSceneMedia(s.id, "audio")}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
 
       {/* Theme */}
       {script?.video.theme && (
