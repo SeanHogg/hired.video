@@ -118,6 +118,13 @@ async function exportMediaRecorder(
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
+  canvas.style.position = "fixed";
+  canvas.style.left = "-99999px";
+  canvas.style.top = "0";
+  document.body.appendChild(canvas);
+
+  // Render first frame so the captureStream has video data before recording starts
+  renderFrame(canvas, compiledVideo, 0);
 
   const stream = (canvas as unknown as { captureStream(fps: number): MediaStream }).captureStream(fps);
   const recorder = new MediaRecorder(stream, {
@@ -128,29 +135,39 @@ async function exportMediaRecorder(
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-  recorder.start(1000 / fps);
+  recorder.start(250);
 
   const frameDuration = 1000 / fps;
   let frame = 0;
   const totalFrames = Math.ceil(totalDuration * fps);
+  const startWallTime = performance.now();
 
   await new Promise<void>((resolve) => {
     function next() {
-      if (frame >= totalFrames) {
-        recorder.stop();
-        resolve();
-        return;
-      }
+      if (frame >= totalFrames) { resolve(); return; }
       const time = frame / fps;
       renderFrame(canvas, compiledVideo, time);
       opts.onProgress?.(frame / totalFrames);
       frame++;
-      setTimeout(next, frameDuration);
+      const targetMs = startWallTime + frame * frameDuration;
+      const delay = Math.max(0, targetMs - performance.now());
+      setTimeout(next, delay);
     }
     next();
   });
 
-  await new Promise<void>((r) => { recorder.onstop = () => r(); });
+  // Allow the recorder to flush the final timeslice before stopping
+  await new Promise<void>((r) => setTimeout(r, 300));
+  if (recorder.state === "recording") {
+    try { recorder.requestData(); } catch {}
+  }
+  await new Promise<void>((resolve) => {
+    if (recorder.state === "inactive") { resolve(); return; }
+    recorder.onstop = () => resolve();
+    recorder.stop();
+  });
+
+  if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
   opts.onProgress?.(1);
   return new Blob(chunks, { type: "video/webm" });
 }
@@ -177,9 +194,20 @@ async function exportMediaRecorderWithAudio(
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
+  // Canvas must be in DOM (even hidden) for captureStream to reliably emit frames in some browsers
+  canvas.style.position = "fixed";
+  canvas.style.left = "-99999px";
+  canvas.style.top = "0";
+  document.body.appendChild(canvas);
 
-  // Set up audio capture
+  // Render the first frame BEFORE starting recorder so the stream has video data
+  renderFrame(canvas, compiledVideo, 0);
+
+  // Set up audio capture — resume context (required by browser autoplay policy)
   const audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") {
+    try { await audioCtx.resume(); } catch {}
+  }
   const audioDest = audioCtx.createMediaStreamDestination();
 
   // Multi-track mixer (gap #129) — per-lane GainNodes feed a master gain
@@ -267,32 +295,47 @@ async function exportMediaRecorderWithAudio(
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-  recorder.start(1000 / fps);
+  // Use a 250ms timeslice so chunks accumulate while rendering
+  recorder.start(250);
 
   const frameDuration = 1000 / fps;
   let frame = 0;
   const totalFrames = Math.ceil(totalDuration * fps);
+  const startWallTime = performance.now();
 
+  // Drive frame rendering against wall-clock time so captureStream picks them up
   await new Promise<void>((resolve) => {
     function next() {
-      if (frame >= totalFrames) {
-        recorder.stop();
-        resolve();
-        return;
-      }
+      if (frame >= totalFrames) { resolve(); return; }
       const time = frame / fps;
       renderFrame(canvas, compiledVideo, time);
       opts.onProgress?.(frame / totalFrames);
       frame++;
-      setTimeout(next, frameDuration);
+
+      // Schedule next frame so it lands on its real-time slot
+      const targetMs = startWallTime + frame * frameDuration;
+      const delay = Math.max(0, targetMs - performance.now());
+      setTimeout(next, delay);
     }
     next();
   });
 
-  await new Promise<void>((r) => { recorder.onstop = () => r(); });
+  // Give the recorder time to flush the final timeslice before stopping
+  await new Promise<void>((r) => setTimeout(r, 300));
+
+  // Force flush any buffered data, then stop and wait for the stop event
+  if (recorder.state === "recording") {
+    try { recorder.requestData(); } catch {}
+  }
+  await new Promise<void>((resolve) => {
+    if (recorder.state === "inactive") { resolve(); return; }
+    recorder.onstop = () => resolve();
+    recorder.stop();
+  });
 
   if (hasAmbientTrack) exportPlayer.stop();
   audioCtx.close().catch(() => {});
+  if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
 
   opts.onProgress?.(1);
   return new Blob(chunks, { type: "video/webm" });

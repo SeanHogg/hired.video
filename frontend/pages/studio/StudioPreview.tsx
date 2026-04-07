@@ -251,7 +251,7 @@ export default function StudioPreview({
       {showActions && <div className="flex flex-col overflow-y-auto">
         {([
           { n: 1, title: "Generate Script", done: !!state.script,   active: !state.script || state.status === "generating" },
-          { n: 2, title: "Export MP4",      done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
+          { n: 2, title: "Export Video",    done: !!state.videoBlob, active: !!state.script && !state.videoBlob && state.status !== "generating" },
           { n: 3, title: "Share",           done: isPublished, active: !!state.videoBlob || isPublished },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
