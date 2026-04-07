@@ -348,6 +348,8 @@ export interface VideoScript {
     aspect: VideoAspect;
     theme: VideoTheme;
     audio?: VideoAudio;
+    /** Optional purpose stored on AI-generated scripts for backward compat. */
+    purpose?: string;
   };
   scenes: SceneScript[];
   /** Internal metadata not rendered by the compiler — persisted with the draft */
