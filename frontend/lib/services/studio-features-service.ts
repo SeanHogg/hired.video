@@ -736,3 +736,216 @@ export async function rewriteScript(params: {
   );
   return res.data;
 }
+
+// ─── In-Video Lead Forms (gap #140) ─────────────────────────────────────────
+
+export type VideoFormFieldType = "email" | "text" | "tel" | "select";
+export interface VideoFormField {
+  key: string;
+  label: string;
+  type: VideoFormFieldType;
+  required: boolean;
+  options?: string[];
+}
+
+export interface VideoForm {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string | null;
+  positionSeconds: number;
+  fields: VideoFormField[];
+  requireToContinue: boolean;
+  redirectUrl: string | null;
+  submitButtonText: string;
+  isActive: boolean;
+}
+
+export async function listVideoForms(projectId: string): Promise<VideoForm[]> {
+  const res = await apiClient.get<{ forms: VideoForm[] }>(`/api/studio/projects/${projectId}/forms`);
+  return res.data.forms;
+}
+
+export async function createVideoForm(projectId: string, form: Omit<VideoForm, "id" | "projectId" | "isActive">): Promise<VideoForm> {
+  const res = await apiClient.post<VideoForm>(`/api/studio/projects/${projectId}/forms`, form);
+  return res.data;
+}
+
+export async function updateVideoForm(id: string, patch: Partial<Omit<VideoForm, "id" | "projectId" | "fields">>): Promise<VideoForm> {
+  const res = await apiClient.patch<VideoForm>(`/api/studio/forms/${id}`, patch);
+  return res.data;
+}
+
+export async function deleteVideoForm(id: string): Promise<void> {
+  await apiClient.delete(`/api/studio/forms/${id}`);
+}
+
+export async function getPublicVideoForms(videoId: string): Promise<VideoForm[]> {
+  const res = await apiClient.get<{ forms: VideoForm[] }>(`/api/studio/videos/${videoId}/forms/public`);
+  return res.data.forms;
+}
+
+export async function submitVideoForm(formId: string, params: {
+  answers: Record<string, string>;
+  timestampSec?: number;
+  videoId?: string;
+}): Promise<{ id: string; redirectUrl: string | null }> {
+  const res = await apiClient.post<{ id: string; redirectUrl: string | null }>(
+    `/api/studio/forms/${formId}/submit`,
+    params,
+  );
+  return res.data;
+}
+
+export async function getVideoFormSubmissions(formId: string): Promise<{
+  submissions: Array<{
+    id: string;
+    viewerEmail: string | null;
+    viewerName: string | null;
+    answers: Record<string, string>;
+    timestampSec: number | null;
+    createdAt: string;
+  }>;
+  total: number;
+}> {
+  const res = await apiClient.get<{
+    submissions: Array<{
+      id: string;
+      viewerEmail: string | null;
+      viewerName: string | null;
+      answers: Record<string, string>;
+      timestampSec: number | null;
+      createdAt: string;
+    }>;
+    total: number;
+  }>(`/api/studio/forms/${formId}/submissions`);
+  return res.data;
+}
+
+// ─── Review Comments + Share Links (gap #145) ───────────────────────────────
+
+export interface ReviewComment {
+  id: string;
+  projectId: string;
+  parentId: string | null;
+  authorUserId: string | null;
+  authorName: string;
+  authorEmail: string | null;
+  body: string;
+  timestampSec: number | null;
+  resolved: boolean;
+  createdAt: string;
+}
+
+export interface ReviewLink {
+  id: string;
+  projectId: string;
+  shareToken: string;
+  name: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+}
+
+export async function createReviewLink(projectId: string, opts: { name?: string; expiresInDays?: number } = {}): Promise<ReviewLink> {
+  const res = await apiClient.post<ReviewLink>(`/api/studio/projects/${projectId}/review-links`, opts);
+  return res.data;
+}
+
+export async function listReviewLinks(projectId: string): Promise<ReviewLink[]> {
+  const res = await apiClient.get<{ links: ReviewLink[] }>(`/api/studio/projects/${projectId}/review-links`);
+  return res.data.links;
+}
+
+export async function deleteReviewLink(id: string): Promise<void> {
+  await apiClient.delete(`/api/studio/review-links/${id}`);
+}
+
+export async function getProjectComments(projectId: string): Promise<ReviewComment[]> {
+  const res = await apiClient.get<{ comments: ReviewComment[] }>(`/api/studio/projects/${projectId}/comments`);
+  return res.data.comments;
+}
+
+export async function postProjectComment(projectId: string, params: {
+  body: string;
+  timestampSec?: number | null;
+  parentId?: string | null;
+}): Promise<ReviewComment> {
+  const res = await apiClient.post<ReviewComment>(`/api/studio/projects/${projectId}/comments`, params);
+  return res.data;
+}
+
+export async function resolveComment(id: string, resolved: boolean): Promise<ReviewComment> {
+  const res = await apiClient.patch<ReviewComment>(`/api/studio/comments/${id}`, { resolved });
+  return res.data;
+}
+
+export async function deleteComment(id: string): Promise<void> {
+  await apiClient.delete(`/api/studio/comments/${id}`);
+}
+
+export async function getPublicReview(shareToken: string): Promise<{
+  projectId: string;
+  project: { id: string; status: string; videoId: string | null } | null;
+  comments: ReviewComment[];
+  linkName: string | null;
+}> {
+  const res = await apiClient.get<{
+    projectId: string;
+    project: { id: string; status: string; videoId: string | null } | null;
+    comments: ReviewComment[];
+    linkName: string | null;
+  }>(`/api/studio/review/${shareToken}`);
+  return res.data;
+}
+
+export async function postPublicReviewComment(shareToken: string, params: {
+  authorName: string;
+  authorEmail?: string;
+  body: string;
+  timestampSec?: number | null;
+  parentId?: string | null;
+}): Promise<ReviewComment> {
+  const res = await apiClient.post<ReviewComment>(`/api/studio/review/${shareToken}/comments`, params);
+  return res.data;
+}
+
+// ─── AI Thumbnails (gap #142) ───────────────────────────────────────────────
+
+export interface ThumbnailCandidate {
+  id: string;
+  projectId: string;
+  imageUrl: string;
+  storageKey: string | null;
+  sourceTimeSec: number | null;
+  headlineText: string | null;
+  score: number | null;
+  isSelected: boolean;
+  createdAt: string;
+}
+
+export async function scoreThumbnails(projectId: string, candidates: Array<{
+  imageUrl: string;
+  storageKey?: string;
+  sourceTimeSec?: number;
+}>, headlineHint?: string): Promise<ThumbnailCandidate[]> {
+  const res = await apiClient.post<{ candidates: ThumbnailCandidate[] }>(
+    `/api/studio/projects/${projectId}/thumbnails/score`,
+    { candidates, headlineHint },
+  );
+  return res.data.candidates;
+}
+
+export async function listThumbnails(projectId: string): Promise<ThumbnailCandidate[]> {
+  const res = await apiClient.get<{ thumbnails: ThumbnailCandidate[] }>(
+    `/api/studio/projects/${projectId}/thumbnails`,
+  );
+  return res.data.thumbnails;
+}
+
+export async function selectThumbnail(projectId: string, thumbnailId: string): Promise<ThumbnailCandidate> {
+  const res = await apiClient.patch<ThumbnailCandidate>(
+    `/api/studio/projects/${projectId}/thumbnail`,
+    { thumbnailId },
+  );
+  return res.data;
+}

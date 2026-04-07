@@ -621,6 +621,7 @@ export default function StudioLayout() {
         state.name,
         state.projectId ?? undefined,
         state.resumeId,
+        state.resolution,
       );
       if (!uploadRes.data) throw new Error("Upload failed");
 
@@ -774,6 +775,7 @@ export default function StudioLayout() {
           state.name,
           projectId ?? undefined,
           state.resumeId,
+          state.resolution,
         );
         if (!uploadRes.data) throw new Error("Upload failed");
         projectId = uploadRes.data.id;
@@ -941,7 +943,7 @@ export default function StudioLayout() {
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-            {/* Studio toolbar — version history, chapters, AI rewrite */}
+            {/* Studio toolbar — version history, chapters, AI rewrite, forms, review, thumbnails */}
             <StudioToolbar
               projectId={state.projectId}
               storyboard={state.script}
@@ -949,6 +951,9 @@ export default function StudioLayout() {
                 start: s.start,
                 title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
               }))}
+              videoUrl={(state as any).videoUrl ?? null}
+              durationSec={state.script?.video?.duration}
+              currentTimeSec={currentTime}
               onRestoreVersion={(storyboard) => {
                 const restored = storyboard as VideoScript | null;
                 if (restored) {

@@ -33,8 +33,8 @@ export interface StudioProjectState {
   model: string;                // default "qwen/qwen3.6-plus:free"
   temperature: number;          // 0–1
   // Video settings
-  resolution: "720p" | "1080p";
-  aspectRatio: "16:9" | "9:16" | "1:1";
+  resolution: "720p" | "1080p" | "4k";
+  aspectRatio: "16:9" | "9:16" | "1:1" | "4:3";
   targetDuration: number;       // seconds
   motion: "minimal" | "moderate" | "cinematic";
   // TTS voiceover

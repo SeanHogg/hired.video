@@ -10,12 +10,14 @@ import { buildSceneGraph } from "./scene-graph";
 const RESOLUTION_MAP: Record<string, { w: number; h: number }> = {
   "720p":  { w: 1280, h: 720  },
   "1080p": { w: 1920, h: 1080 },
+  "4k":    { w: 3840, h: 2160 }, // gap #133 — Premium-gated at the export route
 };
 
 const ASPECT_MAP: Record<string, { w: number; h: number }> = {
   "16:9": { w: 16, h: 9  },
   "9:16": { w: 9,  h: 16 },
   "1:1":  { w: 1,  h: 1  },
+  "4:3":  { w: 4,  h: 3  },
 };
 
 function resolveSize(resolution: string, aspect: string): { width: number; height: number } {

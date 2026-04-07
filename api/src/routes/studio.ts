@@ -894,9 +894,18 @@ studioRoutes.post("/upload", async (c) => {
   const title = String(form?.get("title") ?? "My Video Resume");
   const maybeProjectId = String(form?.get("projectId") ?? "").trim();
   const maybeResumeId = String(form?.get("resumeId") ?? "").trim() || null;
+  const resolution = String(form?.get("resolution") ?? "").trim(); // gap #133
 
   if (!file || typeof file.arrayBuffer !== "function") {
     return c.json(fail("VALIDATION_ERROR", "Missing video file"), 400);
+  }
+
+  // Gap #133: 4K export gated to Premium
+  if (resolution === "4k") {
+    const sub = await getSubscription(user.sub);
+    if (!sub.isPremium) {
+      return c.json(fail("PREMIUM_REQUIRED", "4K export requires a Premium subscription. Upgrade to unlock 3840×2160 export."), 402);
+    }
   }
 
   const db = getDb();

@@ -105,7 +105,7 @@ export default function StudioSettings({ state, onStateChange }: Props) {
           <Label className="mb-1.5 block text-xs">Resolution</Label>
           <Select
             value={state.resolution}
-            onValueChange={(v) => onStateChange({ resolution: v as "720p" | "1080p" })}
+            onValueChange={(v) => onStateChange({ resolution: v as "720p" | "1080p" | "4k" })}
           >
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
@@ -113,6 +113,7 @@ export default function StudioSettings({ state, onStateChange }: Props) {
             <SelectContent>
               <SelectItem value="720p">720p (faster)</SelectItem>
               <SelectItem value="1080p">1080p (HD)</SelectItem>
+              <SelectItem value="4k">4K (3840×2160) — Premium</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -127,9 +128,10 @@ export default function StudioSettings({ state, onStateChange }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="16:9">16:9 — Landscape</SelectItem>
-              <SelectItem value="9:16">9:16 — Portrait (LinkedIn)</SelectItem>
-              <SelectItem value="1:1">1:1 — Square</SelectItem>
+              <SelectItem value="16:9">16:9 — Landscape (YouTube / LinkedIn)</SelectItem>
+              <SelectItem value="9:16">9:16 — Portrait (TikTok / Reels / Shorts)</SelectItem>
+              <SelectItem value="1:1">1:1 — Square (Instagram)</SelectItem>
+              <SelectItem value="4:3">4:3 — Classic</SelectItem>
             </SelectContent>
           </Select>
         </div>

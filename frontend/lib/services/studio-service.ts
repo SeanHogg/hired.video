@@ -268,12 +268,14 @@ export const studioService = {
     title: string,
     projectId?: string,
     resumeId?: string,
+    resolution?: "720p" | "1080p" | "4k",
   ): Promise<ApiSuccessResponse<StudioProject>> {
     const formData = new FormData();
     formData.append("video", blob, "studio-video.webm");
     formData.append("title", title);
     if (projectId) formData.append("projectId", projectId);
     if (resumeId) formData.append("resumeId", resumeId);
+    if (resolution) formData.append("resolution", resolution); // gap #133 — 4K Premium gate
 
     return apiClient.post("/api/studio/upload", formData, StudioProjectSchema);
   },

@@ -442,3 +442,118 @@ export const studioChapters = pgTable(
     index("idx_studio_chapters_project").on(t.projectId),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// In-Video Lead Forms (gap #140) — Wistia Turnstile equivalent.
+// A form is an interruptive overlay rendered at `positionSeconds` during
+// playback. Submissions land in `studio_video_form_submissions` and are
+// also mirrored into the global `marketingLeads` table for the unified
+// lead inbox.
+// ---------------------------------------------------------------------------
+export const studioVideoForms = pgTable(
+  "studio_video_forms",
+  {
+    id:              uuid("id").primaryKey().defaultRandom(),
+    userId:          text("user_id").notNull(),
+    projectId:       text("project_id").notNull(),
+    title:           text("title").notNull(),             // shown in form modal
+    description:     text("description"),
+    positionSeconds: real("position_seconds").notNull(),  // when to interrupt
+    fields:          jsonb("fields").notNull(),           // Array<{key, label, type, required}>
+    requireToContinue: boolean("require_to_continue").notNull().default(true), // gate vs skippable
+    redirectUrl:     text("redirect_url"),                // optional CTA after submit
+    submitButtonText: text("submit_button_text").notNull().default("Continue"),
+    isActive:        boolean("is_active").notNull().default(true),
+    createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_video_forms_project").on(t.projectId),
+    index("idx_studio_video_forms_user").on(t.userId),
+  ],
+);
+
+export const studioVideoFormSubmissions = pgTable(
+  "studio_video_form_submissions",
+  {
+    id:          uuid("id").primaryKey().defaultRandom(),
+    formId:      text("form_id").notNull(),
+    projectId:   text("project_id").notNull(),
+    videoId:     text("video_id"),                        // when submitted from a published video
+    viewerEmail: text("viewer_email"),
+    viewerName:  text("viewer_name"),
+    answers:     jsonb("answers").notNull(),              // { fieldKey: value }
+    timestampSec: real("timestamp_sec"),                  // playback position at submission
+    referrer:    text("referrer"),
+    ipCountry:   text("ip_country"),
+    createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_video_form_subs_form").on(t.formId),
+    index("idx_video_form_subs_project").on(t.projectId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Review Comments (gap #145) — Frame.io-style time-coded comments for
+// async team review of draft videos. Public review links via shareToken.
+// ---------------------------------------------------------------------------
+export const studioReviewComments = pgTable(
+  "studio_review_comments",
+  {
+    id:           uuid("id").primaryKey().defaultRandom(),
+    projectId:    text("project_id").notNull(),
+    parentId:     text("parent_id"),                      // null = root, else thread reply
+    authorUserId: text("author_user_id"),                  // null for anonymous via shareToken
+    authorName:   text("author_name").notNull(),
+    authorEmail:  text("author_email"),
+    body:         text("body").notNull(),
+    timestampSec: real("timestamp_sec"),                  // playback position pinned to (null = general)
+    resolved:     boolean("resolved").notNull().default(false),
+    createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_review_comments_project").on(t.projectId),
+    index("idx_review_comments_parent").on(t.parentId),
+  ],
+);
+
+export const studioReviewLinks = pgTable(
+  "studio_review_links",
+  {
+    id:          uuid("id").primaryKey().defaultRandom(),
+    projectId:   text("project_id").notNull(),
+    userId:      text("user_id").notNull(),               // owner of the project
+    shareToken:  text("share_token").notNull(),           // unique URL token
+    name:        text("name"),                             // friendly label e.g. "client review"
+    expiresAt:   timestamp("expires_at", { withTimezone: true }),
+    isActive:    boolean("is_active").notNull().default(true),
+    createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_review_links_project").on(t.projectId),
+    index("idx_review_links_token").on(t.shareToken),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Video Thumbnails (gap #142) — AI-generated candidates + chosen poster.
+// ---------------------------------------------------------------------------
+export const studioThumbnails = pgTable(
+  "studio_thumbnails",
+  {
+    id:          uuid("id").primaryKey().defaultRandom(),
+    projectId:   text("project_id").notNull(),
+    userId:      text("user_id").notNull(),
+    imageUrl:    text("image_url").notNull(),
+    storageKey:  text("storage_key"),
+    sourceTimeSec: real("source_time_sec"),                // frame extracted at this time
+    headlineText: text("headline_text"),                    // optional overlay text
+    score:       real("score"),                              // 0..1 LLM/heuristic score
+    isSelected:  boolean("is_selected").notNull().default(false),
+    createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_studio_thumbnails_project").on(t.projectId),
+  ],
+);

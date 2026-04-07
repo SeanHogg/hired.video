@@ -39,6 +39,9 @@ const {
   studioSkillsDemos, studioAsyncInterviews, studioAsyncResponses,
   studioVideoHeatmap, stockMediaAssets, userStockMediaUsage,
   studioProjectVersions, studioChapters,
+  studioVideoForms, studioVideoFormSubmissions,
+  studioReviewComments, studioReviewLinks,
+  studioThumbnails, marketingLeads,
 } = schema;
 
 export const studioFeaturesRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -2150,4 +2153,574 @@ studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
     console.error("[script/rewrite] error:", err);
     return c.json(fail("AI_ERROR", `Script rewrite failed: ${err}`), 500);
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  16. IN-VIDEO LEAD FORMS — gap #140
+// ██
+// ██  Wistia Turnstile equivalent. Forms are pinned to a playback timestamp
+// ██  and surface as an overlay during the embedded player. Submissions
+// ██  land in `studio_video_form_submissions` AND mirror into the global
+// ██  `marketingLeads` table for the unified lead inbox.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/studio/projects/:projectId/forms — list forms for a project (owner)
+studioFeaturesRoutes.get("/projects/:projectId/forms", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+
+  const forms = await db
+    .select()
+    .from(studioVideoForms)
+    .where(and(
+      eq(studioVideoForms.projectId, projectId),
+      eq(studioVideoForms.userId, user.sub),
+    ))
+    .orderBy(studioVideoForms.positionSeconds);
+
+  return c.json(ok({ forms }));
+});
+
+// GET /api/studio/videos/:videoId/forms — public — used by the embedded player
+// to fetch the active forms attached to a video at view time. Only returns
+// forms whose parent project owns the video AND `isActive = true`.
+studioFeaturesRoutes.get("/videos/:videoId/forms/public", async (c) => {
+  const videoId = c.req.param("videoId");
+  const db = getDb();
+
+  // Find the project owning this video
+  const [project] = await db
+    .select({ id: schema.studioProjects.id })
+    .from(schema.studioProjects)
+    .where(eq(schema.studioProjects.videoId, videoId))
+    .limit(1);
+
+  if (!project) return c.json(ok({ forms: [] }));
+
+  const forms = await db
+    .select({
+      id: studioVideoForms.id,
+      title: studioVideoForms.title,
+      description: studioVideoForms.description,
+      positionSeconds: studioVideoForms.positionSeconds,
+      fields: studioVideoForms.fields,
+      requireToContinue: studioVideoForms.requireToContinue,
+      submitButtonText: studioVideoForms.submitButtonText,
+      redirectUrl: studioVideoForms.redirectUrl,
+    })
+    .from(studioVideoForms)
+    .where(and(
+      eq(studioVideoForms.projectId, project.id),
+      eq(studioVideoForms.isActive, true),
+    ))
+    .orderBy(studioVideoForms.positionSeconds);
+
+  return c.json(ok({ forms }));
+});
+
+// POST /api/studio/projects/:projectId/forms — create
+studioFeaturesRoutes.post("/projects/:projectId/forms", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    title: z.string().min(1).max(120),
+    description: z.string().max(500).optional(),
+    positionSeconds: z.number().min(0),
+    fields: z.array(z.object({
+      key: z.string().min(1),
+      label: z.string().min(1),
+      type: z.enum(["email", "text", "tel", "select"]),
+      required: z.boolean().default(true),
+      options: z.array(z.string()).optional(), // for select
+    })).min(1),
+    requireToContinue: z.boolean().default(true),
+    redirectUrl: z.string().url().optional(),
+    submitButtonText: z.string().max(40).optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+
+  const db = getDb();
+  const [form] = await db.insert(studioVideoForms).values({
+    userId: user.sub,
+    projectId,
+    title: parsed.data.title,
+    description: parsed.data.description ?? null,
+    positionSeconds: parsed.data.positionSeconds,
+    fields: parsed.data.fields,
+    requireToContinue: parsed.data.requireToContinue,
+    redirectUrl: parsed.data.redirectUrl ?? null,
+    submitButtonText: parsed.data.submitButtonText ?? "Continue",
+  } as any).returning();
+
+  return c.json(ok(form), 201);
+});
+
+// PATCH /api/studio/forms/:id
+studioFeaturesRoutes.patch("/forms/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    title: z.string().min(1).max(120).optional(),
+    description: z.string().max(500).nullable().optional(),
+    positionSeconds: z.number().min(0).optional(),
+    requireToContinue: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    redirectUrl: z.string().url().nullable().optional(),
+    submitButtonText: z.string().max(40).optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const [updated] = await db.update(studioVideoForms)
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
+    .where(and(eq(studioVideoForms.id, id), eq(studioVideoForms.userId, user.sub)))
+    .returning();
+
+  if (!updated) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  return c.json(ok(updated));
+});
+
+// DELETE /api/studio/forms/:id
+studioFeaturesRoutes.delete("/forms/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const deleted = await db.delete(studioVideoForms)
+    .where(and(eq(studioVideoForms.id, id), eq(studioVideoForms.userId, user.sub)))
+    .returning({ id: studioVideoForms.id });
+  if (deleted.length === 0) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+  return c.json(ok({ deleted: deleted[0].id }));
+});
+
+// POST /api/studio/forms/:id/submit — public submission from the embedded player
+studioFeaturesRoutes.post("/forms/:id/submit", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    answers: z.record(z.string(), z.string().max(2000)),
+    timestampSec: z.number().min(0).optional(),
+    videoId: z.string().optional(),
+    referrer: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const [form] = await db.select().from(studioVideoForms).where(eq(studioVideoForms.id, id)).limit(1);
+  if (!form || !form.isActive) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+
+  // Validate required fields
+  const fields = (form.fields as Array<{ key: string; required: boolean; type: string }>) || [];
+  for (const f of fields) {
+    if (f.required && !parsed.data.answers[f.key]) {
+      return c.json(fail("VALIDATION_ERROR", `Required field missing: ${f.key}`), 400);
+    }
+  }
+
+  const email = parsed.data.answers["email"] ?? null;
+  const name = parsed.data.answers["name"] ?? null;
+  const company = parsed.data.answers["company"] ?? null;
+
+  const ipCountry = c.req.header("cf-ipcountry") ?? null;
+
+  const [submission] = await db.insert(studioVideoFormSubmissions).values({
+    formId: id,
+    projectId: form.projectId,
+    videoId: parsed.data.videoId ?? null,
+    viewerEmail: email,
+    viewerName: name,
+    answers: parsed.data.answers,
+    timestampSec: parsed.data.timestampSec ?? null,
+    referrer: parsed.data.referrer ?? null,
+    ipCountry,
+  } as any).returning();
+
+  // Mirror into global lead inbox (#54 / #38)
+  if (email) {
+    await db.insert(marketingLeads).values({
+      email,
+      name,
+      company,
+      source: "video-form",
+      metadata: {
+        formId: id,
+        projectId: form.projectId,
+        formTitle: form.title,
+        timestampSec: parsed.data.timestampSec ?? null,
+      },
+    } as any).catch(() => { /* ignore duplicate-email FKs */ });
+  }
+
+  return c.json(ok({
+    id: submission.id,
+    redirectUrl: form.redirectUrl,
+  }), 201);
+});
+
+// GET /api/studio/forms/:id/submissions — owner only
+studioFeaturesRoutes.get("/forms/:id/submissions", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+
+  // Confirm ownership
+  const [form] = await db.select().from(studioVideoForms)
+    .where(and(eq(studioVideoForms.id, id), eq(studioVideoForms.userId, user.sub)))
+    .limit(1);
+  if (!form) return c.json(fail("NOT_FOUND", "Form not found"), 404);
+
+  const submissions = await db.select()
+    .from(studioVideoFormSubmissions)
+    .where(eq(studioVideoFormSubmissions.formId, id))
+    .orderBy(desc(studioVideoFormSubmissions.createdAt))
+    .limit(500);
+
+  return c.json(ok({ submissions, total: submissions.length }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  17. REVIEW COMMENTS + SHARE LINKS — gap #145
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function generateShareToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// POST /api/studio/projects/:projectId/review-links — create a public review link
+studioFeaturesRoutes.post("/projects/:projectId/review-links", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = z.object({
+    name: z.string().max(80).optional(),
+    expiresInDays: z.number().int().positive().max(365).optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const expiresAt = parsed.data.expiresInDays
+    ? new Date(Date.now() + parsed.data.expiresInDays * 86400_000)
+    : null;
+
+  const [link] = await db.insert(studioReviewLinks).values({
+    projectId,
+    userId: user.sub,
+    shareToken: generateShareToken(),
+    name: parsed.data.name ?? "Review link",
+    expiresAt,
+  } as any).returning();
+
+  return c.json(ok(link), 201);
+});
+
+// GET /api/studio/projects/:projectId/review-links — owner only
+studioFeaturesRoutes.get("/projects/:projectId/review-links", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+  const links = await db.select().from(studioReviewLinks)
+    .where(and(
+      eq(studioReviewLinks.projectId, projectId),
+      eq(studioReviewLinks.userId, user.sub),
+    ))
+    .orderBy(desc(studioReviewLinks.createdAt));
+  return c.json(ok({ links }));
+});
+
+// DELETE /api/studio/review-links/:id
+studioFeaturesRoutes.delete("/review-links/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const deleted = await db.delete(studioReviewLinks)
+    .where(and(eq(studioReviewLinks.id, id), eq(studioReviewLinks.userId, user.sub)))
+    .returning({ id: studioReviewLinks.id });
+  if (deleted.length === 0) return c.json(fail("NOT_FOUND", "Link not found"), 404);
+  return c.json(ok({ deleted: deleted[0].id }));
+});
+
+// GET /api/studio/review/:shareToken — public — resolves a review link to its
+// project + comments. Used by anonymous reviewers.
+studioFeaturesRoutes.get("/review/:shareToken", async (c) => {
+  const token = c.req.param("shareToken");
+  const db = getDb();
+
+  const [link] = await db.select().from(studioReviewLinks)
+    .where(and(eq(studioReviewLinks.shareToken, token), eq(studioReviewLinks.isActive, true)))
+    .limit(1);
+  if (!link) return c.json(fail("NOT_FOUND", "Review link not found or inactive"), 404);
+  if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
+    return c.json(fail("EXPIRED", "Review link has expired"), 410);
+  }
+
+  const [project] = await db.select().from(schema.studioProjects)
+    .where(eq(schema.studioProjects.id, link.projectId))
+    .limit(1);
+
+  const comments = await db.select().from(studioReviewComments)
+    .where(eq(studioReviewComments.projectId, link.projectId))
+    .orderBy(studioReviewComments.createdAt);
+
+  return c.json(ok({
+    projectId: link.projectId,
+    project: project ? { id: project.id, status: project.status, videoId: project.videoId } : null,
+    comments,
+    linkName: link.name,
+  }));
+});
+
+// GET /api/studio/projects/:projectId/comments — owner authenticated read
+studioFeaturesRoutes.get("/projects/:projectId/comments", async (c) => {
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+  const comments = await db.select().from(studioReviewComments)
+    .where(eq(studioReviewComments.projectId, projectId))
+    .orderBy(studioReviewComments.createdAt);
+  return c.json(ok({ comments }));
+});
+
+// POST /api/studio/projects/:projectId/comments — authenticated post (owner / collaborator)
+// Body: { body, timestampSec?, parentId? }
+studioFeaturesRoutes.post("/projects/:projectId/comments", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    body: z.string().min(1).max(2000),
+    timestampSec: z.number().min(0).nullable().optional(),
+    parentId: z.string().uuid().nullable().optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const [comment] = await db.insert(studioReviewComments).values({
+    projectId,
+    parentId: parsed.data.parentId ?? null,
+    authorUserId: user.sub,
+    authorName: user.email?.split("@")[0] ?? "Reviewer",
+    authorEmail: user.email,
+    body: parsed.data.body,
+    timestampSec: parsed.data.timestampSec ?? null,
+  } as any).returning();
+
+  return c.json(ok(comment), 201);
+});
+
+// POST /api/studio/review/:shareToken/comments — public anonymous post
+studioFeaturesRoutes.post("/review/:shareToken/comments", async (c) => {
+  const token = c.req.param("shareToken");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    authorName: z.string().min(1).max(80),
+    authorEmail: z.string().email().optional(),
+    body: z.string().min(1).max(2000),
+    timestampSec: z.number().min(0).nullable().optional(),
+    parentId: z.string().uuid().nullable().optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  const [link] = await db.select().from(studioReviewLinks)
+    .where(and(eq(studioReviewLinks.shareToken, token), eq(studioReviewLinks.isActive, true)))
+    .limit(1);
+  if (!link) return c.json(fail("NOT_FOUND", "Review link not found"), 404);
+  if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
+    return c.json(fail("EXPIRED", "Review link has expired"), 410);
+  }
+
+  const [comment] = await db.insert(studioReviewComments).values({
+    projectId: link.projectId,
+    parentId: parsed.data.parentId ?? null,
+    authorUserId: null,
+    authorName: parsed.data.authorName,
+    authorEmail: parsed.data.authorEmail ?? null,
+    body: parsed.data.body,
+    timestampSec: parsed.data.timestampSec ?? null,
+  } as any).returning();
+
+  return c.json(ok(comment), 201);
+});
+
+// PATCH /api/studio/comments/:id — resolve / unresolve
+studioFeaturesRoutes.patch("/comments/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({ resolved: z.boolean() }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+  // Caller must own the project that the comment belongs to.
+  const [comment] = await db.select().from(studioReviewComments)
+    .where(eq(studioReviewComments.id, id))
+    .limit(1);
+  if (!comment) return c.json(fail("NOT_FOUND", "Comment not found"), 404);
+
+  const [project] = await db.select().from(schema.studioProjects)
+    .where(and(eq(schema.studioProjects.id, comment.projectId), eq(schema.studioProjects.userId, user.sub)))
+    .limit(1);
+  if (!project) return c.json(fail("FORBIDDEN", "Not allowed"), 403);
+
+  const [updated] = await db.update(studioReviewComments)
+    .set({ resolved: parsed.data.resolved } as any)
+    .where(eq(studioReviewComments.id, id))
+    .returning();
+  return c.json(ok(updated));
+});
+
+// DELETE /api/studio/comments/:id — owner only
+studioFeaturesRoutes.delete("/comments/:id", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+
+  const [comment] = await db.select().from(studioReviewComments).where(eq(studioReviewComments.id, id)).limit(1);
+  if (!comment) return c.json(fail("NOT_FOUND", "Comment not found"), 404);
+  const [project] = await db.select().from(schema.studioProjects)
+    .where(and(eq(schema.studioProjects.id, comment.projectId), eq(schema.studioProjects.userId, user.sub)))
+    .limit(1);
+  if (!project) return c.json(fail("FORBIDDEN", "Not allowed"), 403);
+
+  await db.delete(studioReviewComments).where(eq(studioReviewComments.id, id));
+  return c.json(ok({ deleted: id }));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ██  18. AI THUMBNAIL GENERATOR — gap #142
+// ██
+// ██  Heuristic + LLM scoring of candidate frames extracted from a project's
+// ██  video. The frames themselves are extracted client-side (browser
+// ██  `<canvas>` from `<video>`) and uploaded as data URLs / R2 keys, since
+// ██  the Worker runtime cannot decode video frames. The route receives
+// ██  candidate frames + their source timestamps, asks an LLM to rank them,
+// ██  and persists the ranked candidates so the user can pick one.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/studio/projects/:projectId/thumbnails/score
+// Body: { candidates: Array<{ imageUrl, sourceTimeSec }>, headlineHint? }
+studioFeaturesRoutes.post("/projects/:projectId/thumbnails/score", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    candidates: z.array(z.object({
+      imageUrl: z.string().url(),
+      storageKey: z.string().optional(),
+      sourceTimeSec: z.number().min(0).optional(),
+    })).min(1).max(12),
+    headlineHint: z.string().max(80).optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
+
+  const db = getDb();
+
+  // Heuristic score: prefer frames slightly past the start (skip the first
+  // 1.5 s of typical fade-ins) and that are not in the final 10 % of the video.
+  // The LLM step (when an API key is present) refines the ranking.
+  const heuristic = parsed.data.candidates.map((cand, i) => {
+    const t = cand.sourceTimeSec ?? i;
+    let score = 0.5;
+    if (t > 1.5) score += 0.15;
+    if (t > 5) score += 0.1;
+    score += Math.max(0, 0.25 - Math.abs(t - 8) / 100);
+    return { ...cand, score: Math.min(1, score) };
+  });
+
+  let ranked = heuristic;
+  const apiKey = getApiKey(c.env);
+  if (apiKey) {
+    try {
+      const RankSchema = z.object({
+        ranked: z.array(z.object({
+          index: z.number().int().nonnegative(),
+          score: z.number().min(0).max(1),
+          reason: z.string().optional(),
+        })),
+      });
+      const llmResult = await callLLMJson(
+        apiKey,
+        {
+          systemPrompt: "You score video thumbnail candidates for click-through rate. Favour frames that show a clear face, strong eye contact, vivid colour contrast, and uncluttered backgrounds. Return JSON only.",
+          userMessage: `Score the following ${parsed.data.candidates.length} candidate frames on a 0..1 scale (1 = best CTR). Frames are described only by their position in the video so use position as a tie-breaker.\n\nCandidates: ${parsed.data.candidates.map((c, i) => `[${i}] t=${c.sourceTimeSec ?? "?"}s`).join(", ")}\n\nReturn JSON: { "ranked": [{ "index": 0, "score": 0.8, "reason": "..." }, ...] }`,
+          temperature: 0.4,
+        },
+        RankSchema,
+      );
+      // Merge LLM scores back onto heuristic order
+      ranked = heuristic.map((cand, i) => {
+        const llm = llmResult.ranked.find((r) => r.index === i);
+        return llm ? { ...cand, score: llm.score } : cand;
+      });
+    } catch (err) {
+      console.warn("[thumbnails/score] LLM scoring failed, falling back to heuristic:", err);
+    }
+  }
+
+  // Persist all candidates as new rows; clear any prior un-selected candidates.
+  await db.delete(studioThumbnails).where(and(
+    eq(studioThumbnails.projectId, projectId),
+    eq(studioThumbnails.isSelected, false),
+  ));
+
+  const inserted = await db.insert(studioThumbnails).values(
+    ranked.map((r) => ({
+      projectId,
+      userId: user.sub,
+      imageUrl: r.imageUrl,
+      storageKey: r.storageKey ?? null,
+      sourceTimeSec: r.sourceTimeSec ?? null,
+      headlineText: parsed.data.headlineHint ?? null,
+      score: r.score,
+      isSelected: false,
+    }) as any),
+  ).returning();
+
+  return c.json(ok({
+    candidates: inserted.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+  }), 201);
+});
+
+// GET /api/studio/projects/:projectId/thumbnails — list
+studioFeaturesRoutes.get("/projects/:projectId/thumbnails", async (c) => {
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+  const rows = await db.select().from(studioThumbnails)
+    .where(eq(studioThumbnails.projectId, projectId))
+    .orderBy(desc(studioThumbnails.score));
+  return c.json(ok({ thumbnails: rows }));
+});
+
+// PATCH /api/studio/projects/:projectId/thumbnail — select active thumbnail
+studioFeaturesRoutes.patch("/projects/:projectId/thumbnail", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({ thumbnailId: z.string().uuid() }).safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body"), 400);
+
+  const db = getDb();
+
+  // Clear existing selection
+  await db.update(studioThumbnails)
+    .set({ isSelected: false } as any)
+    .where(and(
+      eq(studioThumbnails.projectId, projectId),
+      eq(studioThumbnails.userId, user.sub),
+    ));
+
+  const [selected] = await db.update(studioThumbnails)
+    .set({ isSelected: true } as any)
+    .where(and(
+      eq(studioThumbnails.id, parsed.data.thumbnailId),
+      eq(studioThumbnails.projectId, projectId),
+      eq(studioThumbnails.userId, user.sub),
+    ))
+    .returning();
+
+  if (!selected) return c.json(fail("NOT_FOUND", "Thumbnail not found"), 404);
+  return c.json(ok(selected));
 });
