@@ -53,6 +53,8 @@ interface Props {
     voiceName: string;
     speed: number;
   }) => void;
+  /** Optional action bar rendered as a compact strip directly under the tab bar */
+  actionBar?: React.ReactNode;
 }
 
 /** First-tab label per content template */
@@ -74,6 +76,7 @@ export default function StudioEditor({
   currentTimeSec, videoUrl,
   onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
   onVoiceConfigChange,
+  actionBar,
 }: Props) {
   const firstLabel = getFirstTabLabel(contentTemplate);
 
@@ -125,6 +128,9 @@ export default function StudioEditor({
           </div>
         )}
       </div>
+
+      {/* Compact action bar (Generate / Export / Share) — mounted under tabs */}
+      {actionBar}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">

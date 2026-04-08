@@ -52,6 +52,7 @@ import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
+import StudioActionBar from "./StudioActionBar";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -1157,6 +1158,24 @@ export default function StudioLayout() {
 
             {/* Prompt / Storyboard / Actions editor — same flow for all templates */}
             <StudioEditor
+              actionBar={
+                <StudioActionBar
+                  state={state}
+                  compiledVideo={compiledVideo}
+                  exportProgress={exportProgress}
+                  hasShared={hasShared}
+                  isPublic={isPublic}
+                  isPublishedToProfile={isPublishedToProfile}
+                  profileUrl={user?.id ? `/people/${user.id}` : undefined}
+                  onGenerate={handleGenerate}
+                  onExport={handleExport}
+                  onPublish={handlePublish}
+                  onPublishToProfile={handlePublishToProfile}
+                  onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
+                  onMakePublic={handleMakePublic}
+                  onDownloadLocal={handleDownloadLocal}
+                />
+              }
               tab={tab}
               onTabChange={setTab}
               state={state}
@@ -1241,30 +1260,6 @@ export default function StudioLayout() {
             />
           </div>
 
-          {/* Right panel — export/publish actions + settings */}
-          <div className="studio-right-panel">
-            <StudioPreview
-              state={state}
-              compiledVideo={compiledVideo}
-              playing={playing}
-              currentTime={currentTime}
-              exportProgress={exportProgress}
-              onPlayPause={() => setPlaying((p) => !p)}
-              onTimeUpdate={setCurrentTime}
-              onExport={handleExport}
-              onPublish={handlePublish}
-              onPublishToProfile={handlePublishToProfile}
-              isPublishedToProfile={isPublishedToProfile}
-              profileUrl={user?.id ? `/people/${user.id}` : undefined}
-              onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
-              onMakePublic={handleMakePublic}
-              isPublic={isPublic}
-              onDownloadLocal={handleDownloadLocal}
-              hasShared={hasShared}
-              onGenerate={handleGenerate}
-              showVideo={false}
-            />
-          </div>
         </div>
       </div>
 
