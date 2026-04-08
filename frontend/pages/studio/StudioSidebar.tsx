@@ -1,13 +1,12 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2 } from "lucide-react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2 } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import StudioSettings from "./StudioSettings";
 import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -1101,15 +1100,6 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </section>
       )}
 
-      {/* Bottom links */}
-      <div className="mt-auto border-t p-3">
-        <Link
-          to="/resume-roast"
-          className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <Flame className="w-4 h-4 text-orange-400" /> Resume Roast
-        </Link>
-      </div>
     </aside>
   );
 }
