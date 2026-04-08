@@ -1,7 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2 } from "lucide-react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import StudioSettings from "./StudioSettings";
 import type { StudioProjectState } from "@/types/studio";
@@ -105,6 +105,8 @@ interface Props {
   onCreateNew: () => void;
   /** Open the new-video wizard modal */
   onOpenWizard?: () => void;
+  /** Collapse/hide this sidebar (parent owns the visibility state) */
+  onCollapseSidebar?: () => void;
   onProjectSelect: (project: StudioProject) => void;
   onDeleteProject?: (id: string) => void;
   onTemplateLoad: (script: VideoScript) => void;
@@ -152,7 +154,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -383,6 +385,18 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               title="Open new video wizard"
             >
               <Wand2 className="w-4 h-4" />
+            </Button>
+          )}
+          {onCollapseSidebar && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 shrink-0 px-2"
+              onClick={onCollapseSidebar}
+              title="Hide sidebar"
+              aria-label="Hide sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
             </Button>
           )}
         </div>

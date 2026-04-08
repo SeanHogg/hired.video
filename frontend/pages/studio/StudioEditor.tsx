@@ -129,9 +129,6 @@ export default function StudioEditor({
         )}
       </div>
 
-      {/* Compact action bar (Generate / Export / Share) — mounted under tabs */}
-      {actionBar}
-
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {tab === "prompt" && contentTemplate === "skills-demo" && (
@@ -192,6 +189,9 @@ export default function StudioEditor({
         )}
 
       </div>
+
+      {/* Compact action bar (Generate / Export / Share) — pinned to bottom */}
+      {actionBar}
     </div>
   );
 }

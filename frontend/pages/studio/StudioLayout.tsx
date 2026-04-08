@@ -21,6 +21,8 @@ import {
   ChevronDown,
   ChevronRight,
   GripHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -386,6 +388,12 @@ export default function StudioLayout() {
   const [hasShared, setHasShared] = useState(false);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [studioSidebarHidden, setStudioSidebarHidden] = useState<boolean>(() => {
+    return localStorage.getItem("studio_sidebar_hidden") === "1";
+  });
+  useEffect(() => {
+    localStorage.setItem("studio_sidebar_hidden", studioSidebarHidden ? "1" : "0");
+  }, [studioSidebarHidden]);
   /** Tracks whether we've already attempted the auto-load-latest-or-open-wizard
    *  bootstrap, so it only runs once per studio session. */
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -1066,7 +1074,21 @@ export default function StudioLayout() {
           sidebarCollapsed={sidebarCollapsed}
         />
         <div className="pt-16 flex h-[calc(100vh-64px)] overflow-hidden">
+          {studioSidebarHidden ? (
+            <div className="w-8 shrink-0 border-r bg-card flex flex-col items-center py-2">
+              <button
+                type="button"
+                title="Show sidebar"
+                aria-label="Show sidebar"
+                className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setStudioSidebarHidden(false)}
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
           <StudioSidebar
+            onCollapseSidebar={() => setStudioSidebarHidden(true)}
             projects={projects}
             activeProjectId={state.projectId}
             projectName={state.name}
@@ -1087,6 +1109,7 @@ export default function StudioLayout() {
             state={state}
             onStateChange={patchState}
           />
+          )}
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
             {/* Video preview — height controlled by drag handle */}
