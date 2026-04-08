@@ -51,7 +51,6 @@ import Sidebar from "@/components/Sidebar";
 import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
-import StudioSettings from "./StudioSettings";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -1052,6 +1051,8 @@ export default function StudioLayout() {
             contentTemplate={contentTemplate}
             onContentTemplateSelect={handleContentTemplateSelect}
             focusedSceneId={focusedSceneId}
+            state={state}
+            onStateChange={patchState}
           />
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -1231,7 +1232,6 @@ export default function StudioLayout() {
               onGenerate={handleGenerate}
               showVideo={false}
             />
-            <StudioSettings state={state} onStateChange={patchState} />
           </div>
         </div>
       </div>

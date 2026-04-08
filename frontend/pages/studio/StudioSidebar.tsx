@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
+import StudioSettings from "./StudioSettings";
+import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
@@ -115,6 +117,9 @@ interface Props {
   onContentTemplateSelect?: (template: ContentTemplate) => void;
   /** Currently focused scene id (in storyboard editor) — when set, stock media picks insert into that scene */
   focusedSceneId?: string;
+  /** Studio project state — used to render AI / Video settings sections in the sidebar */
+  state?: StudioProjectState;
+  onStateChange?: (patch: Partial<StudioProjectState>) => void;
 }
 
 const STATUS_COLOUR: Record<string, string> = {
@@ -146,7 +151,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -632,6 +637,11 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           </Button>
         </>}
       </section>
+
+      {/* AI + Video settings — moved here from the right panel */}
+      {state && onStateChange && (
+        <StudioSettings state={state} onStateChange={onStateChange} />
+      )}
 
       {/* Stock Media Library — gap #128 (deduplicated cache) */}
       <section className="px-3 pb-3 border-t pt-3">

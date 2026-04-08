@@ -1,7 +1,8 @@
-// StudioSettings.tsx — AI settings + Video settings accordions.
+// StudioSettings.tsx — AI settings + Video settings sections, styled to match
+// the left sidebar (collapsible accordion sections used inside StudioSidebar).
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Sparkles, Film } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -32,25 +33,48 @@ interface Props {
   onStateChange: (patch: Partial<StudioProjectState>) => void;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true);
+const SETTINGS_PREFS_KEY = "studio_sidebar_settings_collapsed";
+
+function loadCollapsed(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SETTINGS_PREFS_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, boolean>;
+  } catch {}
+  return { ai: false, video: false };
+}
+
+interface SectionProps {
+  id: string;
+  title: string;
+  icon: React.ElementType;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function Section({ title, icon: Icon, collapsed, onToggle, children }: SectionProps) {
   return (
-    <div className="border-b">
+    <section className="px-3 pb-3 border-t pt-3">
       <button
         type="button"
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-accent/40 transition-colors"
-        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 w-full text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1 hover:text-foreground transition-colors"
+        onClick={onToggle}
       >
-        {title}
-        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <Icon className="w-3 h-3" /> <span className="flex-1 text-left">{title}</span>
+        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
       </button>
-      {open && <div className="px-4 pb-4 flex flex-col gap-4">{children}</div>}
-    </div>
+      {!collapsed && <div className="flex flex-col gap-3">{children}</div>}
+    </section>
   );
 }
 
 export default function StudioSettings({ state, onStateChange }: Props) {
   const [models, setModels] = useState<ModelEntry[]>(FALLBACK_MODELS);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
+
+  useEffect(() => {
+    try { localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
+  }, [collapsed]);
 
   useEffect(() => {
     apiClient.get("/api/ai/models")
@@ -61,13 +85,13 @@ export default function StudioSettings({ state, onStateChange }: Props) {
       .catch(() => { /* use fallback */ });
   }, []);
 
-  return (
-    <div className="flex flex-col overflow-y-auto">
-      <div className="px-4 py-3 border-b">
-        <p className="text-sm font-semibold">Settings</p>
-      </div>
+  function toggle(key: string) {
+    setCollapsed((s) => ({ ...s, [key]: !s[key] }));
+  }
 
-      <Section title="AI">
+  return (
+    <>
+      <Section id="ai" title="AI" icon={Sparkles} collapsed={!!collapsed.ai} onToggle={() => toggle("ai")}>
         <div>
           <Label className="mb-1.5 block text-xs">Model</Label>
           <Select
@@ -100,7 +124,7 @@ export default function StudioSettings({ state, onStateChange }: Props) {
         </div>
       </Section>
 
-      <Section title="Video">
+      <Section id="video" title="Video" icon={Film} collapsed={!!collapsed.video} onToggle={() => toggle("video")}>
         <div>
           <Label className="mb-1.5 block text-xs">Resolution</Label>
           <Select
@@ -165,6 +189,6 @@ export default function StudioSettings({ state, onStateChange }: Props) {
           </Select>
         </div>
       </Section>
-    </div>
+    </>
   );
 }
