@@ -1,7 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library } from "lucide-react";
+import { Plus, Flame, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2 } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import StudioSettings from "./StudioSettings";
 import type { StudioProjectState } from "@/types/studio";
@@ -27,7 +27,7 @@ interface ContentTemplateDef {
   icon: React.ElementType;
 }
 
-const CONTENT_TEMPLATES: ContentTemplateDef[] = [
+export const CONTENT_TEMPLATES: ContentTemplateDef[] = [
   { id: "resume",         label: "Promote Yourself",  desc: "Video resume from your experience",           icon: FileVideo },
   { id: "skills-demo",    label: "Skills Demo",       desc: "Screen + webcam walkthrough of your work",    icon: Code2 },
   { id: "job_ad",         label: "Job Ad",            desc: "Video ad for a job opening or company promo", icon: Megaphone },
@@ -37,7 +37,7 @@ const CONTENT_TEMPLATES: ContentTemplateDef[] = [
 // ─── Visual themes (how it looks) ─────────────────────────────────────────
 
 // Template metadata with visual descriptions
-const TEMPLATES: {
+export const TEMPLATES: {
   label: string;
   file: string;
   desc: string;
@@ -65,14 +65,14 @@ const TEMPLATES: {
 
 // ─── Background presets ────────────────────────────────────────────────────
 
-type BgPreset = {
+export type BgPreset = {
   label: string;
   /** Value passed as video.theme.background + optional color encoded as "type:color1:color2" */
   value: string;
   preview: string; // CSS background for the swatch
 };
 
-const BG_PRESETS: BgPreset[] = [
+export const BG_PRESETS: BgPreset[] = [
   { label: "Purple Gradient", value: "gradient:#7c3aed:#2563eb", preview: "linear-gradient(135deg,#7c3aed,#2563eb)" },
   { label: "Sunset",          value: "gradient:#f97316:#ec4899", preview: "linear-gradient(135deg,#f97316,#ec4899)" },
   { label: "Ocean",           value: "gradient:#0ea5e9:#06b6d4", preview: "linear-gradient(135deg,#0ea5e9,#06b6d4)" },
@@ -104,6 +104,8 @@ interface Props {
   onSave?: () => void;
   isSaving?: boolean;
   onCreateNew: () => void;
+  /** Open the new-video wizard modal */
+  onOpenWizard?: () => void;
   onProjectSelect: (project: StudioProject) => void;
   onDeleteProject?: (id: string) => void;
   onTemplateLoad: (script: VideoScript) => void;
@@ -132,7 +134,7 @@ const STATUS_COLOUR: Record<string, string> = {
   Failed:     "bg-red-500/20 text-red-300",
 };
 
-async function loadTemplate(file: string): Promise<VideoScript | null> {
+export async function loadTemplate(file: string): Promise<VideoScript | null> {
   try {
     const mod = await import(`../../data/templates/${file}.json`);
     return mod.default as VideoScript;
@@ -151,7 +153,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -369,9 +371,22 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     <aside className="studio-sidebar">
       {/* Create New + Project name/save */}
       <div className="p-3 border-b flex flex-col gap-2">
-        <Button className="w-full" size="sm" onClick={onCreateNew}>
-          <Plus className="w-4 h-4 mr-2" /> New Video
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button className="flex-1 min-w-0" size="sm" onClick={onCreateNew}>
+            <Plus className="w-4 h-4 mr-2" /> New Video
+          </Button>
+          {onOpenWizard && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 px-2"
+              onClick={onOpenWizard}
+              title="Open new video wizard"
+            >
+              <Wand2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
         {onSave && (
           <div className="flex items-center gap-1.5">
             <Input

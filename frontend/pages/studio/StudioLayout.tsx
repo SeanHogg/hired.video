@@ -51,6 +51,7 @@ import Sidebar from "@/components/Sidebar";
 import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
+import StudioWizard from "./StudioWizard";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -383,6 +384,10 @@ export default function StudioLayout() {
    *  Create New / load project, set when the user clicks any share button. */
   const [hasShared, setHasShared] = useState(false);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  /** Tracks whether we've already attempted the auto-load-latest-or-open-wizard
+   *  bootstrap, so it only runs once per studio session. */
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   /** Element selected for editing — drives both the canvas overlay highlight
@@ -502,9 +507,35 @@ export default function StudioLayout() {
 
   useEffect(() => {
     if (!user) return;
-    studioService.getProjects().then((r) => {
-      if (r.data) setProjects(r.data);
-    }).catch(() => {});
+    studioService.getProjects()
+      .then((r) => {
+        const list = r.data ?? [];
+        setProjects(list);
+        // ── Bootstrap: on first load, either auto-open the latest project, or
+        //    pop the wizard for first-time users. Only runs once per session.
+        if (!bootstrapped) {
+          setBootstrapped(true);
+          if (list.length > 0) {
+            // Pick most recently updated (createdAt fallback)
+            const latest = [...list].sort((a, b) => {
+              const ta = new Date(a.updateDateTime ?? a.creationDateTime).getTime();
+              const tb = new Date(b.updateDateTime ?? b.creationDateTime).getTime();
+              return tb - ta;
+            })[0];
+            if (latest) handleProjectSelect(latest);
+          } else {
+            setWizardOpen(true);
+          }
+        }
+      })
+      .catch(() => {
+        // On fetch failure, still allow first-time users into the wizard.
+        if (!bootstrapped) {
+          setBootstrapped(true);
+          setWizardOpen(true);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Sync focused scene to current script — auto-focus first scene if none, or
@@ -1042,6 +1073,7 @@ export default function StudioLayout() {
             onSave={handleSave}
             isSaving={isSaving}
             onCreateNew={handleCreateNew}
+            onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
             onProjectSelect={handleProjectSelect}
             onDeleteProject={handleDeleteProject}
             onTemplateLoad={handleTemplateLoad}
@@ -1235,6 +1267,18 @@ export default function StudioLayout() {
           </div>
         </div>
       </div>
+
+      <StudioWizard
+        open={wizardOpen}
+        state={state}
+        onStateChange={patchState}
+        contentTemplate={contentTemplate}
+        onContentTemplateSelect={handleContentTemplateSelect}
+        onTemplateLoad={handleTemplateLoad}
+        onBackgroundSelect={handleBackgroundSelect}
+        onGenerate={handleGenerate}
+        onClose={() => setWizardOpen(false)}
+      />
 
       {linkedInPublishOpen && state.projectId && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
