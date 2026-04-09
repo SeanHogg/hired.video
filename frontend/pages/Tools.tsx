@@ -894,7 +894,7 @@ export default function Tools() {
                   </Link>
 
                   {/* Resume Consolidator */}
-                  <Link to="/resumes">
+                  <Link to="/tools/resume-consolidator">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-center justify-between">
@@ -2016,7 +2016,7 @@ export default function Tools() {
                 </Link>
 
                 {/* Resume Consolidator */}
-                <Link to="/resumes">
+                <Link to="/tools/resume-consolidator">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                     <CardHeader>
                       <div className="flex items-center justify-between">
