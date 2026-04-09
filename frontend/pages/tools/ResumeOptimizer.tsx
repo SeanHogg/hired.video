@@ -33,6 +33,7 @@ import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { extractTextFromFile } from "@/lib/extract-text";
 
 interface OptimizationResult {
   overallScore: number;
@@ -180,13 +181,22 @@ export default function ResumeOptimizer() {
     setOptimizationResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Extract text client-side (pdfjs-dist for PDF, jszip for DOCX)
+      const extractedText = await extractTextFromFile(file);
+      if (!extractedText.trim()) {
+        setError("Could not extract text from this file.");
+        setIsOptimizing(false);
+        return;
+      }
 
-      // First parse the file to text
+      // Parse extracted text into structured JSON via AI
       const { data: parseResult } = await apiClient.requestRaw<any>(
         "/api/resume/parse",
-        { method: "POST", body: formData },
+        {
+          method: "POST",
+          body: JSON.stringify({ content: extractedText }),
+          headers: { "Content-Type": "application/json" },
+        },
       );
       const resumeContent = parseResult.result || parseResult;
 

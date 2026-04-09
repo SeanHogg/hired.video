@@ -826,7 +826,7 @@ export default function Tools() {
                   </Link>
 
                   {/* Resume Roast */}
-                  <Link to="/resume-roast">
+                  <Link to="/tools/resume-roast">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-center justify-between">
@@ -1952,7 +1952,7 @@ export default function Tools() {
                 </Link>
 
                 {/* Resume Roast */}
-                <Link to="/resume-roast">
+                <Link to="/tools/resume-roast">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                     <CardHeader>
                       <div className="flex items-center justify-between">

@@ -1,11 +1,18 @@
 import { useState, useCallback } from "react";
-import { Flame, Upload, Download, Loader2, Share2, Send, Mail, ArrowRight } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { Flame, Upload, Download, Loader2, Share2, Send, Mail, ArrowRight, ArrowLeft, FileText } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -21,6 +28,8 @@ import { scoreCardToBlob } from "@/components/ScoreCard";
 import { useToast } from "@/hooks/use-toast";
 import { extractTextFromFile } from "@/lib/extract-text";
 import FileUploadInput from "@/components/FileUploadInput";
+import { resumeService } from "@/lib/services/resume-service";
+import { useQuery } from "@tanstack/react-query";
 
 // ─── API schema ───────────────────────────────────────────────────────────────
 
@@ -43,6 +52,13 @@ export default function ResumeRoast() {
   const { isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
+  // Fetch user's resumes if authenticated
+  const { data: resumes = [] } = useQuery({
+    queryKey: ["resumes"],
+    queryFn: () => resumeService.getUserResumes(),
+    enabled: isAuthenticated,
+  });
+
   const [resumeText, setResumeText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RoastResult | null>(null);
@@ -51,6 +67,42 @@ export default function ResumeRoast() {
   const [captureEmail, setCaptureEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
+
+  const handleExistingResumeSelect = useCallback(async (resumeId: string) => {
+    try {
+      const resume = await resumeService.getResumeById(resumeId);
+      const data = resume?.data;
+      if (!data) {
+        toast({ title: "Could not load resume", variant: "destructive" });
+        return;
+      }
+      // Convert structured resume to readable text for the roast
+      const parts: string[] = [];
+      if (data.Basics?.Name) parts.push(data.Basics.Name);
+      if (data.Basics?.Label) parts.push(data.Basics.Label);
+      if (data.Basics?.Summary) parts.push(`\nSummary\n${data.Basics.Summary}`);
+      if (data.Work?.length) {
+        parts.push("\nExperience");
+        for (const w of data.Work) {
+          parts.push(`${w.Position} at ${w.Name} (${w.StartDate} - ${w.EndDate || "Present"})`);
+          if (w.Summary) parts.push(w.Summary);
+          if (w.Highlights?.length) parts.push(w.Highlights.map((h) => `- ${h}`).join("\n"));
+        }
+      }
+      if (data.Education?.length) {
+        parts.push("\nEducation");
+        for (const e of data.Education) {
+          parts.push(`${e.StudyType || ""} ${e.Area || ""} at ${e.Institution} (${e.StartDate} - ${e.EndDate || ""})`);
+        }
+      }
+      if (data.Skills?.length) {
+        parts.push(`\nSkills: ${data.Skills.map((s) => s.Name + (s.Keywords?.length ? ` (${s.Keywords.join(", ")})` : "")).join(", ")}`);
+      }
+      setResumeText(parts.join("\n"));
+    } catch {
+      toast({ title: "Could not load resume", variant: "destructive" });
+    }
+  }, [toast]);
 
   const handleFileChange = useCallback(async (file: File) => {
     try {
@@ -110,7 +162,7 @@ export default function ResumeRoast() {
     if (!result) return;
     const grade = result.score >= 80 ? "A" : result.score >= 65 ? "B" : result.score >= 50 ? "C" : "D";
     const post = `🔥 I just got my resume brutally roasted by AI — and it was humbling.\n\nScore: ${result.score}/100 (${grade})\n\n✅ Biggest strength: ${result.strengths[0] ?? "strong experience section"}\n🔧 Top fix: ${result.fixes[0] ?? "add more quantified achievements"}\n\nHonestly, every job seeker should try this. It took 30 seconds and I already know exactly what to improve.\n\nTry Resume Roast free → hired.video\n\n#ResumeRoast #CareerAdvice #JobSearch #AI`;
-    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hired.video/resume-roast")}&summary=${encodeURIComponent(post)}`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hired.video/tools/resume-roast")}&summary=${encodeURIComponent(post)}`;
     window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
   }, [result]);
 
@@ -159,25 +211,56 @@ export default function ResumeRoast() {
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
         <main className="max-w-3xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
-          {/* Hero */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-4">
-              <Flame className="w-7 h-7 text-orange-500" />
+          {/* Header with back link */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                <Flame className="h-6 w-6 text-red-500" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">AI Resume Roast</h1>
+                <p className="text-muted-foreground">
+                  Brutally honest AI feedback on your resume
+                </p>
+              </div>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight">AI Resume Roast</h1>
-            <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
-              Paste your resume. Get a brutally honest score, roast, and actionable fixes in seconds.
-              Download a shareable score card for LinkedIn.
-            </p>
+            <Link to="/tools">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Tools
+              </Button>
+            </Link>
           </div>
 
           {/* Input */}
           {!result && (
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle className="text-base">Paste or upload your resume</CardTitle>
+                <CardTitle className="text-base">Select, paste, or upload your resume</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Existing resume selector for authenticated users */}
+                {isAuthenticated && resumes.length > 0 && (
+                  <div>
+                    <Label htmlFor="resume-select" className="text-sm mb-1.5 block">Select an existing resume</Label>
+                    <Select onValueChange={handleExistingResumeSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a resume..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {resumes.filter((r) => (r as any).Id || r.id).map((r) => (
+                          <SelectItem key={((r as any).Id || r.id)!} value={((r as any).Id || r.id)!}>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              {(r as any).Name || r.name || "Untitled Resume"}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div>
                   <FileUploadInput
                     label={<Label className="sr-only">Upload file</Label>}

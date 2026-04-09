@@ -576,7 +576,7 @@ resumeRoutes.post("/parse", async (c) => {
   }
 
   if (!resumeText) {
-    return c.json(ok({ result: "{}" }), 200);
+    return c.json(fail("PARSE_FAILED", "Could not extract text from the uploaded file. Try a text-based PDF, DOCX, or paste the text directly."), 422);
   }
 
   const parsed = await parseResumeTextWithAI(c, resumeText);

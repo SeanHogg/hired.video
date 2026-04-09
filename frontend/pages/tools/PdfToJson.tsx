@@ -20,6 +20,7 @@ import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
+import { extractTextFromFile } from "@/lib/extract-text";
 
 export default function PdfToJson() {
   const location = useLocation();
@@ -82,20 +83,34 @@ export default function PdfToJson() {
     setJsonResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Extract text client-side using pdfjs-dist (much more reliable than
+      // the server-side regex-based PDF parser)
+      const text = await extractTextFromFile(file);
+      if (!text.trim()) {
+        setError("Could not extract text from this file. It may be a scanned image — try a text-based PDF or DOCX.");
+        setIsConverting(false);
+        return;
+      }
 
-      // Use the resume parse endpoint to convert to JSON
+      // Send extracted text to the parse endpoint for AI-powered structuring
       const { data: result } = await apiClient.requestRaw<any>(
         "/api/resume/parse",
-        { method: "POST", body: formData },
+        {
+          method: "POST",
+          body: JSON.stringify({ content: text }),
+          headers: { "Content-Type": "application/json" },
+        },
       );
 
       // Format the JSON result nicely
-      const formattedJson =
-        typeof result.result === "string"
-          ? result.result
-          : JSON.stringify(result.result, null, 2);
+      const raw = typeof result.result === "string" ? result.result : JSON.stringify(result.result, null, 2);
+      // Pretty-print if it's valid JSON
+      let formattedJson: string;
+      try {
+        formattedJson = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        formattedJson = raw;
+      }
 
       setJsonResult(formattedJson);
     } catch (err) {
