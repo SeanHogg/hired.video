@@ -354,14 +354,14 @@ export default function SentimentAnalysis() {
                                   <SelectValue placeholder="Choose a resume to analyze" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {resumes.filter((resume) => resume.id).map((resume) => (
+                                  {resumes.filter((resume) => resume.Id || resume.id).map((resume) => (
                                     <SelectItem
-                                      key={resume.id}
-                                      value={resume.id!}
+                                      key={(resume.Id || resume.id)!}
+                                      value={(resume.Id || resume.id)!}
                                     >
                                       <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4" />
-                                        {resume.name || "Untitled Resume"}
+                                        {resume.Name || resume.name || "Untitled Resume"}
                                       </div>
                                     </SelectItem>
                                   ))}

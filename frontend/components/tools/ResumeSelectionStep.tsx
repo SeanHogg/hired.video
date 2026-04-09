@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { resumeService, type Resume } from "@/lib/services/resume-service";
+import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 
@@ -179,12 +179,12 @@ export default function ResumeSelectionStep({
                       <SelectValue placeholder="Choose a resume to analyze" />
                     </SelectTrigger>
                     <SelectContent>
-                      {resumes.filter((resume) => resume.id).map((resume) => (
-                        <SelectItem key={resume.id} value={resume.id!}>
+                      {resumes.filter((resume) => resume.id || (resume as any).Id).map((resume) => (
+                        <SelectItem key={(resume.id || (resume as any).Id)!} value={(resume.id || (resume as any).Id)!}>
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             <div className="flex flex-col">
-                              <span>{resume.name || "Untitled Resume"}</span>
+                              <span>{resume.name || (resume as any).Name || "Untitled Resume"}</span>
                               {resume.description && (
                                 <span className="text-xs text-muted-foreground">
                                   {resume.description}
