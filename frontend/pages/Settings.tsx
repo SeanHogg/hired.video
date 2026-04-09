@@ -30,7 +30,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import PersonaSwitcher from "@/components/PersonaSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -734,8 +733,6 @@ function SettingsContent() {
                 </p>
               </div>
 
-              {/* Persona Switcher for SuperAdmin */}
-              <PersonaSwitcher />
               {!isSuperAdmin && (
                 <Badge variant="secondary">
                   {getRoleDisplayLabel(user.role)}
@@ -765,76 +762,147 @@ function SettingsContent() {
               </Alert>
             )}
 
-            {/* Settings Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-              {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
-              <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-9 gap-1 min-w-max sm:min-w-0">
-                  <TabsTrigger
-                    value="notifications"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Bell className="h-4 w-4" />
-                    <span>Notifications</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="privacy"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Shield className="h-4 w-4" />
-                    <span>Privacy</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="security"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Lock className="h-4 w-4" />
-                    <span>Security</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="appearance"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Palette className="h-4 w-4" />
-                    <span>Appearance</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="integrations"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Youtube className="h-4 w-4" />
-                    <span>Integrations</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="job-preferences"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Target className="h-4 w-4" />
-                    <span>Job Preferences</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="lead-generation"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <Megaphone className="h-4 w-4" />
-                    <span>Lead Generation</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="team-billing"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    <span>Team & Billing</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="account"
-                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                  >
-                    <SettingsIcon className="h-4 w-4" />
-                    <span>Account</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            {/* Settings Tabs — vertical grouped sidebar on desktop, scrollable horizontal on mobile */}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              orientation="vertical"
+              className="space-y-4 sm:space-y-6 lg:space-y-0"
+            >
+              <div className="flex flex-col lg:flex-row lg:gap-8">
+                <aside className="lg:w-60 lg:shrink-0">
+                  {/* Mobile: scrollable horizontal list */}
+                  <div className="lg:hidden w-full overflow-x-auto -mx-6 px-6">
+                    <TabsList className="inline-flex h-auto w-auto gap-1 min-w-max bg-muted p-1">
+                      <TabsTrigger value="notifications" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Bell className="h-4 w-4" />
+                        <span>Notifications</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="appearance" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Palette className="h-4 w-4" />
+                        <span>Appearance</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="privacy" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Shield className="h-4 w-4" />
+                        <span>Privacy</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="security" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Lock className="h-4 w-4" />
+                        <span>Security</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="job-preferences" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Target className="h-4 w-4" />
+                        <span>Job Preferences</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="lead-generation" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Megaphone className="h-4 w-4" />
+                        <span>Lead Generation</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="integrations" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Youtube className="h-4 w-4" />
+                        <span>Integrations</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <CreditCard className="h-4 w-4" />
+                        <span>Team & Billing</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <SettingsIcon className="h-4 w-4" />
+                        <span>Account</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  {/* Desktop: vertical grouped sidebar */}
+                  <nav className="hidden lg:block sticky top-20">
+                    <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-0.5 items-stretch">
+                      <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        General
+                      </div>
+                      <TabsTrigger
+                        value="notifications"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Bell className="h-4 w-4" />
+                        <span>Notifications</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="appearance"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Palette className="h-4 w-4" />
+                        <span>Appearance</span>
+                      </TabsTrigger>
+
+                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Privacy & Security
+                      </div>
+                      <TabsTrigger
+                        value="privacy"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <span>Privacy</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="security"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Lock className="h-4 w-4" />
+                        <span>Security</span>
+                      </TabsTrigger>
+
+                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Career
+                      </div>
+                      <TabsTrigger
+                        value="job-preferences"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Target className="h-4 w-4" />
+                        <span>Job Preferences</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="lead-generation"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Megaphone className="h-4 w-4" />
+                        <span>Lead Generation</span>
+                      </TabsTrigger>
+
+                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Connections
+                      </div>
+                      <TabsTrigger
+                        value="integrations"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Youtube className="h-4 w-4" />
+                        <span>Integrations</span>
+                      </TabsTrigger>
+
+                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Account
+                      </div>
+                      <TabsTrigger
+                        value="team-billing"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Team & Billing</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="account"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <SettingsIcon className="h-4 w-4" />
+                        <span>Account</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </nav>
+                </aside>
+
+                <div className="flex-1 min-w-0 space-y-6">
 
               {/* Notifications Tab */}
               <TabsContent value="notifications" className="space-y-6">
@@ -1790,6 +1858,8 @@ function SettingsContent() {
                   </CardContent>
                 </Card>
               </TabsContent>
+                </div>
+              </div>
             </Tabs>
           </div>
         </div>
