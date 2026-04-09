@@ -10,6 +10,247 @@ import type {
 } from "../../../shared/job.js";
 
 const { jobItems, savedJobs, jobApplications, jobAlerts } = schema;
+// Re-export so the route can use it for inline bookmark inserts during
+// the dedup fast-path (where we return the existing row without calling
+// createTrackedJob).
+export { savedJobs as schema_savedJobs };
+
+// =====================================================================
+// Dedup helpers — 3-layer duplicate detection
+// =====================================================================
+
+/**
+ * Tracking params that major job sites append to URLs. Stripping them
+ * gives us a stable "canonical URL" that survives re-clicks, shared
+ * links, and different entry points to the same listing.
+ */
+const TRACKING_PARAMS = new Set([
+  // LinkedIn
+  'refid', 'trackingid', 'trk', 'midtoken', 'midsig', 'ref',
+  'currentjobid', 'ebotoken', 'start',
+  // Indeed
+  'vjk', 'advn', 'adid', 'from', 'fromage', 'fccid', 'tk',
+  // Google / UTM
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+  // Glassdoor
+  'clicksource', 'src', 'ao',
+  // Generic
+  'fbclid', 'gclid', 'li_fat_id', 'mc_cid', 'mc_eid',
+]);
+
+/**
+ * Normalize a job-page URL by stripping query params that change on
+ * every click. Returns the stable canonical form.
+ */
+export function normalizeJobUrl(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    const params = new URLSearchParams();
+    for (const [key, value] of u.searchParams) {
+      if (!TRACKING_PARAMS.has(key.toLowerCase())) {
+        params.set(key, value);
+      }
+    }
+    u.search = params.toString();
+    // Also strip trailing hash — LinkedIn uses it for SPA routing
+    u.hash = '';
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Compute a short content fingerprint from title + company. Used to
+ * catch the same job appearing at two different URLs (e.g. LinkedIn
+ * /jobs/view/123 vs /jobs/collections/easy-apply/?currentJobId=123).
+ *
+ * Uses the Web Crypto API (available in Cloudflare Workers) to produce
+ * a hex SHA-256 of the normalized text.
+ */
+export async function computeContentHash(title?: string, company?: string): Promise<string> {
+  const input = [title, company]
+    .map((s) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+    .join('|');
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Layer 2 — fuzzy candidate query. Returns up to 5 rows from job_items
+ * whose title and company are close to the input. Uses ILIKE for broad
+ * matching (pg_trgm `similarity()` would be better but requires the
+ * extension installed — ILIKE works everywhere).
+ */
+export async function findFuzzyCandidates(title: string, company?: string, limit = 5): Promise<JobEntity[]> {
+  const db = getDb();
+  const titleWords = title
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 3)
+    .slice(0, 5);
+
+  if (titleWords.length === 0) return [];
+
+  // Build an OR chain: title ILIKE '%word%' for each significant word,
+  // AND company ILIKE '%company%' when present.
+  const titleConditions = titleWords.map((w) => ilike(jobItems.title, `%${w}%`));
+  const companyClause = company && company.trim().length > 2
+    ? ilike(jobItems.company as any, `%${company.trim()}%`)
+    : undefined;
+
+  const rows = await db
+    .select()
+    .from(jobItems)
+    .where(
+      and(
+        eq(jobItems.isActive, true),
+        or(...titleConditions),
+        companyClause,
+      ),
+    )
+    .orderBy(desc(jobItems.createdAt))
+    .limit(limit);
+
+  return rows.map(rowToJob);
+}
+
+// =====================================================================
+// Layer 3 — AI duplicate confirmation
+// =====================================================================
+
+const DuplicateCheckSchema = z.object({
+  isDuplicate: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  matchedJobId: z.string().nullable().optional(),
+  reason: z.string().optional(),
+});
+
+export type DuplicateCheckResult = z.infer<typeof DuplicateCheckSchema>;
+
+/**
+ * Ask the LLM to compare a new job against a list of candidates and
+ * decide whether any of them is the same posting. Only called when
+ * Layer 2 found fuzzy matches but Layer 1 didn't find an exact one.
+ *
+ * Returns { isDuplicate: true, matchedJobId, confidence } when a match
+ * is found, or { isDuplicate: false } otherwise.
+ */
+export async function aiDuplicateCheck(
+  apiKey: string,
+  newJob: { title: string; company?: string; location?: string; description?: string },
+  candidates: JobEntity[],
+): Promise<DuplicateCheckResult> {
+  if (candidates.length === 0) return { isDuplicate: false, confidence: 0 };
+
+  const candidateLines = candidates
+    .map((c, i) => `[${i}] id="${c.id}" title="${c.title}" company="${c.company ?? ''}" location="${c.location ?? ''}"`)
+    .join('\n');
+
+  const systemPrompt = [
+    'You compare a NEW job against a list of EXISTING jobs and decide whether any existing job is the same posting.',
+    'Two jobs are "the same" if they describe the same role at the same employer, even if the title wording differs slightly (e.g. "Sr. Director" vs "Senior Director", or "AI R&D" vs "AI Research & Development").',
+    'They are NOT the same if the employer is different, or if the role is materially different (e.g. "Data Engineer" vs "Data Scientist" at the same company).',
+    '',
+    'Return ONLY JSON with this shape (no markdown fences):',
+    '{ "isDuplicate": boolean, "confidence": 0-1, "matchedJobId": "id of the matching existing job or null", "reason": "one sentence" }',
+  ].join('\n');
+
+  const userMessage = [
+    'NEW JOB:',
+    `  title: ${newJob.title}`,
+    `  company: ${newJob.company ?? '(unknown)'}`,
+    `  location: ${newJob.location ?? '(unknown)'}`,
+    `  description snippet: ${(newJob.description ?? '').slice(0, 500)}`,
+    '',
+    'EXISTING JOBS:',
+    candidateLines,
+  ].join('\n');
+
+  return callLLMJson(
+    apiKey,
+    { systemPrompt, userMessage, temperature: 0.1, maxTokens: 300, responseFormat: 'json_object' },
+    DuplicateCheckSchema,
+  );
+}
+
+// =====================================================================
+// Combined dedup pipeline — used by the extract route
+// =====================================================================
+
+export interface DedupResult {
+  /** 'exact' = Layer 1 hit, 'fuzzy' = Layer 2 hit confirmed by Layer 3, 'new' = no match */
+  outcome: 'exact' | 'fuzzy' | 'new';
+  existingJob?: JobEntity;
+  /** Fuzzy candidates returned to the caller when Layer 2 matches but
+   *  Layer 3 is unavailable or below threshold — lets the extension
+   *  show a "did you mean?" prompt. */
+  candidates?: JobEntity[];
+}
+
+export async function deduplicateJob(
+  input: { title: string; company?: string; location?: string; description?: string; sourceUrl?: string },
+  apiKey?: string,
+): Promise<DedupResult> {
+  const db = getDb();
+
+  // ---- Layer 1a: normalized URL match ---
+  const normalizedUrl = normalizeJobUrl(input.sourceUrl);
+  if (normalizedUrl) {
+    const [byUrl] = await db
+      .select()
+      .from(jobItems)
+      .where(eq(jobItems.sourceUrl, normalizedUrl))
+      .limit(1);
+    if (byUrl) return { outcome: 'exact', existingJob: rowToJob(byUrl) };
+  }
+
+  // ---- Layer 1b: content hash match ---
+  const contentHash = await computeContentHash(input.title, input.company);
+  // We'll compare against computed hashes of candidates rather than
+  // storing a column for now — the candidate set is small (max 5 rows).
+
+  // ---- Layer 2: fuzzy candidates ---
+  const candidates = await findFuzzyCandidates(input.title, input.company);
+  if (candidates.length === 0) return { outcome: 'new' };
+
+  // Check content-hash match against candidates (instant, no AI)
+  for (const c of candidates) {
+    const cHash = await computeContentHash(c.title, c.company);
+    if (cHash === contentHash) {
+      return { outcome: 'exact', existingJob: c };
+    }
+  }
+
+  // ---- Layer 3: AI confirmation ---
+  if (!apiKey) {
+    // No AI available — return candidates for the extension to show
+    return { outcome: 'new', candidates };
+  }
+
+  try {
+    const result = await aiDuplicateCheck(apiKey, input, candidates);
+    if (result.isDuplicate && result.confidence >= 0.8 && result.matchedJobId) {
+      const matched = candidates.find((c) => c.id === result.matchedJobId);
+      if (matched) return { outcome: 'fuzzy', existingJob: matched };
+    }
+    // AI says not a duplicate but candidates exist → return them so
+    // extension can still prompt the user.
+    if (candidates.length > 0 && result.confidence >= 0.5) {
+      return { outcome: 'new', candidates };
+    }
+  } catch (err) {
+    console.warn('[dedup] AI duplicate check failed, falling open:', err);
+    // Fall through with candidates so the extension can prompt
+    if (candidates.length > 0) return { outcome: 'new', candidates };
+  }
+
+  return { outcome: 'new' };
+}
 
 /** Stable string used as the "company" for jobs tracked through the
  * extension when we can't extract a real employer from the page.
@@ -36,6 +277,7 @@ export interface JobEntity extends JobSummaryDTO {
   salaryMax?: number;
   salaryCurrency?: string;
   skills?: string[];
+  sourceUrl?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -650,6 +892,7 @@ export async function createTrackedJob(
   const db = getDb();
   const track = options.track ?? true;
   const company = input.company?.trim() || HIRED_VIDEO_SEED_COMPANY;
+  const normalizedUrl = normalizeJobUrl(input.sourceUrl);
 
   const details = {
     responsibilities: input.responsibilities ?? [],
@@ -658,15 +901,15 @@ export async function createTrackedJob(
     benefits: input.benefits ?? [],
   };
 
-  // Re-use an existing job row for the same sourceUrl so we don't fill
-  // the public board with duplicates of the same listing. When tracking
-  // is enabled we also bookmark the existing row to the caller; when
-  // it's disabled we just return the row as-is.
-  if (input.sourceUrl) {
+  // NOTE: the extract route now runs deduplicateJob() BEFORE calling
+  // createTrackedJob, so by the time we get here the dedup pipeline
+  // has already either returned an existing row or decided this is
+  // genuinely new. This inner sourceUrl check is a safety net.
+  if (normalizedUrl) {
     const [existing] = await db
       .select()
       .from(jobItems)
-      .where(eq(jobItems.sourceUrl, input.sourceUrl))
+      .where(eq(jobItems.sourceUrl, normalizedUrl))
       .limit(1);
     if (existing) {
       if (track) {
@@ -679,9 +922,6 @@ export async function createTrackedJob(
   const [row] = await db
     .insert(jobItems)
     .values({
-      // When `track` is false the row is intentionally orphaned from
-      // any user — it's published under the hired.video community
-      // seed company so the public board still has an owner.
       postedByUserId: track ? userId : null,
       title: input.title.slice(0, 250) || "Tracked Job",
       description: input.description ?? "",
@@ -696,7 +936,7 @@ export async function createTrackedJob(
       details,
       isRemote: input.isRemote ?? false,
       isActive: true,
-      sourceUrl: input.sourceUrl,
+      sourceUrl: normalizedUrl || input.sourceUrl,
     } as any)
     .returning();
 

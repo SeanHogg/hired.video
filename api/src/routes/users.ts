@@ -3,6 +3,7 @@ import { eq, or, and, lte } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { getSubscription } from "../services/billing.js";
 import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -257,7 +258,10 @@ userRoutes.get("/me", async (c) => {
     .where(eq(userProfiles.userId, user.sub))
     .limit(1);
 
-  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
+  const meDto = toUserProfileDto(me, profile ?? null);
+  const meSub = await getSubscription(user.sub);
+  meDto.isPremium = meSub.isPremium;
+  return c.json(success(meDto), 200);
 });
 
 /** GET /api/users/profile — get the authenticated user's profile */
@@ -290,7 +294,10 @@ userRoutes.get("/profile", async (c) => {
     .where(eq(userProfiles.userId, user.sub))
     .limit(1);
 
-  return c.json(success(toUserProfileDto(me, profile ?? null)), 200);
+  const profileDto = toUserProfileDto(me, profile ?? null);
+  const profileSub = await getSubscription(user.sub);
+  profileDto.isPremium = profileSub.isPremium;
+  return c.json(success(profileDto), 200);
 });
 
 /** PUT /api/users/profile — update the authenticated user's profile */

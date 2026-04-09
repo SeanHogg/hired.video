@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { getDb } from "../db/index.js";
 import * as jobService from "../services/job.js";
 import { getApiKey } from "../services/ai.js";
 
@@ -238,15 +239,19 @@ jobRoutes.post("/createfromfile", async (c) => {
 /**
  * POST /api/jobs/extract — track a job from a webpage
  *
- * The Chrome extension sends `{ url, html, sourceUrl? }`. The backend:
- *   1. Parses structured data out of the HTML (JSON-LD JobPosting → OG → heuristics).
- *   2. If the page lacks JSON-LD, runs an AI classifier to confirm it's
- *      actually a single job posting (not a job board, search results, etc).
- *   3. On rejection, returns 422 + a friendly reason the extension surfaces.
- *   4. On acceptance, creates a public job under the hired.video seed
- *      company so it's surfaced on the public board even when the
- *      original posting is behind a paywall, and auto-saves it to the
- *      caller's tracker so it shows up in GET /api/jobs/saved.
+ * The Chrome extension sends `{ url, html, sourceUrl?, force? }`.
+ *
+ * Pipeline:
+ *   1. Parse structured data (JSON-LD → OG → heuristics → AI classifier).
+ *   2. Run the 3-layer dedup pipeline (normalized URL → content hash →
+ *      fuzzy ILIKE → AI duplicate confirmation).
+ *      - If an exact match is found, return it as-is (just bookmark it
+ *        to the user's tracker if `track` is true).
+ *      - If fuzzy candidates exist but AI confidence < 0.8, return
+ *        a 200 with `{ duplicate_candidates: [...] }` so the extension
+ *        can show a "did you mean?" prompt. The extension re-submits
+ *        with `force: true` to skip dedup if the user says "Track new".
+ *   3. Create the new job and bookmark it.
  */
 const extractHandler = async (c: any) => {
   const userId = c.var.user?.sub;
@@ -256,17 +261,18 @@ const extractHandler = async (c: any) => {
   const url: string = typeof body?.url === "string" ? body.url : "";
   const html: string = typeof body?.html === "string" ? body.html : "";
   const sourceUrl: string = typeof body?.sourceUrl === "string" ? body.sourceUrl : url;
-  // Query OR body — when false, the job is created on the public board
-  // under the hired.video community seed company but NOT bookmarked to
-  // the caller's tracker. Used by the "Generate without tracking" path.
   const trackParam = c.req.query("track");
   const track =
     body?.track === false ? false : trackParam === "false" ? false : true;
+  const force = body?.force === true;
 
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+
+  // ---- Step 1: classify the page --------------------------------
   const result = await jobService.extractAndClassifyJob({
     url: sourceUrl,
     html,
-    apiKey: getApiKey(c.env as { OPENROUTER_API_KEY?: string }),
+    apiKey,
   });
 
   if (!result.ok || !result.parsed) {
@@ -279,15 +285,67 @@ const extractHandler = async (c: any) => {
   }
 
   const parsed = result.parsed;
+  const company = track ? parsed.company : jobService.HIRED_VIDEO_SEED_COMPANY;
+
+  // ---- Step 2: dedup (skip when force=true — user confirmed "new") --
+  if (!force) {
+    const dedup = await jobService.deduplicateJob(
+      {
+        title: parsed.title,
+        company,
+        location: parsed.location,
+        description: parsed.description?.slice(0, 1000),
+        sourceUrl: sourceUrl || undefined,
+      },
+      apiKey,
+    );
+
+    if (dedup.outcome === 'exact' && dedup.existingJob) {
+      // Exact match — just bookmark the existing row.
+      if (track) {
+        const db = getDb();
+        await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
+      }
+      return c.json(success(dedup.existingJob), 200);
+    }
+
+    if (dedup.outcome === 'fuzzy' && dedup.existingJob) {
+      // AI-confirmed fuzzy match — treat like exact.
+      if (track) {
+        const db = getDb();
+        await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
+      }
+      return c.json(success(dedup.existingJob), 200);
+    }
+
+    if (dedup.candidates && dedup.candidates.length > 0) {
+      // Ambiguous fuzzy matches — return candidates so extension can
+      // show a "did you mean?" prompt. Status 200 + special shape.
+      return c.json(
+        success({
+          duplicate_candidates: dedup.candidates.map((c) => ({
+            id: c.id,
+            title: c.title,
+            company: c.company,
+            location: c.location,
+            sourceUrl: c.sourceUrl,
+            createdAt: c.createdAt,
+          })),
+          parsed_title: parsed.title,
+          parsed_company: company,
+        }),
+        200,
+      );
+    }
+  }
+
+  // ---- Step 3: create new job ------------------------------------
   const created = await jobService.createTrackedJob(
     {
       title: parsed.title,
       description: parsed.description,
       location: parsed.location,
-      // When `track` is false the job is published under the hired.video
-      // community seed company instead of whatever name the parser found
-      // on the source page. Keeps the public board attributable.
-      company: track ? parsed.company : jobService.HIRED_VIDEO_SEED_COMPANY,
+      company,
       sourceUrl: sourceUrl || undefined,
       isRemote: parsed.isRemote,
       jobType: parsed.jobType,
