@@ -398,33 +398,161 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
 /**
  * Generate structured data for different content types
  */
+/**
+ * Input shape for the JobPosting structured-data builder. Mirrors the
+ * common subset of fields available on UI Job objects throughout the
+ * frontend (JobDetail, JobCard, public listings, etc).
+ *
+ * This is the canonical shape — pass the full job, not pre-flattened
+ * strings. Anything that consumes the resulting JSON-LD (Google for
+ * Jobs, the hired.video Chrome extension's `parseJobFromPage`, third
+ * parties) will read the same schema.org fields.
+ */
+export interface JobPostingInput {
+  id?: string;
+  title: string;
+  description: string;
+  /** ISO-8601 date string. */
+  postedDate?: string | Date;
+  /** ISO-8601 date string. */
+  validThrough?: string | Date;
+  employmentType?: string; // e.g. "full_time", "Contract"
+  companyName: string;
+  companyLogoUrl?: string;
+  companyWebsite?: string;
+  /** Set true for fully-remote roles — emits jobLocationType=TELECOMMUTE. */
+  isRemote?: boolean;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  /** Numeric salary in dollars (annual unless `salaryUnit` is set). */
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string; // ISO 4217, defaults to USD
+  /** YEAR | MONTH | WEEK | DAY | HOUR — defaults to YEAR. */
+  salaryUnit?: "YEAR" | "MONTH" | "WEEK" | "DAY" | "HOUR";
+  /** Canonical URL for the job posting (defaults to hired.video/jobs/{id}). */
+  url?: string;
+  /** Skills, requirements — emitted as `skills` if present. */
+  skills?: string[];
+}
+
+/**
+ * Schema.org employment type values accepted by Google for Jobs.
+ * Maps from our internal slugs (full_time, part_time, contract, …)
+ * to the spec values (FULL_TIME, PART_TIME, …).
+ */
+function normalizeEmploymentType(value?: string): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.replace(/[\s-]+/g, "_").toUpperCase();
+  const allowed = new Set([
+    "FULL_TIME",
+    "PART_TIME",
+    "CONTRACTOR",
+    "CONTRACT",
+    "TEMPORARY",
+    "INTERN",
+    "INTERNSHIP",
+    "VOLUNTEER",
+    "PER_DIEM",
+    "OTHER",
+  ]);
+  // Spec uses CONTRACTOR; our app uses CONTRACT — map both.
+  if (normalized === "CONTRACT") return "CONTRACTOR";
+  if (normalized === "INTERN") return "INTERNSHIP";
+  return allowed.has(normalized) ? normalized : "OTHER";
+}
+
+function toIsoString(value?: string | Date): string | undefined {
+  if (!value) return undefined;
+  try {
+    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
 export const generateStructuredData = {
-  jobPosting: (job: any) => ({
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.title,
-    description: job.description,
-    datePosted: job.postedDate,
-    employmentType: job.employmentType?.toUpperCase(),
-    hiringOrganization: {
-      "@type": "Organization",
-      name: job.companyName,
-    },
-    jobLocation: {
-      "@type": "Place",
-      address: job.location,
-    },
-    baseSalary: job.salaryRange
-      ? {
-          "@type": "MonetaryAmount",
-          currency: "USD",
-          value: {
-            "@type": "QuantitativeValue",
-            value: job.salaryRange,
-          },
-        }
-      : undefined,
-  }),
+  /**
+   * Build a schema.org JobPosting object. Used both for SEO (Google
+   * for Jobs) and as the source of truth that the hired.video Chrome
+   * extension's `parseJobFromPage` reads when extracting job pages.
+   */
+  jobPosting: (job: JobPostingInput) => {
+    const datePosted = toIsoString(job.postedDate) ?? new Date().toISOString();
+    // Google for Jobs requires validThrough; default to 30 days out
+    // when the caller doesn't supply one.
+    const validThrough =
+      toIsoString(job.validThrough) ??
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const address: Record<string, string> = { "@type": "PostalAddress" };
+    if (job.city) address.addressLocality = job.city;
+    if (job.state) address.addressRegion = job.state;
+    if (job.country) address.addressCountry = job.country;
+    if (job.postalCode) address.postalCode = job.postalCode;
+
+    const jobLocation = job.isRemote
+      ? undefined
+      : {
+          "@type": "Place",
+          address: Object.keys(address).length > 1 ? address : { "@type": "PostalAddress", addressCountry: "US" },
+        };
+
+    const applicantLocationRequirements = job.isRemote
+      ? { "@type": "Country", name: job.country || "US" }
+      : undefined;
+
+    const baseSalary =
+      job.salaryMin || job.salaryMax
+        ? {
+            "@type": "MonetaryAmount",
+            currency: job.salaryCurrency || "USD",
+            value: {
+              "@type": "QuantitativeValue",
+              minValue: job.salaryMin,
+              maxValue: job.salaryMax,
+              unitText: job.salaryUnit || "YEAR",
+            },
+          }
+        : undefined;
+
+    const url =
+      job.url ||
+      (job.id ? `https://hired.video/jobs/${job.id}` : undefined);
+
+    const data: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      title: job.title,
+      description: job.description,
+      datePosted,
+      validThrough,
+      employmentType: normalizeEmploymentType(job.employmentType),
+      hiringOrganization: {
+        "@type": "Organization",
+        name: job.companyName,
+        ...(job.companyWebsite ? { sameAs: job.companyWebsite } : {}),
+        ...(job.companyLogoUrl ? { logo: job.companyLogoUrl } : {}),
+      },
+      ...(jobLocation ? { jobLocation } : {}),
+      ...(job.isRemote
+        ? {
+            jobLocationType: "TELECOMMUTE",
+            ...(applicantLocationRequirements
+              ? { applicantLocationRequirements }
+              : {}),
+          }
+        : {}),
+      ...(baseSalary ? { baseSalary } : {}),
+      ...(job.id ? { identifier: { "@type": "PropertyValue", name: "hired.video", value: job.id } } : {}),
+      ...(url ? { url, directApply: true } : {}),
+      ...(job.skills && job.skills.length > 0 ? { skills: job.skills.join(", ") } : {}),
+    };
+
+    return data;
+  },
 
   organization: (company: any) => ({
     "@context": "https://schema.org",

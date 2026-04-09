@@ -174,29 +174,58 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   const url = input.url ?? "";
 
   // 1. JSON-LD JobPosting — gold standard, treat as high confidence.
+  // Matches the schema.org shape produced by hired.video's own
+  // generateStructuredData.jobPosting() helper as well as the standard
+  // emitted by every major ATS (Greenhouse, Lever, Workday, LinkedIn,
+  // Indeed, Glassdoor, etc).
   const ldMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
   for (const block of ldMatches) {
     const inner = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>\s*$/, "").trim();
     if (!inner) continue;
     try {
       const data = JSON.parse(inner);
-      const items = Array.isArray(data) ? data : [data];
+      // Support @graph wrapper used by some sites/CMSes (Yoast SEO etc).
+      const items = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.["@graph"])
+          ? data["@graph"]
+          : [data];
       for (const item of items) {
         const type = (item?.["@type"] ?? "").toString().toLowerCase();
         if (type !== "jobposting") continue;
+
+        // jobLocation may be a single object or an array of Place objects.
+        const jobLocations = Array.isArray(item.jobLocation)
+          ? item.jobLocation
+          : item.jobLocation
+            ? [item.jobLocation]
+            : [];
+        const primaryLocation = jobLocations[0];
+        const address = primaryLocation?.address;
+        const locationParts = [
+          stripHtml(address?.addressLocality),
+          stripHtml(address?.addressRegion),
+          stripHtml(address?.addressCountry),
+        ].filter(Boolean);
+
+        const jobLocationType = item.jobLocationType?.toString().toLowerCase() ?? "";
+        const isRemote =
+          jobLocationType.includes("telecommute") ||
+          /\bremote\b/i.test(stripHtml(item.title ?? "")) ||
+          undefined;
+
         return {
           title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
           description: stripHtml(item.description ?? "") || stripHtml(html).slice(0, 5000),
           company:
-            stripHtml(item.hiringOrganization?.name ?? item.employmentUnit?.name ?? "") ||
-            HIRED_VIDEO_SEED_COMPANY,
-          location: stripHtml(
-            item.jobLocation?.address?.addressLocality ??
-              item.jobLocation?.address?.addressRegion ??
-              item.jobLocation?.address?.addressCountry ??
-              "",
-          ) || undefined,
-          isRemote: item.jobLocationType?.toString().toLowerCase().includes("telecommute"),
+            stripHtml(
+              item.hiringOrganization?.name ??
+                item.hiringOrganization?.legalName ??
+                item.employmentUnit?.name ??
+                "",
+            ) || HIRED_VIDEO_SEED_COMPANY,
+          location: locationParts.length > 0 ? locationParts.join(", ") : undefined,
+          isRemote,
           confidence: "high",
         };
       }

@@ -244,18 +244,23 @@ export default function JobDetail() {
     : undefined;
   const jobStructuredData = job
     ? generateStructuredData.jobPosting({
+        id: job.id,
         title: job.data.title,
         description: job.data.description,
         postedDate: job.createdAt,
+        validThrough: (job as any).data?.expiresAt || (job as any).expiresAt,
         employmentType: job.data.employmentType,
         companyName: job.data.company.name,
-        location: job.data.location.remote
-          ? "Remote"
-          : `${job.data.location.city || ""}, ${job.data.location.state || ""}`,
-        salaryRange:
-          job.data.salaryMin && job.data.salaryMax
-            ? `${(job.data.salaryMin / 1000).toFixed(0)}k-${(job.data.salaryMax / 1000).toFixed(0)}k`
-            : undefined,
+        companyLogoUrl: (job.data.company as any).logo || (job.data.company as any).logoUrl,
+        companyWebsite: (job.data.company as any).website,
+        isRemote: !!job.data.location?.remote,
+        city: job.data.location?.city,
+        state: job.data.location?.state,
+        country: (job.data.location as any)?.country,
+        salaryMin: job.data.salaryMin,
+        salaryMax: job.data.salaryMax,
+        salaryCurrency: (job.data as any).salaryCurrency || "USD",
+        skills: (job.data as any).skills || (job.data as any).skillsRequired,
       })
     : undefined;
 
