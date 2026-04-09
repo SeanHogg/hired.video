@@ -65,6 +65,7 @@ import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
 import CreateVariationDialog from "@/components/CreateVariationDialog";
+import MergeResumeDialog from "@/components/MergeResumeDialog";
 import MetadataModal from "@/components/MetadataModal";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
@@ -162,6 +163,12 @@ export default function Resumes() {
     open: false,
     target: null,
     submitting: false,
+  });
+
+  // Merge dialog state
+  const [mergeDialog, setMergeDialog] = useState<{ isOpen: boolean; targetResumeId: string | null }>({
+    isOpen: false,
+    targetResumeId: null,
   });
 
   // Actions modal state
@@ -1382,6 +1389,9 @@ export default function Resumes() {
                             setPromoteDialog({ open: true, target: resume, submitting: false });
                           }
                         }}
+                        onMergeResume={(resumeId) => {
+                          setMergeDialog({ isOpen: true, targetResumeId: resumeId });
+                        }}
                       />
                     ))}
                   </div>
@@ -1707,6 +1717,22 @@ export default function Resumes() {
         masterResumeId={variationDialog.masterResumeId}
         masterResumeName={variationDialog.masterResumeName}
         onVariationCreated={handleVariationCreated}
+      />
+
+      {/* Merge Resume Dialog */}
+      <MergeResumeDialog
+        isOpen={mergeDialog.isOpen}
+        onClose={() => setMergeDialog({ isOpen: false, targetResumeId: null })}
+        resumes={displayResumes}
+        preselectedTargetId={mergeDialog.targetResumeId}
+        onMergeComplete={async () => {
+          const updated = await getResumesForDisplay();
+          setResumes(updated);
+          try {
+            const groups = await resumeService.getMasterResumeGroups();
+            setMasterResumeGroups(groups);
+          } catch {}
+        }}
       />
 
       {/* Metadata Modal */}

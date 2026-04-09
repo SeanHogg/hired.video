@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
+import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume-merge.js";
 
 const { resumeInformation: resumes, watchedResumes } = schema;
 
@@ -918,6 +919,135 @@ resumeRoutes.get("/:id/diff", async (c) => {
     changes,
     summary: { total: changes.length, added: changes.filter((c) => c.type === "added").length, removed: changes.filter((c) => c.type === "removed").length, changed: changes.filter((c) => c.type === "changed").length },
   }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Merge endpoints
+// ---------------------------------------------------------------------------
+
+const MergeAnalyzeSchema = z.object({
+  sourceResumeId: z.string().uuid(),
+  targetResumeId: z.string().uuid(),
+  useAI: z.boolean().optional().default(true),
+});
+
+resumeRoutes.post("/merge/analyze", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = MergeAnalyzeSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+
+  const { sourceResumeId, targetResumeId, useAI } = parsed.data;
+  if (sourceResumeId === targetResumeId) return c.json(fail("VALIDATION_ERROR", "Source and target must be different resumes"), 400);
+
+  const db = getDb();
+  const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
+  if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
+
+  const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
+  const analysis = await analyzeMerge(
+    (source.content ?? {}) as Record<string, unknown>,
+    (target.content ?? {}) as Record<string, unknown>,
+    apiKey || undefined,
+  );
+
+  return c.json(ok(analysis), 200);
+});
+
+const MergeExecuteSchema = z.object({
+  sourceResumeId: z.string().uuid(),
+  targetResumeId: z.string().uuid(),
+  decisions: z.array(z.object({
+    sectionType: z.string(),
+    sourceIndex: z.number(),
+    targetIndex: z.number().nullable(),
+    action: z.enum(["merge", "replace", "skip", "add"]),
+    mergeHighlights: z.enum(["combine", "source_only", "target_only"]).optional(),
+  })),
+  basicDecisions: z.record(z.enum(["source", "target"])).optional(),
+  createNew: z.boolean(),
+  newTitle: z.string().optional(),
+});
+
+resumeRoutes.post("/merge/execute", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = MergeExecuteSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+
+  const { sourceResumeId, targetResumeId, decisions, basicDecisions, createNew, newTitle } = parsed.data;
+
+  const db = getDb();
+  const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
+  if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
+
+  const mergedContent = executeMerge(
+    (target.content ?? {}) as Record<string, any>,
+    (source.content ?? {}) as Record<string, any>,
+    decisions as MergeDecision[],
+    basicDecisions,
+  );
+
+  const mergedCount = decisions.filter((d) => d.action === "merge" || d.action === "replace").length;
+  const skippedCount = decisions.filter((d) => d.action === "skip").length;
+  const newCount = decisions.filter((d) => d.action === "add").length;
+
+  if (createNew) {
+    const title = newTitle || `${target.title} (merged)`;
+    const [created] = await db
+      .insert(resumes)
+      .values({
+        userId: user.sub,
+        title,
+        content: mergedContent,
+        status: "draft",
+        isMaster: false,
+        isActive: false,
+        parentId: targetResumeId,
+        privacyLevel: (target as any).privacyLevel ?? 10,
+      } as any)
+      .returning();
+    return c.json(ok({ resumeId: created.id, title, mergedSections: mergedCount, skippedSections: skippedCount, newSections: newCount }), 201);
+  }
+
+  // Update target in-place
+  await db.update(resumes).set({ content: mergedContent, updatedAt: new Date() } as any).where(eq(resumes.id, targetResumeId));
+  return c.json(ok({ resumeId: targetResumeId, title: target.title, mergedSections: mergedCount, skippedSections: skippedCount, newSections: newCount }), 200);
+});
+
+const MergeFromFileSchema = z.object({
+  text: z.string().min(1),
+  targetResumeId: z.string().uuid(),
+  useAI: z.boolean().optional().default(true),
+});
+
+resumeRoutes.post("/merge/from-file", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = MergeFromFileSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+
+  const { text, targetResumeId, useAI } = parsed.data;
+
+  const db = getDb();
+  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
+
+  // Parse the uploaded text with AI (reuses existing function in this file)
+  const parsedContent = await parseResumeTextWithAI(c, text);
+
+  const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
+  const analysis = await analyzeMerge(
+    parsedContent as Record<string, unknown>,
+    (target.content ?? {}) as Record<string, unknown>,
+    apiKey || undefined,
+  );
+
+  return c.json(ok({ parsedContent, analysis, parseConfidence: Object.keys(parsedContent).length > 2 ? 0.8 : 0.4 }), 200);
 });
 
 resumeRoutes.all("*", (c) => c.json(fail("NOT_IMPLEMENTED", "Resume route not implemented"), 501));

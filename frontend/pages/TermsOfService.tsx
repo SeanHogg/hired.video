@@ -476,12 +476,32 @@ export default function TermsOfService() {
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-2">Cancellation</h4>
+                    <h4 className="font-medium mb-2">
+                      Cancellation &amp; Refund Policy
+                    </h4>
                     <p className="text-muted-foreground mb-2">
-                      All purchases are non-refundable. You can cancel your
-                      subscription at any time by logging into your account.
-                      Your cancellation will take effect at the end of the
-                      current paid term.
+                      We offer a 30-day money-back guarantee on subscription
+                      fees. If you are not satisfied with the Services, you may
+                      request a full refund of your subscription payment within
+                      30 days of your initial purchase or renewal date.
+                    </p>
+                    <p className="text-muted-foreground mb-2">
+                      <strong>
+                        Consumption-based usage is non-refundable.
+                      </strong>{" "}
+                      Because the Services operate on a consumption-based
+                      model, any usage that exceeds your plan's included free
+                      allotment will be billed at the applicable rate and is
+                      not eligible for a refund. This includes, but is not
+                      limited to, AI-generated content, video rendering,
+                      voice synthesis, and any other metered resource usage.
+                    </p>
+                    <p className="text-muted-foreground mb-2">
+                      You can cancel your subscription at any time by logging
+                      into your account. Your cancellation will take effect at
+                      the end of the current paid term. No partial refunds
+                      will be issued for unused portions of a billing period
+                      after the 30-day guarantee window has passed.
                     </p>
                   </div>
 

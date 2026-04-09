@@ -702,7 +702,7 @@ export async function extractAndClassifyJob(input: {
   const heuristic = parseJobFromPage({ url: input.url, html: input.html });
 
   if (heuristic.confidence === "high") {
-    return { ok: true, confidence: 1, parsed: heuristic };
+    return { ok: true, confidence: 1, parsed: splitDescriptionSections(heuristic) };
   }
 
   // No JSON-LD. Try the LLM classifier.
@@ -710,7 +710,7 @@ export async function extractAndClassifyJob(input: {
     // No AI configured — accept the heuristic parse rather than blocking
     // the user. Dev mode + self-hosted deployments without an OpenRouter
     // key still get the same UX as before.
-    return { ok: true, confidence: 0.5, parsed: heuristic };
+    return { ok: true, confidence: 0.5, parsed: splitDescriptionSections(heuristic) };
   }
 
   if (!input.html || stripHtml(input.html).length < 200) {
@@ -733,7 +733,7 @@ export async function extractAndClassifyJob(input: {
     console.warn("[jobs/extract] LLM classification failed, falling open:", err);
     // Don't punish the user for an upstream LLM outage — fall through
     // to the heuristic parse.
-    return { ok: true, confidence: 0.5, parsed: heuristic };
+    return { ok: true, confidence: 0.5, parsed: splitDescriptionSections(heuristic) };
   }
 
   if (!classification.isJobPosting || classification.confidence < CLASSIFICATION_THRESHOLD) {
@@ -760,7 +760,7 @@ export async function extractAndClassifyJob(input: {
   return {
     ok: true,
     confidence: classification.confidence,
-    parsed: {
+    parsed: splitDescriptionSections({
       title: (aiJob.title || heuristic.title || "Tracked Job").slice(0, 250),
       description: aiJob.description || heuristic.description,
       company: aiJob.company || heuristic.company || HIRED_VIDEO_SEED_COMPANY,
@@ -784,7 +784,7 @@ export async function extractAndClassifyJob(input: {
         : heuristic.qualifications,
       benefits: aiJob.benefits?.length ? aiJob.benefits : heuristic.benefits,
       confidence: "high",
-    },
+    }),
   };
 }
 
@@ -838,6 +838,121 @@ function parseStringList(value: unknown): string[] {
       .filter((s) => s.length > 0);
   }
   return [];
+}
+
+/**
+ * Post-parse description section splitter. When the structured arrays
+ * (responsibilities, requirements, qualifications, benefits) are empty
+ * but the description text contains recognizable headings, extract them.
+ *
+ * Common patterns (Dice, Greenhouse, many ATSes):
+ *   "Key Responsibilities ... Qualifications ... Benefits ..."
+ *   "What You'll Do ... What We're Looking For ... What We Offer ..."
+ */
+export function splitDescriptionSections(parsed: ParsedJob): ParsedJob {
+  // Only run when all structured fields are empty.
+  const hasStructure =
+    (parsed.responsibilities?.length ?? 0) > 0 ||
+    (parsed.requirements?.length ?? 0) > 0 ||
+    (parsed.qualifications?.length ?? 0) > 0 ||
+    (parsed.benefits?.length ?? 0) > 0;
+  if (hasStructure) return parsed;
+
+  const text = parsed.description || "";
+  if (text.length < 200) return parsed;
+
+  // Section-header patterns — order matters: check more specific first.
+  const SECTION_PATTERNS: Array<{
+    key: keyof Pick<ParsedJob, "responsibilities" | "requirements" | "qualifications" | "benefits">;
+    patterns: RegExp[];
+  }> = [
+    {
+      key: "responsibilities",
+      patterns: [
+        /(?:key\s+)?responsibilities/i,
+        /what\s+you(?:'ll|\s+will)\s+do/i,
+        /your\s+role/i,
+        /the\s+role/i,
+        /job\s+duties/i,
+        /essential\s+(?:duties|functions)/i,
+      ],
+    },
+    {
+      key: "requirements",
+      patterns: [
+        /(?:basic\s+|minimum\s+)?requirements/i,
+        /what\s+we(?:'re|\s+are)\s+looking\s+for/i,
+        /what\s+you(?:'ll|\s+will)\s+(?:need|bring)/i,
+        /required\s+skills/i,
+        /skills\s+(?:&|and)\s+experience/i,
+        /must\s+have/i,
+      ],
+    },
+    {
+      key: "qualifications",
+      patterns: [
+        /qualifications/i,
+        /education/i,
+        /preferred\s+qualifications/i,
+        /nice\s+to\s+have/i,
+        /desired\s+skills/i,
+      ],
+    },
+    {
+      key: "benefits",
+      patterns: [
+        /benefits?\s*(?:&|and)?\s*perks?/i,
+        /what\s+we\s+offer/i,
+        /why\s+(?:join|work)/i,
+        /compensation/i,
+        /our\s+benefits/i,
+        /perks/i,
+      ],
+    },
+  ];
+
+  // Split the text into lines.
+  const lines = text.split(/\n|(?<=\.)\s+(?=[A-Z])/);
+
+  // Walk lines and assign each to the most-recently-matched section.
+  let currentKey: string | null = null;
+  const buckets: Record<string, string[]> = {};
+  let cleanDescription: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    let matched = false;
+    for (const section of SECTION_PATTERNS) {
+      if (section.patterns.some((p) => p.test(line) && line.length < 120)) {
+        currentKey = section.key;
+        if (!buckets[currentKey]) buckets[currentKey] = [];
+        matched = true;
+        break;
+      }
+    }
+
+    if (matched) continue;
+
+    if (currentKey && buckets[currentKey]) {
+      // Strip leading bullet chars.
+      const clean = line.replace(/^[\s•\-–—*·▪►●○◦→⮞\d.)\]]+\s*/, "").trim();
+      if (clean.length > 10) buckets[currentKey].push(clean);
+    } else {
+      cleanDescription.push(line);
+    }
+  }
+
+  return {
+    ...parsed,
+    // Replace the giant-blob description with the pre-section portion.
+    description: cleanDescription.length > 0 ? cleanDescription.join("\n") : parsed.description,
+    responsibilities: buckets.responsibilities?.length ? buckets.responsibilities : parsed.responsibilities,
+    requirements: buckets.requirements?.length ? buckets.requirements : parsed.requirements,
+    qualifications: buckets.qualifications?.length ? buckets.qualifications : parsed.qualifications,
+    benefits: buckets.benefits?.length ? buckets.benefits : parsed.benefits,
+  };
 }
 
 /** Map schema.org employmentType (FULL_TIME, CONTRACTOR, …) to our internal slug. */

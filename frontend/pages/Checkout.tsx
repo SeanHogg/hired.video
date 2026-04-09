@@ -242,11 +242,22 @@ export default function Checkout() {
                       <div className="flex items-center gap-2 text-green-700 text-sm">
                         <CheckCircle2 className="h-4 w-4" />
                         <span className="font-medium">
-                          30-day money-back guarantee
+                          30-day money-back guarantee*
                         </span>
                       </div>
                       <p className="text-green-600 text-xs mt-1">
                         Not satisfied? Get a full refund within 30 days.
+                      </p>
+                      <p className="text-green-600 text-xs mt-1">
+                        *Consumption-based usage beyond your free allotment is
+                        non-refundable. See{" "}
+                        <Link
+                          to="/terms-of-service"
+                          className="underline hover:text-green-800"
+                        >
+                          Terms of Service
+                        </Link>{" "}
+                        for details.
                       </p>
                     </div>
                   </CardContent>

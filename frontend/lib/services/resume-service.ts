@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile } from "@/lib/extract-text";
 
@@ -1503,6 +1503,38 @@ export class ResumeService {
           : "Failed to load resumes. Please try again."
       );
     }
+  }
+
+  // ==========================================================================
+  // MERGE
+  // ==========================================================================
+
+  async analyzeMerge(sourceResumeId: string, targetResumeId: string, useAI = true): Promise<MergeAnalysis> {
+    const response = await apiClient.post<MergeAnalysis>(
+      `/api/resumes/merge/analyze`,
+      { sourceResumeId, targetResumeId, useAI },
+      z.any(),
+    );
+    return response.data;
+  }
+
+  async executeMerge(request: MergeRequest): Promise<MergeResult> {
+    const response = await apiClient.post<MergeResult>(
+      `/api/resumes/merge/execute`,
+      request,
+      z.any(),
+    );
+    return response.data;
+  }
+
+  async analyzeFileMerge(file: File, targetResumeId: string, useAI = true): Promise<FileMergeAnalysis> {
+    const text = await extractTextFromFile(file);
+    const response = await apiClient.post<FileMergeAnalysis>(
+      `/api/resumes/merge/from-file`,
+      { text, targetResumeId, useAI },
+      z.any(),
+    );
+    return response.data;
   }
 }
 

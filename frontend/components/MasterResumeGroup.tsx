@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Star, Eye, Plus, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Star, Eye, Plus, MoreHorizontal, GitMerge } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,7 @@ interface MasterResumeGroupProps {
   onTrackResume?: (resumeId: string) => void;
   onPromoteVariant?: (resumeId: string) => void;
   onAddMedia?: (resumeId: string) => void;
+  onMergeResume?: (resumeId: string) => void;
 }
 
 export default function MasterResumeGroupComponent({
@@ -41,6 +42,7 @@ export default function MasterResumeGroupComponent({
   onTrackResume,
   onPromoteVariant,
   onAddMedia,
+  onMergeResume,
 }: MasterResumeGroupProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -153,6 +155,12 @@ export default function MasterResumeGroupComponent({
                     <DropdownMenuItem onClick={() => onCreateVariation(group.masterResume.id)}>
                       Create Variation
                     </DropdownMenuItem>
+                    {onMergeResume && (
+                      <DropdownMenuItem onClick={() => onMergeResume(group.masterResume.id)}>
+                        <GitMerge className="h-4 w-4 mr-2" />
+                        Merge Into...
+                      </DropdownMenuItem>
+                    )}
                     {!group.masterResume.isActive && (
                       <DropdownMenuItem onClick={() => onSetActive(group.masterResume.id)}>
                         Set as Active
@@ -271,6 +279,12 @@ export default function MasterResumeGroupComponent({
                           <DropdownMenuItem onClick={() => onPromoteVariant && onPromoteVariant(variation.id)}>
                             Promote to Master
                           </DropdownMenuItem>
+                          {onMergeResume && (
+                            <DropdownMenuItem onClick={() => onMergeResume(variation.id)}>
+                              <GitMerge className="h-4 w-4 mr-2" />
+                              Merge Into...
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => onDeleteResume(variation.id)}
                             className="text-red-600"
