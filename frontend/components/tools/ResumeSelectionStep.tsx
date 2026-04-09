@@ -179,8 +179,8 @@ export default function ResumeSelectionStep({
                       <SelectValue placeholder="Choose a resume to analyze" />
                     </SelectTrigger>
                     <SelectContent>
-                      {resumes.map((resume) => (
-                        <SelectItem key={resume.id} value={resume.id || ""}>
+                      {resumes.filter((resume) => resume.id).map((resume) => (
+                        <SelectItem key={resume.id} value={resume.id!}>
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             <div className="flex flex-col">

@@ -416,8 +416,8 @@ export default function JobInputStep({
                       <SelectValue placeholder="Choose a job from your saved jobs" />
                     </SelectTrigger>
                     <SelectContent>
-                      {userJobs.map((job) => (
-                        <SelectItem key={job.id} value={job.id || ""}>
+                      {userJobs.filter((job) => job.id).map((job) => (
+                        <SelectItem key={job.id} value={job.id!}>
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             {job.title || "Untitled Job"} - {job.company}
