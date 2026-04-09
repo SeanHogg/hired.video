@@ -163,6 +163,30 @@ export const accountPreferences = pgTable("account_preferences", {
 export type AccountPreferences = typeof accountPreferences.$inferSelect;
 export type NewAccountPreferences = typeof accountPreferences.$inferInsert;
 
+export const privacyPreferences = pgTable("privacy_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  profileVisibleToPublic: boolean("profile_visible_to_public").default(true).notNull(),
+  profileVisibleToRecruiters: boolean("profile_visible_to_recruiters").default(true).notNull(),
+  allowSearchEngineIndexing: boolean("allow_search_engine_indexing").default(true).notNull(),
+  showActivityStatus: boolean("show_activity_status").default(true).notNull(),
+  showConnectionsList: boolean("show_connections_list").default(true).notNull(),
+  allowDirectMessages: boolean("allow_direct_messages").default(true).notNull(),
+  allowConnectionRequests: boolean("allow_connection_requests").default(true).notNull(),
+  showEmail: boolean("show_email").default(false).notNull(),
+  showPhone: boolean("show_phone").default(false).notNull(),
+  showLocation: boolean("show_location").default(false).notNull(),
+  allowMessaging: boolean("allow_messaging").default(true).notNull(),
+  shareAnalyticsData: boolean("share_analytics_data").default(true).notNull(),
+  shareUsageData: boolean("share_usage_data").default(true).notNull(),
+  allowDataExport: boolean("allow_data_export").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PrivacyPreferences = typeof privacyPreferences.$inferSelect;
+export type NewPrivacyPreferences = typeof privacyPreferences.$inferInsert;
+
 export const accountInvitations = pgTable("account_invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull(),

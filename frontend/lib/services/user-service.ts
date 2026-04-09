@@ -92,6 +92,9 @@ export const PublicUserSchema = z.object({
   currentRole: nullableString(),
   currentCompany: nullableString(),
   openToWork: nullableBoolean(),
+  showEmail: nullableBoolean(),
+  showPhone: nullableBoolean(),
+  showLocation: nullableBoolean(),
   skills: z
     .array(z.string())
     .nullable()
@@ -104,9 +107,13 @@ export const PublicUserSchema = z.object({
     avatar: nullableString(),
     headline: nullableString(),
     location: nullableString(),
+    phone: nullableString(),
     currentRole: nullableString(),
     currentCompany: nullableString(),
     openToWork: nullableBoolean(),
+    showEmail: nullableBoolean(),
+    showPhone: nullableBoolean(),
+    showLocation: nullableBoolean(),
     skills: z
       .array(z.string())
       .nullable()
@@ -262,9 +269,14 @@ export class UserService {
    */
   private normalizePublicUserToProfile(payload: any): UserProfile {
     const dataBlock = payload?.data ?? {};
+    const showEmail = payload.showEmail ?? dataBlock.showEmail ?? false;
+    const showPhone = payload.showPhone ?? dataBlock.showPhone ?? false;
+    const showLocation = payload.showLocation ?? dataBlock.showLocation ?? false;
 
     return {
       id: String(payload.id ?? ""),
+      // Server has already nulled email/phone/location for non-owners
+      // when the corresponding privacy toggle is off, so just trust them.
       email: payload.email ?? undefined,
       firstName: payload.firstName ?? dataBlock.firstName ?? undefined,
       lastName: payload.lastName ?? dataBlock.lastName ?? undefined,
@@ -289,6 +301,25 @@ export class UserService {
       isVerified: payload.isVerified ?? undefined,
       isPremium: payload.isPremium ?? undefined,
       subscription: payload.isPremium ? "pro" : "free",
+      // Mirror nested data block so consumers checking userProfile.data.* work.
+      data: {
+        firstName: dataBlock.firstName ?? null,
+        lastName: dataBlock.lastName ?? null,
+        avatar: dataBlock.avatar ?? null,
+        headline: dataBlock.headline ?? null,
+        summary: dataBlock.summary ?? null,
+        location: dataBlock.location ?? null,
+        website: dataBlock.website ?? null,
+        linkedIn: dataBlock.linkedIn ?? null,
+        gitHub: dataBlock.gitHub ?? dataBlock.github ?? null,
+        twitter: dataBlock.twitter ?? null,
+        phone: dataBlock.phone ?? null,
+        currentRole: dataBlock.currentRole ?? null,
+        currentCompany: dataBlock.currentCompany ?? null,
+        showEmail,
+        showPhone,
+        showLocation,
+      } as any,
     };
   }
 

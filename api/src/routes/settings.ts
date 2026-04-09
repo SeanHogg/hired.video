@@ -11,7 +11,39 @@ import {
   defaultSecuritySettings,
 } from "../services/settings.js";
 
-const { accountPreferences, jobPreferences, users } = schema;
+const { accountPreferences, jobPreferences, users, privacyPreferences } = schema;
+
+const PRIVACY_FIELDS = [
+  "profileVisibleToPublic",
+  "profileVisibleToRecruiters",
+  "allowSearchEngineIndexing",
+  "showActivityStatus",
+  "showConnectionsList",
+  "allowDirectMessages",
+  "allowConnectionRequests",
+  "showEmail",
+  "showPhone",
+  "showLocation",
+  "allowMessaging",
+  "shareAnalyticsData",
+  "shareUsageData",
+  "allowDataExport",
+] as const;
+
+async function loadPrivacy(uid: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(privacyPreferences)
+    .where(eq(privacyPreferences.userId, uid))
+    .limit(1);
+  if (!row) return defaultPrivacyPreferences();
+  const out: Record<string, boolean> = {};
+  for (const field of PRIVACY_FIELDS) {
+    out[field] = (row as any)[field];
+  }
+  return out;
+}
 
 export const settingsRoutes = new Hono<{ Variables: Variables }>();
 
@@ -38,7 +70,7 @@ settingsRoutes.get("/", async (c) => {
       pushJobMatches: true, pushApplicationUpdates: true, pushMessages: true, pushConnectionRequests: true,
       smsImportantUpdates: false, smsSecurityAlerts: true,
     },
-    privacy: defaultPrivacyPreferences(),
+    privacy: await loadPrivacy(uid),
     jobPreferences: jobPrefs ? {
       ...defaultJobPreferences(),
       desiredTitle: jobPrefs.desiredTitle,
@@ -72,8 +104,31 @@ settingsRoutes.put("/notifications", async (c) => {
   return c.json(success({ ...defaultNotificationPreferences(), ...body }), 200);
 });
 
-settingsRoutes.get("/privacy", (c) => c.json(success(defaultPrivacyPreferences()), 200));
-settingsRoutes.put("/privacy", async (c) => c.json(success({ ...defaultPrivacyPreferences(), ...(await c.req.json().catch(() => ({}))) }), 200));
+settingsRoutes.get("/privacy", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  return c.json(success(await loadPrivacy(uid)), 200);
+});
+
+settingsRoutes.put("/privacy", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+
+  // Whitelist: only accept known boolean fields, coerce, ignore everything else.
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  for (const field of PRIVACY_FIELDS) {
+    if (field in body) updates[field] = Boolean(body[field]);
+  }
+
+  await db
+    .insert(privacyPreferences)
+    .values({ userId: uid, ...updates } as any)
+    .onConflictDoUpdate({ target: privacyPreferences.userId, set: updates as any });
+
+  return c.json(success(await loadPrivacy(uid)), 200);
+});
 
 settingsRoutes.get("/job-preferences", async (c) => {
   const uid = userId(c);

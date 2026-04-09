@@ -7,7 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 
-const { users, userProfiles, userConnections, tasks } = schema;
+const { users, userProfiles, userConnections, tasks, privacyPreferences } = schema;
 
 // Explicit column list for userProfiles — avoids SELECT * and protects against
 // schema columns that haven't been migrated to the DB yet.
@@ -118,29 +118,55 @@ function toUserProfileDto(
     skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
     updatedAt?: Date | string | null;
   } | null,
+  privacyOptions?: {
+    isOwner?: boolean;
+    privacy?: {
+      showEmail?: boolean;
+      showPhone?: boolean;
+      showLocation?: boolean;
+    } | null;
+  },
 ) {
   const nameParts = (row.name ?? "").split(" ");
   const firstName = nameParts[0] ?? "";
   const lastName = nameParts.slice(1).join(" ");
   const profileUpdatedAt = profile?.updatedAt ?? row.updatedAt ?? row.createdAt;
+
+  // Privacy gating: redact contact fields for non-owners when toggled off.
+  // Owners always see their own data. Defaults: email/phone/location hidden.
+  const isOwner = privacyOptions?.isOwner ?? true;
+  const showEmail = privacyOptions?.privacy?.showEmail ?? false;
+  const showPhone = privacyOptions?.privacy?.showPhone ?? false;
+  const showLocation = privacyOptions?.privacy?.showLocation ?? false;
+
+  const visibleEmail = isOwner || showEmail ? row.email : null;
+  const visiblePhone = isOwner || showPhone ? (profile?.phone ?? "") : null;
+  const visibleLocation = isOwner || showLocation ? (profile?.location ?? "") : null;
+
   return {
     id: row.id,
     slug: profile?.customUrlSlug ?? "",
-    email: row.email,
+    email: visibleEmail,
     userName: row.email,
+    showEmail,
+    showPhone,
+    showLocation,
     data: {
       firstName,
       lastName,
       avatar: profile?.avatarUrl ?? "",
       headline: profile?.headline ?? "",
       summary: profile?.summary ?? "",
-      location: profile?.location ?? "",
+      location: visibleLocation,
       website: profile?.website ?? "",
       linkedIn: profile?.linkedIn ?? "",
       github: profile?.github ?? "",
-      phone: profile?.phone ?? "",
+      phone: visiblePhone,
       currentRole: profile?.currentRole ?? "",
       currentCompany: profile?.currentCompany ?? "",
+      showEmail,
+      showPhone,
+      showLocation,
     },
     role: row.role,
     isPremium: false,
@@ -727,17 +753,25 @@ userRoutes.get("/:id", async (c) => {
   }
 
   // Enrich with public resume and video counts for "Hire Me" profile page
-  const [publicResumes, publicVideos] = await Promise.all([
+  const [publicResumes, publicVideos, privacyRow] = await Promise.all([
     db.select({ id: schema.resumeInformation.id })
       .from(schema.resumeInformation)
       .where(and(eq(schema.resumeInformation.userId, me.id), lte(schema.resumeInformation.privacyLevel, 0))),
     db.select({ id: schema.videos.id, title: schema.videos.title, thumbnailUrl: schema.videos.thumbnailUrl, youtubeUrl: schema.videos.youtubeUrl, createdAt: schema.videos.createdAt })
       .from(schema.videos)
       .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.isPublic, true))),
+    db.select({
+      showEmail: privacyPreferences.showEmail,
+      showPhone: privacyPreferences.showPhone,
+      showLocation: privacyPreferences.showLocation,
+    })
+      .from(privacyPreferences)
+      .where(eq(privacyPreferences.userId, me.id))
+      .limit(1),
   ]);
 
   return c.json(success({
-    ...toUserProfileDto(me, profile ?? null),
+    ...toUserProfileDto(me, profile ?? null, { isOwner, privacy: privacyRow[0] ?? null }),
     publicResumeCount: publicResumes.length,
     publicVideos,
   }), 200);
