@@ -9,6 +9,11 @@ import type {
 
 const { jobItems, savedJobs, jobApplications, jobAlerts } = schema;
 
+/** Stable string used as the "company" for jobs tracked through the
+ * extension when we can't extract a real employer from the page.
+ * Surfaced as the seed company on the public job board. */
+export const HIRED_VIDEO_SEED_COMPANY = "hired.video Community";
+
 export interface JobQuery {
   page?: number;
   limit?: number;
@@ -138,6 +143,166 @@ export async function createJob(job: CreateJobDTO, userId: string): Promise<JobE
       isRemote: false,
     } as any)
     .returning();
+  return rowToJob(row!);
+}
+
+/**
+ * Lightweight HTML → structured-job parser used by `POST /api/jobs/extract`.
+ * Tries (in order):
+ *   1. JSON-LD `JobPosting` (the gold standard — most ATSes emit this)
+ *   2. OpenGraph `og:title` + `<meta name="description">`
+ *   3. `<title>` + URL hostname as a last-resort fallback
+ *
+ * Pure string operations on purpose: we run inside a Cloudflare Worker so
+ * there is no real DOM, and pulling in cheerio just for this one route is
+ * not worth the bundle hit.
+ */
+export interface ParsedJob {
+  title: string;
+  description: string;
+  company?: string;
+  location?: string;
+  isRemote?: boolean;
+}
+
+export function parseJobFromPage(input: { url?: string; html?: string }): ParsedJob {
+  const html = input.html ?? "";
+  const url = input.url ?? "";
+
+  // 1. JSON-LD JobPosting
+  const ldMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  for (const block of ldMatches) {
+    const inner = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>\s*$/, "").trim();
+    if (!inner) continue;
+    try {
+      const data = JSON.parse(inner);
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        const type = (item?.["@type"] ?? "").toString().toLowerCase();
+        if (type !== "jobposting") continue;
+        return {
+          title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
+          description: stripHtml(item.description ?? "") || stripHtml(html).slice(0, 5000),
+          company:
+            stripHtml(item.hiringOrganization?.name ?? item.employmentUnit?.name ?? "") ||
+            HIRED_VIDEO_SEED_COMPANY,
+          location: stripHtml(
+            item.jobLocation?.address?.addressLocality ??
+              item.jobLocation?.address?.addressRegion ??
+              item.jobLocation?.address?.addressCountry ??
+              "",
+          ) || undefined,
+          isRemote: item.jobLocationType?.toString().toLowerCase().includes("telecommute"),
+        };
+      }
+    } catch {
+      // malformed JSON-LD block — fall through
+    }
+  }
+
+  // 2. OpenGraph + meta description fallback
+  const ogTitle = matchMeta(html, /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+  const ogDesc = matchMeta(html, /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
+  const metaDesc = matchMeta(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+  const ogSite = matchMeta(html, /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i);
+  const docTitle = matchMeta(html, /<title[^>]*>([^<]+)<\/title>/i);
+
+  const title = ogTitle || docTitle || fallbackTitle(url);
+  const description = ogDesc || metaDesc || stripHtml(html).slice(0, 5000) || url;
+
+  return {
+    title: title.slice(0, 250),
+    description,
+    company: ogSite || HIRED_VIDEO_SEED_COMPANY,
+    location: undefined,
+    isRemote: undefined,
+  };
+}
+
+function matchMeta(html: string, pattern: RegExp): string | undefined {
+  const m = html.match(pattern);
+  return m?.[1]?.trim();
+}
+
+function stripHtml(text: unknown): string {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fallbackTitle(url: string): string {
+  try {
+    const u = new URL(url);
+    return `Job from ${u.hostname.replace(/^www\./, "")}`;
+  } catch {
+    return "Tracked Job";
+  }
+}
+
+/**
+ * Insert a job posting created via the extension and immediately
+ * bookmark it so the calling user can see it in their `/saved` count.
+ *
+ * Public-by-default: `isActive` defaults to true on the column, which is
+ * the only filter `getPublicJobs` applies — so the job lands on the
+ * public board the moment it's inserted.
+ */
+export async function createTrackedJob(
+  input: {
+    title: string;
+    description: string;
+    company?: string;
+    location?: string;
+    sourceUrl?: string;
+    isRemote?: boolean;
+  },
+  userId: string,
+): Promise<JobEntity> {
+  const db = getDb();
+  const company = input.company?.trim() || HIRED_VIDEO_SEED_COMPANY;
+
+  // Re-use an existing tracked job for the same sourceUrl so users
+  // tracking the same listing don't create duplicates on the board.
+  if (input.sourceUrl) {
+    const [existing] = await db
+      .select()
+      .from(jobItems)
+      .where(eq(jobItems.sourceUrl, input.sourceUrl))
+      .limit(1);
+    if (existing) {
+      await db.insert(savedJobs).values({ userId, jobId: existing.id }).onConflictDoNothing();
+      return rowToJob(existing);
+    }
+  }
+
+  const [row] = await db
+    .insert(jobItems)
+    .values({
+      postedByUserId: userId,
+      title: input.title.slice(0, 250) || "Tracked Job",
+      description: input.description ?? "",
+      company,
+      location: input.location,
+      isRemote: input.isRemote ?? false,
+      isActive: true,
+      sourceUrl: input.sourceUrl,
+    } as any)
+    .returning();
+
+  if (row) {
+    await db.insert(savedJobs).values({ userId, jobId: row.id }).onConflictDoNothing();
+  }
+
   return rowToJob(row!);
 }
 

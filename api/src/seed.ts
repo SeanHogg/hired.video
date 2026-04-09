@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
+import { HIRED_VIDEO_SEED_COMPANY } from "./services/job.js";
 
 const { users, jobItems } = schema;
 
@@ -94,6 +95,32 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
         updatedAt: new Date(),
       } as any);
       console.log("[seed] Created sample job for company", companyName);
+    }
+
+    // hired.video Community — placeholder company that owns jobs tracked
+    // through the Chrome extension. Seeds a single sample job so the
+    // company surfaces on the public board even before any user has
+    // tracked anything.
+    const [existingCommunityJob] = await db
+      .select()
+      .from(jobItems)
+      .where(eq(jobItems.company, HIRED_VIDEO_SEED_COMPANY))
+      .limit(1);
+
+    if (!existingCommunityJob && userId) {
+      await db.insert(jobItems).values({
+        postedByUserId: userId,
+        title: "Welcome to the hired.video community board",
+        description:
+          "This is the placeholder posting for jobs tracked by hired.video community members through the Chrome extension. As soon as anyone tracks a job from a webpage, it will appear here and on their personal tracker.",
+        company: HIRED_VIDEO_SEED_COMPANY,
+        location: "Remote",
+        isActive: true,
+        isRemote: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+      console.log("[seed] Created hired.video community placeholder job");
     }
 
     seeded = true;

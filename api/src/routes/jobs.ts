@@ -234,49 +234,43 @@ jobRoutes.post("/createfromfile", async (c) => {
   return c.json(success(created), 201);
 });
 
-/** POST /api/Job/Extract — extract job from URL */
-jobRoutes.post("/Extract", async (c) => {
+/**
+ * POST /api/jobs/extract — track a job from a webpage
+ *
+ * The Chrome extension sends `{ url, html, sourceUrl? }`. The backend parses
+ * structured data out of the HTML (JSON-LD JobPosting → OpenGraph → bare
+ * heuristics), creates a public job under the hired.video seed company
+ * (so it's surfaced on the public board even when the original posting is
+ * behind a paywall), and auto-saves it to the calling user's tracker so it
+ * shows up in `GET /api/jobs/saved` without an extra round-trip.
+ */
+const extractHandler = async (c: any) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const body = await c.req.json().catch(() => null);
-  const url = typeof body?.url === "string" ? body.url : "";
+  const url: string = typeof body?.url === "string" ? body.url : "";
+  const html: string = typeof body?.html === "string" ? body.html : "";
+  const sourceUrl: string = typeof body?.sourceUrl === "string" ? body.sourceUrl : url;
 
-  let title = "Extracted Job";
-  if (url) {
-    try {
-      const u = new URL(url);
-      title = `Job from ${u.hostname}`;
-    } catch {
-      // ignore
-    }
-  }
+  const parsed = jobService.parseJobFromPage({ url: sourceUrl, html });
 
-  const description = url || "";
-  const created = await jobService.createJob({ title, description, location: undefined }, userId);
+  const created = await jobService.createTrackedJob(
+    {
+      title: parsed.title,
+      description: parsed.description,
+      location: parsed.location,
+      company: parsed.company,
+      sourceUrl: sourceUrl || undefined,
+      isRemote: parsed.isRemote,
+    },
+    userId,
+  );
+
   return c.json(success(created), 201);
-});
-jobRoutes.post("/extract", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const body = await c.req.json().catch(() => null);
-  const url = typeof body?.url === "string" ? body.url : "";
-
-  let title = "Extracted Job";
-  if (url) {
-    try {
-      const u = new URL(url);
-      title = `Job from ${u.hostname}`;
-    } catch {
-      // ignore
-    }
-  }
-
-  const description = url || "";
-  const created = await jobService.createJob({ title, description, location: undefined }, userId);
-  return c.json(success(created), 201);
-});
+};
+jobRoutes.post("/Extract", extractHandler);
+jobRoutes.post("/extract", extractHandler);
 
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {
