@@ -503,10 +503,10 @@ export default function AIResumeScorer() {
                               <SelectValue placeholder="Choose a resume to score" />
                             </SelectTrigger>
                             <SelectContent>
-                              {resumes?.map((resume) => (
+                              {resumes?.filter((resume) => resume.id).map((resume) => (
                                 <SelectItem
                                   key={resume.id}
-                                  value={resume.id || ""}
+                                  value={resume.id!}
                                 >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>

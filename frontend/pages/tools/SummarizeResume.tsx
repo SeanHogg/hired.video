@@ -390,10 +390,10 @@ export default function SummarizeResume() {
                               <SelectValue placeholder="Choose a resume to summarize" />
                             </SelectTrigger>
                             <SelectContent>
-                              {resumes?.map((resume) => (
+                              {resumes?.filter((resume) => resume.id).map((resume) => (
                                 <SelectItem
                                   key={resume.id}
-                                  value={resume.id || ""}
+                                  value={resume.id!}
                                 >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>

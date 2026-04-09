@@ -191,8 +191,8 @@ export default function ResumeTailor() {
                             <SelectValue placeholder="Select a resume..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {resumes?.map((resume) => (
-                              <SelectItem key={resume.Id || resume.id || ""} value={resume.Id || resume.id || ""}>
+                            {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
+                              <SelectItem key={(resume.Id || resume.id)!} value={(resume.Id || resume.id)!}>
                                 {resume.Name || resume.name || resume.Slug || resume.slug || "Untitled Resume"}
                               </SelectItem>
                             ))}

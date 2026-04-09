@@ -191,24 +191,38 @@ export default function SalaryCalculator() {
         throw new Error(apiResponse.error.message || "Salary analysis failed");
       }
 
-      // Get the result data
-      const result: SalaryAnalysisResult = 'data' in apiResponse && apiResponse.data
+      // Get the result data — the raw shape varies between API versions so
+      // we treat it as `any` and pull known fields defensively.
+      const raw: any = 'data' in apiResponse && apiResponse.data
         ? apiResponse.data
-        : apiResponse as SalaryAnalysisResult;
+        : apiResponse;
 
-      // Validate the response has required data
-      if (!result.averageSalary && !result.salaryRange) {
+      // The API may return the "legacy" shape (averageSalary, salaryRange.percentile50, …)
+      // or the current shape (medianSalary, estimatedSalary, percentiles.p25, …).
+      // Normalise both into the values we need.
+      const baseSalary: number =
+        raw.estimatedSalary || raw.medianSalary || raw.averageSalary ||
+        raw.percentiles?.p50 || raw.salaryRange?.percentile50 || 0;
+
+      if (!baseSalary && !raw.salaryRange) {
         throw new Error("Invalid salary data received from server.");
       }
 
-      // Map API response to UI display format
-      const baseSalary = result.averageSalary || result.salaryRange?.percentile50 || 0;
-      const locationFactor = result.locationAdjustment?.factor || 1;
+      // Location adjustment can be a plain number (1 = no change) or an object { factor }
+      const locationFactor: number =
+        typeof raw.locationAdjustment === "number"
+          ? raw.locationAdjustment
+          : raw.locationAdjustment?.factor ?? 1;
       const locationAdjustmentPercent = Math.round((locationFactor - 1) * 100);
-      const experienceBoost = result.experienceImpact?.salaryBoost || 0;
+
+      const experienceBoost = raw.experienceImpact?.salaryBoost || 0;
       const experienceAdjustmentPercent = baseSalary > 0
         ? Math.round((experienceBoost / baseSalary) * 100)
         : experience[0] * 5;
+
+      // Percentiles — may live in `percentiles` (p25, p50, …) or in `salaryRange`
+      const p25 = raw.percentiles?.p25 ?? raw.salaryRange?.percentile25 ?? Math.round(baseSalary * 0.85);
+      const p75 = raw.percentiles?.p75 ?? raw.salaryRange?.percentile75 ?? Math.round(baseSalary * 1.2);
 
       // Create industry comparison from API data
       const industryComparison = [
@@ -235,8 +249,8 @@ export default function SalaryCalculator() {
       ];
 
       // If we have industry comparison data from the API, adjust values
-      if (result.industryComparison?.industryAverage) {
-        const industryAvg = result.industryComparison.industryAverage;
+      const industryAvg = raw.industryComparison?.industryAverage;
+      if (industryAvg) {
         industryComparison.forEach((item) => {
           if (item.industry === industry) {
             item.averageSalary = industryAvg;
@@ -248,21 +262,21 @@ export default function SalaryCalculator() {
       }
 
       const salaryDataResult: SalaryData = {
-        baseSalary: baseSalary,
-        lowRange: result.salaryRange?.min || Math.round(baseSalary * 0.8),
-        highRange: result.salaryRange?.max || Math.round(baseSalary * 1.3),
-        marketAverage: result.averageSalary || baseSalary,
-        percentile25: result.salaryRange?.percentile25 || Math.round(baseSalary * 0.85),
-        percentile75: result.salaryRange?.percentile75 || Math.round(baseSalary * 1.2),
-        totalCompensation: Math.round(baseSalary * 1.25), // Estimate total comp with benefits
+        baseSalary,
+        lowRange: raw.salaryRange?.min || Math.round(baseSalary * 0.8),
+        highRange: raw.salaryRange?.max || Math.round(baseSalary * 1.3),
+        marketAverage: baseSalary,
+        percentile25: p25,
+        percentile75: p75,
+        totalCompensation: Math.round(baseSalary * 1.25),
         locationAdjustment: locationAdjustmentPercent,
         experienceAdjustment: experienceAdjustmentPercent,
-        industryComparison: industryComparison,
-        // Extended data
-        careerGrowth: result.careerGrowth,
-        negotiationRange: result.negotiationRange,
-        marketTrends: result.marketTrends,
-        skillsPremium: result.skillsPremium,
+        industryComparison,
+        // Extended data (may not be present in all API versions)
+        careerGrowth: raw.careerGrowth,
+        negotiationRange: raw.negotiationRange,
+        marketTrends: raw.marketTrends,
+        skillsPremium: raw.skillsPremium,
       };
 
       setSalaryData(salaryDataResult);

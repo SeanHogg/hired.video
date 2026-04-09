@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
+import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -9,25 +10,13 @@ import { checkAIUsage, requirePremium } from "../middleware/tierEnforcement.js";
 
 export const matchRoutes = new Hono<{ Variables: Variables }>();
 
-// ---------------------------------------------------------------------------
+// =====================================================================
 // Schemas
-// ---------------------------------------------------------------------------
-// jobHtml is optional when jobId is provided — handlers refuse the
-// request only if BOTH are missing. This is the change that lets the
-// Chrome extension's "Tracker tab" rehydrate a previously-saved job
-// from the DB without re-scraping the source page.
-const AnalyzeSchema = z
-  .object({
-    jobHtml: z.string().optional(),
-    jobId: z.string().uuid().optional(),
-    resumeId: z.string().uuid().optional(),
-    sourceUrl: z.string().optional(),
-  })
-  .refine((v) => !!(v.jobHtml || v.jobId), {
-    message: "Either jobHtml or jobId is required",
-  });
+// =====================================================================
 
-const TailorSchema = z
+/** Shared input shape for analyze + tailor. Accepts EITHER raw HTML
+ *  (from the content-script capture) OR a jobId (DB rehydration). */
+const MatchInputSchema = z
   .object({
     jobHtml: z.string().optional(),
     jobId: z.string().uuid().optional(),
@@ -48,153 +37,7 @@ const MatchByContentSchema = z.object({
   resumeContent: z.string().min(1),
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve a job-text payload from EITHER raw HTML provided by the
- * caller OR a `jobId` pointing at a previously-tracked row. When
- * jobId is supplied, we synthesize an HTML doc from the stored
- * fields so the same `htmlToText` pipeline downstream just works.
- *
- * Returns null when jobId points at a non-existent row.
- */
-async function resolveJobText(input: { jobHtml?: string; jobId?: string }): Promise<string | null> {
-  if (input.jobHtml && input.jobHtml.trim().length > 0) {
-    return htmlToText(input.jobHtml);
-  }
-  if (!input.jobId) return null;
-
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, input.jobId))
-    .limit(1);
-  if (!row) return null;
-
-  // Synthesize a flat text representation. Mirrors the shape that
-  // the existing keyword/LLM analysis already expects.
-  const parts: string[] = [];
-  parts.push(`Title: ${row.title}`);
-  if (row.company) parts.push(`Company: ${row.company}`);
-  if (row.location) parts.push(`Location: ${row.location}`);
-  if (row.jobType) parts.push(`Type: ${row.jobType}`);
-  if (row.experienceLevel) parts.push(`Level: ${row.experienceLevel}`);
-  if (row.salaryMin || row.salaryMax) {
-    parts.push(`Salary: ${row.salaryMin ?? ""}-${row.salaryMax ?? ""} ${row.salaryCurrency ?? "USD"}`);
-  }
-  parts.push("\nDescription:\n" + (row.description ?? ""));
-
-  const details = ((row as any).details ?? {}) as Record<string, unknown>;
-  const stringify = (label: string, value: unknown) => {
-    if (Array.isArray(value) && value.length > 0) {
-      parts.push(`\n${label}:\n- ` + value.map(String).join("\n- "));
-    }
-  };
-  stringify("Responsibilities", details.responsibilities);
-  stringify("Requirements", details.requirements);
-  stringify("Qualifications", details.qualifications);
-  stringify("Benefits", details.benefits);
-  if (Array.isArray(row.skillsRequired) && row.skillsRequired.length > 0) {
-    parts.push(`\nSkills: ${(row.skillsRequired as string[]).join(", ")}`);
-  }
-
-  return parts.join("\n").slice(0, 8000);
-}
-
-/** Strip HTML tags and collapse whitespace to get plain text for LLM. */
-function htmlToText(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 8000); // cap to avoid token overflow
-}
-
-/** Convert a resume JSON content blob to readable plain text for LLM. */
-function resumeContentToText(content: unknown): string {
-  if (!content || typeof content !== "object") return "";
-
-  const parts: string[] = [];
-  const c = content as Record<string, unknown>;
-
-  // Common resume JSON fields (flexible — handles various resume builder formats)
-  if (c.name || c.fullName) parts.push(`Name: ${c.name ?? c.fullName}`);
-  if (c.headline || c.title) parts.push(`Title: ${c.headline ?? c.title}`);
-  if (c.summary || c.objective) parts.push(`Summary: ${c.summary ?? c.objective}`);
-
-  const skills = c.skills ?? c.Skills;
-  if (Array.isArray(skills)) {
-    const skillList = skills.map((s: unknown) => (typeof s === "string" ? s : (s as any)?.name ?? "")).filter(Boolean);
-    if (skillList.length) parts.push(`Skills: ${skillList.join(", ")}`);
-  } else if (typeof skills === "string") {
-    parts.push(`Skills: ${skills}`);
-  }
-
-  const experience = c.experience ?? c.workExperience ?? c.Experience ?? [];
-  if (Array.isArray(experience)) {
-    for (const job of experience) {
-      if (!job || typeof job !== "object") continue;
-      const j = job as Record<string, unknown>;
-      parts.push(`\nJob: ${j.title ?? j.position ?? ""} at ${j.company ?? j.employer ?? ""}`);
-      if (j.description) parts.push(String(j.description).slice(0, 500));
-    }
-  }
-
-  const education = c.education ?? c.Education ?? [];
-  if (Array.isArray(education)) {
-    for (const edu of education) {
-      if (!edu || typeof edu !== "object") continue;
-      const e = edu as Record<string, unknown>;
-      parts.push(`Education: ${e.degree ?? e.program ?? ""} at ${e.institution ?? e.school ?? ""}`);
-    }
-  }
-
-  // If content is stored as serialised JSON string under a known key
-  if (c.resumeSerialized && typeof c.resumeSerialized === "string") {
-    try {
-      return resumeContentToText(JSON.parse(c.resumeSerialized));
-    } catch {
-      parts.push(c.resumeSerialized.slice(0, 4000));
-    }
-  }
-
-  // If content is just a markdown string
-  if (c.markdown && typeof c.markdown === "string") {
-    parts.push(c.markdown.slice(0, 4000));
-  }
-
-  return parts.join("\n") || JSON.stringify(content).slice(0, 4000);
-}
-
-/** Resolve resume for current user — prefers provided ID, falls back to active/master. */
-async function resolveResume(userId: string, resumeId?: string) {
-  const db = getDb();
-  if (resumeId) {
-    const [row] = await db
-      .select()
-      .from(schema.resumeInformation)
-      .where(and(eq(schema.resumeInformation.id, resumeId), eq(schema.resumeInformation.userId, userId)))
-      .limit(1);
-    return row ?? null;
-  }
-  // Try active resume first, then master, then any
-  const all = await db
-    .select()
-    .from(schema.resumeInformation)
-    .where(eq(schema.resumeInformation.userId, userId));
-  return (
-    all.find((r) => r.isActive) ??
-    all.find((r) => r.isMaster) ??
-    all[0] ??
-    null
-  );
-}
-
+// ---- LLM response schemas ---
 const AnalyzeResponseSchema = z.object({
   score: z.number().min(0).max(100),
   summaryRecommendations: z.string(),
@@ -207,11 +50,182 @@ const TailorResponseSchema = z.object({
   summaryRecommendations: z.string(),
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/match/analyze
-// Scores how well the user's resume matches a job posting.
-// ---------------------------------------------------------------------------
-matchRoutes.post("/analyze", async (c) => {
+const InsightsResponseSchema = z.object({
+  overallFit: z.enum(["strong", "good", "fair", "weak"]),
+  seniorityFit: z.string(),
+  missingSkills: z.array(z.object({ skill: z.string(), category: z.string(), importance: z.enum(["critical", "important", "nice-to-have"]) })),
+  careerTrajectory: z.string(),
+  interviewTips: z.array(z.string()),
+  suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
+  estimatedRampTime: z.string(),
+});
+
+// =====================================================================
+// Shared helpers — Single Responsibility
+// =====================================================================
+
+/** Max chars of job/resume text sent to the LLM. 6000 chars ≈ 1500
+ *  tokens — stays under even the smallest free model context window. */
+const TEXT_CAP = 6000;
+
+/** Strip HTML tags and collapse whitespace to plain text for LLM. */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Resolve job text from raw HTML or a DB row by ID. Returns capped text. */
+async function resolveJobText(input: { jobHtml?: string; jobId?: string }): Promise<string | null> {
+  if (input.jobHtml && input.jobHtml.trim().length > 0) {
+    return htmlToText(input.jobHtml).slice(0, TEXT_CAP);
+  }
+  if (!input.jobId) return null;
+
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, input.jobId))
+    .limit(1);
+  if (!row) return null;
+
+  const parts: string[] = [];
+  parts.push(`Title: ${row.title}`);
+  if (row.company) parts.push(`Company: ${row.company}`);
+  if (row.location) parts.push(`Location: ${row.location}`);
+  if (row.jobType) parts.push(`Type: ${row.jobType}`);
+  if (row.experienceLevel) parts.push(`Level: ${row.experienceLevel}`);
+  if (row.salaryMin || row.salaryMax) {
+    parts.push(`Salary: ${row.salaryMin ?? ""}-${row.salaryMax ?? ""} ${row.salaryCurrency ?? "USD"}`);
+  }
+  parts.push("\nDescription:\n" + (row.description ?? ""));
+
+  const details = ((row as any).details ?? {}) as Record<string, unknown>;
+  for (const [label, key] of [["Responsibilities", "responsibilities"], ["Requirements", "requirements"], ["Qualifications", "qualifications"], ["Benefits", "benefits"]]) {
+    const val = details[key];
+    if (Array.isArray(val) && val.length > 0) {
+      parts.push(`\n${label}:\n- ` + val.map(String).join("\n- "));
+    }
+  }
+  if (Array.isArray(row.skillsRequired) && row.skillsRequired.length > 0) {
+    parts.push(`\nSkills: ${(row.skillsRequired as string[]).join(", ")}`);
+  }
+
+  return parts.join("\n").slice(0, TEXT_CAP);
+}
+
+/** Convert a resume JSON content blob to readable plain text for LLM. Returns capped text. */
+function resumeContentToText(content: unknown): string {
+  if (!content || typeof content !== "object") return "";
+  const parts: string[] = [];
+  const c = content as Record<string, unknown>;
+
+  if (c.name || c.fullName) parts.push(`Name: ${c.name ?? c.fullName}`);
+  if (c.headline || c.title) parts.push(`Title: ${c.headline ?? c.title}`);
+  if (c.summary || c.objective) parts.push(`Summary: ${c.summary ?? c.objective}`);
+
+  const skills = c.skills ?? c.Skills;
+  if (Array.isArray(skills)) {
+    const list = skills.map((s: unknown) => (typeof s === "string" ? s : (s as any)?.name ?? "")).filter(Boolean);
+    if (list.length) parts.push(`Skills: ${list.join(", ")}`);
+  } else if (typeof skills === "string") {
+    parts.push(`Skills: ${skills}`);
+  }
+
+  for (const job of asArray(c.experience ?? c.workExperience ?? c.Experience)) {
+    if (!job || typeof job !== "object") continue;
+    const j = job as Record<string, unknown>;
+    parts.push(`\nJob: ${j.title ?? j.position ?? ""} at ${j.company ?? j.employer ?? ""}`);
+    if (j.description) parts.push(String(j.description).slice(0, 500));
+  }
+
+  for (const edu of asArray(c.education ?? c.Education)) {
+    if (!edu || typeof edu !== "object") continue;
+    const e = edu as Record<string, unknown>;
+    parts.push(`Education: ${e.degree ?? e.program ?? ""} at ${e.institution ?? e.school ?? ""}`);
+  }
+
+  if (c.resumeSerialized && typeof c.resumeSerialized === "string") {
+    try { return resumeContentToText(JSON.parse(c.resumeSerialized)); } catch { parts.push(c.resumeSerialized.slice(0, 4000)); }
+  }
+  if (c.markdown && typeof c.markdown === "string") {
+    parts.push(c.markdown.slice(0, 4000));
+  }
+
+  return (parts.join("\n") || JSON.stringify(content).slice(0, 4000)).slice(0, TEXT_CAP);
+}
+
+function asArray(val: unknown): unknown[] {
+  return Array.isArray(val) ? val : [];
+}
+
+/** Resolve resume for current user — prefers provided ID, falls back to active/master. */
+async function resolveResume(userId: string, resumeId?: string) {
+  const db = getDb();
+  if (resumeId) {
+    const [row] = await db
+      .select()
+      .from(schema.resumeInformation)
+      .where(eq(schema.resumeInformation.id, resumeId))
+      .limit(1);
+    return row ?? null;
+  }
+  const all = await db
+    .select()
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.userId, userId));
+  return all.find((r) => r.isActive) ?? all.find((r) => r.isMaster) ?? all[0] ?? null;
+}
+
+/** Heuristic keyword-overlap scorer — used when API key is missing or all LLM models fail. */
+function keywordScore(jobText: string, resumeText: string): { score: number; message: string } {
+  const jobWords = new Set(jobText.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
+  const resumeWords = resumeText.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
+  const matches = resumeWords.filter((w) => jobWords.has(w)).length;
+  const score = Math.min(100, Math.round((matches / Math.max(jobWords.size, 1)) * 150));
+  return {
+    score,
+    message:
+      "AI analysis unavailable — using keyword overlap as a rough estimate.\n\n" +
+      `Keyword overlap score: ${score}/100. Review the job description and ensure your resume highlights relevant skills and experience.`,
+  };
+}
+
+/** Record AI usage for billing/audit. Fire-and-forget. */
+function recordAIUsage(userId: string, featureKey: string, promptLen: number, completionLen: number) {
+  const db = getDb();
+  db.insert(schema.aiUsageRecords)
+    .values({
+      userId,
+      model: "openrouter/free",
+      featureKey,
+      promptTokens: Math.round(promptLen / 4),
+      completionTokens: Math.round(completionLen / 4),
+      totalTokens: Math.round((promptLen + completionLen) / 4),
+    } as any)
+    .catch((err) => console.warn(`[match] Failed to record AI usage for ${featureKey}:`, err));
+}
+
+// =====================================================================
+// Shared pipeline: auth → usage-check → parse → resolve → call LLM
+// =====================================================================
+
+interface PipelineContext {
+  userId: string;
+  jobText: string;
+  resumeText: string;
+  resumeId: string;
+  sourceUrl?: string;
+  apiKey?: string;
+}
+
+/** Common auth + resolve logic for analyze/tailor/byid. Returns either
+ *  a ready-to-use PipelineContext or an error Response. */
+async function resolveMatchContext(c: Context<{ Variables: Variables }>): Promise<PipelineContext | Response> {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -219,28 +233,39 @@ matchRoutes.post("/analyze", async (c) => {
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
-  const parsed = AnalyzeSchema.safeParse(body);
+  const parsed = MatchInputSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
   const { jobHtml, jobId, resumeId, sourceUrl } = parsed.data;
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const rawJobText = await resolveJobText({ jobHtml, jobId });
-  if (!rawJobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
+  const jobText = await resolveJobText({ jobHtml, jobId });
+  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
 
-  // Cap inputs to stay well within free-tier context limits (~8k tokens).
-  // Most free models handle 65K+ context but some (Nemotron Nano) have ~9K.
-  // 6000 chars ≈ 1500 tokens. Total prompt ≈ 3500 tokens, well under any limit.
-  const jobText = rawJobText.slice(0, 6000);
-  const resumeText = resumeContentToText(resume.content).slice(0, 6000);
-
+  const resumeText = resumeContentToText(resume.content);
   const apiKey = getApiKey((c.env as any) ?? {});
 
-  if (apiKey) {
+  return { userId, jobText, resumeText, resumeId: resume.id, sourceUrl, apiKey };
+}
+
+function isResponse(val: PipelineContext | Response): val is Response {
+  return val instanceof Response || (typeof val === "object" && "status" in val && typeof (val as any).json === "function");
+}
+
+// =====================================================================
+// Routes
+// =====================================================================
+
+/** POST /api/match/analyze — score resume vs job */
+matchRoutes.post("/analyze", async (c) => {
+  const ctx = await resolveMatchContext(c);
+  if (isResponse(ctx)) return ctx;
+
+  if (ctx.apiKey) {
     try {
       const result = await callLLMJson(
-        apiKey,
+        ctx.apiKey,
         {
           systemPrompt: `You are a professional resume analyst. Evaluate how well a resume matches a job description and return a JSON response.
 Scoring criteria:
@@ -249,82 +274,34 @@ Scoring criteria:
 - Education and certifications: 15%
 - Language and keywords match: 15%
 Always return valid JSON with integer score 0-100 and actionable recommendations.`,
-          userMessage: `Job Description:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-4 bullet points of key gaps and suggestions>" }`,
+          userMessage: `Job Description:\n${ctx.jobText}\n\n---\n\nResume:\n${ctx.resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-4 bullet points of key gaps and suggestions>" }`,
           responseFormat: "json_object",
           temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
 
-      // Record AI usage
-      const db = getDb();
-      await db.insert(schema.aiUsageRecords).values({
-        userId,
-        model: "google/gemini-flash-1.5",
-        featureKey: "match_analyze",
-        promptTokens: Math.round((jobText.length + resumeText.length) / 4),
-        completionTokens: Math.round(JSON.stringify(result).length / 4),
-        totalTokens: Math.round((jobText.length + resumeText.length + JSON.stringify(result).length) / 4),
-      } as any);
-
-      return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: resume.id, sourceUrl }), 200);
-    } catch (llmError) {
-      console.error("[match/analyze] All LLM models failed:", llmError instanceof Error ? llmError.message : llmError);
-      // Fall through to heuristic fallback
+      recordAIUsage(ctx.userId, "match_analyze", ctx.jobText.length + ctx.resumeText.length, JSON.stringify(result).length);
+      return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
+    } catch (err) {
+      console.error("[match/analyze] LLM failed:", err instanceof Error ? err.message : err);
     }
   }
 
-  // Heuristic fallback (no API key or LLM error)
-  console.warn("[match/analyze] Using heuristic keyword fallback. apiKey present:", !!apiKey, "jobText length:", jobText.length, "resumeText length:", resumeText.length);
-  const jobWords = new Set(jobText.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
-  const resumeWords = resumeText.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-  const matches = resumeWords.filter((w) => jobWords.has(w)).length;
-  const score = Math.min(100, Math.round((matches / Math.max(jobWords.size, 1)) * 150));
-
-  return c.json(
-    success({
-      score,
-      summaryRecommendations:
-        "AI analysis unavailable. Configure OPENROUTER_API_KEY for detailed recommendations.\n\n" +
-        `Keyword overlap score: ${score}/100. Review the job description and ensure your resume highlights relevant skills and experience.`,
-      resumeId: resume.id,
-      sourceUrl,
-    }),
-    200,
-  );
+  console.warn("[match/analyze] Heuristic fallback. apiKey:", !!ctx.apiKey, "jobLen:", ctx.jobText.length, "resumeLen:", ctx.resumeText.length);
+  const { score, message } = keywordScore(ctx.jobText, ctx.resumeText);
+  return c.json(success({ score, summaryRecommendations: message, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/match/tailor
-// Rewrites the resume to better match a job posting.
-// ---------------------------------------------------------------------------
+/** POST /api/match/tailor — rewrite resume to better match a job */
 matchRoutes.post("/tailor", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const ctx = await resolveMatchContext(c);
+  if (isResponse(ctx)) return ctx;
 
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = TailorSchema.safeParse(body);
-  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
-
-  const { jobHtml, jobId, resumeId, sourceUrl } = parsed.data;
-  const resume = await resolveResume(userId, resumeId);
-  if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
-
-  const rawJobText = await resolveJobText({ jobHtml, jobId });
-  if (!rawJobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before tailoring."), 404);
-
-  const jobText = rawJobText.slice(0, 6000);
-  const resumeText = resumeContentToText(resume.content).slice(0, 6000);
-
-  const apiKey = getApiKey((c.env as any) ?? {});
-
-  if (apiKey) {
+  if (ctx.apiKey) {
     try {
       const result = await callLLMJson(
-        apiKey,
+        ctx.apiKey,
         {
           systemPrompt: `You are an expert resume writer. Your job is to:
 1. Score the original resume against the job (0-100)
@@ -338,31 +315,17 @@ Rules:
 - Add missing keywords naturally where experience supports it
 - Use a professional Markdown resume format with sections: Summary, Experience, Skills, Education
 - Return valid JSON only`,
-          userMessage: `Job Description:\n${jobText}\n\n---\n\nOriginal Resume:\n${resumeText}\n\n---\n\nReturn JSON: { "oldScore": <0-100>, "newScore": <0-100>, "markdownResume": "<full tailored resume in Markdown>", "summaryRecommendations": "<3-5 bullet points summarising changes>" }`,
+          userMessage: `Job Description:\n${ctx.jobText}\n\n---\n\nOriginal Resume:\n${ctx.resumeText}\n\n---\n\nReturn JSON: { "oldScore": <0-100>, "newScore": <0-100>, "markdownResume": "<full tailored resume in Markdown>", "summaryRecommendations": "<3-5 bullet points summarising changes>" }`,
           responseFormat: "json_object",
           temperature: 0.5,
         },
         TailorResponseSchema,
       );
 
-      const totalTokens = Math.round((jobText.length + resumeText.length + result.markdownResume.length) / 4);
-      const db = getDb();
-      await db.insert(schema.aiUsageRecords).values({
-        userId,
-        model: "google/gemini-flash-1.5",
-        featureKey: "match_tailor",
-        promptTokens: Math.round((jobText.length + resumeText.length) / 4),
-        completionTokens: Math.round(result.markdownResume.length / 4),
-        totalTokens,
-      } as any);
-
-      return c.json(
-        success({ ...result, resumeId: resume.id, sourceUrl }),
-        200,
-      );
-    } catch (llmError) {
-      console.error("[match/tailor] All LLM models failed:", llmError instanceof Error ? llmError.message : llmError);
-      // Fall through to stub
+      recordAIUsage(ctx.userId, "match_tailor", ctx.jobText.length + ctx.resumeText.length, result.markdownResume.length);
+      return c.json(success({ ...result, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
+    } catch (err) {
+      console.error("[match/tailor] LLM failed:", err instanceof Error ? err.message : err);
     }
   }
 
@@ -370,30 +333,19 @@ Rules:
     success({
       oldScore: 0,
       newScore: 0,
-      markdownResume: `# ${resume.title}\n\n${resumeText}`,
-      summaryRecommendations: "AI tailoring unavailable. Configure OPENROUTER_API_KEY for AI-powered resume tailoring.",
-      resumeId: resume.id,
-      sourceUrl,
+      markdownResume: `# Resume\n\n${ctx.resumeText}`,
+      summaryRecommendations: "AI tailoring unavailable — using keyword overlap as a rough estimate.",
+      resumeId: ctx.resumeId,
+      sourceUrl: ctx.sourceUrl,
     }),
     200,
   );
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/match — simple match by job HTML + auto-resolved resume
-// ---------------------------------------------------------------------------
-matchRoutes.post("/", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const body = await c.req.json().catch(() => ({}));
-  // Forward to analyze logic
-  const fakeReq = new Request(c.req.url, { method: "POST", body: JSON.stringify({ jobHtml: body.jobHtml ?? body.html ?? "", resumeId: body.resumeId }) });
-  return c.redirect("/api/match/analyze", 307);
-});
+/** POST /api/match — redirect to analyze */
+matchRoutes.post("/", (_c) => _c.redirect("/api/match/analyze", 307));
 
-// ---------------------------------------------------------------------------
-// POST /api/match/byid
-// ---------------------------------------------------------------------------
+/** POST /api/match/byid — analyze by job ID + resume ID */
 matchRoutes.post("/byid", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -406,24 +358,12 @@ matchRoutes.post("/byid", async (c) => {
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "jobId and resumeId are required"), 400);
 
   const { jobId, resumeId } = parsed.data;
-  const db = getDb();
+  const jobText = await resolveJobText({ jobId });
+  if (!jobText) return c.json(error("NOT_FOUND", "Job not found"), 404);
 
-  const [job] = await db
-    .select({ title: schema.jobItems.title, description: schema.jobItems.description, company: schema.jobItems.company })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
-
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-
-  const jobHtml = `<h1>${job.title}</h1><p>${job.company ?? ""}</p><div>${job.description}</div>`;
-  const fakeBody = { jobHtml, resumeId };
-
-  // Reuse analyze logic inline
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "Resume not found"), 404);
 
-  const jobText = htmlToText(jobHtml);
   const resumeText = resumeContentToText(resume.content);
   const apiKey = getApiKey((c.env as any) ?? {});
 
@@ -433,27 +373,23 @@ matchRoutes.post("/byid", async (c) => {
         apiKey,
         {
           systemPrompt: "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
-          userMessage: `Job Description:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
+          userMessage: `Job:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
           responseFormat: "json_object",
           temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
       return c.json(success({ ...result, jobId, resumeId }), 200);
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error("[match/byid] LLM failed:", err instanceof Error ? err.message : err);
     }
   }
 
-  const jobWords = new Set(jobText.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
-  const resumeWords = resumeText.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-  const score = Math.min(100, Math.round((resumeWords.filter((w) => jobWords.has(w)).length / Math.max(jobWords.size, 1)) * 150));
-  return c.json(success({ score, summaryRecommendations: `Keyword match score: ${score}/100`, jobId, resumeId }), 200);
+  const { score, message } = keywordScore(jobText, resumeText);
+  return c.json(success({ score, summaryRecommendations: message, jobId, resumeId }), 200);
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/match/bycontent
-// ---------------------------------------------------------------------------
+/** POST /api/match/bycontent — analyze by raw text */
 matchRoutes.post("/bycontent", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -465,7 +401,8 @@ matchRoutes.post("/bycontent", async (c) => {
   const parsed = MatchByContentSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "jobContent and resumeContent are required"), 400);
 
-  const { jobContent, resumeContent } = parsed.data;
+  const jobText = parsed.data.jobContent.slice(0, TEXT_CAP);
+  const resumeText = parsed.data.resumeContent.slice(0, TEXT_CAP);
   const apiKey = getApiKey((c.env as any) ?? {});
 
   if (apiKey) {
@@ -474,72 +411,47 @@ matchRoutes.post("/bycontent", async (c) => {
         apiKey,
         {
           systemPrompt: "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
-          userMessage: `Job:\n${jobContent.slice(0, 4000)}\n\n---\n\nResume:\n${resumeContent.slice(0, 4000)}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
+          userMessage: `Job:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
           responseFormat: "json_object",
           temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
       return c.json(success(result), 200);
-    } catch {
-      // fall through
+    } catch (err) {
+      console.error("[match/bycontent] LLM failed:", err instanceof Error ? err.message : err);
     }
   }
 
-  const jobWords = new Set(jobContent.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
-  const resumeWords = resumeContent.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-  const score = Math.min(100, Math.round((resumeWords.filter((w) => jobWords.has(w)).length / Math.max(jobWords.size, 1)) * 150));
-  return c.json(success({ score, summaryRecommendations: `Keyword match score: ${score}/100` }), 200);
+  const { score, message } = keywordScore(jobText, resumeText);
+  return c.json(success({ score, summaryRecommendations: message }), 200);
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/match/insights — deep career insights (Premium only)
-//
-// Goes beyond a pass/fail score to provide:
-//  - Skill gap breakdown (missing skills by category)
-//  - Career trajectory analysis (seniority fit, growth path)
-//  - Interview preparation tips specific to the role
-//  - Suggested learning resources / certifications
-// Free users get a 402 upgrade prompt; Premium users get full analysis.
-// ---------------------------------------------------------------------------
-
-const InsightsSchema = z.object({
-  jobHtml: z.string().min(1),
-  resumeId: z.string().uuid().optional(),
-});
-
-const InsightsResponseSchema = z.object({
-  overallFit: z.enum(["strong", "good", "fair", "weak"]),
-  seniorityFit: z.string(),
-  missingSkills: z.array(z.object({ skill: z.string(), category: z.string(), importance: z.enum(["critical", "important", "nice-to-have"]) })),
-  careerTrajectory: z.string(),
-  interviewTips: z.array(z.string()),
-  suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
-  estimatedRampTime: z.string(),
-});
-
+/** POST /api/match/insights — deep career analysis (Premium only) */
 matchRoutes.post("/insights", requirePremium("Career Insights"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const body = await c.req.json().catch(() => null);
-  const parsed = InsightsSchema.safeParse(body);
+  const insightsSchema = z.object({ jobHtml: z.string().min(1), resumeId: z.string().uuid().optional() });
+  const parsed = insightsSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
   const resume = await resolveResume(userId, parsed.data.resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = htmlToText(parsed.data.jobHtml);
+  const jobText = htmlToText(parsed.data.jobHtml).slice(0, TEXT_CAP);
   const resumeText = resumeContentToText(resume.content);
   const apiKey = getApiKey((c.env as any) ?? {});
 
-  if (apiKey) {
-    try {
-      const result = await callLLMJson(
-        apiKey,
-        {
-          systemPrompt: `You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.`,
-          userMessage: `Analyse this candidate's fit for the role and return a comprehensive JSON insights report.
+  if (!apiKey) return c.json(error("AI_ERROR", "AI service not configured. Please contact support."), 503);
+
+  try {
+    const result = await callLLMJson(
+      apiKey,
+      {
+        systemPrompt: `You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.`,
+        userMessage: `Analyse this candidate's fit for the role and return a comprehensive JSON insights report.
 
 Job Description:
 ${jobText}
@@ -554,36 +466,25 @@ ${resumeText}
 Return JSON matching this structure exactly:
 {
   "overallFit": "strong|good|fair|weak",
-  "seniorityFit": "<1-2 sentences on whether the candidate is under/over/well-qualified>",
-  "missingSkills": [{"skill": "<skill name>", "category": "<technical|soft|domain|tool>", "importance": "critical|important|nice-to-have"}],
-  "careerTrajectory": "<2-3 sentences on how this role fits the candidate's career arc>",
-  "interviewTips": ["<specific tip 1>", "<specific tip 2>", "<specific tip 3>"],
-  "suggestedCertifications": [{"name": "<cert/course name>", "reason": "<why it would help>"}],
-  "estimatedRampTime": "<e.g. '2-4 weeks' to be fully productive in this role>"
+  "seniorityFit": "<1-2 sentences>",
+  "missingSkills": [{"skill": "<name>", "category": "<technical|soft|domain|tool>", "importance": "critical|important|nice-to-have"}],
+  "careerTrajectory": "<2-3 sentences>",
+  "interviewTips": ["<tip 1>", "<tip 2>", "<tip 3>"],
+  "suggestedCertifications": [{"name": "<cert>", "reason": "<why>"}],
+  "estimatedRampTime": "<e.g. '2-4 weeks'>"
 }`,
-          responseFormat: "json_object",
-          temperature: 0.4,
-        },
-        InsightsResponseSchema,
-      );
+        responseFormat: "json_object",
+        temperature: 0.4,
+      },
+      InsightsResponseSchema,
+    );
 
-      const db = getDb();
-      await db.insert(schema.aiUsageRecords).values({
-        userId,
-        model: "google/gemini-flash-1.5",
-        featureKey: "match_insights",
-        promptTokens: Math.round((jobText.length + resumeText.length) / 4),
-        completionTokens: Math.round(JSON.stringify(result).length / 4),
-        totalTokens: Math.round((jobText.length + resumeText.length + JSON.stringify(result).length) / 4),
-      } as any);
-
-      return c.json(success({ ...result, resumeId: resume.id }), 200);
-    } catch {
-      return c.json(error("AI_ERROR", "Failed to generate insights. Please try again."), 500);
-    }
+    recordAIUsage(userId, "match_insights", jobText.length + resumeText.length, JSON.stringify(result).length);
+    return c.json(success({ ...result, resumeId: resume.id }), 200);
+  } catch (err) {
+    console.error("[match/insights] LLM failed:", err instanceof Error ? err.message : err);
+    return c.json(error("AI_ERROR", "Failed to generate insights. Please try again."), 500);
   }
-
-  return c.json(error("AI_ERROR", "AI service not configured. Please contact support."), 503);
 });
 
 matchRoutes.all("*", (c) =>

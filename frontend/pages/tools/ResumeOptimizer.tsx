@@ -499,10 +499,10 @@ export default function ResumeOptimizer() {
                               <SelectValue placeholder="Choose a resume to optimize" />
                             </SelectTrigger>
                             <SelectContent>
-                              {resumes?.map((resume) => (
+                              {resumes?.filter((resume) => resume.id).map((resume) => (
                                 <SelectItem
                                   key={resume.id}
-                                  value={resume.id || ""}
+                                  value={resume.id!}
                                 >
                                   {resume.name || "Untitled Resume"}
                                 </SelectItem>

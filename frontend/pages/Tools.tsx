@@ -23,6 +23,7 @@ import {
   Chrome,
   PenTool,
   Flame,
+  GitMerge,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -115,7 +116,7 @@ export default function Tools() {
               {/* Stats Section */}
               <div className="grid md:grid-cols-4 gap-6 mb-16">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">9+</div>
+                  <div className="text-3xl font-bold text-primary mb-2">10+</div>
                   <p className="text-sm text-muted-foreground">
                     AI-powered tools
                   </p>
@@ -886,6 +887,74 @@ export default function Tools() {
                           </div>
                           <Button className="w-full mt-4" variant="outline">
                             Roast My Resume
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  {/* Resume Consolidator */}
+                  <Link to="/resumes">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                              <GitMerge className="h-6 w-6 text-teal-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Resume Consolidator
+                              </CardTitle>
+                              <CardDescription>
+                                Merge multiple resumes into one master
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-teal-100 text-teal-800"
+                          >
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-teal-600">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Matching
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-teal-600">
+                                Dedup
+                              </div>
+                              <div className="text-muted-foreground">
+                                Highlights
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Merge variants into master
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Import &amp; merge from PDF/Word
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Smart section matching
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Consolidate Resumes
                           </Button>
                         </div>
                       </CardContent>
@@ -1940,6 +2009,70 @@ export default function Tools() {
                         </div>
                         <Button className="w-full mt-4" variant="outline">
                           Roast My Resume
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Resume Consolidator */}
+                <Link to="/resumes">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                            <GitMerge className="h-6 w-6 text-teal-600 group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl">
+                              Resume Consolidator
+                            </CardTitle>
+                            <CardDescription>
+                              Merge multiple resumes into one master
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-teal-100 text-teal-800"
+                        >
+                          New
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-teal-600">
+                              AI
+                            </div>
+                            <div className="text-muted-foreground">Matching</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-teal-600">
+                              Dedup
+                            </div>
+                            <div className="text-muted-foreground">Highlights</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Merge variants into master
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Import &amp; merge from PDF/Word
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Smart section matching
+                          </div>
+                        </div>
+                        <Button className="w-full mt-4" variant="outline">
+                          Consolidate Resumes
                         </Button>
                       </div>
                     </CardContent>

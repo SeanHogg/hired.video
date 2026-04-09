@@ -354,10 +354,10 @@ export default function SentimentAnalysis() {
                                   <SelectValue placeholder="Choose a resume to analyze" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {resumes.map((resume) => (
+                                  {resumes.filter((resume) => resume.id).map((resume) => (
                                     <SelectItem
                                       key={resume.id}
-                                      value={resume.id || ""}
+                                      value={resume.id!}
                                     >
                                       <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4" />
