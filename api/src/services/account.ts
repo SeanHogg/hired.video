@@ -12,7 +12,7 @@ import {
   InviteUserResponse,
 } from "../../../shared/account.js";
 
-const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes } = schema;
+const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation } = schema;
 
 function normalizeUser(row: typeof users.$inferSelect): AccountUser {
   return {
@@ -205,17 +205,78 @@ export async function updateAccountSettings(userId: string, settings: AccountSet
 
 export async function getAccountAnalytics(userId: string, userRole: string): Promise<AccountAnalytics> {
   const db = getDb();
-  const [activeUsersRow] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.isActive, true));
-  const [invitesSentRow] = await db.select({ count: sql<number>`count(*)::int` }).from(accountInvitations);
-  const [invitesAcceptedRow] = await db.select({ count: sql<number>`count(*)::int` }).from(accountInvitations).where(eq(accountInvitations.status, "accepted"));
-  const [lastActiveRow] = await db
-    .select({ lastActiveAt: sql<string>`max(${users.lastLoginAt})` })
-    .from(users);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [
+    [totalUsersRow],
+    [activeUsersRow],
+    [newUsers30Row],
+    [totalJobsRow],
+    [newJobs30Row],
+    [totalResumesRow],
+    [totalApplicationsRow],
+    [newApplications30Row],
+    [invitesSentRow],
+    [invitesAcceptedRow],
+    [lastActiveRow],
+  ] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(users),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(sql`${users.lastLoginAt} >= ${thirtyDaysAgo}`),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(sql`${users.createdAt} >= ${thirtyDaysAgo}`),
+    db.select({ count: sql<number>`count(*)::int` }).from(jobItems),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(jobItems)
+      .where(sql`${jobItems.createdAt} >= ${thirtyDaysAgo}`),
+    db.select({ count: sql<number>`count(*)::int` }).from(resumeInformation),
+    db.select({ count: sql<number>`count(*)::int` }).from(jobApplications),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(jobApplications)
+      .where(sql`${jobApplications.createdAt} >= ${thirtyDaysAgo}`),
+    db.select({ count: sql<number>`count(*)::int` }).from(accountInvitations),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(accountInvitations)
+      .where(eq(accountInvitations.status, "accepted")),
+    db
+      .select({ lastActiveAt: sql<string>`max(${users.lastLoginAt})` })
+      .from(users),
+  ]);
+
+  const growthRate = (current: number, newInPeriod: number) => {
+    const prior = current - newInPeriod;
+    if (prior <= 0) return newInPeriod > 0 ? 100 : 0;
+    return Math.round((newInPeriod / prior) * 1000) / 10;
+  };
+
+  const totalUsers = Number(totalUsersRow?.count ?? 0);
+  const activeUsers = Number(activeUsersRow?.count ?? 0);
+  const newUsers30 = Number(newUsers30Row?.count ?? 0);
+  const totalJobs = Number(totalJobsRow?.count ?? 0);
+  const newJobs30 = Number(newJobs30Row?.count ?? 0);
+  const totalResumes = Number(totalResumesRow?.count ?? 0);
+  const totalApplications = Number(totalApplicationsRow?.count ?? 0);
+  const newApplications30 = Number(newApplications30Row?.count ?? 0);
+
   return {
-    activeUsers: Number(activeUsersRow?.count ?? 0),
+    totalUsers,
+    activeUsers,
+    totalJobs,
+    totalResumes,
+    totalApplications,
+    userGrowth: growthRate(totalUsers, newUsers30),
+    jobGrowth: growthRate(totalJobs, newJobs30),
+    applicationGrowth: growthRate(totalApplications, newApplications30),
     invitesSent: Number(invitesSentRow?.count ?? 0),
     invitesAccepted: Number(invitesAcceptedRow?.count ?? 0),
-    lastActiveAt: lastActiveRow?.lastActiveAt ?? new Date().toISOString(),
+    lastActiveAt: lastActiveRow?.lastActiveAt ?? null,
   };
 }
 

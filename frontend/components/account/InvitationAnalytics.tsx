@@ -72,7 +72,29 @@ export function InvitationAnalytics({ onExport }: InvitationAnalyticsProps) {
       setLoading(true);
       setError(null);
       const response = await accountService.getInvitationAnalytics();
-      setData(response);
+      const raw = (response ?? {}) as Partial<InvitationAnalyticsData> &
+        Record<string, any>;
+      const total = raw.totalInvitations ?? raw.total ?? 0;
+      const accepted = raw.acceptedInvitations ?? raw.accepted ?? 0;
+      const pending = raw.pendingInvitations ?? raw.pending ?? 0;
+      const expired = raw.expiredInvitations ?? raw.expired ?? 0;
+      const rejected = raw.rejectedInvitations ?? raw.rejected ?? 0;
+      const normalized: InvitationAnalyticsData = {
+        companyName: raw.companyName ?? "",
+        totalInvitations: total,
+        acceptedInvitations: accepted,
+        pendingInvitations: pending,
+        expiredInvitations: expired,
+        rejectedInvitations: rejected,
+        acceptanceRate:
+          raw.acceptanceRate ?? (total > 0 ? Math.round((accepted / total) * 100) : 0),
+        recentInvitations30Days: raw.recentInvitations30Days ?? 0,
+        recentAccepted30Days: raw.recentAccepted30Days ?? 0,
+        weeklyInvitations: raw.weeklyInvitations ?? 0,
+        roleDistribution: raw.roleDistribution ?? {},
+        monthlyTrends: raw.monthlyTrends ?? [],
+      };
+      setData(normalized);
     } catch (err) {
       console.error("Error loading invitation analytics:", err);
       setError("Failed to load invitation analytics");

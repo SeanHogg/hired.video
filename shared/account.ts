@@ -59,10 +59,17 @@ export const AccountSettingsSchema = z.object({
 export type AccountSettings = z.infer<typeof AccountSettingsSchema>;
 
 export const AccountAnalyticsSchema = z.object({
+  totalUsers: z.number().optional(),
   activeUsers: z.number().optional(),
+  totalJobs: z.number().optional(),
+  totalResumes: z.number().optional(),
+  totalApplications: z.number().optional(),
+  userGrowth: z.number().optional(),
+  jobGrowth: z.number().optional(),
+  applicationGrowth: z.number().optional(),
   invitesSent: z.number().optional(),
   invitesAccepted: z.number().optional(),
-  lastActiveAt: z.string().optional(),
+  lastActiveAt: z.string().nullable().optional(),
 });
 export type AccountAnalytics = z.infer<typeof AccountAnalyticsSchema>;
 

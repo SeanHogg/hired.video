@@ -24,8 +24,10 @@ class AccountService {
    */
   async getAccountUsers(): Promise<AccountUser[]> {
     try {
-      const response = await apiClient.get<AccountUser[]>("/api/account/users");
-      return response.data || [];
+      const response = await apiClient.get<AccountUser[] | { result: AccountUser[] }>("/api/account/users");
+      const data = response.data;
+      if (Array.isArray(data)) return data;
+      return data?.result ?? [];
     } catch (error) {
       console.error("Error fetching account users:", error);
       throw error;
@@ -77,8 +79,9 @@ class AccountService {
    */
   async getAvailableAccounts(): Promise<AccountOption[]> {
     try {
-      const response = await apiClient.get<any[]>("/api/account/available");
-      const accounts = response.data || [];
+      const response = await apiClient.get<any[] | { result: any[] }>("/api/account/available");
+      const data = response.data;
+      const accounts: any[] = Array.isArray(data) ? data : (data?.result ?? []);
 
       return accounts.map((account: any) => ({
         id: account.id,

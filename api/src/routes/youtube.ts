@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
 const { youtubeAccounts, videos } = schema;
 
-export const youtubeRoutes = new Hono<{ Variables: Variables }>();
+export const youtubeRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 const YOUTUBE_SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
@@ -48,12 +48,12 @@ youtubeRoutes.get("/account", async (c) => {
 });
 
 youtubeRoutes.get("/auth-url", (c) => {
-  if (!process.env.YOUTUBE_CLIENT_ID) {
+  if (!c.env.YOUTUBE_CLIENT_ID) {
     return c.json(fail("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
   }
 
   const params = new URLSearchParams({
-    client_id: process.env.YOUTUBE_CLIENT_ID,
+    client_id: c.env.YOUTUBE_CLIENT_ID,
     redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
     response_type: "code",
     scope: YOUTUBE_SCOPES,
@@ -157,17 +157,17 @@ youtubeRoutes.post("/publish/:videoId", async (c) => {
 });
 
 youtubeRoutes.get("/company/status", async (c) => {
-  const configured = Boolean(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_REFRESH_TOKEN);
+  const configured = Boolean(c.env.YOUTUBE_CLIENT_ID && c.env.YOUTUBE_REFRESH_TOKEN);
   return c.json(ok(configured));
 });
 
 youtubeRoutes.get("/company/auth-url", (c) => {
-  if (!process.env.YOUTUBE_CLIENT_ID) {
+  if (!c.env.YOUTUBE_CLIENT_ID) {
     return c.json(fail("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
   }
 
   const params = new URLSearchParams({
-    client_id: process.env.YOUTUBE_CLIENT_ID,
+    client_id: c.env.YOUTUBE_CLIENT_ID,
     redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
     response_type: "code",
     scope: YOUTUBE_SCOPES,
