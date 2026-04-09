@@ -674,7 +674,10 @@ resumeRoutes.delete("/:id", async (c) => {
   const db = getDb();
   const [existing] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!existing) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  await db.delete(resumes).where(eq(resumes.id, id));
+  // Defense-in-depth: include userId in the DELETE WHERE clause so that a
+  // future refactor that drops the existence check above can't silently
+  // become an authorization bypass.
+  await db.delete(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
   return c.json(ok(undefined), 200);
 });
 

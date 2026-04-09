@@ -80,6 +80,16 @@ const SceneElementSchema = z.discriminatedUnion("kind", [
     label: z.string().optional(),
     volume: z.number().optional(),
   }),
+  z.object({
+    ...BaseElementFields,
+    kind: z.literal("chips"),
+    chips: z.array(z.string()),
+    fontSize: z.number().optional(),
+    fontFamily: z.string().optional(),
+    chipColor: z.string().optional(),
+    textColor: z.string().optional(),
+    direction: z.enum(["row", "column"]).optional(),
+  }),
 ]);
 
 export const SceneScriptSchema = z.object({

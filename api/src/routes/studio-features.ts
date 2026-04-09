@@ -1322,9 +1322,12 @@ studioFeaturesRoutes.patch("/voice-clones/:id", async (c) => {
     }
   }
 
+  // Defense-in-depth: include userId in the UPDATE WHERE clause so that a
+  // future refactor that drops the existence check above can't silently
+  // become an authorization bypass.
   const [updated] = await db.update(studioVoiceClones)
     .set(patch as any)
-    .where(eq(studioVoiceClones.id, id))
+    .where(and(eq(studioVoiceClones.id, id), eq(studioVoiceClones.userId, user.sub)))
     .returning();
   return c.json(ok(updated));
 });
