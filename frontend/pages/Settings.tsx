@@ -2,6 +2,7 @@ import {
   Settings as SettingsIcon,
   User,
   Bell,
+  BellOff,
   Shield,
   Palette,
   CreditCard,
@@ -19,6 +20,9 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Megaphone,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
@@ -54,7 +58,16 @@ import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
+import { servicesService } from "@/lib/services/services-service";
+import {
+  isPushSupported,
+  requestPushPermission,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getCurrentPushSubscription,
+} from "@/lib/push-notifications";
 import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -108,12 +121,28 @@ function SettingsContent() {
   const [securityLoading, setSecurityLoading] = useState(false);
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
 
+  // Lead Generation state
+  const [providesServices, setProvidesServices] = useState(false);
+  const [providesServicesLoading, setProvidesServicesLoading] = useState(false);
+  const [providesServicesSaving, setProvidesServicesSaving] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
   // YouTube integration state
   const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [youtubeConnecting, setYoutubeConnecting] = useState(false);
   const [companyYoutubeConfigured, setCompanyYoutubeConfigured] = useState(false);
   const [companyYoutubeLoading, setCompanyYoutubeLoading] = useState(false);
+
+  // Sync active tab from ?tab= query param (e.g. /settings?tab=lead-generation)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) setActiveTab(tab);
+    // run once on mount; subsequent tab changes are user-driven
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle YouTube OAuth callback query params (both user and company)
   useEffect(() => {
@@ -253,6 +282,76 @@ function SettingsContent() {
         console.error("Failed to check company YouTube status", err);
       });
   }, [isAuthenticated, activeTab]);
+
+  // Lazy-load Lead Generation status when its tab is active
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== "lead-generation") return;
+
+    setProvidesServicesLoading(true);
+    (async () => {
+      try {
+        const { apiClient } = await import("@/lib/api-client");
+        const res = await apiClient.get<any>("/api/users/me");
+        const profile = (res as any)?.data?.profile ?? (res as any)?.data;
+        setProvidesServices(profile?.providesServices ?? false);
+      } catch {
+        // ignore
+      } finally {
+        setProvidesServicesLoading(false);
+      }
+
+      if (isPushSupported()) {
+        setPushSupported(true);
+        const sub = await getCurrentPushSubscription();
+        setPushSubscribed(!!sub);
+      }
+    })();
+  }, [isAuthenticated, activeTab]);
+
+  async function handleToggleProvider(checked: boolean) {
+    setProvidesServicesSaving(true);
+    try {
+      await servicesService.toggleProvideServices(checked);
+      setProvidesServices(checked);
+      toast({
+        title: checked
+          ? "Lead generation enabled. Your services will appear on your profile."
+          : "Lead generation disabled.",
+      });
+    } catch {
+      toast({ title: "Failed to update setting", variant: "destructive" });
+    } finally {
+      setProvidesServicesSaving(false);
+    }
+  }
+
+  async function handleTogglePush() {
+    setPushLoading(true);
+    try {
+      if (pushSubscribed) {
+        await unsubscribeFromPush();
+        setPushSubscribed(false);
+        toast({ title: "Push notifications disabled" });
+      } else {
+        const granted = await requestPushPermission();
+        if (!granted) {
+          toast({
+            title: "Permission denied",
+            description: "Please allow notifications in your browser settings.",
+            variant: "destructive",
+          });
+          return;
+        }
+        const sub = await subscribeToPush();
+        setPushSubscribed(!!sub);
+        if (sub) toast({ title: "Push notifications enabled" });
+      }
+    } catch {
+      toast({ title: "Failed to update push notifications", variant: "destructive" });
+    } finally {
+      setPushLoading(false);
+    }
+  }
 
   // Lazy-load security settings when security tab is active
   useEffect(() => {
@@ -670,7 +769,7 @@ function SettingsContent() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
               {/* Mobile: Scrollable horizontal tabs, Desktop: Grid layout */}
               <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-7 gap-1 min-w-max sm:min-w-0">
+                <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-9 gap-1 min-w-max sm:min-w-0">
                   <TabsTrigger
                     value="notifications"
                     className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
@@ -714,10 +813,24 @@ function SettingsContent() {
                     <span>Job Preferences</span>
                   </TabsTrigger>
                   <TabsTrigger
-                    value="account"
+                    value="lead-generation"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <Megaphone className="h-4 w-4" />
+                    <span>Lead Generation</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="team-billing"
                     className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
                   >
                     <CreditCard className="h-4 w-4" />
+                    <span>Team & Billing</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="account"
+                    className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
                     <span>Account</span>
                   </TabsTrigger>
                 </TabsList>
@@ -1503,6 +1616,97 @@ function SettingsContent() {
                 </Card>
               </TabsContent>
 
+
+              {/* Lead Generation Tab */}
+              <TabsContent value="lead-generation" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Lead Generation</CardTitle>
+                    <CardDescription>
+                      Enable this to list your services publicly on your profile. Other users
+                      can browse and purchase them directly or submit an inquiry.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {providesServicesLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {providesServices ? (
+                              <ToggleRight className="h-5 w-5 text-violet-600" />
+                            ) : (
+                              <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p className="font-medium">Provide Services</p>
+                              <p className="text-sm text-muted-foreground">
+                                {providesServices
+                                  ? "Your services are publicly visible on your profile"
+                                  : "Your services are hidden from your profile"}
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={providesServices}
+                            onCheckedChange={handleToggleProvider}
+                            disabled={providesServicesSaving}
+                          />
+                        </div>
+
+                        {pushSupported && (
+                          <div className="flex items-center justify-between border-t pt-4">
+                            <div className="flex items-center gap-3">
+                              {pushSubscribed ? (
+                                <Bell className="h-5 w-5 text-violet-600" />
+                              ) : (
+                                <BellOff className="h-5 w-5 text-muted-foreground" />
+                              )}
+                              <div>
+                                <p className="font-medium">Push Notifications</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Get notified on this device when someone messages you or requests a service
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant={pushSubscribed ? "outline" : "default"}
+                              size="sm"
+                              onClick={handleTogglePush}
+                              disabled={pushLoading}
+                            >
+                              {pushLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : pushSubscribed ? (
+                                "Disable"
+                              ) : (
+                                "Enable"
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
+                        <div className="border-t pt-4">
+                          <Link to="/services">
+                            <Button variant="outline" className="gap-2">
+                              <ArrowRight className="h-4 w-4" />
+                              Manage your service offerings
+                            </Button>
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Team & Billing Tab */}
+              <TabsContent value="team-billing" className="space-y-6">
+                <AccountManagementPanel />
+              </TabsContent>
 
               {/* Account Tab */}
               <TabsContent value="account" className="space-y-6">

@@ -293,11 +293,10 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  Team management features have been moved to the dedicated
-                  Account Management page.
+                  Team management features have been moved to Account Settings.
                 </p>
                 <Button asChild>
-                  <a href="/account">Go to Account Management</a>
+                  <a href="/settings">Go to Account Settings</a>
                 </Button>
               </CardContent>
             </Card>

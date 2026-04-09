@@ -12,7 +12,6 @@ import {
   CheckSquare,
   Send,
   LogOut,
-  UserCog,
   X,
   BarChart3,
   MessageSquare,
@@ -75,7 +74,6 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "My Services", href: "/services", icon: ShoppingBag, exactMatch: false },
-    { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
   ];
 
   // Additional navigation for unauthenticated users (mobile)
@@ -301,10 +299,10 @@ export default function Sidebar({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
-                  title={collapsed ? "Settings" : undefined}
+                  title={collapsed ? "Account Settings" : undefined}
                 >
                   <Settings className="h-4 w-4" />
-                  {!collapsed && "Settings"}
+                  {!collapsed && "Account Settings"}
                 </Link>
 
                 {/* Sign Out */}
@@ -355,10 +353,10 @@ export default function Sidebar({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
-                  title={collapsed ? "Settings" : undefined}
+                  title={collapsed ? "Account Settings" : undefined}
                 >
                   <Settings className="h-4 w-4" />
-                  {!collapsed && "Settings"}
+                  {!collapsed && "Account Settings"}
                 </Link>
                 <Link
                   to="/help"

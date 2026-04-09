@@ -2,16 +2,12 @@ import {
   Plus,
   Pencil,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
   DollarSign,
   Eye,
   EyeOff,
   Clock,
   Tag,
   Loader2,
-  Bell,
-  BellOff,
   CheckCircle,
   AlertCircle,
   Inbox,
@@ -26,6 +22,7 @@ import {
   Users,
   Briefcase,
   TrendingUp,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -75,8 +72,6 @@ import {
   isPushSupported,
   requestPushPermission,
   subscribeToPush,
-  unsubscribeFromPush,
-  getCurrentPushSubscription,
 } from "@/lib/push-notifications";
 import { toast } from "sonner";
 
@@ -158,10 +153,6 @@ export default function ServicesManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateServiceInput>(defaultForm);
 
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-
   // ── Inquiries state ─────────────────────────────────────────────────────────
   const [incoming, setIncoming] = useState<InquiryWithDetails[]>([]);
   const [myRequests, setMyRequests] = useState<MyRequestWithDetails[]>([]);
@@ -173,7 +164,6 @@ export default function ServicesManagement() {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     loadServices();
-    checkPushStatus();
   }, [isAuthenticated, user]);
 
   useEffect(() => {
@@ -218,57 +208,40 @@ export default function ServicesManagement() {
     }
   }
 
-  async function checkPushStatus() {
-    if (!isPushSupported()) return;
-    setPushSupported(true);
-    const sub = await getCurrentPushSubscription();
-    setPushSubscribed(!!sub);
-  }
-
   // ── Service handlers ────────────────────────────────────────────────────────
 
-  async function handleToggleProvider(checked: boolean) {
-    setSaving(true);
-    try {
-      await servicesService.toggleProvideServices(checked);
-      setProviderServices(checked);
-      toast.success(
-        checked
-          ? "Lead generation enabled. Your services will appear on your profile."
-          : "Lead generation disabled.",
-      );
-    } catch {
-      toast.error("Failed to update setting");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleTogglePush() {
-    setPushLoading(true);
-    try {
-      if (pushSubscribed) {
-        await unsubscribeFromPush();
-        setPushSubscribed(false);
-        toast.success("Push notifications disabled");
-      } else {
-        const granted = await requestPushPermission();
-        if (!granted) {
-          toast.error("Permission denied. Please allow notifications in your browser settings.");
-          return;
-        }
-        const sub = await subscribeToPush();
-        setPushSubscribed(!!sub);
-        if (sub) toast.success("Push notifications enabled");
+  async function openCreate() {
+    // First-time opt-in: clicking "Add Service" opts the user into providing
+    // services and (best-effort) push notifications. After they've created
+    // their first service, both can be managed in /settings → Lead Generation.
+    if (!providesServices) {
+      setSaving(true);
+      try {
+        await servicesService.toggleProvideServices(true);
+        setProviderServices(true);
+        toast.success("Lead generation enabled — your services will appear on your profile.");
+      } catch {
+        toast.error("Failed to enable lead generation");
+        setSaving(false);
+        return;
+      } finally {
+        setSaving(false);
       }
-    } catch {
-      toast.error("Failed to update push notifications");
-    } finally {
-      setPushLoading(false);
-    }
-  }
 
-  function openCreate() {
+      // Best-effort push subscribe so they get notified about new inquiries
+      if (isPushSupported()) {
+        try {
+          const granted = await requestPushPermission();
+          if (granted) {
+            const sub = await subscribeToPush();
+            if (sub) toast.success("Push notifications enabled");
+          }
+        } catch {
+          // ignore — opting in is best-effort
+        }
+      }
+    }
+
     setEditingId(null);
     setForm(defaultForm);
     setDialogOpen(true);
@@ -526,10 +499,22 @@ export default function ServicesManagement() {
               </p>
             </div>
             {activeTab === "offerings" && (
-              <Button onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Service
-              </Button>
+              <div className="flex items-center gap-2">
+                <Link to="/settings?tab=lead-generation">
+                  <Button variant="outline">
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    Lead Gen Settings
+                  </Button>
+                </Link>
+                <Button onClick={openCreate} disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Add Service
+                </Button>
+              </div>
             )}
           </div>
 
@@ -548,73 +533,6 @@ export default function ServicesManagement() {
 
             {/* ── My Offerings ─────────────────────────────────────────────── */}
             <TabsContent value="offerings" className="space-y-6">
-
-              {/* Lead generation toggle */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Lead Generation</CardTitle>
-                  <CardDescription>
-                    Enable this to list your services publicly on your profile. Other users can
-                    browse and purchase them directly or submit an inquiry.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {providesServices ? (
-                        <ToggleRight className="h-5 w-5 text-violet-600" />
-                      ) : (
-                        <ToggleLeft className="h-5 w-5 text-muted-foreground" />
-                      )}
-                      <div>
-                        <p className="font-medium">Provide Services</p>
-                        <p className="text-sm text-muted-foreground">
-                          {providesServices
-                            ? "Your services are publicly visible on your profile"
-                            : "Your services are hidden from your profile"}
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={providesServices}
-                      onCheckedChange={handleToggleProvider}
-                      disabled={saving}
-                    />
-                  </div>
-
-                  {pushSupported && (
-                    <div className="flex items-center justify-between border-t pt-4">
-                      <div className="flex items-center gap-3">
-                        {pushSubscribed ? (
-                          <Bell className="h-5 w-5 text-violet-600" />
-                        ) : (
-                          <BellOff className="h-5 w-5 text-muted-foreground" />
-                        )}
-                        <div>
-                          <p className="font-medium">Push Notifications</p>
-                          <p className="text-sm text-muted-foreground">
-                            Get notified on this device when someone messages you or requests a service
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant={pushSubscribed ? "outline" : "default"}
-                        size="sm"
-                        onClick={handleTogglePush}
-                        disabled={pushLoading}
-                      >
-                        {pushLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : pushSubscribed ? (
-                          "Disable"
-                        ) : (
-                          "Enable"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Service list */}
               {loading ? (

@@ -42,6 +42,16 @@ export interface JobEntity extends JobSummaryDTO {
 }
 
 function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
+  // The frontend (JobDetail.tsx) expects responsibilities/requirements/
+  // qualifications/benefits to live either at the top level or inside
+  // a JSON-serialized `jobSerialized` string. We expose both so a single
+  // /api/jobs/:id response works for both rendering paths.
+  const details = ((row as any).details as Record<string, unknown> | null) ?? {};
+  const responsibilities = Array.isArray(details.responsibilities) ? (details.responsibilities as string[]) : [];
+  const requirements = Array.isArray(details.requirements) ? (details.requirements as string[]) : [];
+  const qualifications = Array.isArray(details.qualifications) ? (details.qualifications as string[]) : [];
+  const benefits = Array.isArray(details.benefits) ? (details.benefits as string[]) : [];
+
   return {
     id: row.id,
     title: row.title,
@@ -62,6 +72,18 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,
+    // ---- Extension-extracted structured sections ----
+    responsibilities,
+    requirements,
+    qualifications,
+    benefits,
+    // Backwards-compat for the frontend's `parsed = JSON.parse(j.jobSerialized)` path
+    jobSerialized: JSON.stringify({
+      responsibilities,
+      requirements,
+      qualifications,
+      benefits,
+    }),
   } as JobEntity;
 }
 
@@ -605,11 +627,28 @@ export async function createTrackedJob(
     location?: string;
     sourceUrl?: string;
     isRemote?: boolean;
+    jobType?: string;
+    experienceLevel?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    salaryCurrency?: string;
+    skills?: string[];
+    responsibilities?: string[];
+    requirements?: string[];
+    qualifications?: string[];
+    benefits?: string[];
   },
   userId: string,
 ): Promise<JobEntity> {
   const db = getDb();
   const company = input.company?.trim() || HIRED_VIDEO_SEED_COMPANY;
+
+  const details = {
+    responsibilities: input.responsibilities ?? [],
+    requirements: input.requirements ?? [],
+    qualifications: input.qualifications ?? [],
+    benefits: input.benefits ?? [],
+  };
 
   // Re-use an existing tracked job for the same sourceUrl so users
   // tracking the same listing don't create duplicates on the board.
@@ -633,6 +672,13 @@ export async function createTrackedJob(
       description: input.description ?? "",
       company,
       location: input.location,
+      jobType: input.jobType,
+      experienceLevel: input.experienceLevel,
+      salaryMin: input.salaryMin !== undefined ? String(input.salaryMin) : undefined,
+      salaryMax: input.salaryMax !== undefined ? String(input.salaryMax) : undefined,
+      salaryCurrency: input.salaryCurrency || "USD",
+      skillsRequired: input.skills ?? [],
+      details,
       isRemote: input.isRemote ?? false,
       isActive: true,
       sourceUrl: input.sourceUrl,
