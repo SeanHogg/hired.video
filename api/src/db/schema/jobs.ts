@@ -24,6 +24,12 @@ export const jobItems = pgTable("job_items", {
   salaryMax: numeric("salary_max"),
   salaryCurrency: varchar("salary_currency", { length: 10 }).default("USD"),
   skillsRequired: jsonb("skills_required").default([]),
+  // Structured details extracted by /api/jobs/extract:
+  // { responsibilities: string[], requirements: string[],
+  //   qualifications: string[], benefits: string[] }
+  // Stored as jsonb so JobDetail.tsx can render the sections without
+  // re-parsing description markdown.
+  details: jsonb("details").default({}),
   isRemote: boolean("is_remote").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),

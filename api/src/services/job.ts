@@ -164,7 +164,20 @@ export interface ParsedJob {
   description: string;
   company?: string;
   location?: string;
+  city?: string;
+  state?: string;
+  country?: string;
   isRemote?: boolean;
+  jobType?: string;          // full_time, part_time, contract, internship, ...
+  experienceLevel?: string;  // entry, mid, senior, executive
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
+  skills?: string[];
+  responsibilities?: string[];
+  requirements?: string[];
+  qualifications?: string[];
+  benefits?: string[];
   /** "high" when JSON-LD JobPosting was found, "low" otherwise. */
   confidence: "high" | "low";
 }
@@ -202,17 +215,36 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
             : [];
         const primaryLocation = jobLocations[0];
         const address = primaryLocation?.address;
-        const locationParts = [
-          stripHtml(address?.addressLocality),
-          stripHtml(address?.addressRegion),
-          stripHtml(address?.addressCountry),
-        ].filter(Boolean);
+        const city = stripHtml(address?.addressLocality) || undefined;
+        const state = stripHtml(address?.addressRegion) || undefined;
+        const country = stripHtml(address?.addressCountry) || undefined;
+        const locationParts = [city, state, country].filter(Boolean);
 
         const jobLocationType = item.jobLocationType?.toString().toLowerCase() ?? "";
         const isRemote =
           jobLocationType.includes("telecommute") ||
           /\bremote\b/i.test(stripHtml(item.title ?? "")) ||
           undefined;
+
+        const employmentTypeRaw = Array.isArray(item.employmentType)
+          ? item.employmentType[0]
+          : item.employmentType;
+        const jobType = normalizeJsonLdEmploymentType(employmentTypeRaw);
+
+        const baseSalary = item.baseSalary;
+        const salaryMin = numericFromQuantitativeValue(baseSalary?.value, "minValue");
+        const salaryMax = numericFromQuantitativeValue(baseSalary?.value, "maxValue");
+        const salaryCurrency = stripHtml(baseSalary?.currency) || undefined;
+
+        // Skills can come as a comma-separated string or an array.
+        const skills = parseStringList(item.skills);
+
+        // Many JobPosting payloads put responsibilities/requirements
+        // inline; pull them when present.
+        const responsibilities = parseStringList(item.responsibilities);
+        const qualifications = parseStringList(item.qualifications ?? item.educationRequirements);
+        const requirements = parseStringList(item.requirements ?? item.experienceRequirements);
+        const benefits = parseStringList(item.jobBenefits ?? item.benefits);
 
         return {
           title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
@@ -225,7 +257,20 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
                 "",
             ) || HIRED_VIDEO_SEED_COMPANY,
           location: locationParts.length > 0 ? locationParts.join(", ") : undefined,
+          city,
+          state,
+          country,
           isRemote,
+          jobType,
+          experienceLevel: undefined, // schema.org doesn't have a direct field
+          salaryMin,
+          salaryMax,
+          salaryCurrency,
+          skills: skills.length > 0 ? skills : undefined,
+          responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
+          requirements: requirements.length > 0 ? requirements : undefined,
+          qualifications: qualifications.length > 0 ? qualifications : undefined,
+          benefits: benefits.length > 0 ? benefits : undefined,
           confidence: "high",
         };
       }
@@ -265,9 +310,23 @@ const ClassificationSchema = z.object({
       title: z.string().optional(),
       company: z.string().optional(),
       location: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      country: z.string().optional(),
       description: z.string().optional(),
       isRemote: z.boolean().optional(),
+      jobType: z.string().optional(),
+      experienceLevel: z.string().optional(),
+      salaryMin: z.number().nullable().optional(),
+      salaryMax: z.number().nullable().optional(),
+      salaryCurrency: z.string().optional(),
+      skills: z.array(z.string()).optional(),
+      responsibilities: z.array(z.string()).optional(),
+      requirements: z.array(z.string()).optional(),
+      qualifications: z.array(z.string()).optional(),
+      benefits: z.array(z.string()).optional(),
     })
+    .nullable()
     .optional(),
 });
 
@@ -290,11 +349,38 @@ async function classifyWithLLM(
   const text = stripHtml(input.html).slice(0, 12_000);
 
   const systemPrompt = [
-    "You are a strict classifier that decides whether a webpage is a single job posting (a specific role someone can apply to).",
-    "It is NOT a job posting if it's: a job board listing page, a company homepage, an article about jobs, a resume, a profile, a search results page, or anything else.",
-    "Reply with ONLY a JSON object matching this exact shape:",
-    '{ "isJobPosting": boolean, "confidence": number between 0 and 1, "reason": short string (1 sentence), "job": { "title": string, "company": string, "location": string, "description": string (markdown OK, <2000 chars), "isRemote": boolean } }',
-    'Set "job" to null when isJobPosting is false. Be conservative: when in doubt, return false.',
+    "You are a strict classifier and structured-extractor for job postings.",
+    "STEP 1 — classify: decide whether the page is a SINGLE job posting (a specific role someone can apply to).",
+    "  It is NOT a job posting if it's: a job board listing page, search results, a company homepage, an article about jobs, a resume, a profile.",
+    "STEP 2 — if it IS a job posting, extract the fields below from the page text. Use null/empty array when truly absent. Be conservative — never make up data.",
+    "",
+    "Return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
+    "{",
+    '  "isJobPosting": boolean,',
+    '  "confidence": number between 0 and 1,',
+    '  "reason": short string (1 sentence) explaining the decision,',
+    '  "job": {',
+    '    "title": string — the role title, e.g. "Senior Director of Software Engineering",',
+    '    "company": string — the hiring company name (NOT the job board),',
+    '    "city": string,',
+    '    "state": string,',
+    '    "country": string,',
+    '    "isRemote": boolean,',
+    '    "jobType": one of ["full_time","part_time","contract","temporary","internship","volunteer"],',
+    '    "experienceLevel": one of ["entry","mid","senior","executive"],',
+    '    "salaryMin": annual base salary minimum in dollars (number, no formatting),',
+    '    "salaryMax": annual base salary maximum in dollars (number, no formatting),',
+    '    "salaryCurrency": ISO 4217 code, default "USD",',
+    '    "description": clean markdown summary of the role (1-3 paragraphs, <2000 chars),',
+    '    "responsibilities": string[] — bulleted "what you will do" items,',
+    '    "requirements": string[] — bulleted "what we are looking for" items,',
+    '    "qualifications": string[] — degrees / certifications / years of experience requirements,',
+    '    "benefits": string[] — perks, benefits, time off, equity, insurance items,',
+    '    "skills": string[] — technical skills and tools mentioned (e.g. ["TypeScript","AWS","Postgres"])',
+    "  }",
+    "}",
+    "",
+    'When isJobPosting is false, set "job" to null. Be conservative: when in doubt, return false.',
   ].join("\n");
 
   const userMessage = [
@@ -393,6 +479,14 @@ export async function extractAndClassifyJob(input: {
   // AI says yes — merge AI fields over the heuristic so the best
   // available value wins for each slot.
   const aiJob = classification.job ?? {};
+  const aiCity = aiJob.city || undefined;
+  const aiState = aiJob.state || undefined;
+  const aiCountry = aiJob.country || undefined;
+  const composedLocation =
+    aiJob.location ||
+    [aiCity, aiState, aiCountry].filter(Boolean).join(", ") ||
+    heuristic.location;
+
   return {
     ok: true,
     confidence: classification.confidence,
@@ -400,8 +494,25 @@ export async function extractAndClassifyJob(input: {
       title: (aiJob.title || heuristic.title || "Tracked Job").slice(0, 250),
       description: aiJob.description || heuristic.description,
       company: aiJob.company || heuristic.company || HIRED_VIDEO_SEED_COMPANY,
-      location: aiJob.location || heuristic.location,
+      location: composedLocation,
+      city: aiCity || heuristic.city,
+      state: aiState || heuristic.state,
+      country: aiCountry || heuristic.country,
       isRemote: aiJob.isRemote ?? heuristic.isRemote,
+      jobType: aiJob.jobType || heuristic.jobType,
+      experienceLevel: aiJob.experienceLevel || heuristic.experienceLevel,
+      salaryMin: aiJob.salaryMin ?? heuristic.salaryMin,
+      salaryMax: aiJob.salaryMax ?? heuristic.salaryMax,
+      salaryCurrency: aiJob.salaryCurrency || heuristic.salaryCurrency,
+      skills: aiJob.skills?.length ? aiJob.skills : heuristic.skills,
+      responsibilities: aiJob.responsibilities?.length
+        ? aiJob.responsibilities
+        : heuristic.responsibilities,
+      requirements: aiJob.requirements?.length ? aiJob.requirements : heuristic.requirements,
+      qualifications: aiJob.qualifications?.length
+        ? aiJob.qualifications
+        : heuristic.qualifications,
+      benefits: aiJob.benefits?.length ? aiJob.benefits : heuristic.benefits,
       confidence: "high",
     },
   };
@@ -435,6 +546,47 @@ function fallbackTitle(url: string): string {
   } catch {
     return "Tracked Job";
   }
+}
+
+/** Parse a schema.org `QuantitativeValue` field into a number. */
+function numericFromQuantitativeValue(value: unknown, key: "minValue" | "maxValue" | "value"): number | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = (value as Record<string, unknown>)[key];
+  const n = typeof raw === "string" ? Number(raw) : (raw as number | undefined);
+  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
+}
+
+/** Coerce a value that might be a comma-separated string OR a string[] into string[]. */
+function parseStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripHtml(String(v))).filter((s) => s.length > 0);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,;\n•·]/)
+      .map((s) => stripHtml(s))
+      .filter((s) => s.length > 0);
+  }
+  return [];
+}
+
+/** Map schema.org employmentType (FULL_TIME, CONTRACTOR, …) to our internal slug. */
+function normalizeJsonLdEmploymentType(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.toUpperCase().replace(/[\s-]+/g, "_");
+  const map: Record<string, string> = {
+    FULL_TIME: "full_time",
+    PART_TIME: "part_time",
+    CONTRACTOR: "contract",
+    CONTRACT: "contract",
+    TEMPORARY: "temporary",
+    INTERN: "internship",
+    INTERNSHIP: "internship",
+    VOLUNTEER: "volunteer",
+    PER_DIEM: "per_diem",
+    OTHER: "other",
+  };
+  return map[v] ?? undefined;
 }
 
 /**
