@@ -169,7 +169,7 @@ function toUserProfileDto(
       showLocation,
     },
     role: row.role,
-    isPremium: false,
+    isPremium: row.role === "SuperAdmin" || row.role === "Admin",
     isDemo: false,
     isVerified: row.emailVerified,
     openToWork: profile?.openToWork ?? false,

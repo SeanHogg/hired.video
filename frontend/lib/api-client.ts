@@ -443,16 +443,28 @@ export class ApiClient {
         throw new AuthorizationError("Access forbidden");
       case 404:
         throw new NotFoundError("Resource not found");
-      case 429:
+      case 429: {
         // Rate limit exceeded - try to extract details from data
-        const rateLimitData = data as any;
+        const rlData = data as any;
+        const errorCode = rlData?.error?.code;
+        // If the server sent USAGE_LIMIT_EXCEEDED, surface it as AIUsageLimitError
+        if (errorCode === "USAGE_LIMIT_EXCEEDED" || errorCode === "AI_USAGE_LIMIT_REACHED") {
+          const usageInfo = rlData?.error?.usage || {};
+          throw new AIUsageLimitError(
+            rlData?.error?.message || "AI usage limit exceeded",
+            rlData?.error?.upgradeUrl || "/pricing",
+            usageInfo.used,
+            usageInfo.limit,
+          );
+        }
         throw new RateLimitError(
-          rateLimitData?.message || "Rate limit exceeded",
-          rateLimitData?.data?.upgradeUrl,
-          rateLimitData?.data?.used,
-          rateLimitData?.data?.limit,
-          rateLimitData?.data?.remaining,
+          rlData?.message || "Rate limit exceeded",
+          rlData?.data?.upgradeUrl,
+          rlData?.data?.used,
+          rlData?.data?.limit,
+          rlData?.data?.remaining,
         );
+      }
       default:
         throw new NetworkError(`HTTP ${status}: Request failed`);
     }
@@ -470,6 +482,7 @@ export class ApiClient {
         // Do NOT clear auth or redirect; this is a special flow handled by UI
         return new UnverifiedAccountError(error.message, error.details);
       case "AI_USAGE_LIMIT_REACHED":
+      case "USAGE_LIMIT_EXCEEDED":
         // AI usage limit exceeded - extract upgrade info from data
         const aiData = (errorResponse as any).data || {};
         return new AIUsageLimitError(

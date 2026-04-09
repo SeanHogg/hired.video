@@ -8,7 +8,7 @@ import type {
 } from "../../../shared/billing.js";
 import { FREE_AI_MONTHLY_LIMIT } from "../../../shared/pricing.js";
 
-const { subscriptions, subscriptionPlans, paymentMethods, invoices, aiUsageRecords } = schema;
+const { subscriptions, subscriptionPlans, paymentMethods, invoices, aiUsageRecords, users } = schema;
 
 // ---------------------------------------------------------------------------
 // Subscription cache (#8)
@@ -58,7 +58,17 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     }
   }
 
+  // Admin and SuperAdmin roles are treated as premium regardless of
+  // whether they have a subscription row. Check the user's role before
+  // querying the subscriptions table.
   const db = getDb();
+  const [userRow] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const isAdminRole = userRow?.role === "SuperAdmin" || userRow?.role === "Admin";
+
   const [row] = await db
     .select({
       planSlug: subscriptionPlans.slug,
@@ -76,9 +86,9 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
 
   if (!row) {
     const freeResult: SubscriptionSummaryDTO = {
-      planId: "free",
-      planName: "Free",
-      isPremium: false,
+      planId: isAdminRole ? "admin" : "free",
+      planName: isAdminRole ? "Admin" : "Free",
+      isPremium: isAdminRole,
       price: 0,
       currency: "USD",
       interval: "month",

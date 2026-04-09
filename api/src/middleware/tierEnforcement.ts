@@ -17,6 +17,14 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
     if (!userId) {
       return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
     }
+
+    // Admin / SuperAdmin bypass — these roles are always treated as premium.
+    const roles = c.var.user?.roles ?? [];
+    const role = (c.var.user as any)?.role ?? "";
+    if (roles.includes("SuperAdmin") || roles.includes("Admin") || role === "SuperAdmin" || role === "Admin") {
+      return next();
+    }
+
     const sub = await getSubscription(userId);
     if (!sub.isPremium) {
       return c.json(
@@ -42,6 +50,19 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
 export async function checkAIUsage(c: AppCtx): Promise<Response | null> {
   const userId = c.var.user?.sub;
   if (!userId) return null;
+
+  // Admin and SuperAdmin roles are internal users — unlimited AI usage
+  // regardless of subscription status.
+  const roles = c.var.user?.roles ?? [];
+  const role = (c.var.user as any)?.role ?? "";
+  if (
+    roles.includes("SuperAdmin") ||
+    roles.includes("Admin") ||
+    role === "SuperAdmin" ||
+    role === "Admin"
+  ) {
+    return null;
+  }
 
   const sub = await getSubscription(userId);
   if (sub.isPremium) return null; // unlimited

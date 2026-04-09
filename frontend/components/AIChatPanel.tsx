@@ -6,12 +6,9 @@ import {
   Users,
   Briefcase,
   BarChart3,
-  AlertCircle,
-  Zap,
   Info,
   Sparkles,
   Code,
-  AlertTriangle,
   Plus,
   History,
   Copy,
@@ -23,7 +20,6 @@ import {
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { useAI } from "@/lib/ai-context";
 import {
   isAIServiceConfigured,
@@ -36,7 +32,6 @@ import { useAuth, USER_ROLES } from "@/lib/auth";
 import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { aiService } from "@/lib/services/ai-service";
 import {
   getContextLabel,
@@ -50,7 +45,8 @@ import {
   createGeneralContext
 } from "@/lib/utils/ai-context-helpers";
 import type { AIAction, AIContextType, AIContext } from "@/lib/types/ai-context";
-import { billingService } from "@/lib/services/billing-service";
+import { useAIUsage } from "@/hooks/use-ai-usage";
+import { AIUsageLimitBanner, AIUsageLimitErrorBanner } from "@/components/AIUsageLimitBanner";
 
 interface Message {
   id: string;
@@ -271,6 +267,7 @@ export default function AIChatPanel() {
     limit?: number;
     remaining?: number;
   } | null>(null);
+  const aiUsage = useAIUsage();
   const [showContextInfo, setShowContextInfo] = useState(false);
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -323,14 +320,7 @@ export default function AIChatPanel() {
     }
   }, [location.pathname, user?.role, setPageContext]);
 
-  // AI Usage tracking
-  const [aiUsage, setAiUsage] = useState<{
-    used: number;
-    limit: number;
-    remaining: number;
-    isUnlimited: boolean;
-  } | null>(null);
-  const [isLoadingUsage, setIsLoadingUsage] = useState(false);
+  // AI usage is now provided by the useAIUsage hook (see aiUsage above)
 
   // Helper function to get icon for action (MUST be defined before getContextSuggestions)
   const getIconForAction = (action: string) => {
@@ -395,7 +385,7 @@ export default function AIChatPanel() {
 
       // Build user info for system prompt personalisation
       const userInfo = user
-        ? { name: user.name || user.email, role: user.role, plan: aiUsage?.isUnlimited ? "pro" : "free" }
+        ? { name: user.name || user.email, role: user.role, plan: aiUsage.isUnlimited ? "pro" : "free" }
         : undefined;
 
       // Always use context-aware AI with enhanced system prompt
@@ -467,7 +457,7 @@ export default function AIChatPanel() {
     } finally {
       setIsTyping(false);
       if (isAuthenticated) {
-        fetchAIUsage();
+        aiUsage.refresh();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -534,31 +524,12 @@ export default function AIChatPanel() {
   // Allow AI access for all authenticated users (10 requests/month free, unlimited for Pro/Enterprise)
   const hasAIAccess = isAuthenticated;
 
-  // Fetch AI usage when panel opens or after sending a message
-  const fetchAIUsage = async () => {
-    if (!isAuthenticated) return;
-
-    try {
-      setIsLoadingUsage(true);
-      const usage = await billingService.getMonthlyAIUsage();
-      setAiUsage({
-        used: usage.used ?? 0,
-        limit: usage.limit ?? 10,
-        remaining: usage.remaining ?? 10,
-        isUnlimited: usage.isUnlimited ?? false,
-      });
-    } catch (error) {
-      console.error("Failed to fetch AI usage:", error);
-    } finally {
-      setIsLoadingUsage(false);
-    }
-  };
-
-  // Fetch usage when panel opens
+  // Refresh usage when panel opens
   useEffect(() => {
     if (isAIChatOpen && isAuthenticated) {
-      fetchAIUsage();
+      aiUsage.refresh();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAIChatOpen, isAuthenticated]);
 
   // Load session list
@@ -738,45 +709,7 @@ export default function AIChatPanel() {
         </div>
 
         {/* AI Usage Indicator */}
-        {isAuthenticated && aiUsage && !aiUsage.isUnlimited && (
-          <div className="px-4 py-3 border-b bg-muted/30">
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-muted-foreground font-medium">
-                AI Requests: {aiUsage.used}/{aiUsage.limit} used this month
-              </span>
-              {aiUsage.remaining <= 2 && aiUsage.remaining > 0 && (
-                <Link to="/pricing" className="text-primary hover:underline font-medium">
-                  Upgrade for Unlimited
-                </Link>
-              )}
-            </div>
-            <Progress
-              value={(aiUsage.used / aiUsage.limit) * 100}
-              className="h-1.5"
-            />
-            {aiUsage.remaining <= 2 && aiUsage.remaining > 0 && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600">
-                <AlertTriangle className="h-3 w-3" />
-                <span>Only {aiUsage.remaining} request{aiUsage.remaining === 1 ? '' : 's'} remaining</span>
-              </div>
-            )}
-            {aiUsage.remaining === 0 && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-destructive">
-                <AlertCircle className="h-3 w-3" />
-                <span>Monthly limit reached. <Link to="/pricing" className="underline font-medium">Upgrade to Pro</Link> for unlimited access.</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {isAuthenticated && aiUsage && aiUsage.isUnlimited && (
-          <div className="px-4 py-2 border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10">
-            <div className="flex items-center gap-2 text-xs">
-              <Zap className="h-3.5 w-3.5 text-primary" />
-              <span className="text-primary font-medium">Unlimited AI Access</span>
-            </div>
-          </div>
-        )}
+        {isAuthenticated && <AIUsageLimitBanner usage={aiUsage} variant="inline" />}
 
         {/* Context Info Panel */}
         {showContextInfo && pageContext && (
@@ -983,34 +916,13 @@ export default function AIChatPanel() {
         {/* Rate Limit Error Alert */}
         {rateLimitError && (
           <div className="px-4 py-2">
-            <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <AlertDescription className="flex flex-col gap-2">
-                <div className="text-sm text-yellow-800 dark:text-yellow-200">
-                  {rateLimitError.limit && (
-                    <div className="mb-2">
-                      <strong>Usage:</strong> {rateLimitError.used} / {rateLimitError.limit} requests this month
-                    </div>
-                  )}
-                  <div>{rateLimitError.message}</div>
-                </div>
-                <div className="flex gap-2">
-                  <UiButton asChild size="sm" className="bg-gradient-to-r from-brand-purple to-brand-blue">
-                    <Link to={rateLimitError.upgradeUrl || "/pricing"}>
-                      <Zap className="h-3 w-3 mr-1" />
-                      Upgrade to Premium
-                    </Link>
-                  </UiButton>
-                  <UiButton
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRateLimitError(null)}
-                  >
-                    Dismiss
-                  </UiButton>
-                </div>
-              </AlertDescription>
-            </Alert>
+            <AIUsageLimitErrorBanner
+              message={rateLimitError.message}
+              used={rateLimitError.used}
+              limit={rateLimitError.limit}
+              upgradeUrl={rateLimitError.upgradeUrl}
+              onDismiss={() => setRateLimitError(null)}
+            />
           </div>
         )}
 
