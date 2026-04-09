@@ -372,9 +372,15 @@ async function classifyWithLLM(
 
   const systemPrompt = [
     "You are a strict classifier and structured-extractor for job postings.",
-    "STEP 1 — classify: decide whether the page is a SINGLE job posting (a specific role someone can apply to).",
-    "  It is NOT a job posting if it's: a job board listing page, search results, a company homepage, an article about jobs, a resume, a profile.",
-    "STEP 2 — if it IS a job posting, extract the fields below from the page text. Use null/empty array when truly absent. Be conservative — never make up data.",
+    "STEP 1 — classify: decide whether the page contains a job posting the user is currently looking at.",
+    "  ACCEPT (isJobPosting=true) when:",
+    "    - The page text describes one specific role with a title, employer, and responsibilities/requirements. Even if other jobs are listed in a nearby sidebar/rail, treat the prominently-featured job as THE job.",
+    "    - The text begins with or prominently displays a single job title (e.g. 'Director of Software Engineering'), employer name, and a multi-paragraph job description.",
+    "  REJECT (isJobPosting=false) when:",
+    "    - There is no single dominant role — the page is purely a search results list, a company homepage, an article about jobs, a resume, or a profile.",
+    "    - You cannot identify ONE specific role title and employer from the text.",
+    "",
+    "STEP 2 — if accepted, extract the fields below from the page text. Use null/empty array when truly absent. Be conservative — never make up data. When the text contains multiple jobs but one is clearly featured, extract from the featured one.",
     "",
     "Return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
     "{",

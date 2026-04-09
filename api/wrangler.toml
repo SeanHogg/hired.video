@@ -1,8 +1,8 @@
 name = "hired-api"
 account_id = "15a91c1cf46bbc3377e7aad68190e1f1"
 main = "src/worker.ts"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 
 # Routes (API + CDN for R2 assets)
 routes = [
