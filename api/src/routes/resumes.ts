@@ -44,12 +44,27 @@ const PRIVACY_TO_LEVEL: Record<string, number> = {
   draft: 10,
 };
 
+function ensureId(item: Record<string, unknown>, resumeId: string, section: string, index: number): Record<string, unknown> {
+  if (item.id || item.Id) return item;
+  return { ...item, id: `${resumeId}-${section}-${index}` };
+}
+
 function rowToLegacyResume(row: typeof resumes.$inferSelect) {
+  const c = (row.content ?? {}) as Record<string, unknown>;
+  const basics = (c.basics ?? {}) as Record<string, unknown>;
+  const loc = basics.location as Record<string, unknown> | null | undefined;
+  const rid = row.id;
+
+  const ensureArr = (key: string) => {
+    const arr = c[key];
+    return Array.isArray(arr) ? arr.map((item: any, i: number) => ensureId(item, rid, key, i)) : [];
+  };
+
   return {
-    id: row.id,
+    id: rid,
     userId: row.userId,
     name: row.title,
-    slug: row.slug ?? row.id,
+    slug: row.slug ?? rid,
     description: "",
     isPrimaryDefault: false,
     isWatched: false,
@@ -64,40 +79,37 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     views: 0,
-    metaResume: (() => {
-      const c = (row.content ?? {}) as Record<string, unknown>;
-      const basics = (c.basics ?? {}) as Record<string, unknown>;
-      const loc = basics.location as Record<string, unknown> | null | undefined;
-      return {
-        basics: {
-          name: basics.name ?? row.title ?? "",
-          label: basics.label ?? "",
-          image: basics.image ?? "",
-          email: basics.email ?? "",
-          phone: basics.phone ?? "",
-          url: basics.url ?? "",
-          summary: basics.summary ?? "",
-          location: loc ? {
-            address: loc.address ?? "",
-            postalCode: loc.postalCode ?? "",
-            city: loc.city ?? "",
-            countryCode: loc.countryCode ?? "",
-            region: loc.region ?? "",
-          } : null,
-        },
-        work: Array.isArray(c.work) ? c.work : [],
-        education: Array.isArray(c.education) ? c.education : [],
-        volunteer: Array.isArray(c.volunteer) ? c.volunteer : [],
-        awards: Array.isArray(c.awards) ? c.awards : [],
-        certificates: Array.isArray(c.certificates) ? c.certificates : [],
-        publications: Array.isArray(c.publications) ? c.publications : [],
-        skills: Array.isArray(c.skills) ? c.skills : [],
-        languages: Array.isArray(c.languages) ? c.languages : [],
-        interests: Array.isArray(c.interests) ? c.interests : [],
-        references: Array.isArray(c.references) ? c.references : [],
-        projects: Array.isArray(c.projects) ? c.projects : [],
-      };
-    })(),
+    metaData: Array.isArray(c.metaData) ? c.metaData : undefined,
+    metaResume: {
+      basics: {
+        id: basics.id || basics.Id || `${rid}-basics-0`,
+        name: basics.name ?? row.title ?? "",
+        label: basics.label ?? "",
+        image: basics.image ?? "",
+        email: basics.email ?? "",
+        phone: basics.phone ?? "",
+        url: basics.url ?? "",
+        summary: basics.summary ?? "",
+        location: loc ? {
+          address: loc.address ?? "",
+          postalCode: loc.postalCode ?? "",
+          city: loc.city ?? "",
+          countryCode: loc.countryCode ?? "",
+          region: loc.region ?? "",
+        } : null,
+      },
+      work: ensureArr("work"),
+      education: ensureArr("education"),
+      volunteer: ensureArr("volunteer"),
+      awards: ensureArr("awards"),
+      certificates: ensureArr("certificates"),
+      publications: ensureArr("publications"),
+      skills: ensureArr("skills"),
+      languages: ensureArr("languages"),
+      interests: ensureArr("interests"),
+      references: ensureArr("references"),
+      projects: ensureArr("projects"),
+    },
   };
 }
 
@@ -768,14 +780,32 @@ resumeRoutes.get("/:id/export", async (c) => {
   });
 });
 
-resumeRoutes.get("/:id/metadata", (c) => c.json(ok([]), 200));
-resumeRoutes.put("/:id/metadata", async (c) => {
+resumeRoutes.get("/:id/metadata", async (c) => {
   const id = c.req.param("id");
   const user = c.var.user;
   const db = getDb();
   const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(rowToLegacyResume(row)), 200);
+  const content = (row.content ?? {}) as Record<string, unknown>;
+  return c.json(ok(Array.isArray(content.metaData) ? content.metaData : []), 200);
+});
+resumeRoutes.put("/:id/metadata", async (c) => {
+  const id = c.req.param("id");
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const metaData = Array.isArray(body) ? body : [];
+  const db = getDb();
+  const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  const content = (row.content && typeof row.content === "object" ? { ...(row.content as Record<string, unknown>) } : {}) as Record<string, unknown>;
+  content.metaData = metaData;
+  const [updated] = await db
+    .update(resumes)
+    .set({ content, updatedAt: new Date() } as any)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .returning();
+  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  return c.json(ok(rowToLegacyResume(updated)), 200);
 });
 
 resumeRoutes.post("/:id/setmaster", async (c) => {

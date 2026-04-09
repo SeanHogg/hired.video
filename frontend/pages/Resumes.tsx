@@ -29,7 +29,6 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import ResumeBuilder from "@/components/ResumeBuilder";
@@ -171,20 +170,7 @@ export default function Resumes() {
     targetResumeId: null,
   });
 
-  // Actions modal state
-  const [actionsModal, setActionsModal] = useState<{
-    isOpen: boolean;
-    item:
-      | (ResumeWithOwnership & {
-          type: "resume" | "job_description";
-          contentType: "video" | "text";
-          ownerId?: string;
-        })
-      | null;
-  }>({
-    isOpen: false,
-    item: null,
-  });
+  // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
   // Metadata modal state
   const [metadataModal, setMetadataModal] = useState<{
@@ -441,41 +427,21 @@ export default function Resumes() {
     });
   };
 
-  // Action handlers for ActionsModal
-  const handleOpenActions = (resumeId: string) => {
-    const resume = resumes.find((r) => r.id === resumeId);
-    if (resume) {
-      const item = {
-        id: resume.id,
-        ownerId: resume.userId,
-        type: "resume" as const,
-        contentType: "text" as const,
-        ...resume,
-      };
-      setActionsModal({ isOpen: true, item });
-    }
-  };
-
-  const handleCloseActions = () => {
-    setActionsModal({ isOpen: false, item: null });
-  };
-
-  const handleChangePrivacy = async (privacy: ResumePrivacy) => {
-    const targetId = actionsModal.item?.id;
-    if (!targetId) return;
+  const handleChangePrivacy = async (resumeId: string, privacy: ResumePrivacy) => {
+    if (!resumeId) return;
 
     // Pre-compute which owned resumes will be demoted due to exclusivity (Public, Recruiter Only, Connections)
-    const demotedCandidates = displayResumes.filter(r => r.ownership === "owned" && r.id !== targetId && (
+    const demotedCandidates = displayResumes.filter(r => r.ownership === "owned" && r.id !== resumeId && (
       (privacy === "public" && r.privacy === "public") ||
       (privacy === "recruiter_only" && r.privacy === "recruiter_only") ||
       (privacy === "connections" && r.privacy === "connections")
     ));
 
     // Optimistic update
-    optimisticActions.setPrivacyOptimistic(targetId, privacy);
+    optimisticActions.setPrivacyOptimistic(resumeId, privacy);
 
     try {
-      const ok = await resumeService.setResumePrivacy(targetId, privacy);
+      const ok = await resumeService.setResumePrivacy(resumeId, privacy);
       if (!ok) throw new Error("Server rejected privacy change");
 
       toast({
@@ -495,8 +461,6 @@ export default function Resumes() {
         description: (error as Error)?.message || "Please try again.",
         variant: "destructive",
       });
-    } finally {
-      handleCloseActions();
     }
   };
 
@@ -599,6 +563,20 @@ export default function Resumes() {
     setResumes(updatedResumes);
     setSuccessMessage("Resume set as active!");
     setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const handlePromoteToMaster = async (resumeId: string) => {
+    try {
+      const ok = await resumeService.promoteVariantToMaster(resumeId);
+      if (ok) {
+        toast({ title: "Promoted", description: "Variant promoted to master." });
+        await loadResumes();
+      } else {
+        toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+    }
   };
 
   const handleAddMedia = async (resume: ResumeWithOwnership) => {
@@ -1426,7 +1404,15 @@ export default function Resumes() {
                                 parentId={resume.parentId}
                                 ownership={resume.ownership}
                                 onView={() => handleResumeView(resume.id)}
-                                onActions={() => handleOpenActions(resume.id)}
+                                onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                                onAddMedia={() => handleAddMedia(resume)}
+                                onCreateVariation={() => handleCreateVariation(resume.id)}
+                                onSetActive={() => handleSetActiveResume(resume.id)}
+                                onShare={() => handleShare(resume)}
+                                onDownload={() => handleDownload(resume)}
+                                onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
+                                onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
+                                onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                               />
                             ))}
                           </div>
@@ -1465,12 +1451,17 @@ export default function Resumes() {
                                   <ResumeActionsMenu
                                     isOwner
                                     isActive={resume.isActive}
+                                    isMaster={resume.isMaster}
+                                    parentId={resume.parentId}
                                     onView={() => handleResumeView(resume.id)}
                                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                                     onAddMedia={() => handleAddMedia(resume)}
                                     onCreateVariation={() => handleCreateVariation(resume.id)}
                                     onSetActive={() => handleSetActiveResume(resume.id)}
                                     onShare={() => handleShare(resume)}
+                                    onDownload={() => handleDownload(resume)}
+                                    onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
+                                    onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                                     onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                                   />
                                 </div>
@@ -1509,7 +1500,8 @@ export default function Resumes() {
                                 parentId={resume.parentId}
                                 ownership={resume.ownership}
                                 onView={() => handleResumeView(resume.id)}
-                                onActions={() => handleOpenActions(resume.id)}
+                                onShare={() => handleShare(resume)}
+                                onTrack={() => handleTrack(resume)}
                               />
                             ))}
                           </div>
@@ -1542,6 +1534,7 @@ export default function Resumes() {
                                     isOwner={false}
                                     isTracked={resume.ownership === "tracked"}
                                     onView={() => handleResumeView(resume.id)}
+                                    onShare={() => handleShare(resume)}
                                     onTrack={() => handleTrack(resume)}
                                   />
                                 </div>
@@ -1606,42 +1599,7 @@ export default function Resumes() {
         <Footer />
       </div>
 
-      {/* Actions Modal */}
-      <ActionsModal
-        isOpen={actionsModal.isOpen}
-        onClose={handleCloseActions}
-        item={actionsModal.item}
-        user={
-          user
-            ? {
-                ...user,
-                role: user.role || "JobSeeker",
-              }
-            : null
-        }
-        onView={() => actionsModal.item && handleResumeView(actionsModal.item.id)}
-        onShare={() => actionsModal.item && handleShare(actionsModal.item)}
-        onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
-        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
-        onDelete={() => actionsModal.item && setTimeout(() => setDeleteDialog({ open: true, target: actionsModal.item! }), 0)}
-        onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
-        onChangePrivacy={(p) => handleChangePrivacy(p)}
-        onPromoteToMaster={async () => {
-          const id = actionsModal.item?.id;
-          if (!id) return;
-          try {
-            const ok = await resumeService.promoteVariantToMaster(id);
-            if (ok) {
-              toast({ title: "Promoted", description: "Variant promoted to master." });
-              await loadResumes();
-            } else {
-              toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
-            }
-          } catch (e) {
-            toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
-          }
-        }}
-      />
+      {/* ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown */}
 
       {/* Delete Confirmation */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => {

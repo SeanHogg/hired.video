@@ -226,10 +226,14 @@ matchRoutes.post("/analyze", async (c) => {
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = await resolveJobText({ jobHtml, jobId });
-  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
+  const rawJobText = await resolveJobText({ jobHtml, jobId });
+  if (!rawJobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
 
-  const resumeText = resumeContentToText(resume.content);
+  // Cap inputs to stay well within free-tier context limits (~8k tokens).
+  // Most free models handle 65K+ context but some (Nemotron Nano) have ~9K.
+  // 6000 chars ≈ 1500 tokens. Total prompt ≈ 3500 tokens, well under any limit.
+  const jobText = rawJobText.slice(0, 6000);
+  const resumeText = resumeContentToText(resume.content).slice(0, 6000);
 
   const apiKey = getApiKey((c.env as any) ?? {});
 
@@ -264,12 +268,14 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
       } as any);
 
       return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: resume.id, sourceUrl }), 200);
-    } catch {
+    } catch (llmError) {
+      console.error("[match/analyze] All LLM models failed:", llmError instanceof Error ? llmError.message : llmError);
       // Fall through to heuristic fallback
     }
   }
 
   // Heuristic fallback (no API key or LLM error)
+  console.warn("[match/analyze] Using heuristic keyword fallback. apiKey present:", !!apiKey, "jobText length:", jobText.length, "resumeText length:", resumeText.length);
   const jobWords = new Set(jobText.toLowerCase().split(/\W+/).filter((w) => w.length > 4));
   const resumeWords = resumeText.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
   const matches = resumeWords.filter((w) => jobWords.has(w)).length;
@@ -307,10 +313,11 @@ matchRoutes.post("/tailor", async (c) => {
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = await resolveJobText({ jobHtml, jobId });
-  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before tailoring."), 404);
+  const rawJobText = await resolveJobText({ jobHtml, jobId });
+  if (!rawJobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before tailoring."), 404);
 
-  const resumeText = resumeContentToText(resume.content);
+  const jobText = rawJobText.slice(0, 6000);
+  const resumeText = resumeContentToText(resume.content).slice(0, 6000);
 
   const apiKey = getApiKey((c.env as any) ?? {});
 
@@ -353,7 +360,8 @@ Rules:
         success({ ...result, resumeId: resume.id, sourceUrl }),
         200,
       );
-    } catch {
+    } catch (llmError) {
+      console.error("[match/tailor] All LLM models failed:", llmError instanceof Error ? llmError.message : llmError);
       // Fall through to stub
     }
   }

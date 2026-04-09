@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Video } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
@@ -10,7 +10,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import type { Resume, UpdateResumeRequest } from "@/types/resume";
+import type { Resume, UpdateResumeRequest, ResumeSectionMeta } from "@/types/resume";
+import MetadataModal from "@/components/MetadataModal";
 
 export default function ResumeEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +29,18 @@ export default function ResumeEditPage() {
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Metadata modal state
+  const [metadataModalOpen, setMetadataModalOpen] = useState(false);
+
+  const handleAddMedia = () => setMetadataModalOpen(true);
+
+  const handleSaveMetadata = async (metadata: ResumeSectionMeta[]) => {
+    if (!resume?.id) return;
+    await resumeService.updateResumeMetadata(resume.id, metadata);
+    const updatedResume = await resumeService.getResumeById(resume.id);
+    setResume(updatedResume);
+  };
 
   useEffect(() => {
     const loadResume = async () => {
@@ -226,10 +239,16 @@ export default function ResumeEditPage() {
                   )}
                 </div>
               </div>
-              <Button variant="outline" onClick={handleCancel}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to View
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={handleAddMedia}>
+                  <Video className="w-4 h-4 mr-2" />
+                  Add Media
+                </Button>
+                <Button variant="outline" onClick={handleCancel}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to View
+                </Button>
+              </div>
             </div>
 
             {/* Resume Editor - direct builder in edit route */}
@@ -246,6 +265,16 @@ export default function ResumeEditPage() {
         </div>
         <Footer />
       </div>
+
+      {resume && (
+        <MetadataModal
+          open={metadataModalOpen}
+          onOpenChange={setMetadataModalOpen}
+          resumeId={resume.id}
+          initialMetadata={resume.metaData || []}
+          onSave={handleSaveMetadata}
+        />
+      )}
     </div>
   );
 }

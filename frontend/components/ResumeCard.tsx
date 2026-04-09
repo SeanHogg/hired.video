@@ -9,16 +9,18 @@ import {
   Target,
   Edit,
   UserCheck,
-  MoreHorizontal,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
+import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { formatDate } from "@/lib/utils";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import type { ResumePrivacy } from "@/types/resume";
 
 interface ResumeCardProps {
   id: string;
@@ -37,7 +39,20 @@ interface ResumeCardProps {
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
   onView?: () => void;
+  /** @deprecated Use individual action handlers instead */
   onActions?: () => void;
+  // Individual action handlers (consistent with list view)
+  onEdit?: () => void;
+  onAddMedia?: () => void;
+  onCreateVariation?: () => void;
+  onSetActive?: () => void;
+  onShare?: () => void;
+  onDownload?: () => void;
+  onChangePrivacy?: (privacy: ResumePrivacy) => void;
+  onPromoteToMaster?: () => void;
+  onDelete?: () => void;
+  onTrack?: () => void;
+  onContactOwner?: () => void;
 }
 
 export default function ResumeCard({
@@ -54,10 +69,21 @@ export default function ResumeCard({
   parentId,
   ownership = "owned",
   actions,
-  userContext: _userContext,  
-  itemOwnership: _itemOwnership,  
+  userContext: _userContext,
+  itemOwnership: _itemOwnership,
   onView,
   onActions,
+  onEdit,
+  onAddMedia,
+  onCreateVariation,
+  onSetActive,
+  onShare,
+  onDownload,
+  onChangePrivacy,
+  onPromoteToMaster,
+  onDelete,
+  onTrack,
+  onContactOwner,
 }: ResumeCardProps) {
   const getPrivacyIcon = (privacy: string) => {
     switch (privacy) {
@@ -156,7 +182,10 @@ export default function ResumeCard({
     icon: () => getPrivacyIcon(privacy),
   });
 
-  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
+  const isOwner = ownership === "owned";
+  const hasIndividualHandlers = onEdit || onAddMedia || onCreateVariation || onSetActive || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onTrack || onContactOwner || onShare;
+
+  // Fallback actions for legacy usage (dynamic actions or onActions modal trigger)
   const cardActions =
     actions && actions.length > 0
       ? actions
@@ -178,7 +207,7 @@ export default function ResumeCard({
             id: "actions",
             label: "Actions",
             variant: "default" as const,
-            icon: MoreHorizontal,
+            icon: Eye,
             onClick: () => {
               if (onActions) {
                 onActions();
@@ -239,7 +268,44 @@ export default function ResumeCard({
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} />
+      {hasIndividualHandlers ? (
+        <div className="p-4 bg-background border-t border-border flex items-center justify-between gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onView) onView();
+              else window.location.href = `/resumes/${id}`;
+            }}
+            className="gap-2"
+          >
+            <Eye className="w-4 h-4" />
+            View
+          </Button>
+          <ResumeActionsMenu
+            isOwner={isOwner}
+            isActive={isActive}
+            isMaster={isMaster}
+            parentId={parentId}
+            onView={onView}
+            onEdit={onEdit}
+            onAddMedia={onAddMedia}
+            onCreateVariation={onCreateVariation}
+            onSetActive={onSetActive}
+            onShare={onShare}
+            onDownload={onDownload}
+            onChangePrivacy={onChangePrivacy}
+            onPromoteToMaster={onPromoteToMaster}
+            onDelete={onDelete}
+            isTracked={ownership === "tracked"}
+            onTrack={onTrack}
+            onContactOwner={onContactOwner}
+          />
+        </div>
+      ) : (
+        <CardActions actions={cardActions} />
+      )}
     </BaseCard>
   );
 }

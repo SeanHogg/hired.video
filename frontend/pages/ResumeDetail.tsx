@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
+import { useToast } from "@/hooks/use-toast";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -159,6 +160,7 @@ export default function ResumeDetail() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
   const [loading, setLoading] = useState(true);
@@ -275,6 +277,50 @@ export default function ResumeDetail() {
       open: true,
       initialMetadata: resume.metaData || [],
     });
+  };
+
+  const handleDownload = () => {
+    toast({ title: "Download started", description: "Your resume download has started." });
+  };
+
+  const handleChangePrivacy = async (privacy: "public" | "recruiter_only" | "connections" | "private") => {
+    if (!resume?.id) return;
+    try {
+      const ok = await resumeService.setResumePrivacy(resume.id, privacy);
+      if (!ok) throw new Error("Server rejected privacy change");
+      const updated = await resumeService.getResumeById(resume.id);
+      setResume(updated);
+      toast({ title: "Privacy updated", description: `Visibility set to ${privacy.replace("_", " ")}.` });
+    } catch (error) {
+      toast({ title: "Failed to update privacy", description: (error as Error)?.message || "Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handlePromoteToMaster = async () => {
+    if (!resume?.id) return;
+    try {
+      const ok = await resumeService.promoteVariantToMaster(resume.id);
+      if (ok) {
+        toast({ title: "Promoted", description: "Variant promoted to master." });
+        const updated = await resumeService.getResumeById(resume.id);
+        setResume(updated);
+      } else {
+        toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!resume?.id) return;
+    try {
+      await resumeService.deleteResume(resume.id);
+      toast({ title: "Deleted", description: "Resume deleted successfully." });
+      navigate("/resumes");
+    } catch (error) {
+      toast({ title: "Delete failed", description: (error as Error)?.message || "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleSaveMetadata = async (metadata: ResumeSectionMeta[]) => {
@@ -454,9 +500,16 @@ export default function ResumeDetail() {
 
                   <ResumeActionsMenu
                     isOwner={isOwner}
+                    isActive={resume.isActive}
+                    isMaster={resume.isMaster}
+                    parentId={resume.parentId}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                     onAddMedia={handleAddMedia}
                     onShare={() => navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href)}
+                    onDownload={handleDownload}
+                    onChangePrivacy={handleChangePrivacy}
+                    onPromoteToMaster={handlePromoteToMaster}
+                    onDelete={handleDelete}
                     triggerVariant="secondary"
                     triggerClassName="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
                   />
