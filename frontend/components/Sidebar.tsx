@@ -20,7 +20,6 @@ import {
   Brain,
   ShieldCheck,
   ShoppingBag,
-  Inbox,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -76,7 +75,6 @@ export default function Sidebar({
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
     { name: "My Services", href: "/services", icon: ShoppingBag, exactMatch: false },
-    { name: "Inquiries", href: "/services/inquiries", icon: Inbox, exactMatch: false },
     { name: "Account", href: "/account", icon: UserCog, exactMatch: false },
   ];
 

@@ -1,5 +1,7 @@
+import { z } from "zod";
 import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
+import { callLLMJson } from "./ai.js";
 import type {
   ApplyJobDTO,
   CreateJobDTO,
@@ -163,13 +165,15 @@ export interface ParsedJob {
   company?: string;
   location?: string;
   isRemote?: boolean;
+  /** "high" when JSON-LD JobPosting was found, "low" otherwise. */
+  confidence: "high" | "low";
 }
 
 export function parseJobFromPage(input: { url?: string; html?: string }): ParsedJob {
   const html = input.html ?? "";
   const url = input.url ?? "";
 
-  // 1. JSON-LD JobPosting
+  // 1. JSON-LD JobPosting — gold standard, treat as high confidence.
   const ldMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
   for (const block of ldMatches) {
     const inner = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>\s*$/, "").trim();
@@ -193,6 +197,7 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
               "",
           ) || undefined,
           isRemote: item.jobLocationType?.toString().toLowerCase().includes("telecommute"),
+          confidence: "high",
         };
       }
     } catch {
@@ -200,7 +205,7 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
     }
   }
 
-  // 2. OpenGraph + meta description fallback
+  // 2. OpenGraph + meta description fallback — low confidence, AI must verify.
   const ogTitle = matchMeta(html, /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
   const ogDesc = matchMeta(html, /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
   const metaDesc = matchMeta(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
@@ -213,9 +218,163 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   return {
     title: title.slice(0, 250),
     description,
-    company: ogSite || HIRED_VIDEO_SEED_COMPANY,
+    company: ogSite || undefined,
     location: undefined,
     isRemote: undefined,
+    confidence: "low",
+  };
+}
+
+// ---- AI-backed classification ---------------------------------------
+
+const ClassificationSchema = z.object({
+  isJobPosting: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  reason: z.string().optional(),
+  job: z
+    .object({
+      title: z.string().optional(),
+      company: z.string().optional(),
+      location: z.string().optional(),
+      description: z.string().optional(),
+      isRemote: z.boolean().optional(),
+    })
+    .optional(),
+});
+
+export type JobClassification = z.infer<typeof ClassificationSchema>;
+
+/** Threshold below which we reject the page as "not a job". */
+const CLASSIFICATION_THRESHOLD = 0.7;
+
+/**
+ * Use the LLM to decide whether a page is a job posting and, if so,
+ * extract structured fields from it. Used as the second pass in
+ * `extractAndClassifyJob` when JSON-LD wasn't available.
+ */
+async function classifyWithLLM(
+  apiKey: string,
+  input: { url: string; html: string; hint: ParsedJob },
+): Promise<JobClassification> {
+  // Strip the HTML down to plain text — saves tokens and gets the LLM
+  // closer to the user-visible content.
+  const text = stripHtml(input.html).slice(0, 12_000);
+
+  const systemPrompt = [
+    "You are a strict classifier that decides whether a webpage is a single job posting (a specific role someone can apply to).",
+    "It is NOT a job posting if it's: a job board listing page, a company homepage, an article about jobs, a resume, a profile, a search results page, or anything else.",
+    "Reply with ONLY a JSON object matching this exact shape:",
+    '{ "isJobPosting": boolean, "confidence": number between 0 and 1, "reason": short string (1 sentence), "job": { "title": string, "company": string, "location": string, "description": string (markdown OK, <2000 chars), "isRemote": boolean } }',
+    'Set "job" to null when isJobPosting is false. Be conservative: when in doubt, return false.',
+  ].join("\n");
+
+  const userMessage = [
+    `URL: ${input.url}`,
+    `Hint title: ${input.hint.title || "(none)"}`,
+    `Hint company: ${input.hint.company || "(none)"}`,
+    "",
+    "Page text:",
+    text,
+  ].join("\n");
+
+  return callLLMJson(
+    apiKey,
+    {
+      systemPrompt,
+      userMessage,
+      temperature: 0.1,
+      maxTokens: 1500,
+      responseFormat: "json_object",
+    },
+    ClassificationSchema,
+  );
+}
+
+export interface JobExtractionResult {
+  ok: boolean;
+  /** Reason for rejection — only present when ok=false. */
+  reason?: string;
+  /** Confidence score (0-1) for telemetry. */
+  confidence: number;
+  parsed?: ParsedJob;
+}
+
+/**
+ * Full pipeline used by POST /api/jobs/extract:
+ *   1. parseJobFromPage (JSON-LD / OG / heuristics).
+ *   2. If JSON-LD found a JobPosting → high confidence, accept.
+ *   3. Otherwise call the LLM classifier; reject if !isJobPosting
+ *      or if confidence < CLASSIFICATION_THRESHOLD.
+ *
+ * Falls open (accepts the heuristic parse) when no API key is
+ * configured, so dev environments without OpenRouter still work.
+ */
+export async function extractAndClassifyJob(input: {
+  url?: string;
+  html?: string;
+  apiKey?: string;
+}): Promise<JobExtractionResult> {
+  const heuristic = parseJobFromPage({ url: input.url, html: input.html });
+
+  if (heuristic.confidence === "high") {
+    return { ok: true, confidence: 1, parsed: heuristic };
+  }
+
+  // No JSON-LD. Try the LLM classifier.
+  if (!input.apiKey) {
+    // No AI configured — accept the heuristic parse rather than blocking
+    // the user. Dev mode + self-hosted deployments without an OpenRouter
+    // key still get the same UX as before.
+    return { ok: true, confidence: 0.5, parsed: heuristic };
+  }
+
+  if (!input.html || stripHtml(input.html).length < 200) {
+    return {
+      ok: false,
+      confidence: 0,
+      reason:
+        "We couldn't read enough of this page to tell whether it's a job. Open the actual job posting (not a search result or job board) and try again.",
+    };
+  }
+
+  let classification: JobClassification;
+  try {
+    classification = await classifyWithLLM(input.apiKey, {
+      url: input.url ?? "",
+      html: input.html,
+      hint: heuristic,
+    });
+  } catch (err) {
+    console.warn("[jobs/extract] LLM classification failed, falling open:", err);
+    // Don't punish the user for an upstream LLM outage — fall through
+    // to the heuristic parse.
+    return { ok: true, confidence: 0.5, parsed: heuristic };
+  }
+
+  if (!classification.isJobPosting || classification.confidence < CLASSIFICATION_THRESHOLD) {
+    return {
+      ok: false,
+      confidence: classification.confidence,
+      reason:
+        classification.reason ||
+        "This page doesn't look like a single job posting. Open the specific role you want to track (not a search result, company page, or job board) and try again.",
+    };
+  }
+
+  // AI says yes — merge AI fields over the heuristic so the best
+  // available value wins for each slot.
+  const aiJob = classification.job ?? {};
+  return {
+    ok: true,
+    confidence: classification.confidence,
+    parsed: {
+      title: (aiJob.title || heuristic.title || "Tracked Job").slice(0, 250),
+      description: aiJob.description || heuristic.description,
+      company: aiJob.company || heuristic.company || HIRED_VIDEO_SEED_COMPANY,
+      location: aiJob.location || heuristic.location,
+      isRemote: aiJob.isRemote ?? heuristic.isRemote,
+      confidence: "high",
+    },
   };
 }
 

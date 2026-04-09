@@ -20,6 +20,12 @@ import {
   X,
   CheckCircle2,
   MessageSquare,
+  ArrowRight,
+  Sparkles,
+  ShoppingBag,
+  Users,
+  Briefcase,
+  TrendingUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -138,7 +144,7 @@ function timeAgo(dateStr: string) {
 
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
 
@@ -165,9 +171,10 @@ export default function ServicesManagement() {
   // ── Load on mount ───────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!isAuthenticated || !user) return;
     loadServices();
     checkPushStatus();
-  }, []);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (activeTab === "inquiries" && incoming.length === 0 && myRequests.length === 0 && !inquiriesLoading) {
@@ -344,6 +351,160 @@ export default function ServicesManagement() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  // Marketing page for unauthenticated visitors
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
+        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+          <Navigation
+            onMenuClick={openSidebar}
+            onSidebarToggle={toggleSidebar}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <div className="pt-16">
+            <div className="max-w-6xl mx-auto px-4 py-16">
+              {/* Hero */}
+              <div className="text-center mb-16">
+                <div className="inline-flex items-center space-x-2 mb-6">
+                  <div className="relative">
+                    <ShoppingBag className="h-12 w-12 text-primary" />
+                    <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+                  </div>
+                  <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                    Career Services Marketplace
+                  </span>
+                </div>
+                <h1 className="text-5xl font-bold mb-6">
+                  Sell Your Expertise. Hire Top Talent.
+                </h1>
+                <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                  List resume reviews, interview coaching, career consulting, and more — or
+                  browse trusted professionals offering the help you need to land your next role.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link to="/signup">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                    >
+                      Get Started Free
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button size="lg" variant="outline" className="text-lg px-8">
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16">
+                <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
+                  <CardHeader>
+                    <Tag className="h-10 w-10 text-brand-purple mb-4" />
+                    <CardTitle>List Your Services</CardTitle>
+                    <CardDescription>
+                      Set your own prices and turnaround times. Showcase your offerings on your
+                      profile and start receiving paid inquiries from a global audience.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
+                  <CardHeader>
+                    <Inbox className="h-10 w-10 text-brand-blue mb-4" />
+                    <CardTitle>Manage Inquiries</CardTitle>
+                    <CardDescription>
+                      Accept, decline, and complete client requests in one inbox. Get push
+                      notifications when new orders arrive so you never miss a lead.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <Card className="border-primary/20 hover:border-primary/40 transition-colors">
+                  <CardHeader>
+                    <DollarSign className="h-10 w-10 text-primary mb-4" />
+                    <CardTitle>Get Paid Securely</CardTitle>
+                    <CardDescription>
+                      Buyers can pay upfront or submit a custom inquiry. Transparent pricing,
+                      built-in messaging, and a creator-friendly revenue split.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              {/* Who it's for */}
+              <div className="mb-16">
+                <h2 className="text-3xl font-bold text-center mb-12">
+                  Built for Career Professionals
+                </h2>
+                <div className="grid md:grid-cols-3 gap-8">
+                  <Card className="text-center">
+                    <CardHeader>
+                      <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
+                      <CardTitle>Coaches & Consultants</CardTitle>
+                      <CardDescription>
+                        Resume writers, career coaches, and interview prep experts can reach
+                        candidates actively searching for their next opportunity.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+
+                  <Card className="text-center">
+                    <CardHeader>
+                      <Briefcase className="h-12 w-12 mx-auto text-blue-600 mb-4" />
+                      <CardTitle>Recruiters</CardTitle>
+                      <CardDescription>
+                        Offer headhunting, lead generation, and placement services to job
+                        seekers and hiring managers in one professional marketplace.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+
+                  <Card className="text-center">
+                    <CardHeader>
+                      <TrendingUp className="h-12 w-12 mx-auto text-purple-600 mb-4" />
+                      <CardTitle>Job Seekers</CardTitle>
+                      <CardDescription>
+                        Browse vetted services to sharpen your resume, ace your interviews,
+                        and accelerate your job search with expert help.
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="text-center">
+                <Card className="inline-block border-brand-purple/30 bg-gradient-to-br from-brand-purple/5 to-brand-blue/5">
+                  <CardContent className="py-10 px-12">
+                    <h3 className="text-2xl font-bold mb-2">Ready to start?</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Create your free account and list your first service in minutes.
+                    </p>
+                    <Link to="/signup">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                      >
+                        Sign Up Free
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
@@ -353,7 +514,8 @@ export default function ServicesManagement() {
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <main className="pt-16 p-4 md:p-8 max-w-4xl mx-auto w-full">
+        <div className="pt-16">
+        <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -738,6 +900,7 @@ export default function ServicesManagement() {
             </TabsContent>
           </Tabs>
         </main>
+        </div>
         <Footer />
       </div>
 

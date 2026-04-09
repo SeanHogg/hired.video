@@ -133,23 +133,9 @@ const JobAlertSchema = z.object({
 type JobApplication = z.infer<typeof JobApplicationSchema>;
 type JobAlert = z.infer<typeof JobAlertSchema>;
 
-interface SavedJob {
-  id: string;
-  jobId: string;
-  userId: string;
-  savedAt: string;
-  notes?: string;
-  job: {
-    id: string;
-    title: string;
-    company: string;
-    location?: string;
-    salary?: string;
-    employmentType?: string;
-    postedDate?: string;
-    description?: string;
-  };
-}
+// Saved jobs are returned by the API as flat JobSummary entities
+// (see GET /api/Job/saved → jobService.getSavedJobs()).
+type SavedJob = JobSummary;
 
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -305,7 +291,7 @@ export default function Jobs() {
     try {
       setSavedJobsLoading(true);
       const jobs = await jobService.getSavedJobs();
-      setSavedJobs(jobs as unknown as SavedJob[]);
+      setSavedJobs(jobs);
     } catch {
       toast.error("Failed to load saved jobs");
     } finally {
@@ -316,7 +302,7 @@ export default function Jobs() {
   const handleUnsaveJob = async (jobId: string) => {
     try {
       await jobService.unsaveJob(jobId);
-      setSavedJobs((prev) => prev.filter((job) => job.jobId !== jobId));
+      setSavedJobs((prev) => prev.filter((job) => job.id !== jobId));
       toast.success("Job removed from saved");
     } catch {
       toast.error("Failed to remove job");
@@ -781,81 +767,86 @@ export default function Jobs() {
                     </Card>
                   ) : (
                     <div className="space-y-4">
-                      {savedJobs.map((savedJob) => (
-                        <Card key={savedJob.id} className="hover:shadow-lg transition-shadow">
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <Link
-                                  to={`/jobs/${savedJob.jobId}`}
-                                  className="text-xl font-semibold hover:text-primary transition-colors"
+                      {savedJobs.map((savedJob) => {
+                        const salary =
+                          savedJob.salaryMin && savedJob.salaryMax
+                            ? `$${savedJob.salaryMin.toLocaleString()} - $${savedJob.salaryMax.toLocaleString()}`
+                            : savedJob.salaryMin
+                              ? `From $${savedJob.salaryMin.toLocaleString()}`
+                              : savedJob.salaryMax
+                                ? `Up to $${savedJob.salaryMax.toLocaleString()}`
+                                : null;
+                        return (
+                          <Card key={savedJob.id} className="hover:shadow-lg transition-shadow">
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <Link
+                                    to={`/jobs/${savedJob.id}`}
+                                    className="text-xl font-semibold hover:text-primary transition-colors"
+                                  >
+                                    {savedJob.title}
+                                  </Link>
+                                  {savedJob.company && (
+                                    <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                                      <Briefcase className="h-4 w-4" />
+                                      {savedJob.company}
+                                    </p>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleUnsaveJob(savedJob.id)}
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                 >
-                                  {savedJob.job.title}
-                                </Link>
-                                <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                                  <Briefcase className="h-4 w-4" />
-                                  {savedJob.job.company}
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex flex-wrap gap-4 mb-4">
+                                {savedJob.location && (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <MapPin className="h-4 w-4" />
+                                    {savedJob.location}
+                                  </div>
+                                )}
+                                {salary && (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <DollarSign className="h-4 w-4" />
+                                    {salary}
+                                  </div>
+                                )}
+                                {savedJob.employmentType && (
+                                  <Badge variant="secondary">{savedJob.employmentType}</Badge>
+                                )}
+                              </div>
+
+                              {savedJob.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                                  {savedJob.description}
                                 </p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleUnsaveJob(savedJob.jobId)}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex flex-wrap gap-4 mb-4">
-                              {savedJob.job.location && (
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                  <MapPin className="h-4 w-4" />
-                                  {savedJob.job.location}
+                              )}
+
+                              <div className="flex items-center justify-between pt-4 border-t">
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  Saved {formatDate(savedJob.createdAt ?? savedJob.postedDate ?? "")}
                                 </div>
-                              )}
-                              {savedJob.job.salary && (
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                  <DollarSign className="h-4 w-4" />
-                                  {savedJob.job.salary}
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm" asChild>
+                                    <Link to={`/jobs/${savedJob.id}`}>View Details</Link>
+                                  </Button>
+                                  <Button size="sm" asChild>
+                                    <Link to={`/jobs/${savedJob.id}`}>Apply Now</Link>
+                                  </Button>
                                 </div>
-                              )}
-                              {savedJob.job.employmentType && (
-                                <Badge variant="secondary">{savedJob.job.employmentType}</Badge>
-                              )}
-                            </div>
-
-                            {savedJob.job.description && (
-                              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                {savedJob.job.description}
-                              </p>
-                            )}
-
-                            <div className="flex items-center justify-between pt-4 border-t">
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                Saved {formatDate(savedJob.savedAt)}
                               </div>
-                              <div className="flex gap-2">
-                                <Button variant="outline" size="sm" asChild>
-                                  <Link to={`/jobs/${savedJob.jobId}`}>View Details</Link>
-                                </Button>
-                                <Button size="sm" asChild>
-                                  <Link to={`/jobs/${savedJob.jobId}`}>Apply Now</Link>
-                                </Button>
-                              </div>
-                            </div>
-
-                            {savedJob.notes && (
-                              <div className="mt-4 p-3 bg-muted rounded-md">
-                                <p className="text-sm font-medium mb-1">Your Notes:</p>
-                                <p className="text-sm text-muted-foreground">{savedJob.notes}</p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   )}
                 </TabsContent>

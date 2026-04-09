@@ -112,6 +112,7 @@ const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const RolesPermissions = lazy(() => import("./pages/admin/RolesPermissions"));
+const JobsManagement = lazy(() => import("./pages/admin/JobsManagement"));
 const BillingManagement = lazy(() => import("./pages/admin/BillingManagement"));
 const ModuleManagement = lazy(() => import("./pages/admin/ModuleManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
@@ -515,6 +516,7 @@ const App = () => (
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
                       <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />
+                      <Route path="/admin/jobs"              element={<AdminLayout><JobsManagement /></AdminLayout>} />
                       <Route path="/admin/billing"           element={<AdminLayout><BillingManagement /></AdminLayout>} />
                       <Route path="/admin/modules"           element={<AdminLayout><ModuleManagement /></AdminLayout>} />
                       <Route path="/admin/audit"             element={<AdminLayout><AuditLog /></AdminLayout>} />

@@ -15,6 +15,7 @@ export type AdminResource =
   | "dashboard"
   | "users"
   | "roles"
+  | "jobs"
   | "billing"
   | "modules"
   | "audit"
@@ -26,6 +27,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     dashboard: ["read"],
     users:     ["create", "read", "update", "delete"],
     roles:     ["create", "read", "update", "delete"],
+    jobs:      ["create", "read", "update", "delete"],
     billing:   ["create", "read", "update", "delete"],
     modules:   ["create", "read", "update", "delete"],
     audit:     ["read"],
@@ -35,6 +37,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     dashboard: ["read"],
     users:     ["read"],
     roles:     ["read"],
+    jobs:      ["read", "update"],
     audit:     ["read"],
   },
 };
@@ -85,6 +88,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "dashboard",
   "users",
   "roles",
+  "jobs",
   "billing",
   "modules",
   "audit",
@@ -102,6 +106,7 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   dashboard: "Overview",
   users:     "Users",
   roles:     "Roles",
+  jobs:      "Jobs",
   billing:   "Billing",
   modules:   "Modules",
   audit:     "Audit Log",

@@ -98,9 +98,10 @@ export function AccountAnalytics({
     loadAnalytics();
   }, [onLoadAnalytics, data]);
 
-  // Use real data if available, otherwise fall back to mock data
-  const mockData: AnalyticsData = analyticsData ||
-    data || {
+  // Defaults backfill any fields the API doesn't return — the
+  // /api/account/analytics endpoint only sends a small subset
+  // (activeUsers, invitesSent, invitesAccepted, lastActiveAt).
+  const defaultData: AnalyticsData = {
       totalUsers: 156,
       activeUsers: 89,
       totalJobs: 45,
@@ -135,7 +136,15 @@ export function AccountAnalytics({
       ],
     };
 
+  // Merge real data over defaults so missing API fields don't blow up rendering
+  const mockData: AnalyticsData = {
+    ...defaultData,
+    ...(data ?? {}),
+    ...(analyticsData ?? {}),
+  };
+
   const formatNumber = (num: number) => {
+    if (num == null) return "0";
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
     return num.toString();
   };

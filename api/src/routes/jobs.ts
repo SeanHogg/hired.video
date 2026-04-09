@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import * as jobService from "../services/job.js";
+import { getApiKey } from "../services/ai.js";
 
 // ============================================================================
 // SCHEMAS
@@ -237,12 +238,15 @@ jobRoutes.post("/createfromfile", async (c) => {
 /**
  * POST /api/jobs/extract — track a job from a webpage
  *
- * The Chrome extension sends `{ url, html, sourceUrl? }`. The backend parses
- * structured data out of the HTML (JSON-LD JobPosting → OpenGraph → bare
- * heuristics), creates a public job under the hired.video seed company
- * (so it's surfaced on the public board even when the original posting is
- * behind a paywall), and auto-saves it to the calling user's tracker so it
- * shows up in `GET /api/jobs/saved` without an extra round-trip.
+ * The Chrome extension sends `{ url, html, sourceUrl? }`. The backend:
+ *   1. Parses structured data out of the HTML (JSON-LD JobPosting → OG → heuristics).
+ *   2. If the page lacks JSON-LD, runs an AI classifier to confirm it's
+ *      actually a single job posting (not a job board, search results, etc).
+ *   3. On rejection, returns 422 + a friendly reason the extension surfaces.
+ *   4. On acceptance, creates a public job under the hired.video seed
+ *      company so it's surfaced on the public board even when the
+ *      original posting is behind a paywall, and auto-saves it to the
+ *      caller's tracker so it shows up in GET /api/jobs/saved.
  */
 const extractHandler = async (c: any) => {
   const userId = c.var.user?.sub;
@@ -253,8 +257,22 @@ const extractHandler = async (c: any) => {
   const html: string = typeof body?.html === "string" ? body.html : "";
   const sourceUrl: string = typeof body?.sourceUrl === "string" ? body.sourceUrl : url;
 
-  const parsed = jobService.parseJobFromPage({ url: sourceUrl, html });
+  const result = await jobService.extractAndClassifyJob({
+    url: sourceUrl,
+    html,
+    apiKey: getApiKey(c.env as { OPENROUTER_API_KEY?: string }),
+  });
 
+  if (!result.ok || !result.parsed) {
+    return c.json(
+      error("NOT_A_JOB_POSTING", result.reason || "This page doesn't look like a job posting.", {
+        confidence: result.confidence,
+      }),
+      422,
+    );
+  }
+
+  const parsed = result.parsed;
   const created = await jobService.createTrackedJob(
     {
       title: parsed.title,
