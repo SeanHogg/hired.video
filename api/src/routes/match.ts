@@ -12,17 +12,31 @@ export const matchRoutes = new Hono<{ Variables: Variables }>();
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
-const AnalyzeSchema = z.object({
-  jobHtml: z.string().min(1),
-  resumeId: z.string().uuid().optional(),
-  sourceUrl: z.string().optional(),
-});
+// jobHtml is optional when jobId is provided — handlers refuse the
+// request only if BOTH are missing. This is the change that lets the
+// Chrome extension's "Tracker tab" rehydrate a previously-saved job
+// from the DB without re-scraping the source page.
+const AnalyzeSchema = z
+  .object({
+    jobHtml: z.string().optional(),
+    jobId: z.string().uuid().optional(),
+    resumeId: z.string().uuid().optional(),
+    sourceUrl: z.string().optional(),
+  })
+  .refine((v) => !!(v.jobHtml || v.jobId), {
+    message: "Either jobHtml or jobId is required",
+  });
 
-const TailorSchema = z.object({
-  jobHtml: z.string().min(1),
-  resumeId: z.string().uuid().optional(),
-  sourceUrl: z.string().optional(),
-});
+const TailorSchema = z
+  .object({
+    jobHtml: z.string().optional(),
+    jobId: z.string().uuid().optional(),
+    resumeId: z.string().uuid().optional(),
+    sourceUrl: z.string().optional(),
+  })
+  .refine((v) => !!(v.jobHtml || v.jobId), {
+    message: "Either jobHtml or jobId is required",
+  });
 
 const MatchByIdSchema = z.object({
   jobId: z.string().uuid(),
@@ -37,6 +51,58 @@ const MatchByContentSchema = z.object({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Resolve a job-text payload from EITHER raw HTML provided by the
+ * caller OR a `jobId` pointing at a previously-tracked row. When
+ * jobId is supplied, we synthesize an HTML doc from the stored
+ * fields so the same `htmlToText` pipeline downstream just works.
+ *
+ * Returns null when jobId points at a non-existent row.
+ */
+async function resolveJobText(input: { jobHtml?: string; jobId?: string }): Promise<string | null> {
+  if (input.jobHtml && input.jobHtml.trim().length > 0) {
+    return htmlToText(input.jobHtml);
+  }
+  if (!input.jobId) return null;
+
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, input.jobId))
+    .limit(1);
+  if (!row) return null;
+
+  // Synthesize a flat text representation. Mirrors the shape that
+  // the existing keyword/LLM analysis already expects.
+  const parts: string[] = [];
+  parts.push(`Title: ${row.title}`);
+  if (row.company) parts.push(`Company: ${row.company}`);
+  if (row.location) parts.push(`Location: ${row.location}`);
+  if (row.jobType) parts.push(`Type: ${row.jobType}`);
+  if (row.experienceLevel) parts.push(`Level: ${row.experienceLevel}`);
+  if (row.salaryMin || row.salaryMax) {
+    parts.push(`Salary: ${row.salaryMin ?? ""}-${row.salaryMax ?? ""} ${row.salaryCurrency ?? "USD"}`);
+  }
+  parts.push("\nDescription:\n" + (row.description ?? ""));
+
+  const details = ((row as any).details ?? {}) as Record<string, unknown>;
+  const stringify = (label: string, value: unknown) => {
+    if (Array.isArray(value) && value.length > 0) {
+      parts.push(`\n${label}:\n- ` + value.map(String).join("\n- "));
+    }
+  };
+  stringify("Responsibilities", details.responsibilities);
+  stringify("Requirements", details.requirements);
+  stringify("Qualifications", details.qualifications);
+  stringify("Benefits", details.benefits);
+  if (Array.isArray(row.skillsRequired) && row.skillsRequired.length > 0) {
+    parts.push(`\nSkills: ${(row.skillsRequired as string[]).join(", ")}`);
+  }
+
+  return parts.join("\n").slice(0, 8000);
+}
 
 /** Strip HTML tags and collapse whitespace to get plain text for LLM. */
 function htmlToText(html: string): string {
@@ -156,11 +222,13 @@ matchRoutes.post("/analyze", async (c) => {
   const parsed = AnalyzeSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const { jobHtml, resumeId, sourceUrl } = parsed.data;
+  const { jobHtml, jobId, resumeId, sourceUrl } = parsed.data;
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = htmlToText(jobHtml);
+  const jobText = await resolveJobText({ jobHtml, jobId });
+  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
+
   const resumeText = resumeContentToText(resume.content);
 
   const apiKey = getApiKey((c.env as any) ?? {});
@@ -235,11 +303,13 @@ matchRoutes.post("/tailor", async (c) => {
   const parsed = TailorSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const { jobHtml, resumeId, sourceUrl } = parsed.data;
+  const { jobHtml, jobId, resumeId, sourceUrl } = parsed.data;
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = htmlToText(jobHtml);
+  const jobText = await resolveJobText({ jobHtml, jobId });
+  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before tailoring."), 404);
+
   const resumeText = resumeContentToText(resume.content);
 
   const apiKey = getApiKey((c.env as any) ?? {});

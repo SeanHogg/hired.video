@@ -639,8 +639,10 @@ export async function createTrackedJob(
     benefits?: string[];
   },
   userId: string,
+  options: { track?: boolean } = {},
 ): Promise<JobEntity> {
   const db = getDb();
+  const track = options.track ?? true;
   const company = input.company?.trim() || HIRED_VIDEO_SEED_COMPANY;
 
   const details = {
@@ -650,8 +652,10 @@ export async function createTrackedJob(
     benefits: input.benefits ?? [],
   };
 
-  // Re-use an existing tracked job for the same sourceUrl so users
-  // tracking the same listing don't create duplicates on the board.
+  // Re-use an existing job row for the same sourceUrl so we don't fill
+  // the public board with duplicates of the same listing. When tracking
+  // is enabled we also bookmark the existing row to the caller; when
+  // it's disabled we just return the row as-is.
   if (input.sourceUrl) {
     const [existing] = await db
       .select()
@@ -659,7 +663,9 @@ export async function createTrackedJob(
       .where(eq(jobItems.sourceUrl, input.sourceUrl))
       .limit(1);
     if (existing) {
-      await db.insert(savedJobs).values({ userId, jobId: existing.id }).onConflictDoNothing();
+      if (track) {
+        await db.insert(savedJobs).values({ userId, jobId: existing.id }).onConflictDoNothing();
+      }
       return rowToJob(existing);
     }
   }
@@ -667,7 +673,10 @@ export async function createTrackedJob(
   const [row] = await db
     .insert(jobItems)
     .values({
-      postedByUserId: userId,
+      // When `track` is false the row is intentionally orphaned from
+      // any user — it's published under the hired.video community
+      // seed company so the public board still has an owner.
+      postedByUserId: track ? userId : null,
       title: input.title.slice(0, 250) || "Tracked Job",
       description: input.description ?? "",
       company,
@@ -685,7 +694,7 @@ export async function createTrackedJob(
     } as any)
     .returning();
 
-  if (row) {
+  if (row && track) {
     await db.insert(savedJobs).values({ userId, jobId: row.id }).onConflictDoNothing();
   }
 

@@ -256,6 +256,12 @@ const extractHandler = async (c: any) => {
   const url: string = typeof body?.url === "string" ? body.url : "";
   const html: string = typeof body?.html === "string" ? body.html : "";
   const sourceUrl: string = typeof body?.sourceUrl === "string" ? body.sourceUrl : url;
+  // Query OR body — when false, the job is created on the public board
+  // under the hired.video community seed company but NOT bookmarked to
+  // the caller's tracker. Used by the "Generate without tracking" path.
+  const trackParam = c.req.query("track");
+  const track =
+    body?.track === false ? false : trackParam === "false" ? false : true;
 
   const result = await jobService.extractAndClassifyJob({
     url: sourceUrl,
@@ -278,7 +284,10 @@ const extractHandler = async (c: any) => {
       title: parsed.title,
       description: parsed.description,
       location: parsed.location,
-      company: parsed.company,
+      // When `track` is false the job is published under the hired.video
+      // community seed company instead of whatever name the parser found
+      // on the source page. Keeps the public board attributable.
+      company: track ? parsed.company : jobService.HIRED_VIDEO_SEED_COMPANY,
       sourceUrl: sourceUrl || undefined,
       isRemote: parsed.isRemote,
       jobType: parsed.jobType,
@@ -293,6 +302,7 @@ const extractHandler = async (c: any) => {
       benefits: parsed.benefits,
     },
     userId,
+    { track },
   );
 
   return c.json(success(created), 201);

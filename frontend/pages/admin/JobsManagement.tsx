@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
@@ -76,6 +77,10 @@ export default function JobsManagement() {
   const [search, setSearch] = useState("");
   const [employmentType, setEmploymentType] = useState("all");
   const [confirmDelete, setConfirmDelete] = useState<JobSummary | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<string>("");
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { toast } = useToast();
   const { can } = useAdminPermissions();
 
@@ -126,6 +131,73 @@ export default function JobsManagement() {
     } catch {
       toast({ title: "Failed to delete job", variant: "destructive" });
     }
+  };
+
+  // Clear selection when the visible page of jobs changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, search, employmentType]);
+
+  const allVisibleSelected =
+    jobs.length > 0 && jobs.every((j) => selectedIds.has(j.id));
+  const someVisibleSelected =
+    jobs.some((j) => selectedIds.has(j.id)) && !allVisibleSelected;
+
+  const toggleAllVisible = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        jobs.forEach((j) => next.add(j.id));
+      } else {
+        jobs.forEach((j) => next.delete(j.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleApplyBulkAction = () => {
+    if (!bulkAction || selectedIds.size === 0) return;
+    if (bulkAction === "delete") {
+      setConfirmBulkDelete(true);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) => jobService.deleteJob(id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const succeeded = ids.length - failed;
+    if (succeeded > 0) {
+      toast({
+        title: `Deleted ${succeeded} job${succeeded === 1 ? "" : "s"}`,
+        ...(failed > 0
+          ? { description: `${failed} failed to delete.` }
+          : {}),
+      });
+    }
+    if (succeeded === 0 && failed > 0) {
+      toast({
+        title: `Failed to delete ${failed} job${failed === 1 ? "" : "s"}`,
+        variant: "destructive",
+      });
+    }
+    setBulkDeleting(false);
+    setConfirmBulkDelete(false);
+    setBulkAction("");
+    setSelectedIds(new Set());
+    loadJobs();
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -217,11 +289,59 @@ export default function JobsManagement() {
         </div>
       )}
 
+      {/* Bulk actions toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <Select value={bulkAction} onValueChange={setBulkAction}>
+            <SelectTrigger className="w-[180px] h-8">
+              <SelectValue placeholder="Bulk action..." />
+            </SelectTrigger>
+            <SelectContent>
+              {canDelete && <SelectItem value="delete">Delete</SelectItem>}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!bulkAction}
+            onClick={handleApplyBulkAction}
+          >
+            Apply
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSelectedIds(new Set());
+              setBulkAction("");
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={
+                    allVisibleSelected
+                      ? true
+                      : someVisibleSelected
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(v) => toggleAllVisible(v === true)}
+                  aria-label="Select all jobs on this page"
+                />
+              </TableHead>
               <TableHead>Job</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Location</TableHead>
@@ -235,14 +355,14 @@ export default function JobsManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading jobs...
                 </TableCell>
               </TableRow>
             ) : jobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   No jobs match your filters.
                 </TableCell>
               </TableRow>
@@ -251,7 +371,14 @@ export default function JobsManagement() {
                 const status = (job as any).status ?? "Open";
                 const posted = job.postedDate ?? job.createdAt;
                 return (
-                  <TableRow key={job.id}>
+                  <TableRow key={job.id} data-state={selectedIds.has(job.id) ? "selected" : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(job.id)}
+                        onCheckedChange={(v) => toggleOne(job.id, v === true)}
+                        aria-label={`Select ${job.title}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
@@ -381,6 +508,44 @@ export default function JobsManagement() {
               onClick={() => confirmDelete && handleDelete(confirmDelete)}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog
+        open={confirmBulkDelete}
+        onOpenChange={(open) => !open && !bulkDeleting && setConfirmBulkDelete(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected job
+              {selectedIds.size === 1 ? "" : "s"}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={bulkDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBulkDelete();
+              }}
+            >
+              {bulkDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
