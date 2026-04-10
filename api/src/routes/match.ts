@@ -15,13 +15,17 @@ export const matchRoutes = new Hono<{ Variables: Variables }>();
 // =====================================================================
 
 /** Shared input shape for analyze + tailor. Accepts EITHER raw HTML
- *  (from the content-script capture) OR a jobId (DB rehydration). */
+ *  (from the content-script capture) OR a jobId (DB rehydration).
+ *  `priorRecommendations` lets the tailor endpoint receive the gap
+ *  analysis from a previous /analyze call so the LLM can target those
+ *  specific weaknesses when rewriting the resume. */
 const MatchInputSchema = z
   .object({
     jobHtml: z.string().optional(),
     jobId: z.string().uuid().optional(),
     resumeId: z.string().uuid().optional(),
     sourceUrl: z.string().optional(),
+    priorRecommendations: z.string().optional(),
   })
   .refine((v) => !!(v.jobHtml || v.jobId), {
     message: "Either jobHtml or jobId is required",
@@ -279,6 +283,7 @@ interface PipelineContext {
   resumeId: string;
   sourceUrl?: string;
   apiKey?: string;
+  priorRecommendations?: string;
 }
 
 /** Common auth + resolve logic for analyze/tailor/byid. Returns either
@@ -294,7 +299,7 @@ async function resolveMatchContext(c: Context<{ Variables: Variables }>): Promis
   const parsed = MatchInputSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const { jobHtml, jobId, resumeId, sourceUrl } = parsed.data;
+  const { jobHtml, jobId, resumeId, sourceUrl, priorRecommendations } = parsed.data;
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
@@ -304,7 +309,7 @@ async function resolveMatchContext(c: Context<{ Variables: Variables }>): Promis
   const resumeText = resumeContentToText(resume.content);
   const apiKey = getApiKey((c.env as any) ?? {});
 
-  return { userId, jobText, resumeText, resumeId: resume.id, sourceUrl, apiKey };
+  return { userId, jobText, resumeText, resumeId: resume.id, sourceUrl, apiKey, priorRecommendations };
 }
 
 function isResponse(val: PipelineContext | Response): val is Response {
@@ -358,6 +363,13 @@ matchRoutes.post("/tailor", async (c) => {
 
   if (ctx.apiKey) {
     try {
+      // Build a targeted prompt — if prior score recommendations exist,
+      // inject them so the LLM specifically addresses identified gaps
+      // rather than doing a generic rewrite.
+      const priorSection = ctx.priorRecommendations
+        ? `\n\nPRIOR SCORE ANALYSIS (address these specific gaps):\n${ctx.priorRecommendations}\n`
+        : "";
+
       const result = await callLLMJson(
         ctx.apiKey,
         {
@@ -366,6 +378,7 @@ matchRoutes.post("/tailor", async (c) => {
 2. Rewrite the resume in Markdown to better match the job requirements
 3. Score the rewritten resume (should be higher)
 4. Summarize the key changes made
+${ctx.priorRecommendations ? "\nIMPORTANT: A prior analysis identified specific gaps and recommendations (included below the resume). You MUST directly address each of these gaps in your rewrite. Prioritize fixing the identified weaknesses over generic improvements." : ""}
 
 Rules:
 - Keep the same person's real experience — do not fabricate jobs or degrees
@@ -373,7 +386,7 @@ Rules:
 - Add missing keywords naturally where experience supports it
 - Use a professional Markdown resume format with sections: Summary, Experience, Skills, Education
 - Return valid JSON only`,
-          userMessage: `Job Description:\n${ctx.jobText}\n\n---\n\nOriginal Resume:\n${ctx.resumeText}\n\n---\n\nReturn JSON: { "oldScore": <0-100>, "newScore": <0-100>, "markdownResume": "<full tailored resume in Markdown>", "summaryRecommendations": "<3-5 bullet points summarising changes>" }`,
+          userMessage: `Job Description:\n${ctx.jobText}\n\n---\n\nOriginal Resume:\n${ctx.resumeText}${priorSection}\n\n---\n\nReturn JSON: { "oldScore": <0-100>, "newScore": <0-100>, "markdownResume": "<full tailored resume in Markdown>", "summaryRecommendations": "<3-5 bullet points summarising changes>" }`,
           responseFormat: "json_object",
           temperature: 0.5,
         },
