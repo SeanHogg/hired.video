@@ -347,11 +347,20 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
       recordAIUsage(ctx.userId, "match_analyze", ctx.jobText.length + ctx.resumeText.length, JSON.stringify(result).length);
       return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
     } catch (err) {
-      console.error("[match/analyze] LLM failed:", err instanceof Error ? err.message : err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("[match/analyze] LLM failed:", errMsg);
+      // Return the LLM error in the fallback message so it's debuggable
+      const { score, message } = keywordScore(ctx.jobText, ctx.resumeText);
+      return c.json(success({
+        score,
+        summaryRecommendations: message + `\n\n_LLM error: ${errMsg.slice(0, 300)}_`,
+        resumeId: ctx.resumeId,
+        sourceUrl: ctx.sourceUrl,
+      }), 200);
     }
   }
 
-  console.warn("[match/analyze] Heuristic fallback. apiKey:", !!ctx.apiKey, "jobLen:", ctx.jobText.length, "resumeLen:", ctx.resumeText.length);
+  console.warn("[match/analyze] No API key. jobLen:", ctx.jobText.length, "resumeLen:", ctx.resumeText.length);
   const { score, message } = keywordScore(ctx.jobText, ctx.resumeText);
   return c.json(success({ score, summaryRecommendations: message, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
 });

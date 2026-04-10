@@ -50,6 +50,7 @@ EMAIL_FROM = "info@hired.video"
 # wrangler secret put HELCIM_ACCOUNT_ID
 # wrangler secret put HELCIM_API_TOKEN
 # wrangler secret put HELCIM_WEBHOOK_TOKEN
+# wrangler secret put OPENROUTER_API_KEY
 # wrangler secret put OPENROUTER_MODELS
 # wrangler secret put GOOGLE_GEMINI_KEY
 # wrangler secret put YOUTUBE_CLIENT_ID
