@@ -42,16 +42,24 @@ const MatchByContentSchema = z.object({
 });
 
 // ---- LLM response schemas ---
+
+/** LLMs sometimes return recommendations as an array of strings instead
+ *  of a single string. This transformer coerces both forms to a string. */
+const coerceToString = z.union([
+  z.string(),
+  z.array(z.string()).transform((arr) => arr.map((s) => `- ${s}`).join("\n")),
+]).pipe(z.string());
+
 const AnalyzeResponseSchema = z.object({
   score: z.number().min(0).max(100),
-  summaryRecommendations: z.string(),
+  summaryRecommendations: coerceToString,
 });
 
 const TailorResponseSchema = z.object({
   oldScore: z.number().min(0).max(100),
   newScore: z.number().min(0).max(100),
   markdownResume: z.string(),
-  summaryRecommendations: z.string(),
+  summaryRecommendations: coerceToString,
 });
 
 const InsightsResponseSchema = z.object({
