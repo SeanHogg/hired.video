@@ -658,6 +658,124 @@ Return JSON: {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/extension-analytics — metrics for the Chrome extension
+// Analytics tab. Combines saved-job pipeline data with scoring stats.
+// ---------------------------------------------------------------------------
+dashboardRoutes.get("/extension-analytics", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json({ error: { code: "UNAUTHORIZED" } }, 401);
+  const db = getDb();
+
+  const weekAgo = daysAgo(7);
+  const twoWeeksAgo = daysAgo(14);
+  const monthAgo = daysAgo(30);
+
+  // Fetch all saved jobs with their statuses
+  const allSaved = await db
+    .select({
+      id: schema.savedJobs.id,
+      jobId: schema.savedJobs.jobId,
+      status: schema.savedJobs.status,
+      appliedAt: schema.savedJobs.appliedAt,
+      statusChangedAt: schema.savedJobs.statusChangedAt,
+      createdAt: schema.savedJobs.createdAt,
+    })
+    .from(schema.savedJobs)
+    .where(eq(schema.savedJobs.userId, userId));
+
+  // Pipeline funnel counts
+  const funnel: Record<string, number> = {
+    tracked: 0, applied: 0, interviewing: 0, offered: 0,
+    accepted: 0, rejected: 0, cancelled: 0, withdrawn: 0, declined: 0,
+  };
+  for (const s of allSaved) {
+    const st = ((s as any).status ?? 'tracked').toLowerCase();
+    funnel[st] = (funnel[st] ?? 0) + 1;
+  }
+
+  // This week vs last week activity
+  const thisWeekTracked = allSaved.filter((s) => s.createdAt >= weekAgo).length;
+  const lastWeekTracked = allSaved.filter((s) => s.createdAt >= twoWeeksAgo && s.createdAt < weekAgo).length;
+  const thisWeekApplied = allSaved.filter((s) =>
+    (s as any).status !== 'tracked' && (s as any).appliedAt && (s as any).appliedAt >= weekAgo
+  ).length;
+  const lastWeekApplied = allSaved.filter((s) =>
+    (s as any).status !== 'tracked' && (s as any).appliedAt && (s as any).appliedAt >= twoWeeksAgo && (s as any).appliedAt < weekAgo
+  ).length;
+
+  // Weekly trend (last 4 weeks)
+  const weeklyTrend: Array<{ week: string; tracked: number; applied: number }> = [];
+  for (let w = 3; w >= 0; w--) {
+    const start = daysAgo((w + 1) * 7);
+    const end = daysAgo(w * 7);
+    const label = w === 0 ? 'This week' : w === 1 ? 'Last week' : `${w + 1}w ago`;
+    weeklyTrend.push({
+      week: label,
+      tracked: allSaved.filter((s) => s.createdAt >= start && s.createdAt < end).length,
+      applied: allSaved.filter((s) => (s as any).appliedAt && (s as any).appliedAt >= start && (s as any).appliedAt < end).length,
+    });
+  }
+
+  // Conversion rates
+  const totalTracked = allSaved.length;
+  const totalApplied = allSaved.filter((s) => (s as any).status !== 'tracked' && (s as any).status !== 'cancelled').length;
+  const totalInterviewing = funnel.interviewing + funnel.offered + funnel.accepted;
+  const applyRate = totalTracked > 0 ? Math.round((totalApplied / totalTracked) * 100) : 0;
+  const interviewRate = totalApplied > 0 ? Math.round((totalInterviewing / totalApplied) * 100) : 0;
+  const offerRate = totalInterviewing > 0 ? Math.round(((funnel.offered + funnel.accepted) / totalInterviewing) * 100) : 0;
+
+  // Score insights (from match scores cache in the extension — but we can
+  // also pull from aiUsageRecords or jobApplications)
+  // For now, derive from job count only; actual score data lives client-side.
+
+  // Activity streak — count consecutive days with at least one tracked or applied job
+  const uniqueDays = new Set<string>();
+  for (const s of allSaved) {
+    uniqueDays.add(s.createdAt.toISOString().slice(0, 10));
+    if ((s as any).appliedAt) uniqueDays.add((s as any).appliedAt.toISOString().slice(0, 10));
+    if ((s as any).statusChangedAt) uniqueDays.add((s as any).statusChangedAt.toISOString().slice(0, 10));
+  }
+  let streak = 0;
+  const today = new Date();
+  for (let d = 0; d < 365; d++) {
+    const dayStr = new Date(today.getTime() - d * 86400000).toISOString().slice(0, 10);
+    if (uniqueDays.has(dayStr)) streak++;
+    else break;
+  }
+
+  // Response tracking — estimate "ghost rate" from jobs applied > 14 days ago
+  // still in "applied" status (no response)
+  const fourteenDaysAgo = daysAgo(14);
+  const appliedNoResponse = allSaved.filter((s) =>
+    (s as any).status === 'applied' && (s as any).appliedAt && (s as any).appliedAt < fourteenDaysAgo
+  ).length;
+  const totalAppliedOver14d = allSaved.filter((s) =>
+    (s as any).appliedAt && (s as any).appliedAt < fourteenDaysAgo
+  ).length;
+  const ghostRate = totalAppliedOver14d > 0 ? Math.round((appliedNoResponse / totalAppliedOver14d) * 100) : 0;
+
+  return c.json(success({
+    thisWeek: {
+      tracked: thisWeekTracked,
+      applied: thisWeekApplied,
+      trackedDelta: thisWeekTracked - lastWeekTracked,
+      appliedDelta: thisWeekApplied - lastWeekApplied,
+      streak,
+    },
+    funnel,
+    conversion: { applyRate, interviewRate, offerRate },
+    weeklyTrend,
+    ghostRate,
+    totals: {
+      tracked: totalTracked,
+      applied: totalApplied,
+      interviewing: totalInterviewing,
+      offers: funnel.offered + funnel.accepted,
+    },
+  }));
+});
+
 dashboardRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_IMPLEMENTED", message: "Dashboard route not found" } }, 404),
 );

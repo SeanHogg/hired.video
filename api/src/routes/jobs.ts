@@ -121,6 +121,20 @@ jobRoutes.delete("/:id/save", async (c) => {
   return c.json(success({ success: true }));
 });
 
+/** PATCH /api/jobs/:id/status — update saved job pipeline status */
+jobRoutes.patch("/:id/status", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => null);
+  const status = body?.status;
+  if (!status || !jobService.JOB_PIPELINE_STATUSES.includes(status)) {
+    return c.json(error("VALIDATION_ERROR", `Invalid status. Must be one of: ${jobService.JOB_PIPELINE_STATUSES.join(', ')}`), 400);
+  }
+  const updated = await jobService.updateSavedJobStatus(c.req.param("id"), userId, status, body?.notes);
+  if (!updated) return c.json(error("NOT_FOUND", "Job not found in your tracker"), 404);
+  return c.json(success({ status }));
+});
+
 /** POST /api/Job/:id/apply — apply to a job */
 jobRoutes.post("/:id/apply", async (c) => {
   const userId = c.var.user?.sub;

@@ -83,7 +83,14 @@ export const savedJobs = pgTable("saved_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
+  // Job seeker pipeline: tracked → applied → interviewing → offered → accepted
+  // Also: cancelled (job removed), rejected, withdrawn (user pulled out), declined (offer declined)
+  status: varchar("status", { length: 50 }).default("tracked").notNull(),
+  statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type SavedJob = typeof savedJobs.$inferSelect;

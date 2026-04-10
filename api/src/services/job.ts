@@ -1096,15 +1096,45 @@ export async function unsaveJob(jobId: string, userId: string): Promise<void> {
   await db.delete(savedJobs).where(and(eq(savedJobs.jobId, jobId), eq(savedJobs.userId, userId)));
 }
 
-export async function getSavedJobs(userId: string): Promise<JobEntity[]> {
+export async function getSavedJobs(userId: string): Promise<(JobEntity & { pipelineStatus?: string; appliedAt?: string; statusChangedAt?: string })[]> {
   const db = getDb();
   const rows = await db
-    .select({ job: jobItems })
+    .select({ job: jobItems, saved: savedJobs })
     .from(savedJobs)
     .innerJoin(jobItems, eq(savedJobs.jobId, jobItems.id))
     .where(eq(savedJobs.userId, userId))
     .orderBy(desc(savedJobs.createdAt));
-  return rows.map((r) => rowToJob(r.job));
+  return rows.map((r) => ({
+    ...rowToJob(r.job),
+    pipelineStatus: (r.saved as any).status ?? 'tracked',
+    appliedAt: (r.saved as any).appliedAt?.toISOString?.() ?? undefined,
+    statusChangedAt: (r.saved as any).statusChangedAt?.toISOString?.() ?? undefined,
+  }));
+}
+
+/** Valid job seeker pipeline statuses */
+export const JOB_PIPELINE_STATUSES = [
+  'tracked', 'applied', 'interviewing', 'offered',
+  'accepted', 'rejected', 'cancelled', 'withdrawn', 'declined',
+] as const;
+
+export async function updateSavedJobStatus(
+  jobId: string, userId: string, status: string, notes?: string,
+): Promise<boolean> {
+  const db = getDb();
+  const now = new Date();
+  const [updated] = await db
+    .update(savedJobs)
+    .set({
+      status,
+      statusChangedAt: now,
+      updatedAt: now,
+      ...(status === 'applied' ? { appliedAt: now } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+    } as any)
+    .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
+    .returning();
+  return !!updated;
 }
 
 export async function applyToJob(jobId: string, userId: string, application: ApplyJobDTO): Promise<void> {
