@@ -459,7 +459,8 @@ jobRoutes.put("/:id", async (c) => {
 jobRoutes.delete("/:id", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const isAdmin = (c.var.user as any)?.isSuperAdmin === true;
+  const user = c.var.user;
+  const isAdmin = user?.isSuperAdmin === true || user?.roles?.includes("SuperAdmin") || user?.roles?.includes("super_admin");
   const deleted = await jobService.deleteJob(c.req.param("id"), userId, isAdmin);
   if (!deleted) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
   return c.json(success(null, "Job deleted"));
