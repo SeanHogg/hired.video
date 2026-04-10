@@ -266,6 +266,12 @@ const extractHandler = async (c: any) => {
     body?.track === false ? false : trackParam === "false" ? false : true;
   const force = body?.force === true;
 
+  // Optional hints from the content script's DOM detection —
+  // used as fallbacks when AI extraction struggles with noisy HTML.
+  const hintTitle: string = typeof body?.hintTitle === "string" ? body.hintTitle.trim() : "";
+  const hintCompany: string = typeof body?.hintCompany === "string" ? body.hintCompany.trim() : "";
+  const hintLocation: string = typeof body?.hintLocation === "string" ? body.hintLocation.trim() : "";
+
   const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
 
   // ---- Step 1: classify the page --------------------------------
@@ -276,15 +282,54 @@ const extractHandler = async (c: any) => {
   });
 
   if (!result.ok || !result.parsed) {
-    return c.json(
-      error("NOT_A_JOB_POSTING", result.reason || "This page doesn't look like a job posting.", {
-        confidence: result.confidence,
-      }),
-      422,
-    );
+    // If AI extraction fails but we have hints from the content script,
+    // create a minimal job from the hints + raw description text rather
+    // than rejecting the request entirely.
+    if (hintTitle) {
+      const strippedHtml = html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      // Try to extract the "About the job" section from the text
+      const aboutIdx = strippedHtml.toLowerCase().indexOf("about the job");
+      const descText = aboutIdx >= 0
+        ? strippedHtml.slice(aboutIdx + 14, aboutIdx + 5000).trim()
+        : strippedHtml.slice(0, 3000);
+
+      (result as any).ok = true;
+      (result as any).parsed = {
+        title: hintTitle,
+        company: hintCompany || jobService.HIRED_VIDEO_SEED_COMPANY,
+        location: hintLocation,
+        description: descText,
+        confidence: "low",
+      };
+    } else {
+      return c.json(
+        error("NOT_A_JOB_POSTING", result.reason || "This page doesn't look like a job posting.", {
+          confidence: result.confidence,
+        }),
+        422,
+      );
+    }
   }
 
-  const parsed = result.parsed;
+  const parsed = result.parsed!;
+
+  // Apply hints as fallbacks — content script DOM parsing is often more
+  // accurate than AI extraction for title/company on obfuscated pages.
+  if (hintTitle && (!parsed.title || parsed.title.toLowerCase().includes('job from'))) {
+    parsed.title = hintTitle;
+  }
+  if (hintCompany && (!parsed.company || parsed.company === jobService.HIRED_VIDEO_SEED_COMPANY)) {
+    parsed.company = hintCompany;
+  }
+  if (hintLocation && !parsed.location) {
+    parsed.location = hintLocation;
+  }
+
   const company = track ? parsed.company : jobService.HIRED_VIDEO_SEED_COMPANY;
 
   // ---- Step 2: dedup (skip when force=true — user confirmed "new") --
