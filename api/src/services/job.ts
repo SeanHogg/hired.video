@@ -1081,9 +1081,13 @@ export async function updateJob(
   return row ? rowToJob(row) : null;
 }
 
-export async function deleteJob(id: string, userId: string): Promise<void> {
+export async function deleteJob(id: string, userId: string, isAdmin = false): Promise<boolean> {
   const db = getDb();
-  await db.delete(jobItems).where(and(eq(jobItems.id, id), eq((jobItems as any).postedByUserId, userId)));
+  const condition = isAdmin
+    ? eq(jobItems.id, id)
+    : and(eq(jobItems.id, id), eq((jobItems as any).postedByUserId, userId));
+  const deleted = await db.delete(jobItems).where(condition).returning({ id: jobItems.id });
+  return deleted.length > 0;
 }
 
 export async function saveJob(jobId: string, userId: string): Promise<void> {
