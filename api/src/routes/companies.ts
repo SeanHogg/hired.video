@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { callLLMJson, getApiKey } from "../services/ai.js";
 
 const { companyProfiles, companyFollowers, jobItems, userCompanyRoleAssociations, employerBrandingPages } = schema;
 
@@ -254,6 +255,138 @@ companyRoutes.patch("/:id/branding", async (c) => {
     } as any)
     .returning();
   return c.json(success(created), 201);
+});
+
+// ─── Company Extraction (from page HTML) ─────────────────────────────────────
+// POST /extract — AI-extract company details from page HTML.
+// Public: deduplicates against existing company_profiles by name similarity.
+// Merges new fields into existing records when a match is found.
+
+const ExtractCompanySchema = z.object({
+  html: z.string().min(50),
+  sourceUrl: z.string().min(1),
+});
+
+const CompanyExtractionResponseSchema = z.object({
+  name: z.string(),
+  industry: z.string().optional().default(""),
+  size: z.string().optional().default(""),
+  location: z.string().optional().default(""),
+  website: z.string().optional().default(""),
+  description: z.string().optional().default(""),
+  foundedYear: z.number().nullable().optional(),
+});
+
+companyRoutes.post("/extract", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = ExtractCompanySchema.safeParse(body);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+
+  const { html, sourceUrl } = parsed.data;
+  const db = getDb();
+
+  // Strip HTML to plain text
+  const plainText = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 10000);
+
+  // Extract via LLM
+  const apiKey = getApiKey((c.env as any) ?? {});
+  let extracted: z.infer<typeof CompanyExtractionResponseSchema>;
+
+  if (apiKey) {
+    try {
+      extracted = await callLLMJson(
+        apiKey,
+        {
+          systemPrompt: `You extract company/business information from a web page.
+Return valid JSON with the company's details. If a field is not found, use an empty string.`,
+          userMessage: `Extract company details from this page:
+
+${plainText}
+
+Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...", "website": "...", "description": "...", "foundedYear": null }`,
+          responseFormat: "json_object",
+          temperature: 0.2,
+        },
+        CompanyExtractionResponseSchema,
+      );
+    } catch {
+      return c.json(error("AI_ERROR", "Failed to extract company details. Please try again."), 500);
+    }
+  } else {
+    extracted = {
+      name: "Unknown Company",
+      industry: "", size: "", location: "", website: "", description: "", foundedYear: null,
+    };
+  }
+
+  // Dedup: check for existing company by name (case-insensitive)
+  const slug = extracted.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
+
+  const [existing] = await db
+    .select()
+    .from(companyProfiles)
+    .where(
+      or(
+        eq(companyProfiles.slug, slug),
+        ilike(companyProfiles.name, extracted.name),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    // Merge new fields into existing record (only fill blanks)
+    const updates: Record<string, unknown> = {};
+    if (!existing.industry && extracted.industry) updates.industry = extracted.industry;
+    if (!existing.size && extracted.size) updates.size = extracted.size;
+    if (!existing.headquarters && extracted.location) updates.headquarters = extracted.location;
+    if (!existing.website && extracted.website) updates.website = extracted.website;
+    if (!existing.description && extracted.description) updates.description = extracted.description;
+    if (!existing.foundedYear && extracted.foundedYear) updates.foundedYear = extracted.foundedYear;
+
+    if (Object.keys(updates).length > 0) {
+      updates.updatedAt = new Date();
+      await db
+        .update(companyProfiles)
+        .set(updates as any)
+        .where(eq(companyProfiles.id, existing.id));
+    }
+
+    return c.json(success({
+      company: { ...existing, ...updates },
+      duplicate: true,
+      existingId: existing.id,
+    }), 200);
+  }
+
+  // Create new company record
+  const [created] = await db
+    .insert(companyProfiles)
+    .values({
+      ownerId: uid,
+      name: extracted.name,
+      slug,
+      description: extracted.description || null,
+      website: extracted.website || null,
+      industry: extracted.industry || null,
+      size: extracted.size || null,
+      headquarters: extracted.location || null,
+      foundedYear: extracted.foundedYear ?? null,
+    } as any)
+    .returning();
+
+  return c.json(success({
+    company: created,
+    duplicate: false,
+  }), 201);
 });
 
 companyRoutes.all("*", (c) =>

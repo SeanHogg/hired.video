@@ -266,3 +266,54 @@ export const atsConnections = pgTable("ats_connections", {
 export type AtsConnection = typeof atsConnections.$inferSelect;
 export type NewAtsConnection = typeof atsConnections.$inferInsert;
 
+// ─── Extracted Profiles (recruiter-private candidate extractions) ────────────
+// Stores structured data extracted from candidate profiles (LinkedIn, Indeed, etc.)
+// by the recruiter Chrome extension. Private to the recruiter who extracted them.
+
+export const extractedProfiles = pgTable("extracted_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  talentPoolCandidateId: uuid("talent_pool_candidate_id").references(() => talentPoolCandidates.id, { onDelete: "set null" }),
+  sourceUrl: text("source_url").notNull(),
+  sourceUrlNormalized: varchar("source_url_normalized", { length: 500 }),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(),
+  extractedData: jsonb("extracted_data").default({}).notNull().$type<{
+    name?: string;
+    title?: string;
+    company?: string;
+    location?: string;
+    skills?: string[];
+    experience?: Array<{ title?: string; company?: string; duration?: string; description?: string }>;
+    education?: Array<{ degree?: string; institution?: string; year?: string }>;
+    summary?: string;
+    contactInfo?: { email?: string; phone?: string; linkedin?: string };
+  }>(),
+  extractionMethod: varchar("extraction_method", { length: 50 }).default("extension").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ExtractedProfile = typeof extractedProfiles.$inferSelect;
+export type NewExtractedProfile = typeof extractedProfiles.$inferInsert;
+
+// ─── Recruiter Match Scores (cached job ↔ candidate compatibility scores) ────
+// Stores the result of scoring a talent-pool candidate against a job.
+// Unique constraint on (recruiter, job, candidate) prevents re-scoring.
+
+export const recruiterMatchScores = pgTable("recruiter_match_scores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recruiterId: uuid("recruiter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").notNull(),
+  candidateId: uuid("candidate_id").notNull(), // talent_pool_candidates.id
+  candidateName: varchar("candidate_name", { length: 255 }).default("").notNull(),
+  jobTitle: varchar("job_title", { length: 255 }).default("").notNull(),
+  score: integer("score").notNull(),
+  recommendations: text("recommendations"),
+  resumeTextHash: varchar("resume_text_hash", { length: 64 }),
+  scoredAt: timestamp("scored_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RecruiterMatchScore = typeof recruiterMatchScores.$inferSelect;
+export type NewRecruiterMatchScore = typeof recruiterMatchScores.$inferInsert;
+

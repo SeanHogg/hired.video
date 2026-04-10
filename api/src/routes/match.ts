@@ -180,7 +180,7 @@ function resumeContentToText(content: unknown): string {
     if (!edu || typeof edu !== "object") continue;
     const e = edu as Record<string, unknown>;
     const institution = e.institution ?? e.Institution ?? e.school ?? "";
-    const degree = [e.studyType ?? e.StudyType, e.area ?? e.Area].filter(Boolean).join(" in ") || e.degree ?? e.program ?? "";
+    const degree = [e.studyType ?? e.StudyType, e.area ?? e.Area].filter(Boolean).join(" in ") || (e.degree ?? e.program ?? "");
     const dates = [e.startDate ?? e.StartDate, e.endDate ?? e.EndDate].filter(Boolean).join(" - ");
     parts.push(`Education: ${degree} at ${institution}${dates ? ` (${dates})` : ""}`);
   }

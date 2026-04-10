@@ -15,6 +15,7 @@ import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { getEmailProvider } from "./services/email.js";
 import { scrapeAllActiveSources } from "./services/jobscraper.js";
+import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/recruiter-match.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -211,6 +212,20 @@ async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelec
         subject: String(payload.subject),
         html: String(payload.html ?? payload.body ?? ""),
       });
+      break;
+    }
+    case "recruiter_score_candidates": {
+      const { recruiterId, jobId } = payload;
+      if (!recruiterId || !jobId) throw new Error("Missing recruiterId or jobId");
+      const result = await scoreAllCandidatesForJob(String(recruiterId), String(jobId));
+      console.log(`[scheduled] Scored ${result.scored} candidates for job ${jobId} (${result.skipped} skipped)`);
+      break;
+    }
+    case "recruiter_score_jobs": {
+      const { recruiterId: rId, candidateId: cId } = payload;
+      if (!rId || !cId) throw new Error("Missing recruiterId or candidateId");
+      const result = await scoreAllJobsForCandidate(String(rId), String(cId));
+      console.log(`[scheduled] Scored ${result.scored} jobs for candidate ${cId} (${result.skipped} skipped)`);
       break;
     }
     default:

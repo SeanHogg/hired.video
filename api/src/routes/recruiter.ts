@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { eq, and, desc, count, sum, sql, inArray, ilike, or } from "drizzle-orm";
+import { z } from "zod";
 import type { Variables } from "../types/index.js";
-import { success } from "../types/index.js";
+import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/ai.js";
+import { callLLM, callLLMJson, getApiKey } from "../services/ai.js";
+import { normalizeJobUrl, computeContentHash } from "../services/job.js";
+import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/recruiter-match.js";
 
 export const recruiterRoutes = new Hono<{ Variables: Variables }>();
 
@@ -872,4 +875,333 @@ recruiterRoutes.get("/agent/runs/:id", async (c) => {
 
 	if (!run) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Run not found" } }, 404);
 	return c.json(responseEnvelope(run), 200);
+});
+
+// ─── Profile Extraction ─────────────────────────────────────────────────────
+// POST /extract-profile — extract a candidate profile from page HTML.
+// Creates an `extracted_profiles` row (deduped) and auto-creates/links
+// a `talent_pool_candidates` entry.
+
+const ExtractProfileSchema = z.object({
+	html: z.string().min(50),
+	sourceUrl: z.string().min(1),
+	force: z.boolean().optional(),
+});
+
+const ProfileExtractionResponseSchema = z.object({
+	name: z.string(),
+	title: z.string().optional().default(""),
+	company: z.string().optional().default(""),
+	location: z.string().optional().default(""),
+	skills: z.array(z.string()).optional().default([]),
+	experience: z.array(z.object({
+		title: z.string().optional().default(""),
+		company: z.string().optional().default(""),
+		duration: z.string().optional().default(""),
+		description: z.string().optional().default(""),
+	})).optional().default([]),
+	education: z.array(z.object({
+		degree: z.string().optional().default(""),
+		institution: z.string().optional().default(""),
+		year: z.string().optional().default(""),
+	})).optional().default([]),
+	summary: z.string().optional().default(""),
+});
+
+function stripHtmlForProfile(html: string): string {
+	return html
+		.replace(/<script[\s\S]*?<\/script>/gi, "")
+		.replace(/<style[\s\S]*?<\/style>/gi, "")
+		.replace(/<[^>]+>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.slice(0, 10000);
+}
+
+recruiterRoutes.post("/extract-profile", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => null);
+	const parsed = ExtractProfileSchema.safeParse(body);
+	if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+
+	const { html, sourceUrl, force } = parsed.data;
+	const db = getDb();
+	const recruiterId = user.sub;
+
+	// Normalize URL for dedup
+	const normalizedUrl = normalizeJobUrl(sourceUrl) ?? sourceUrl;
+	const plainText = stripHtmlForProfile(html);
+
+	// Extract structured data via LLM
+	const apiKey = getApiKey((c.env as any) ?? {});
+	let extracted: z.infer<typeof ProfileExtractionResponseSchema>;
+
+	if (apiKey) {
+		try {
+			extracted = await callLLMJson(
+				apiKey,
+				{
+					systemPrompt: `You are a professional recruiter extracting candidate information from a web page.
+Extract the candidate's profile details and return valid JSON only.
+If a field is not found, use an empty string or empty array.`,
+					userMessage: `Extract the candidate profile from this page content:
+
+${plainText}
+
+Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...", "skills": ["..."], "experience": [{"title": "...", "company": "...", "duration": "...", "description": "..."}], "education": [{"degree": "...", "institution": "...", "year": "..."}], "summary": "..." }`,
+					responseFormat: "json_object",
+					temperature: 0.2,
+				},
+				ProfileExtractionResponseSchema,
+			);
+		} catch {
+			return c.json(error("AI_ERROR", "Failed to extract profile. Please try again."), 500);
+		}
+	} else {
+		// Basic heuristic extraction when no AI available
+		extracted = {
+			name: "Unknown Candidate",
+			title: "", company: "", location: "",
+			skills: [], experience: [], education: [], summary: "",
+		};
+	}
+
+	// Compute content hash for dedup
+	const hashInput = [extracted.name, extracted.title]
+		.map((s) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, ""))
+		.join("|");
+	const hashBytes = new TextEncoder().encode(hashInput);
+	const digest = await crypto.subtle.digest("SHA-256", hashBytes);
+	const contentHash = Array.from(new Uint8Array(digest))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+
+	// Check for existing extraction (dedup)
+	if (!force) {
+		const [existing] = await db
+			.select()
+			.from(schema.extractedProfiles)
+			.where(
+				and(
+					eq(schema.extractedProfiles.recruiterId, recruiterId),
+					eq(schema.extractedProfiles.contentHash, contentHash),
+				),
+			)
+			.limit(1);
+
+		if (existing) {
+			return c.json(success({
+				profile: existing,
+				talentPoolCandidate: existing.talentPoolCandidateId
+					? await db.select().from(schema.talentPoolCandidates)
+							.where(eq(schema.talentPoolCandidates.id, existing.talentPoolCandidateId))
+							.limit(1).then((r) => r[0] ?? null)
+					: null,
+				duplicate: true,
+			}), 200);
+		}
+	}
+
+	// Create talent pool candidate entry
+	const [candidate] = await db.insert(schema.talentPoolCandidates).values({
+		recruiterId,
+		candidateId: recruiterId, // Self-ref until real user ID is known
+		candidateName: extracted.name,
+		candidateTitle: extracted.title,
+		currentCompany: extracted.company || undefined,
+		currentTitle: extracted.title || undefined,
+		status: "active",
+		tags: extracted.skills?.slice(0, 10) ?? [],
+		preferredLocations: extracted.location || undefined,
+		notes: extracted.summary || undefined,
+	} as any).returning();
+
+	// Create extracted profile record
+	const [profile] = await db.insert(schema.extractedProfiles).values({
+		recruiterId,
+		talentPoolCandidateId: candidate.id,
+		sourceUrl,
+		sourceUrlNormalized: normalizedUrl,
+		contentHash,
+		extractedData: extracted as any,
+		extractionMethod: "extension",
+	} as any).returning();
+
+	// Enqueue background scoring against recruiter's active jobs
+	try {
+		await db.insert(schema.queueJobToProcess).values({
+			type: "recruiter_score_jobs",
+			payload: { recruiterId, candidateId: candidate.id },
+			priority: 1,
+		} as any);
+	} catch { /* non-critical */ }
+
+	return c.json(success({
+		profile,
+		talentPoolCandidate: rowToTalentPoolEntry(candidate),
+		duplicate: false,
+	}), 201);
+});
+
+// ─── Match Scoring ───────────────────────────────────────────────────────────
+
+// POST /match/score-candidates — score all recruiter's candidates against a job
+recruiterRoutes.post("/match/score-candidates", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const jobId = body.jobId;
+	if (!jobId) return c.json(error("VALIDATION_ERROR", "jobId is required"), 400);
+
+	const db = getDb();
+
+	// Count how many candidates will be scored
+	const candidates = await db
+		.select({ id: schema.talentPoolCandidates.id })
+		.from(schema.talentPoolCandidates)
+		.where(
+			and(
+				eq(schema.talentPoolCandidates.recruiterId, user.sub),
+				eq(schema.talentPoolCandidates.status, "active"),
+			),
+		);
+
+	// Enqueue the scoring job
+	const [queueEntry] = await db.insert(schema.queueJobToProcess).values({
+		type: "recruiter_score_candidates",
+		payload: { recruiterId: user.sub, jobId },
+		priority: 1,
+	} as any).returning();
+
+	return c.json(success({
+		queueId: queueEntry.id,
+		candidateCount: candidates.length,
+	}), 202);
+});
+
+// POST /match/score-jobs — score a candidate against all recruiter's active jobs
+recruiterRoutes.post("/match/score-jobs", async (c) => {
+	const user = c.get("user");
+	const body = await c.req.json().catch(() => ({}));
+	const candidateId = body.candidateId;
+	if (!candidateId) return c.json(error("VALIDATION_ERROR", "candidateId is required"), 400);
+
+	const db = getDb();
+
+	// Enqueue the scoring job
+	const [queueEntry] = await db.insert(schema.queueJobToProcess).values({
+		type: "recruiter_score_jobs",
+		payload: { recruiterId: user.sub, candidateId },
+		priority: 1,
+	} as any).returning();
+
+	return c.json(success({ queueId: queueEntry.id }), 202);
+});
+
+// GET /match/scores — retrieve cached match scores
+recruiterRoutes.get("/match/scores", async (c) => {
+	const user = c.get("user");
+	const jobId = c.req.query("jobId");
+	const candidateId = c.req.query("candidateId");
+	const db = getDb();
+
+	let condition = eq(schema.recruiterMatchScores.recruiterId, user.sub);
+	if (jobId) {
+		condition = and(condition, eq(schema.recruiterMatchScores.jobId, jobId))!;
+	}
+	if (candidateId) {
+		condition = and(condition, eq(schema.recruiterMatchScores.candidateId, candidateId))!;
+	}
+
+	const scores = await db
+		.select()
+		.from(schema.recruiterMatchScores)
+		.where(condition)
+		.orderBy(desc(schema.recruiterMatchScores.score))
+		.limit(200);
+
+	return c.json(success({
+		scores: scores.map((s) => ({
+			id: s.id,
+			jobId: s.jobId,
+			candidateId: s.candidateId,
+			candidateName: s.candidateName,
+			jobTitle: s.jobTitle,
+			score: s.score,
+			recommendations: s.recommendations,
+			scoredAt: s.scoredAt.toISOString(),
+		})),
+	}));
+});
+
+// ─── Pipeline ────────────────────────────────────────────────────────────────
+// GET /pipeline — aggregated kanban view grouped by submission status
+
+recruiterRoutes.get("/pipeline", async (c) => {
+	const user = c.get("user");
+	const db = getDb();
+
+	const submissions = await db
+		.select()
+		.from(schema.candidateSubmissions)
+		.where(eq(schema.candidateSubmissions.recruiterId, user.sub))
+		.orderBy(desc(schema.candidateSubmissions.updatedAt));
+
+	// Group by status into pipeline stages
+	const stageMap: Record<string, string> = {
+		"Submitted": "sourced",
+		"Reviewed": "contacted",
+		"Screening": "screening",
+		"Phone Screen": "screening",
+		"Interview": "interview",
+		"Technical Interview": "interview",
+		"Final Interview": "interview",
+		"Offer": "offer",
+		"Offer Extended": "offer",
+		"Accepted": "placed",
+		"Placed": "placed",
+		"Started": "placed",
+	};
+
+	const stages: Record<string, any[]> = {
+		sourced: [],
+		contacted: [],
+		screening: [],
+		interview: [],
+		offer: [],
+		placed: [],
+	};
+
+	for (const sub of submissions) {
+		const stage = stageMap[sub.status] || "sourced";
+		// Look up match score if available
+		const [score] = sub.jobId
+			? await db
+					.select({ score: schema.recruiterMatchScores.score })
+					.from(schema.recruiterMatchScores)
+					.where(
+						and(
+							eq(schema.recruiterMatchScores.recruiterId, user.sub),
+							eq(schema.recruiterMatchScores.jobId, sub.jobId),
+							eq(schema.recruiterMatchScores.candidateId, sub.candidateId),
+						),
+					)
+					.limit(1)
+			: [undefined];
+
+		stages[stage].push({
+			id: sub.id,
+			candidateId: sub.candidateId,
+			candidateName: sub.candidateName,
+			candidateEmail: sub.candidateEmail,
+			jobId: sub.jobId,
+			jobTitle: sub.jobTitle,
+			companyName: sub.companyName,
+			status: sub.status,
+			score: score?.score ?? null,
+			submittedAt: sub.submittedAt.toISOString(),
+			updatedAt: sub.updatedAt.toISOString(),
+		});
+	}
+
+	return c.json(success({ stages }));
 });
