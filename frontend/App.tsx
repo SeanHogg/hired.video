@@ -55,6 +55,7 @@ const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
 const CompanyEditPage = lazy(() => import("./pages/CompanyEditPage"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Home = lazy(() => import("./pages/Home"));
 const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const People = lazy(() => import("./pages/People"));
@@ -357,8 +358,9 @@ const App = () => (
                         element={<PersonaSelection />}
                       />
                       <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/feed" element={<Feed />} />
+                      <Route path="/home" element={<Home />} />
+                      <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+                      <Route path="/feed" element={<Navigate to="/home" replace />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"

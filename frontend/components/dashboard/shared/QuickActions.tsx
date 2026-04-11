@@ -10,6 +10,8 @@ import {
   Download,
   BarChart3,
   Film,
+  Chrome,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,18 +60,28 @@ export function QuickActions({
         },
         {
           icon: FileText,
-          label: "Update Resume",
+          label: "Import / Update Resume",
           href: "/resumes",
         },
         {
-          icon: Eye,
-          label: "View Applications",
-          href: "/applications",
+          icon: Chrome,
+          label: "Install Chrome Extension",
+          href: "/chrome-extension",
+        },
+        {
+          icon: Sparkles,
+          label: "Earn as a Creator",
+          href: "/services",
         },
         {
           icon: Target,
           label: "Find New Jobs",
           href: "/jobs",
+        },
+        {
+          icon: Eye,
+          label: "View Applications",
+          href: "/applications",
         },
       );
     }

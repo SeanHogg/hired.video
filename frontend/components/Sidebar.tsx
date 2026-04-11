@@ -1,5 +1,4 @@
 import {
-  Home,
   Video,
   Briefcase,
   TrendingUp,
@@ -14,9 +13,6 @@ import {
   LogOut,
   X,
   BarChart3,
-  MessageSquare,
-  Mic,
-  Brain,
   ShieldCheck,
   ShoppingBag,
 } from "lucide-react";
@@ -45,23 +41,14 @@ export default function Sidebar({
 
   // Main navigation items - shown to all users
   const navigation = [
-    { name: "Home", href: "/", icon: Home, exactMatch: true },
     {
-      name: "Dashboard",
-      href: "/dashboard",
+      name: "Home",
+      href: "/home",
       icon: TrendingUp,
-      exactMatch: false,
-    },
-    {
-      name: "Feed",
-      href: "/feed",
-      icon: MessageSquare,
       exactMatch: false,
     },
     { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
     { name: "Studio", href: "/studio", icon: Video, exactMatch: false },
-    { name: "Interview Practice", href: "/interview", icon: Mic, exactMatch: false },
-    { name: "AI Coach", href: "/chat", icon: Brain, exactMatch: false },
     { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
     {
       name: "Companies",

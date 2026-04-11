@@ -21,14 +21,38 @@ import {
   CheckCircle2,
   ArrowRight,
   Download,
-  MousePointer,
   Briefcase,
-  BarChart3,
+  Users,
+  LayoutGrid,
+  Building2,
+  MessageSquare,
+  Search,
+  UserPlus,
+  ListChecks,
+  TrendingUp,
   Shield,
 } from "lucide-react";
 
-const CHROME_STORE_URL =
+const JOBSEEKER_STORE_URL =
   "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol";
+// Recruiter extension is pre-launch; point early-access CTAs at /contact until published.
+const RECRUITER_EARLY_ACCESS_URL = "/contact?topic=recruiter-extension";
+
+const JOB_SITES = [
+  "LinkedIn",
+  "Indeed",
+  "Glassdoor",
+  "ZipRecruiter",
+  "Monster",
+  "CareerBuilder",
+  "Dice",
+  "SimplyHired",
+  "Lever",
+  "Greenhouse",
+  "Workday",
+  "Wellfound",
+  "Built In",
+];
 
 export default function ChromeExtension() {
   useSEO("/chrome-extension");
@@ -40,89 +64,172 @@ export default function ChromeExtension() {
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <main className="pt-16">
-          {/* Hero Section */}
+          {/* Hero */}
           <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-6">
             <div className="max-w-6xl mx-auto text-center">
               <Badge className="mb-4 bg-blue-100 text-blue-800 hover:bg-blue-100">
-                <Chrome className="h-4 w-4 mr-1" /> Chrome Extension
+                <Chrome className="h-4 w-4 mr-1" /> Chrome Extensions
               </Badge>
               <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Generate Job-Specific Resumes in One Click
+                Work Smarter on Every Job Board
               </h1>
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-                Our Chrome extension lets you create perfectly tailored resumes directly from any job posting. 
-                No more copy-pasting or manual adjustments.
+                Two purpose-built Chrome extensions — one for job seekers, one for recruiters and companies.
+                Capture jobs, candidates, and companies from LinkedIn, Indeed, Glassdoor, Workday and more without
+                leaving the page you're on.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
+                <a href="#job-seeker">
                   <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                    <Download className="h-5 w-5 mr-2" />
-                    Install Free Extension
+                    <Briefcase className="h-5 w-5 mr-2" />
+                    For Job Seekers
                   </Button>
                 </a>
-                <Button size="lg" variant="outline">
-                  <Sparkles className="h-5 w-5 mr-2" />
-                  Watch Demo
-                </Button>
+                <a href="#recruiter">
+                  <Button size="lg" variant="outline">
+                    <Users className="h-5 w-5 mr-2" />
+                    For Recruiters & Companies
+                  </Button>
+                </a>
               </div>
             </div>
           </section>
 
-          {/* Key Features */}
+          {/* Two-plugin split */}
           <section className="py-16 px-6">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12">Key Features</h2>
-              <div className="grid md:grid-cols-3 gap-8">
-                <Card className="border-blue-200 hover:border-blue-400 transition-colors">
+              <div className="grid md:grid-cols-2 gap-8">
+                {/* Job Seeker card */}
+                <Card id="job-seeker" className="border-blue-200 hover:border-blue-400 transition-colors scroll-mt-20">
                   <CardHeader>
-                    <MousePointer className="h-10 w-10 text-blue-600 mb-4" />
-                    <CardTitle>One-Click Generation</CardTitle>
-                    <CardDescription>
-                      Click the extension icon on any job page and get a tailored resume instantly
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <Briefcase className="h-3 w-3 mr-1" /> Job Seeker
+                      </Badge>
+                      <Badge variant="secondary">v2.1</Badge>
+                    </div>
+                    <CardTitle className="text-2xl">hired.video — Job Seeker</CardTitle>
+                    <CardDescription className="text-base">
+                      Track jobs, score your resume against any posting, and generate AI-tailored resume variations
+                      without leaving the job site.
                     </CardDescription>
                   </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="space-y-2">
+                      {[
+                        "One-click job tracking from any board",
+                        "AI match score vs. your master resume",
+                        "Auto-tailored resume per job posting",
+                        "Application tracking — which resume went where",
+                        "Side-panel UI with auto-detect banners",
+                      ].map((feat) => (
+                        <li key={feat} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <a href={JOBSEEKER_STORE_URL} target="_blank" rel="noopener noreferrer" className="block">
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                        <Download className="h-4 w-4 mr-2" />
+                        Install Job Seeker Extension
+                      </Button>
+                    </a>
+                  </CardContent>
                 </Card>
 
-                <Card className="border-purple-200 hover:border-purple-400 transition-colors">
+                {/* Recruiter card */}
+                <Card id="recruiter" className="border-purple-200 hover:border-purple-400 transition-colors scroll-mt-20">
                   <CardHeader>
-                    <Target className="h-10 w-10 text-purple-600 mb-4" />
-                    <CardTitle>Job-Specific Optimization</CardTitle>
-                    <CardDescription>
-                      AI extracts key requirements and optimizes your resume to match perfectly
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                        <Users className="h-3 w-3 mr-1" /> Recruiter & Employer
+                      </Badge>
+                      <Badge variant="secondary">v1.0 · Early Access</Badge>
+                    </div>
+                    <CardTitle className="text-2xl">hired.video — Recruiter</CardTitle>
+                    <CardDescription className="text-base">
+                      Source candidates from LinkedIn and Indeed, build a searchable talent pool, and move candidates
+                      through a visual hiring pipeline — all from the browser.
                     </CardDescription>
                   </CardHeader>
-                </Card>
-
-                <Card className="border-green-200 hover:border-green-400 transition-colors">
-                  <CardHeader>
-                    <Zap className="h-10 w-10 text-green-600 mb-4" />
-                    <CardTitle>Works Everywhere</CardTitle>
-                    <CardDescription>
-                      LinkedIn, Indeed, Glassdoor, company career pages, and any job board
-                    </CardDescription>
-                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ul className="space-y-2">
+                      {[
+                        "Extract candidate profiles from LinkedIn & Indeed",
+                        "Extract company pages from LinkedIn & Glassdoor",
+                        "Searchable talent pool with tags and notes",
+                        "Kanban pipeline — Sourced → Contacted → Offer → Placed",
+                        "AI candidate ↔ job matching and scoring",
+                        "In-extension candidate messaging",
+                      ].map((feat) => (
+                        <li key={feat} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <a href={RECRUITER_EARLY_ACCESS_URL} className="block">
+                      <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Request Early Access
+                      </Button>
+                    </a>
+                  </CardContent>
                 </Card>
               </div>
             </div>
           </section>
 
-          {/* How It Works */}
+          {/* Job Seeker feature detail */}
           <section className="py-16 px-6 bg-gray-50">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-              <div className="grid md:grid-cols-4 gap-6">
+              <div className="text-center mb-12">
+                <Badge className="mb-3 bg-blue-100 text-blue-800 hover:bg-blue-100">
+                  <Briefcase className="h-3 w-3 mr-1" /> Job Seeker Extension
+                </Badge>
+                <h2 className="text-3xl font-bold">Find a Job, Score It, Tailor Your Resume</h2>
+                <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
+                  The side panel watches the page you're on. When it detects a job posting, you're one click away
+                  from tracking it, scoring it against your resume, and generating a tailored variation.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-3 gap-6">
                 {[
-                  { step: 1, icon: Download, title: "Install Extension", desc: "Add to Chrome in one click" },
-                  { step: 2, icon: Briefcase, title: "Browse Jobs", desc: "Find jobs on any site" },
-                  { step: 3, icon: MousePointer, title: "Click Extension", desc: "Generate tailored resume" },
-                  { step: 4, icon: FileText, title: "Apply & Win", desc: "Download and submit" },
-                ].map(({ step, icon: Icon, title, desc }) => (
-                  <div key={step} className="text-center">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Icon className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <Badge className="mb-2">Step {step}</Badge>
-                    <h3 className="font-semibold mb-1">{title}</h3>
+                  {
+                    icon: Target,
+                    title: "Track This Job",
+                    desc: "Extracts the full job posting from any board and saves it to your tracked jobs list with one click.",
+                  },
+                  {
+                    icon: TrendingUp,
+                    title: "Resume Match Score",
+                    desc: "AI analyzes your master resume against the job and returns a match score with specific recommendations.",
+                  },
+                  {
+                    icon: FileText,
+                    title: "AI Resume Tailoring",
+                    desc: "Generates a resume variation optimized for the job's keywords and requirements — download as PDF or Word.",
+                  },
+                  {
+                    icon: ListChecks,
+                    title: "Application Tracking",
+                    desc: "Mark which resume variation you sent to which job — finally know what's actually working.",
+                  },
+                  {
+                    icon: Zap,
+                    title: "Auto-Detect Banners",
+                    desc: "Browse normally. When the extension sees a job, a banner appears with title, company, and a one-click score button.",
+                  },
+                  {
+                    icon: Shield,
+                    title: "Your Data Stays Yours",
+                    desc: "All resumes and applications live in your hired.video account — no scraping, no third-party sharing.",
+                  },
+                ].map(({ icon: Icon, title, desc }) => (
+                  <div key={title} className="bg-white p-6 rounded-lg border">
+                    <Icon className="h-8 w-8 text-blue-600 mb-3" />
+                    <h3 className="font-semibold mb-2">{title}</h3>
                     <p className="text-sm text-muted-foreground">{desc}</p>
                   </div>
                 ))}
@@ -130,40 +237,72 @@ export default function ChromeExtension() {
             </div>
           </section>
 
-          {/* Benefits */}
+          {/* Recruiter feature detail */}
           <section className="py-16 px-6">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12">Why Use Our Extension?</h2>
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="text-center mb-12">
+                <Badge className="mb-3 bg-purple-100 text-purple-800 hover:bg-purple-100">
+                  <Users className="h-3 w-3 mr-1" /> Recruiter Extension
+                </Badge>
+                <h2 className="text-3xl font-bold">Source, Track, and Place Candidates Without Leaving the Browser</h2>
+                <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
+                  Five tabs in one side panel: Now (active page), Pipeline (kanban), Candidates (searchable pool),
+                  Companies, and Settings. Everything syncs to your hired.video recruiter workspace.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-3 gap-6">
                 {[
-                  { icon: BarChart3, title: "Higher Match Scores", desc: "AI-optimized resumes score 30%+ higher on ATS systems" },
-                  { icon: Zap, title: "Save Hours", desc: "Create tailored resumes in seconds instead of hours" },
-                  { icon: Target, title: "Beat the Competition", desc: "Stand out with perfectly matched keywords and skills" },
-                  { icon: Shield, title: "Secure & Private", desc: "Your data stays in your hired.video account" },
+                  {
+                    icon: UserPlus,
+                    title: "Profile Extraction",
+                    desc: "Detects candidate profiles on LinkedIn and Indeed. Click Extract to parse name, title, company, and location into your talent pool.",
+                  },
+                  {
+                    icon: Building2,
+                    title: "Company Extraction",
+                    desc: "Detects company pages on LinkedIn and Glassdoor. Pulls name, industry, size, location, and website into your company database.",
+                  },
+                  {
+                    icon: Search,
+                    title: "Searchable Talent Pool",
+                    desc: "Every extracted candidate becomes searchable by name, title, company, or custom tags. Attach notes and match scores.",
+                  },
+                  {
+                    icon: LayoutGrid,
+                    title: "Pipeline Kanban",
+                    desc: "Visualize candidates across six stages — Sourced, Contacted, Screening, Interview, Offer, Placed — with counts per column.",
+                  },
+                  {
+                    icon: Target,
+                    title: "Candidate ↔ Job Matching",
+                    desc: "Score candidates against your open jobs, or score open jobs against your talent pool. AI-powered, premium tier.",
+                  },
+                  {
+                    icon: MessageSquare,
+                    title: "Candidate Messaging",
+                    desc: "Send outreach from the candidate detail pane. Messages are logged against the candidate's interaction history.",
+                  },
                 ].map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex items-start gap-4 p-4 rounded-lg border hover:bg-gray-50">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
-                      <Icon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold mb-1">{title}</h3>
-                      <p className="text-muted-foreground">{desc}</p>
-                    </div>
+                  <div key={title} className="bg-gray-50 p-6 rounded-lg border">
+                    <Icon className="h-8 w-8 text-purple-600 mb-3" />
+                    <h3 className="font-semibold mb-2">{title}</h3>
+                    <p className="text-sm text-muted-foreground">{desc}</p>
                   </div>
                 ))}
               </div>
             </div>
           </section>
 
-          {/* Supported Sites */}
+          {/* Supported sites */}
           <section className="py-16 px-6 bg-gray-50">
             <div className="max-w-6xl mx-auto text-center">
-              <h2 className="text-3xl font-bold mb-6">Works on All Major Job Sites</h2>
-              <p className="text-muted-foreground mb-8">
-                LinkedIn, Indeed, Glassdoor, ZipRecruiter, Dice, SimplyHired, Lever, Greenhouse, and thousands more
+              <h2 className="text-3xl font-bold mb-4">Works Everywhere Your Workflow Lives</h2>
+              <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+                Both extensions auto-detect jobs, profiles, and companies across 16+ major sites — and fall back to
+                generic detection for everything else.
               </p>
-              <div className="flex flex-wrap justify-center gap-4">
-                {["LinkedIn", "Indeed", "Glassdoor", "ZipRecruiter", "Dice", "SimplyHired", "Lever", "Greenhouse"].map((site) => (
+              <div className="flex flex-wrap justify-center gap-3">
+                {JOB_SITES.map((site) => (
                   <Badge key={site} variant="secondary" className="px-4 py-2 text-base">
                     <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
                     {site}
@@ -173,20 +312,29 @@ export default function ChromeExtension() {
             </div>
           </section>
 
-          {/* CTA Section */}
+          {/* Final CTA */}
           <section className="py-16 px-6 bg-gradient-to-r from-blue-600 to-purple-600">
             <div className="max-w-4xl mx-auto text-center text-white">
-              <h2 className="text-3xl font-bold mb-4">Ready to Land Your Dream Job?</h2>
+              <h2 className="text-3xl font-bold mb-4">Pick the Extension That Fits Your Role</h2>
               <p className="text-xl mb-8 opacity-90">
-                Install the free extension and start creating perfectly tailored resumes today.
+                Job seekers get tailored resumes. Recruiters get a talent pipeline. Both without ever leaving the job board.
               </p>
-              <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
-                <Button size="lg" variant="secondary" className="text-blue-600">
-                  <Chrome className="h-5 w-5 mr-2" />
-                  Install Free Extension
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Button>
-              </a>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href={JOBSEEKER_STORE_URL} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" variant="secondary" className="text-blue-600">
+                    <Chrome className="h-5 w-5 mr-2" />
+                    Install Job Seeker
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </a>
+                <a href={RECRUITER_EARLY_ACCESS_URL}>
+                  <Button size="lg" variant="secondary" className="text-purple-600">
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Recruiter Early Access
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </a>
+              </div>
             </div>
           </section>
         </main>
@@ -195,4 +343,3 @@ export default function ChromeExtension() {
     </div>
   );
 }
-

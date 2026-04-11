@@ -3,7 +3,6 @@ import {
   Video,
   Sparkles,
   ChevronDown,
-  TrendingUp,
   FileText,
   Briefcase,
   Building2,
@@ -11,12 +10,14 @@ import {
   Wrench,
   CheckSquare,
   Send,
-  Flame,
   Clapperboard,
+  Chrome,
+  ShoppingBag,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
+import NotificationCenter from "@/components/NotificationCenter";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -42,64 +43,73 @@ export default function Navigation({
 
   const navigationItems = [
     {
-      name: "Video Resumes",
-      href: "/resumes",
-      icon: FileText,
-      description: "Create AI-powered video resumes",
-    },
-    {
-      name: "Smart Jobs",
-      href: "/jobs",
-      icon: Briefcase,
-      description: "Find jobs with AI matching",
-    },
-    {
-      name: "For Companies",
-      href: "/companies",
-      icon: Building2,
-      description: "Hire top talent efficiently",
-    },
-    {
-      name: "Professional Network",
-      href: "/people",
-      icon: Users,
-      description: "Connect with professionals",
+      name: "Video Studio",
+      href: "/studio",
+      icon: Clapperboard,
+      description:
+        "Create marketing videos with AI scripting, voiceover, captions, and teleprompter — promote a resume, profile, job, or company.",
     },
     {
       name: "AI Tools",
       href: "/tools",
       icon: Wrench,
-      description: "Career enhancement tools",
+      description:
+        "Interview practice, AI career coach, resume scoring, resume tailoring, salary calculator, and more — all in one place.",
     },
     {
-      name: "Resume Roast",
-      href: "/resume-roast",
-      icon: Flame,
-      description: "Get brutal AI feedback on your resume",
+      name: "Video Resumes",
+      href: "/resumes",
+      icon: FileText,
+      description:
+        "Import, manage, and generate AI-powered video-ready resumes.",
     },
     {
-      name: "Video Studio",
-      href: "/studio",
-      icon: Clapperboard,
-      description: "Create AI-powered video resumes",
+      name: "Chrome Extensions",
+      href: "/chrome-extension",
+      icon: Chrome,
+      description:
+        "Two extensions — job seekers tailor resumes on any job board, recruiters source candidates from LinkedIn and Indeed.",
     },
     {
-      name: "Task Management",
-      href: "/tasks",
-      icon: CheckSquare,
-      description: "Organize your career journey",
+      name: "Smart Jobs",
+      href: "/jobs",
+      icon: Briefcase,
+      description:
+        "Find jobs with AI match scoring, tailored resumes, and application tracking.",
+    },
+    {
+      name: "Creator Marketplace",
+      href: "/services",
+      icon: ShoppingBag,
+      description:
+        "Offer career services — resume reviews, coaching, video editing — and earn on the platform.",
+    },
+    {
+      name: "For Companies",
+      href: "/companies",
+      icon: Building2,
+      description:
+        "Hire top talent with video interviews, AI candidate matching, and a recruiter pipeline.",
+    },
+    {
+      name: "Professional Network",
+      href: "/people",
+      icon: Users,
+      description:
+        "Connect with professionals, share career wins, and grow your network.",
     },
     {
       name: "Smart Outreach",
       href: "/outreach",
       icon: Send,
-      description: "Intelligent networking",
+      description:
+        "Automate and track outreach campaigns across email and LinkedIn.",
     },
     {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: TrendingUp,
-      description: "Track your progress",
+      name: "Task Management",
+      href: "/tasks",
+      icon: CheckSquare,
+      description: "Plan your job search and keep every follow-up on track.",
     },
   ];
 
@@ -247,25 +257,17 @@ export default function Navigation({
                 >
                   Pricing
                 </Link>
-                <Link
-                  to="/about"
-                  className={cn(
-                    "transition-colors font-medium",
-                    location.pathname === "/about"
-                      ? "text-primary"
-                      : "text-foreground/70 hover:text-foreground",
-                  )}
-                >
-                  About
-                </Link>
               </>
             )}
           </div>
 
-          {/* Right side: SuperAdmin controls + Shopping Cart + Desktop CTA Buttons */}
+          {/* Right side: SuperAdmin controls + Notifications + Shopping Cart + Desktop CTA Buttons */}
           <div className="flex items-center space-x-4">
             {/* SuperAdmin controls (idle or active) */}
             <EmulationHeaderControls />
+
+            {/* Notifications (auth only) */}
+            {isAuthenticated && <NotificationCenter />}
 
             {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />

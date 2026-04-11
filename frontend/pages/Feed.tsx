@@ -136,7 +136,7 @@ function FeedMarketingPage({
 }
 
 // ─── Inline post composer bar ─────────────────────────────────────────────────
-function PostComposerBar({
+export function PostComposerBar({
   user,
   onOpen,
 }: {
@@ -207,7 +207,7 @@ function PostComposerBar({
 }
 
 // ─── Right sidebar — suggestions & trending ───────────────────────────────────
-function FeedRightPanel() {
+export function FeedRightPanel() {
   return (
     <div className="space-y-4">
       {/* Add to your feed */}
@@ -276,7 +276,7 @@ function FeedRightPanel() {
 }
 
 // ─── Feed filter tabs ─────────────────────────────────────────────────────────
-function FeedFilterTabs({
+export function FeedFilterTabs({
   active,
   onChange,
 }: {

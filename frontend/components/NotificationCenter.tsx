@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Bell,
+  MessageSquare,
   X,
   CheckCircle,
   AlertCircle,
@@ -158,8 +158,8 @@ const NotificationCenter: React.FC = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
+          <MessageSquare className="h-4 w-4" />
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
@@ -190,7 +190,7 @@ const NotificationCenter: React.FC = () => {
         <ScrollArea className="h-96">
           {notifications.length === 0 ? (
             <div className="p-6 text-center text-gray-500">
-              <Bell className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 text-gray-300" />
               <p className="text-sm">No notifications yet</p>
             </div>
           ) : (

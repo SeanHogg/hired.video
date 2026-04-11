@@ -1,23 +1,108 @@
 // StudioWizard.tsx — 3-step "create your first video" modal.
 //
-// Step 1: Pick a visual theme (template) + background preset/color
-// Step 2: Pick the content template (Promote Yourself / Skills Demo / Job Ad / Personal Brand)
+// Step 1: What do you want to promote? (Resume / Profile / Job / Company / Personal Brand / Skills Demo)
+// Step 2: Pick a visual theme (template) + background preset/color
 // Step 3: Fill in the corresponding inputs (reuses PromptEditor or SkillsDemoSetup) and Generate.
 
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Sparkles, Wand2, X } from "lucide-react";
+import {
+  Briefcase,
+  Building2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Monitor,
+  Sparkles,
+  UserCircle,
+  Wand2,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import PromptEditor from "@/components/PromptEditor";
 import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import {
   TEMPLATES,
   BG_PRESETS,
-  CONTENT_TEMPLATES,
   loadTemplate,
   type ContentTemplate,
 } from "./StudioSidebar";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
+
+// What-to-promote options — each maps to an existing ContentTemplate
+// and points at the page where the user can import the associated artifact.
+type PromoteOption = {
+  key: string;
+  contentTemplate: ContentTemplate;
+  label: string;
+  desc: string;
+  importHint: string;
+  importHref?: string;
+  importLabel?: string;
+  icon: LucideIcon;
+};
+
+const PROMOTE_OPTIONS: PromoteOption[] = [
+  {
+    key: "resume",
+    contentTemplate: "resume",
+    label: "Your Resume",
+    desc: "Turn your work history into a 60-second video pitch.",
+    importHint: "We'll use your saved resume as the starting script.",
+    importHref: "/resumes",
+    importLabel: "Manage resumes",
+    icon: FileText,
+  },
+  {
+    key: "profile",
+    contentTemplate: "personal_brand",
+    label: "Your Profile",
+    desc: "Promote your hired.video profile, bio, and highlights.",
+    importHint: "We'll pull headline and summary from your profile.",
+    importHref: "/profile",
+    importLabel: "Edit profile",
+    icon: UserCircle,
+  },
+  {
+    key: "job",
+    contentTemplate: "job_ad",
+    label: "A Job",
+    desc: "Make a short ad to promote an open role.",
+    importHint: "Pick a job from your saved jobs or paste a link.",
+    importHref: "/jobs",
+    importLabel: "Import a job",
+    icon: Briefcase,
+  },
+  {
+    key: "company",
+    contentTemplate: "job_ad",
+    label: "A Company",
+    desc: "Company promo video — values, culture, products.",
+    importHint: "Pull company details from your companies list.",
+    importHref: "/companies",
+    importLabel: "Import a company",
+    icon: Building2,
+  },
+  {
+    key: "personal_brand",
+    contentTemplate: "personal_brand",
+    label: "Your Personal Brand",
+    desc: "Tell your career story from scratch — no resume needed.",
+    importHint: "Start with a blank script and we'll help shape it.",
+    icon: Sparkles,
+  },
+  {
+    key: "skills_demo",
+    contentTemplate: "skills-demo",
+    label: "Skills Demo",
+    desc: "Screen-share walkthrough of something you built.",
+    importHint: "Record your screen and narrate.",
+    icon: Monitor,
+  },
+];
 
 interface Props {
   open: boolean;
@@ -47,12 +132,18 @@ export default function StudioWizard({
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [showJD, setShowJD] = useState(false);
   const [running, setRunning] = useState(false);
+  const [promoteKey, setPromoteKey] = useState<string | null>(null);
 
   if (!open) return null;
 
-  const stepTitles = ["Theme & Style", "Content Template", "Your Details"];
+  const stepTitles = ["What to Promote", "Theme & Style", "Your Details"];
   const isFirst = step === 0;
   const isLast = step === stepTitles.length - 1;
+
+  function handlePromoteSelect(opt: PromoteOption) {
+    setPromoteKey(opt.key);
+    onContentTemplateSelect(opt.contentTemplate);
+  }
 
   async function handleTheme(file: string) {
     const script = await loadTemplate(file);
@@ -67,13 +158,16 @@ export default function StudioWizard({
     onBackgroundSelect(value);
   }
 
-  // Per-step gating — Step 3 needs enough input to call generate
+  // Per-step gating
+  // Step 0 (Promote What): must pick an option
+  // Step 2 (Details): needs enough input to call generate
   const canGenerate =
     contentTemplate === "skills-demo"
       ? state.resumeText.trim().length > 0
       : state.resumeText.trim().length > 50;
 
-  const canAdvance = step === 2 ? canGenerate : true;
+  const canAdvance =
+    step === 0 ? promoteKey !== null : step === 2 ? canGenerate : true;
 
   async function handleDone() {
     if (!canGenerate) return;
@@ -134,6 +228,74 @@ export default function StudioWizard({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {step === 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+                What do you want to promote?
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Pick what the video is about — we'll set up the right template
+                and point you at the artifact to import.
+              </p>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {PROMOTE_OPTIONS.map((opt) => {
+                  const isActive = promoteKey === opt.key;
+                  const Icon = opt.icon;
+                  return (
+                    <li key={opt.key}>
+                      <button
+                        type="button"
+                        onClick={() => handlePromoteSelect(opt)}
+                        className={`w-full text-left flex flex-col gap-2 px-3 py-3 rounded-lg border transition-colors ${
+                          isActive
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/40 hover:bg-accent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon
+                            className={`w-5 h-5 shrink-0 ${
+                              isActive ? "text-primary" : "text-muted-foreground"
+                            }`}
+                          />
+                          <span
+                            className={`text-sm font-semibold ${
+                              isActive ? "text-primary" : ""
+                            }`}
+                          >
+                            {opt.label}
+                          </span>
+                          {isActive && (
+                            <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          {opt.desc}
+                        </p>
+                        {isActive && (
+                          <div className="flex items-center justify-between gap-2 mt-1 pt-2 border-t border-primary/20">
+                            <span className="text-[11px] text-muted-foreground leading-snug">
+                              {opt.importHint}
+                            </span>
+                            {opt.importHref && opt.importLabel && (
+                              <Link
+                                to={opt.importHref}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[11px] font-medium text-primary hover:underline shrink-0"
+                              >
+                                {opt.importLabel} →
+                              </Link>
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {step === 1 && (
             <div className="flex flex-col gap-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
@@ -210,52 +372,6 @@ export default function StudioWizard({
                   Pick a starting look — you can fine-tune everything later from the sidebar.
                 </p>
               </div>
-            </div>
-          )}
-
-          {step === 1 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                What kind of video?
-              </p>
-              <ul className="flex flex-col gap-2">
-                {CONTENT_TEMPLATES.map((ct) => {
-                  const isActive = contentTemplate === ct.id;
-                  const Icon = ct.icon;
-                  return (
-                    <li key={ct.id}>
-                      <button
-                        type="button"
-                        onClick={() => onContentTemplateSelect(ct.id)}
-                        className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg border transition-colors ${
-                          isActive
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/40 hover:bg-accent"
-                        }`}
-                      >
-                        <Icon
-                          className={`w-5 h-5 shrink-0 ${
-                            isActive ? "text-primary" : "text-muted-foreground"
-                          }`}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className={`text-sm font-semibold ${
-                              isActive ? "text-primary" : ""
-                            }`}
-                          >
-                            {ct.label}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground leading-tight">
-                            {ct.desc}
-                          </p>
-                        </div>
-                        {isActive && <Check className="w-4 h-4 text-primary shrink-0" />}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
             </div>
           )}
 

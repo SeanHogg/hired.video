@@ -6,7 +6,15 @@ import {
   Calendar,
   Clock,
   TrendingUp,
+  Wrench,
+  Mic,
+  Brain,
+  ArrowRight,
+  Film,
+  Chrome,
+  Sparkles,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -58,14 +66,157 @@ export function JobSeekerDashboard({
     );
   }
 
+  const onboardingPct = dashboardData.onboardingCompletionPercentage ?? 0;
+  const hasProfileViews = (dashboardData.profileStats?.totalViews ?? 0) > 0;
+  const hasApplications =
+    (dashboardData.applicationStats?.totalApplications ?? 0) > 0;
+  const isFirstRun = onboardingPct < 40 && !hasProfileViews && !hasApplications;
+
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* First-Run Welcome Hero — three primary paths to time-to-value */}
+      {isFirstRun && (
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+                Welcome
+              </Badge>
+            </div>
+            <CardTitle className="text-2xl sm:text-3xl">
+              Get to your first win in 5 minutes
+            </CardTitle>
+            <CardDescription className="text-base">
+              Pick any path below. You can always come back and try the others.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Path 1: Create a Video */}
+              <Link
+                to="/studio"
+                className="group block p-5 rounded-lg bg-white border-2 border-blue-200 hover:border-blue-500 hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                  <Film className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-base mb-1">
+                  1. Create a Marketing Video
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Open the Studio, import your resume, and record a 60-second
+                  pitch that stands out.
+                </p>
+                <div className="flex items-center text-sm font-medium text-blue-600 group-hover:gap-2 transition-all">
+                  Open Studio
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </div>
+              </Link>
+
+              {/* Path 2: Install Chrome Extension */}
+              <Link
+                to="/chrome-extension"
+                className="group block p-5 rounded-lg bg-white border-2 border-green-200 hover:border-green-500 hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
+                  <Chrome className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-base mb-1">
+                  2. Find Jobs Faster
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Install the Chrome extension to track jobs, score your
+                  resume, and tailor it on any job board.
+                </p>
+                <div className="flex items-center text-sm font-medium text-green-600 group-hover:gap-2 transition-all">
+                  Install Extension
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </div>
+              </Link>
+
+              {/* Path 3: Earn as a Creator */}
+              <Link
+                to="/services"
+                className="group block p-5 rounded-lg bg-white border-2 border-purple-200 hover:border-purple-500 hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
+                  <Sparkles className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-base mb-1">
+                  3. Earn as a Creator
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Got design, writing, or video skills? Offer services on the
+                  marketplace and get paid.
+                </p>
+                <div className="flex items-center text-sm font-medium text-purple-600 group-hover:gap-2 transition-all">
+                  Start Earning
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </div>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Onboarding Progress */}
       <OnboardingProgress
         tasks={dashboardData.onboardingTasks || []}
         completionPercentage={dashboardData.onboardingCompletionPercentage}
         loading={loading}
       />
+
+      {/* Tools CTA Banner */}
+      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 via-white to-blue-50">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                <Wrench className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-lg">Sharpen Your Edge with Tools</h3>
+                  <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">New</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Interview practice, AI career coach, resume scoring, tailoring, salary calculator, and more —
+                  all in one place.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Link to="/interview">
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
+                      <Mic className="h-3 w-3 mr-1" /> Interview Practice
+                    </Badge>
+                  </Link>
+                  <Link to="/chat">
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
+                      <Brain className="h-3 w-3 mr-1" /> AI Coach
+                    </Badge>
+                  </Link>
+                  <Link to="/tools/resume-tailor">
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
+                      <FileText className="h-3 w-3 mr-1" /> Resume Tailor
+                    </Badge>
+                  </Link>
+                  <Link to="/tools/ai-resume-scorer">
+                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
+                      <Target className="h-3 w-3 mr-1" /> Resume Scorer
+                    </Badge>
+                  </Link>
+                </div>
+              </div>
+            </div>
+            <Link to="/tools" className="shrink-0">
+              <Button className="bg-purple-600 hover:bg-purple-700 w-full lg:w-auto">
+                Explore All Tools
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Metrics Grid */}
       <MetricGrid
