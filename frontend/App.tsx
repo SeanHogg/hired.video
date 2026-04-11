@@ -54,7 +54,6 @@ const CompanyCreatePage = lazy(() => import("./pages/CompanyCreatePage"));
 const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
 const CompanyEditPage = lazy(() => import("./pages/CompanyEditPage"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Home = lazy(() => import("./pages/Home"));
 const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -85,7 +84,6 @@ const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
 const AICoach = lazy(() => import("./pages/AICoach"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
-const Feed = lazy(() => import("./pages/Feed"));
 const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 
 
