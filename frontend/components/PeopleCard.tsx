@@ -197,10 +197,10 @@ export default function PeopleCard({
         ];
 
   return (
-    <Card className="hover:shadow-lg transition-shadow relative">
+    <Card className="hover:shadow-lg transition-shadow relative overflow-hidden">
       <CardHeader className="pb-3 p-4 sm:p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-2 sm:gap-3 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
             {/* Profile Avatar */}
             <Avatar className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={displayFullName} />
