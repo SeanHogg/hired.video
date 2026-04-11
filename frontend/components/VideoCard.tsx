@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
+import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 
@@ -35,11 +36,12 @@ export default function VideoCard({
   company,
   createdAt,
   actions,
-  userContext: _userContext,  
-  itemOwnership: _itemOwnership,  
+  userContext: _userContext,
+  itemOwnership,
   onView,
   onActions,
 }: VideoCardProps) {
+  const isOwner = itemOwnership?.ownership === "owned";
   const formatViews = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
@@ -171,10 +173,10 @@ export default function VideoCard({
             </p>
 
             <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
-              <div className="flex items-center gap-1">
-                <Eye className="w-3 h-3" />
-                <span>{formatViews(views)} views</span>
-              </div>
+              {/* View count is owner-only (engagement metric). Timestamp stays public. */}
+              <OwnerMetricsRow isOwner={isOwner}>
+                <Metric icon={Eye} value={formatViews(views)} label="views" />
+              </OwnerMetricsRow>
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 <span>{formatDate(createdAt)}</span>

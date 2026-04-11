@@ -2,10 +2,8 @@ import {
   MapPin,
   DollarSign,
   Clock,
-  Building2,
   Eye,
   Users,
-  UserCheck,
   Edit,
   Share,
 } from "lucide-react";
@@ -14,8 +12,13 @@ import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
-import SaveJobButton from "@/components/SaveJobButton";
+import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
+import { visibilityHeaderBadge } from "@/lib/visibility-config";
+import { buildTrackAction } from "@/lib/card-track-action";
 import { useAuth } from "@/lib/auth";
+import { jobService } from "@/lib/services/job-service";
+import { toast } from "sonner";
+import { useState } from "react";
 import type { JobMetadata, JobWithOwnership } from "@/types/job";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
@@ -36,22 +39,28 @@ interface JobCardProps {
 
 export default function JobCard({
   job,
-  showOwnership = false,
+  showOwnership: _showOwnership = false,
   actions,
-  userContext: _userContext,  
-  itemOwnership: _itemOwnership,  
-  onTrack: _onTrack,  
-  onUntrack: _onUntrack,  
+  userContext: _userContext,
+  itemOwnership: _itemOwnership,
+  onTrack,
+  onUntrack,
   onView,
   onActions,
 }: JobCardProps) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const ownership = "ownership" in job ? job.ownership : undefined;
   const isOwned =
     ownership === "owned" || (!ownership && job.userId === user?.id);
   const isTracked = ownership === "tracked";
   const canEdit = isOwned;
+
+  // Local saved state so the bookmark toggles optimistically. For tracked lists
+  // the card already knows via `ownership === "tracked"`; for public listings
+  // we fall back to the job-service save/unsave endpoint.
+  const [saved, setSaved] = useState(isTracked);
+  const [savingInFlight, setSavingInFlight] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -68,32 +77,39 @@ export default function JobCard({
     }
   };
 
-  const getPrivacyIcon = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return null;
-      case "company_only":
-        return <Building2 className="h-3 w-3" />;
-      case "recruiter_only":
-        return <UserCheck className="h-3 w-3" />;
-      case "private":
-        return <Eye className="h-3 w-3" />;
-      default:
-        return null;
+  const handleToggleTrack = async () => {
+    if (!isAuthenticated) {
+      toast.error("Please sign in to save jobs");
+      return;
+    }
+    setSavingInFlight(true);
+    try {
+      if (saved) {
+        if (onUntrack) {
+          onUntrack(job.id);
+        } else {
+          await jobService.unsaveJob(job.id);
+          toast.success("Job removed from saved");
+        }
+        setSaved(false);
+      } else {
+        if (onTrack) {
+          onTrack(job.id);
+        } else {
+          await jobService.saveJob(job.id);
+          toast.success("Job saved");
+        }
+        setSaved(true);
+      }
+    } catch {
+      toast.error(saved ? "Failed to unsave job" : "Failed to save job");
+    } finally {
+      setSavingInFlight(false);
     }
   };
 
-  // Prepare badges for header
+  // Prepare badges for header. Tracked state has moved to the bottom action row.
   const badges = [];
-
-  if (showOwnership && isTracked) {
-    badges.push({
-      text: "Tracked",
-      variant: "outline" as const,
-      className: "text-xs bg-blue-50 text-blue-700",
-      icon: UserCheck,
-    });
-  }
 
   if (canEdit && job.status === "draft") {
     badges.push({
@@ -110,58 +126,54 @@ export default function JobCard({
     className: getStatusColor(job.status),
   });
 
-  if (getPrivacyIcon(job.privacy)) {
-    badges.push({
-      text: "",
-      variant: "outline" as const,
-      className: "text-xs",
-      icon: () => getPrivacyIcon(job.privacy),
-    });
+  if (job.privacy) {
+    badges.push(visibilityHeaderBadge(job.privacy));
   }
 
   // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const cardActions =
-    actions && actions.length > 0
-      ? actions
-      : [
-          {
-            id: "view",
-            label: "View",
-            variant: "outline" as const,
-            icon: Eye,
-            onClick: () => {
-              if (onView) {
-                onView();
-              } else {
-                window.location.href = `/jobs/${job.id}`;
-              }
-            },
-          },
-          {
-            id: "share",
-            label: "Share",
-            variant: "default" as const,
-            icon: Share,
-            onClick: () => {
-              if (onActions) {
-                onActions();
-              } else {
-                // Default share functionality - copy link to clipboard
-                const url = `${window.location.origin}/jobs/${job.id}`;
-                navigator.clipboard
-                  .writeText(url)
-                  .then(() => {
-                    // Could show a toast notification here
-                    alert("Job link copied to clipboard!");
-                  })
-                  .catch(() => {
-                    // Fallback for older browsers
-                    prompt("Copy this link:", url);
-                  });
-              }
-            },
-          },
-        ];
+  const fallbackActions: DynamicCardAction[] = [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline",
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/jobs/${job.id}`;
+        }
+      },
+    },
+    buildTrackAction({
+      isTracked: saved,
+      disabled: savingInFlight,
+      trackLabel: "Save",
+      trackedLabel: "Saved",
+      onToggle: (e) => {
+        e.stopPropagation();
+        void handleToggleTrack();
+      },
+    }),
+    {
+      id: "share",
+      label: "Share",
+      variant: "default",
+      icon: Share,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          const url = `${window.location.origin}/jobs/${job.id}`;
+          navigator.clipboard
+            .writeText(url)
+            .then(() => toast.success("Job link copied to clipboard"))
+            .catch(() => prompt("Copy this link:", url));
+        }
+      },
+    },
+  ];
+  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
   return (
     <BaseCard>
@@ -170,14 +182,6 @@ export default function JobCard({
         subtitle={`${job.company}`}
         badges={badges}
         linkTo={`/jobs/${job.id}`}
-        actions={
-          <SaveJobButton
-            jobId={job.id}
-            initialSaved={false}
-            variant="ghost"
-            size="icon"
-          />
-        }
       />
 
       <CardContent>
@@ -212,18 +216,12 @@ export default function JobCard({
             </Badge>
           </div>
 
-          {/* Stats */}
+          {/* Stats — views/applications are owner-only. Non-owners only see the posted date. */}
           <div className="pt-2 border-t space-y-2">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {job.views || 0} views
-              </div>
-              <div className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                {job.applications || 0} applications
-              </div>
-            </div>
+            <OwnerMetricsRow isOwner={isOwned}>
+              <Metric icon={Eye} value={job.views || 0} label="views" />
+              <Metric icon={Users} value={job.applications || 0} label="applications" />
+            </OwnerMetricsRow>
             <div className="text-xs text-muted-foreground">
               Posted {new Date(job.createdAt).toLocaleDateString()}
             </div>

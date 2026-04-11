@@ -2,7 +2,6 @@ import {
   MapPin,
   Eye,
   Briefcase,
-  UserCheck,
   Calendar,
   Building2,
   AlertCircle,
@@ -15,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
+import { buildTrackAction } from "@/lib/card-track-action";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
@@ -37,12 +37,12 @@ interface CompanyCardProps {
 
 export default function CompanyCard({
   company,
-  showOwnership = false,
+  showOwnership: _showOwnership = false,
   actions,
-  userContext: _userContext,  
-  itemOwnership: _itemOwnership,  
-  onTrack: _onTrack,  
-  onUntrack: _onUntrack,  
+  userContext: _userContext,
+  itemOwnership: _itemOwnership,
+  onTrack,
+  onUntrack,
   onView,
   onActions,
 }: CompanyCardProps) {
@@ -95,17 +95,8 @@ export default function CompanyCard({
 
   const onboardingStatus = getOnboardingStatus();
 
-  // Prepare badges for header
+  // Prepare badges for header. Follow/track state lives in the bottom action row.
   const badges = [];
-
-  if (showOwnership && isTracked) {
-    badges.push({
-      text: "Following",
-      variant: "outline" as const,
-      className: "text-xs bg-blue-50 text-blue-700",
-      icon: UserCheck,
-    });
-  }
 
   if (
     canEdit &&
@@ -145,50 +136,59 @@ export default function CompanyCard({
   }
 
   // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const cardActions =
-    actions && actions.length > 0
-      ? actions
-      : [
-        {
-          id: "view",
-          label: "View",
-          variant: "outline" as const,
-          icon: Eye,
-          onClick: () => {
-            if (onView) {
-              onView();
-            } else {
-              navigate(`/companies/${company.id}`);
-            }
-          },
-        },
-        {
-          id: "share",
-          label: "Share",
-          variant: "default" as const,
-          icon: Share,
-          onClick: () => {
-            if (onActions) {
-              onActions();
-            } else {
-              // Default share functionality - copy link to clipboard
-              const url = `${window.location.origin}/companies/${company.id}`;
-              navigator.clipboard
-                .writeText(url)
-                .then(() => {
-                  toast({
-                    title: "Link copied!",
-                    description: "Company link has been copied to your clipboard.",
-                  });
-                })
-                .catch(() => {
-                  // Fallback for older browsers
-                  prompt("Copy this link:", url);
-                });
-            }
-          },
-        },
-      ];
+  const fallbackActions: DynamicCardAction[] = [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline",
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          navigate(`/companies/${company.id}`);
+        }
+      },
+    },
+    buildTrackAction({
+      isTracked,
+      trackLabel: "Follow",
+      trackedLabel: "Following",
+      onToggle: (e) => {
+        e.stopPropagation();
+        if (isTracked) {
+          onUntrack?.(company.id);
+        } else {
+          onTrack?.(company.id);
+        }
+      },
+    }),
+    {
+      id: "share",
+      label: "Share",
+      variant: "default",
+      icon: Share,
+      onClick: () => {
+        if (onActions) {
+          onActions();
+        } else {
+          const url = `${window.location.origin}/companies/${company.id}`;
+          navigator.clipboard
+            .writeText(url)
+            .then(() => {
+              toast({
+                title: "Link copied!",
+                description: "Company link has been copied to your clipboard.",
+              });
+            })
+            .catch(() => {
+              prompt("Copy this link:", url);
+            });
+        }
+      },
+    },
+  ];
+  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
   return (
     <BaseCard>

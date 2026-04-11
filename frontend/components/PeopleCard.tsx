@@ -4,8 +4,7 @@ import {
   Briefcase,
   UserCheck,
   ExternalLink,
-  Bookmark,
-  BookmarkCheck,
+  Eye,
   Calendar,
   Building2,
   MessageCircle,
@@ -17,6 +16,8 @@ import {
   UserCog,
   Send,
 } from "lucide-react";
+import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
+import { buildTrackAction } from "@/lib/card-track-action";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -72,7 +73,7 @@ interface PeopleCardProps {
 export default function PeopleCard({
   person,
   connectionStatus = "none",
-  showOwnership = false,
+  showOwnership: _showOwnership = false,
   actions,
   userContext: _userContext,
   itemOwnership: _itemOwnership,
@@ -104,6 +105,7 @@ export default function PeopleCard({
 
   const ownership = "ownership" in person ? person.ownership : undefined;
   const isTracked = ownership === "tracked";
+  const isOwnProfile = !!user && person.id === user.id;
   const isConnected =
     ownership === "connected" || connectionStatus === "connected";
   const isPendingSent = connectionStatus === "pending_sent";
@@ -163,38 +165,49 @@ export default function PeopleCard({
     .toString()
     .toUpperCase();
 
-  // Use passed actions or fallback to default actions
-  const cardActions =
-    actions && actions.length > 0
-      ? actions
-      : [
-          {
-            id: "view",
-            label: "View",
-            variant: "outline" as const,
-            icon: UserCheck,
-            onClick: () => {
-              if (onView) {
-                onView();
-              } else {
-                window.location.href = `/people/${person.slug || person.id}`;
-              }
-            },
-          },
-          {
-            id: "actions",
-            label: "Actions",
-            variant: "default" as const,
-            icon: MessageCircle,
-            onClick: () => {
-              if (onActions) {
-                onActions();
-              } else {
-                console.log("Actions clicked for person:", person.id);
-              }
-            },
-          },
-        ];
+  // Use passed actions or fallback to default actions.
+  // The Follow/Unfollow toggle lives here (not in the header or connection row) so every
+  // content type exposes tracking from the same spot.
+  const fallbackActions: DynamicCardAction[] = [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline",
+      icon: UserCheck,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/people/${person.slug || person.id}`;
+        }
+      },
+    },
+  ];
+  if (!isOwnProfile) {
+    fallbackActions.push(
+      buildTrackAction({
+        isTracked,
+        trackLabel: "Follow",
+        trackedLabel: "Following",
+        onToggle: (e) => {
+          e.stopPropagation();
+          if (isTracked) {
+            onUntrack?.(person.id);
+          } else {
+            onTrack?.(person.id);
+          }
+        },
+      }),
+    );
+  }
+  fallbackActions.push({
+    id: "actions",
+    label: "Actions",
+    variant: "default",
+    icon: MessageCircle,
+    onClick: () => onActions?.(),
+  });
+  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
   return (
     <Card className="hover:shadow-lg transition-shadow relative overflow-hidden">
@@ -222,15 +235,6 @@ export default function PeopleCard({
                   )}
                   {person.isPremium && (
                     <Star className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
-                  )}
-                  {showOwnership && isTracked && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs bg-blue-50 text-blue-700 flex-shrink-0"
-                    >
-                      <UserCheck className="h-3 w-3 mr-1" />
-                      Following
-                    </Badge>
                   )}
                   {isConnected && (
                     <Badge
@@ -305,8 +309,9 @@ export default function PeopleCard({
             </div>
           )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2 text-xs text-center">
+          {/* Public stats: connections + followers are social proof and stay public.
+              Profile views are engagement data → owner-only, shown in its own row below. */}
+          <div className="grid grid-cols-2 gap-2 text-xs text-center">
             <div>
               <div className="font-medium">{person.connectionCount}</div>
               <div className="text-muted-foreground">Connections</div>
@@ -315,11 +320,11 @@ export default function PeopleCard({
               <div className="font-medium">{person.followerCount}</div>
               <div className="text-muted-foreground">Followers</div>
             </div>
-            <div>
-              <div className="font-medium">{person.profileViews}</div>
-              <div className="text-muted-foreground">Views</div>
-            </div>
           </div>
+
+          <OwnerMetricsRow isOwner={isOwnProfile} className="justify-center pt-1">
+            <Metric icon={Eye} value={person.profileViews ?? 0} label="profile views" />
+          </OwnerMetricsRow>
 
           {/* Last Active */}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
@@ -412,28 +417,7 @@ export default function PeopleCard({
                 </Dialog>
               )}
 
-              {/* Track/Untrack */}
-              {!isConnected && (
-                <div>
-                  {isTracked ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onUntrack?.(person.id)}
-                    >
-                      <BookmarkCheck className="h-3 w-3" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onTrack?.(person.id)}
-                    >
-                      <Bookmark className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              )}
+              {/* Track / Follow moved to the bottom action row — see cardActions below. */}
 
               {/* Add to Talent Pool (Recruiters only) */}
               {user && createRolePermissions(user.role).isRecruiter && onAddToTalentPool && (

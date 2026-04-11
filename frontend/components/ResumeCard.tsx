@@ -2,13 +2,8 @@ import {
   Eye,
   Calendar,
   Star,
-  Globe,
-  Users,
-  Lock,
   Copy,
   Target,
-  Edit,
-  UserCheck,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +11,11 @@ import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
+import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { formatDate } from "@/lib/utils";
+import { visibilityHeaderBadge } from "@/lib/visibility-config";
+import { buildTrackAction } from "@/lib/card-track-action";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { ResumePrivacy } from "@/types/resume";
@@ -85,75 +83,18 @@ export default function ResumeCard({
   onTrack,
   onContactOwner,
 }: ResumeCardProps) {
-  const getPrivacyIcon = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return <Globe className="w-3 h-3" />;
-      case "recruiter_only":
-        return <Users className="w-3 h-3" />;
-      case "connections":
-        return <Users className="w-3 h-3" />;
-      case "private":
-        return <Lock className="w-3 h-3" />;
-      case "draft":
-        return <Edit className="w-3 h-3" />;
-      default:
-        return <Lock className="w-3 h-3" />;
-    }
-  };
+  const isOwner = ownership === "owned";
 
-  const getPrivacyText = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return "Public";
-      case "recruiter_only":
-        return "Recruiter Only";
-      case "connections":
-        return "Connections";
-      case "private":
-        return "Private";
-      case "draft":
-        return "Draft";
-      default:
-        return "Private";
-    }
-  };
-
-  const getPrivacyColor = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return "bg-green-100 text-green-800";
-      case "recruiter_only":
-        return "bg-blue-100 text-blue-800";
-      case "connections":
-        return "bg-indigo-100 text-indigo-800";
-      case "private":
-        return "bg-gray-100 text-gray-800";
-      case "draft":
-        return "bg-orange-100 text-orange-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  // Prepare badges for header (consistent with JobCard pattern)
+  // Prepare badges for header. Tracked state lives in the bottom action row,
+  // not the header, so every content type exposes tracking the same way.
   const badges = [];
-
-  if (ownership === "tracked") {
-    badges.push({
-      text: "Tracked",
-      variant: "secondary" as const,
-      className: "text-xs bg-blue-100 text-blue-800",
-      icon: () => <UserCheck className="w-3 h-3" />,
-    });
-  }
 
   if (isActive) {
     badges.push({
       text: "Active",
       variant: "secondary" as const,
       className: "text-xs bg-green-100 text-green-800",
-      icon: () => <Target className="w-3 h-3" />,
+      icon: Target,
     });
   }
 
@@ -162,7 +103,7 @@ export default function ResumeCard({
       text: "Master",
       variant: "secondary" as const,
       className: "text-xs bg-yellow-100 text-yellow-800",
-      icon: () => <Star className="w-3 h-3" />,
+      icon: Star,
     });
   }
 
@@ -171,50 +112,49 @@ export default function ResumeCard({
       text: "Variation",
       variant: "outline" as const,
       className: "text-xs",
-      icon: () => <Copy className="w-3 h-3" />,
+      icon: Copy,
     });
   }
 
-  badges.push({
-    text: getPrivacyText(privacy),
-    variant: "secondary" as const,
-    className: `text-xs ${getPrivacyColor(privacy)}`,
-    icon: () => getPrivacyIcon(privacy),
-  });
-
-  const isOwner = ownership === "owned";
+  badges.push(visibilityHeaderBadge(privacy));
   const hasIndividualHandlers = onEdit || onAddMedia || onCreateVariation || onSetActive || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onTrack || onContactOwner || onShare;
 
-  // Fallback actions for legacy usage (dynamic actions or onActions modal trigger)
-  const cardActions =
-    actions && actions.length > 0
-      ? actions
-      : [
-          {
-            id: "view",
-            label: "View",
-            variant: "outline" as const,
-            icon: Eye,
-            onClick: () => {
-              if (onView) {
-                onView();
-              } else {
-                window.location.href = `/resumes/${id}`;
-              }
-            },
-          },
-          {
-            id: "actions",
-            label: "Actions",
-            variant: "default" as const,
-            icon: Eye,
-            onClick: () => {
-              if (onActions) {
-                onActions();
-              }
-            },
-          },
-        ];
+  // Fallback actions for legacy usage (dynamic actions or onActions modal trigger).
+  // Tracking goes into the bottom action row for consistency with every other card type.
+  const fallbackActions: DynamicCardAction[] = [
+    {
+      id: "view",
+      label: "View",
+      variant: "outline",
+      icon: Eye,
+      onClick: () => {
+        if (onView) {
+          onView();
+        } else {
+          window.location.href = `/resumes/${id}`;
+        }
+      },
+    },
+  ];
+  if (onTrack) {
+    fallbackActions.push(
+      buildTrackAction({
+        isTracked: ownership === "tracked",
+        onToggle: (e) => {
+          e.stopPropagation();
+          onTrack();
+        },
+      }),
+    );
+  }
+  fallbackActions.push({
+    id: "actions",
+    label: "Actions",
+    variant: "default",
+    icon: Eye,
+    onClick: () => onActions?.(),
+  });
+  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
   return (
     <BaseCard>
@@ -251,11 +191,10 @@ export default function ResumeCard({
               </span>
             </div>
 
-            {/* Views Row - Always show, even if 0 */}
-            <div className="flex items-center gap-2">
-              <Eye className="w-3 h-3 flex-shrink-0" />
-              <span>{views || 0} views</span>
-            </div>
+            {/* Owner-only engagement metrics. Non-owners never see these. */}
+            <OwnerMetricsRow isOwner={isOwner} className="gap-2">
+              <Metric icon={Eye} value={views || 0} label="views" />
+            </OwnerMetricsRow>
 
             {/* Slug Row - Only show if exists */}
             {slug && (
