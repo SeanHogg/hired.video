@@ -17,7 +17,6 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
-import NotificationCenter from "@/components/NotificationCenter";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -178,7 +177,7 @@ export default function Navigation({
                 <Video className="h-8 w-8 text-primary" />
                 <Sparkles className="h-4 w-4 text-brand-blue absolute -top-1 -right-1" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+              <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
                 hired.video
               </span>
             </Link>
@@ -261,13 +260,10 @@ export default function Navigation({
             )}
           </div>
 
-          {/* Right side: SuperAdmin controls + Notifications + Shopping Cart + Desktop CTA Buttons */}
+          {/* Right side: SuperAdmin controls + Shopping Cart + Desktop CTA Buttons */}
           <div className="flex items-center space-x-4">
             {/* SuperAdmin controls (idle or active) */}
             <EmulationHeaderControls />
-
-            {/* Notifications (auth only) */}
-            {isAuthenticated && <NotificationCenter />}
 
             {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />

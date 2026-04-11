@@ -93,7 +93,7 @@ interface Props {
 }
 
 /** Serialize a JobSummary into plain text for the AI. */
-function jobToText(j: JobSummary): string {
+export function jobToText(j: JobSummary): string {
   const lines: string[] = [];
   lines.push(j.title);
   if (j.company) lines.push(`Company: ${j.company}`);
@@ -110,7 +110,7 @@ function jobToText(j: JobSummary): string {
 }
 
 /** Serialize a loaded FrontendResume into plain readable text for the AI. */
-function resumeToText(r: FrontendResume): string {
+export function resumeToText(r: FrontendResume): string {
   const lines: string[] = [];
   const b = r?.data?.Basics;
   if (b?.Name) lines.push(`${b.Name}${b.Label ? ` — ${b.Label}` : ""}`);

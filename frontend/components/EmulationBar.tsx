@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, Eye, Copy, LogOut, ChevronDown, Bug } from "lucide-react";
+import { AlertTriangle, Eye, Copy, LogOut, ChevronDown, Bug, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
@@ -96,34 +98,75 @@ export function EmulationHeaderControls() {
   // ── Idle: no active session ──────────────────────────────────────────────
   if (!isImpersonating && !isPreviewMode) {
     return (
-      <div className="flex items-center gap-1">
-        <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
-
+      <>
+        {/* Mobile: collapsed into a single dropdown so cart/notifications stay accessible */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
-              <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-8 w-8 relative"
+              title="SuperAdmin tools"
+              aria-label="SuperAdmin tools"
+            >
+              <Shield className="h-4 w-4 text-primary" />
+              {debugMode && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500" />
+              )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="flex items-center gap-2">
+              <Shield className="h-3.5 w-3.5" />SuperAdmin
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              Preview as role
+            </DropdownMenuLabel>
             {ROLES.map((r) => (
               <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
+                <Eye className="h-3.5 w-3.5 mr-2" />
                 {getRoleDisplayLabel(r)}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={toggleDebugMode}>
+              <Bug className="h-3.5 w-3.5 mr-2" />
+              {debugMode ? "Disable" : "Enable"} permission debugger
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button
-          variant={debugMode ? "secondary" : "ghost"}
-          size="sm"
-          className="h-7 text-xs gap-1 px-2"
-          onClick={toggleDebugMode}
-          title="Toggle permission debugger (Ctrl+Shift+P)"
-        >
-          <Bug className="h-3 w-3" />Debug
-        </Button>
-      </div>
+        {/* Desktop: inline controls */}
+        <div className="hidden md:flex items-center gap-1">
+          <Badge variant="secondary" className="text-xs">SuperAdmin</Badge>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+                <Eye className="h-3 w-3" />Preview role<ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {ROLES.map((r) => (
+                <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
+                  {getRoleDisplayLabel(r)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant={debugMode ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 text-xs gap-1 px-2"
+            onClick={toggleDebugMode}
+            title="Toggle permission debugger (Ctrl+Shift+P)"
+          >
+            <Bug className="h-3 w-3" />Debug
+          </Button>
+        </div>
+      </>
     );
   }
 
@@ -187,7 +230,7 @@ export function EmulationHeaderControls() {
             size="sm"
             className={`h-7 text-xs gap-1 ${btnBorderCls}`}
           >
-            Role: {getRoleDisplayLabel(effectiveRole)}<ChevronDown className="h-3 w-3" />
+            <span className="hidden sm:inline">Role:&nbsp;</span>{getRoleDisplayLabel(effectiveRole)}<ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -211,7 +254,7 @@ export function EmulationHeaderControls() {
         title="Toggle permission debugger (Ctrl+Shift+P)"
       >
         <Bug className="h-3 w-3" />
-        Permissions
+        <span className="hidden sm:inline">Permissions</span>
         {debugMode && <Badge className="ml-1 h-4 text-[10px] px-1">ON</Badge>}
       </Button>
 
@@ -229,9 +272,15 @@ export function EmulationHeaderControls() {
       </Button>
 
       {/* Exit */}
-      <Button variant="destructive" size="sm" className="h-7 text-xs gap-1" onClick={handleExit}>
+      <Button
+        variant="destructive"
+        size="sm"
+        className="h-7 text-xs gap-1 px-2"
+        onClick={handleExit}
+        title={isImpersonating ? "Exit Emulation" : "Exit Preview"}
+      >
         <LogOut className="h-3 w-3" />
-        {isImpersonating ? "Exit Emulation" : "Exit Preview"}
+        <span className="hidden sm:inline">{isImpersonating ? "Exit Emulation" : "Exit Preview"}</span>
       </Button>
     </div>
   );
