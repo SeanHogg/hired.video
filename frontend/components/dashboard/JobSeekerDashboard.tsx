@@ -4,7 +4,6 @@ import {
   FileText,
   Target,
   Calendar,
-  Clock,
   TrendingUp,
   Wrench,
   Mic,
@@ -502,73 +501,8 @@ export function JobSeekerDashboard({
         </Card>
       </div>
 
-      {/* Messages Section */}
-      {dashboardData.messageStats && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Messages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">
-                  {dashboardData.messageStats.unreadCount}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Unread Messages
-                </div>
-              </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-primary">
-                  {dashboardData.messageStats.totalConversations}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Total Conversations
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Messages */}
-            {dashboardData.messageStats.recentMessages &&
-              dashboardData.messageStats.recentMessages.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Recent Messages
-                  </h4>
-                  {dashboardData.messageStats.recentMessages
-                    .slice(0, 3)
-                    .map((message, index) => (
-                      <div
-                        key={message.conversationId || index}
-                        className="flex items-start gap-3 p-2 bg-muted/20 rounded"
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${message.isRead ? "bg-muted-foreground" : "bg-primary"}`}
-                        />
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">
-                            {message.senderName}
-                          </div>
-                          <div className="text-xs text-muted-foreground line-clamp-2">
-                            {message.preview}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {new Date(message.sentAt).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  <Button variant="outline" className="w-full">
-                    View All Messages
-                  </Button>
-                </div>
-              )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Messages widget intentionally removed — unified into the
+          CommunicationHub bell in the header. */}
 
       {/* Career Progress Summary */}
       {dashboardData.applicationStats && (

@@ -17,6 +17,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ShoppingCart from "@/components/ShoppingCart";
+import CommunicationHub from "@/components/CommunicationHub";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
@@ -260,10 +261,13 @@ export default function Navigation({
             )}
           </div>
 
-          {/* Right side: SuperAdmin controls + Shopping Cart + Desktop CTA Buttons */}
+          {/* Right side: SuperAdmin controls + Inbox + Shopping Cart + Desktop CTA Buttons */}
           <div className="flex items-center space-x-4">
             {/* SuperAdmin controls (idle or active) */}
             <EmulationHeaderControls />
+
+            {/* Unified communication hub - bell with merged inbox */}
+            <CommunicationHub />
 
             {/* Shopping Cart - Visible on both mobile and desktop */}
             <ShoppingCart />

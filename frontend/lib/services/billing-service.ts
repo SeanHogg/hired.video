@@ -2,7 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 
 // Shared pricing constants
-import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
+import { FREE_AI_MONTHLY_LIMIT, FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
 
 // TYPES - mirror backend DTOs; keep in sync with hired.video.Abstractions/Billing/BillingDTOs.cs
 export interface SubscriptionSummary {
@@ -56,6 +56,30 @@ export interface AIUsageMonth {
   isUnlimited: boolean;
 }
 
+/**
+ * Full token-budget summary returned by /api/Billing/token-budget. This is
+ * the new shape used by the sidebar AITokenPill, AIUsageLimitBanner, and
+ * the "buy more tokens" sheet. It surfaces both the monthly subscription
+ * allowance and the purchased pack balance, plus the combined total.
+ */
+export interface TokenBudget {
+  planId: string;
+  isPro: boolean;
+  isUnlimited: boolean;
+  monthly: {
+    used: number;
+    limit: number | null;     // null when isUnlimited
+    remaining: number | null; // null when isUnlimited
+    /** ISO timestamp of next monthly reset (1st of next month UTC). */
+    resetAt: string;
+  };
+  pack: {
+    balance: number;
+  };
+  /** monthly.remaining + pack.balance — what the gate checks. null when unlimited. */
+  totalAvailable: number | null;
+}
+
 export const billingService = {
   async getSubscription(): Promise<SubscriptionSummary> {
     const res: ApiSuccessResponse<SubscriptionSummary> = await apiClient.get(
@@ -83,7 +107,11 @@ export const billingService = {
     const res: ApiSuccessResponse<AIUsageMonth> = await apiClient.get(
       "/api/Billing/ai-usage/month",
     );
-    // Ensure remaining computed when backend didn't provide it
+    // Ensure remaining computed when backend didn't provide it.
+    // Note: legacy `FREE_AI_MONTHLY_LIMIT` is the request-count value (10).
+    // The backend now reports tokens, but this DTO is kept for compatibility
+    // with existing AIUsageLimitBanner call sites until they migrate to
+    // `getTokenBudget()`.
     const u = res.data;
     if (!u.isUnlimited) {
       const limit = u.limit ?? FREE_AI_MONTHLY_LIMIT;
@@ -91,6 +119,30 @@ export const billingService = {
       return { ...u, limit, remaining };
     }
     return u;
+  },
+
+  /**
+   * Fetch the full token-budget summary. Use this for any UI that needs to
+   * show the pack balance, the next reset time, or the combined total
+   * available — the older `getMonthlyAIUsage` only exposes monthly allowance.
+   */
+  async getTokenBudget(): Promise<TokenBudget> {
+    const res: ApiSuccessResponse<TokenBudget> = await apiClient.get(
+      "/api/Billing/token-budget",
+    );
+    const t = res.data;
+    // Defensive: ensure remaining/totalAvailable are computed if the backend
+    // doesn't provide them on a transitional deploy.
+    if (!t.isUnlimited) {
+      const limit = t.monthly.limit ?? FREE_AI_MONTHLY_TOKENS;
+      const monthlyRemaining = Math.max(0, limit - (t.monthly.used ?? 0));
+      return {
+        ...t,
+        monthly: { ...t.monthly, limit, remaining: monthlyRemaining },
+        totalAvailable: monthlyRemaining + (t.pack.balance ?? 0),
+      };
+    }
+    return t;
   },
 
   async createSetupSession(successUrl: string, cancelUrl: string): Promise<string> {

@@ -1,5 +1,5 @@
 import React from "react";
-import { Briefcase, Target, Calendar, UserPlus, Clock } from "lucide-react";
+import { Briefcase, Target, Calendar, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -256,8 +256,8 @@ export function RecruiterDashboard({
         </Card>
       )}
 
-      {/* Lists Row - New Candidates, Interviews, Messages */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Lists Row - New Candidates, Interviews */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* New Candidates */}
         <Card>
           <CardHeader>
@@ -353,42 +353,8 @@ export function RecruiterDashboard({
           </CardContent>
         </Card>
 
-        {/* Message Statistics */}
-        {dashboardData.messageStats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Messages
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-red-600">
-                    {dashboardData.messageStats.unreadCount}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Unread Messages
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-2xl font-bold text-primary">
-                    {dashboardData.messageStats.totalConversations}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Total Conversations
-                  </div>
-                </div>
-                {dashboardData.messageStats.unreadCount > 0 && (
-                  <Button variant="outline" size="sm" className="w-full">
-                    View Messages
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Message Statistics card removed — unified into the
+            CommunicationHub bell in the header. */}
       </div>
 
       {/* Content Grid */}

@@ -1,25 +1,25 @@
 /**
- * ChatPanel — LinkedIn-style fixed footer messaging panel.
- * Shows a "Messaging" button that expands a conversation list,
- * and supports opening individual mini chat windows.
+ * ChatPanel — globally-mounted LinkedIn-style mini chat windows.
+ *
+ * No longer renders its own conversation list / "Messaging" button — the
+ * unified CommunicationHub in the header is now the single entry point.
+ * This component is purely the passive renderer of open conversation
+ * mini-windows; it listens on `chatBus` for "open conversation X" events.
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  MessageCircle,
   X,
   ChevronDown,
   ChevronUp,
   Send,
   Loader2,
-  Pencil,
-  Search,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { communicationService } from "@/lib/services/communication-service";
 import { useAuth } from "@/lib/auth";
+import { chatBus } from "@/lib/chat-bus";
 import type { ConversationListItem, MessageListItem } from "@/types/communication";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,16 +42,6 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
 }
 
 // ─── Mini chat window ─────────────────────────────────────────────────────────
@@ -186,64 +176,82 @@ function ChatWindow({
 
 export default function ChatPanel() {
   const { isAuthenticated } = useAuth();
-
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
-  const [loadingConvs, setLoadingConvs] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [openChats, setOpenChats] = useState<OpenChat[]>([]);
-
-  // Load conversations when panel opens
+  // Mirror of openChats keyed by conversation id, used inside async callbacks
+  // so we can read the latest state without depending on stale closures.
+  const openIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (panelOpen && conversations.length === 0 && isAuthenticated) {
-      setLoadingConvs(true);
-      communicationService
-        .getConversations()
-        .then(setConversations)
-        .catch(() => {})
-        .finally(() => setLoadingConvs(false));
-    }
-  }, [panelOpen, isAuthenticated, conversations.length]);
+    openIdsRef.current = new Set(openChats.map((c) => c.conversation.id));
+  }, [openChats]);
 
-  const openChat = useCallback(async (conv: ConversationListItem) => {
-    // Don't open duplicate
-    if (openChats.some((c) => c.conversation.id === conv.id)) {
-      // Un-minimise if it's there
+  /** Open a conversation by id. Looks it up via the API, since the hub
+   *  passes only the id over the bus. Dedupes against already-open windows. */
+  const openConversationById = useCallback(async (convId: string) => {
+    if (openIdsRef.current.has(convId)) {
+      // Already open — just un-minimise.
       setOpenChats((prev) =>
         prev.map((c) =>
-          c.conversation.id === conv.id ? { ...c, minimized: false } : c,
+          c.conversation.id === convId ? { ...c, minimized: false } : c,
         ),
       );
-      setPanelOpen(false);
       return;
     }
 
+    // Fetch the conversation row so we have a title for the window header.
+    let conversation: ConversationListItem | undefined;
+    try {
+      const convs = await communicationService.getConversations();
+      conversation = convs.find((c) => c.id === convId);
+    } catch {
+      /* fall through with placeholder */
+    }
+    if (!conversation) {
+      conversation = {
+        id: convId,
+        title: "Conversation",
+        type: 0 as ConversationListItem["type"],
+        participantCount: 0,
+        unreadCount: 0,
+        isArchived: false,
+        isMuted: false,
+      };
+    }
+
     const chat: OpenChat = {
-      conversation: conv,
+      conversation,
       messages: [],
       loading: true,
       minimized: false,
       newMessage: "",
       sending: false,
     };
-    setOpenChats((prev) => [...prev.slice(-2), chat]); // max 3 open
-    setPanelOpen(false);
+    // Cap at 3 open windows.
+    setOpenChats((prev) => [...prev.slice(-2), chat]);
 
     try {
-      const msgs = await communicationService.getMessages(conv.id);
+      const msgs = await communicationService.getMessages(convId);
       setOpenChats((prev) =>
         prev.map((c) =>
-          c.conversation.id === conv.id ? { ...c, messages: msgs, loading: false } : c,
+          c.conversation.id === convId ? { ...c, messages: msgs, loading: false } : c,
         ),
       );
     } catch {
       setOpenChats((prev) =>
         prev.map((c) =>
-          c.conversation.id === conv.id ? { ...c, loading: false } : c,
+          c.conversation.id === convId ? { ...c, loading: false } : c,
         ),
       );
     }
-  }, [openChats]);
+  }, []);
+
+  // Subscribe to the chat-bus so the CommunicationHub can ask us to open a
+  // conversation without needing a React context dependency.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    return chatBus.subscribe((convId) => {
+      void openConversationById(convId);
+    });
+  }, [isAuthenticated, openConversationById]);
 
   const closeChat = useCallback((convId: string) => {
     setOpenChats((prev) => prev.filter((c) => c.conversation.id !== convId));
@@ -263,9 +271,14 @@ export default function ChatPanel() {
     );
   }, []);
 
+  const openChatsRef = useRef<OpenChat[]>([]);
+  useEffect(() => {
+    openChatsRef.current = openChats;
+  }, [openChats]);
+
   const sendMessage = useCallback(async (convId: string) => {
-    const chat = openChats.find((c) => c.conversation.id === convId);
-    if (!chat || !chat.newMessage.trim()) return;
+    const pending = openChatsRef.current.find((c) => c.conversation.id === convId);
+    if (!pending || !pending.newMessage.trim()) return;
 
     setOpenChats((prev) =>
       prev.map((c) => (c.conversation.id === convId ? { ...c, sending: true } : c)),
@@ -274,7 +287,7 @@ export default function ChatPanel() {
     try {
       const msg = await communicationService.sendMessage({
         conversationId: convId,
-        content: chat.newMessage.trim(),
+        content: pending.newMessage.trim(),
       });
       setOpenChats((prev) =>
         prev.map((c) =>
@@ -288,19 +301,12 @@ export default function ChatPanel() {
         prev.map((c) => (c.conversation.id === convId ? { ...c, sending: false } : c)),
       );
     }
-  }, [openChats]);
+  }, []);
 
-  if (!isAuthenticated) return null;
-
-  const filteredConvs = conversations.filter((c) =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const totalUnread = openChats.reduce((acc, c) => acc + (c.conversation.unreadCount ?? 0), 0);
+  if (!isAuthenticated || openChats.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 right-4 z-40 flex items-end gap-3">
-      {/* Open chat windows */}
+    <div className="fixed bottom-16 md:bottom-0 right-4 z-40 flex items-end gap-3">
       {openChats.map((chat) => (
         <ChatWindow
           key={chat.conversation.id}
@@ -311,116 +317,6 @@ export default function ChatPanel() {
           onMessageChange={(val) => handleMessageChange(chat.conversation.id, val)}
         />
       ))}
-
-      {/* Messaging panel */}
-      <div className="flex flex-col" style={{ width: 300 }}>
-        {/* Conversation list */}
-        {panelOpen && (
-          <div className="bg-card border rounded-t-xl shadow-xl overflow-hidden mb-0" style={{ maxHeight: 420 }}>
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <span className="font-semibold text-sm">Messaging</span>
-              <div className="flex items-center gap-1">
-                <button type="button" className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors" title="New message">
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button type="button" onClick={() => setPanelOpen(false)} className="p-1.5 rounded-full hover:bg-muted text-muted-foreground transition-colors">
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="px-3 py-2 border-b">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search messages"
-                  className="h-8 pl-8 text-sm rounded-full"
-                />
-              </div>
-            </div>
-
-            {/* Conversations list */}
-            <div className="overflow-y-auto" style={{ maxHeight: 320 }}>
-              {loadingConvs ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : filteredConvs.length === 0 ? (
-                <div className="text-center py-8 px-4">
-                  <MessageCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">No conversations yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Connect with people to start messaging
-                  </p>
-                </div>
-              ) : (
-                filteredConvs.map((conv) => (
-                  <button
-                    key={conv.id}
-                    type="button"
-                    onClick={() => openChat(conv)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <div className="relative shrink-0">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="text-sm bg-primary/10 text-primary">
-                          {getInitials(conv.title)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm truncate">{conv.title}</span>
-                        {conv.lastMessage && (
-                          <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                            {timeAgo(conv.lastMessage.timestamp)}
-                          </span>
-                        )}
-                      </div>
-                      {conv.lastMessage && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {conv.lastMessage.content}
-                        </p>
-                      )}
-                    </div>
-                    {(conv.unreadCount ?? 0) > 0 && (
-                      <Badge variant="destructive" className="text-xs px-1.5 py-0 h-4 shrink-0">
-                        {conv.unreadCount}
-                      </Badge>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Messaging tab button */}
-        <button
-          type="button"
-          onClick={() => setPanelOpen((v) => !v)}
-          className="flex items-center justify-between px-4 py-2.5 bg-card border border-b-0 rounded-t-xl shadow-lg hover:bg-muted/50 transition-colors w-full"
-        >
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5 text-primary" />
-            <span className="font-semibold text-sm">Messaging</span>
-            {totalUnread > 0 && (
-              <Badge variant="destructive" className="text-xs px-1.5 py-0 h-4">
-                {totalUnread}
-              </Badge>
-            )}
-          </div>
-          {panelOpen ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-      </div>
     </div>
   );
 }

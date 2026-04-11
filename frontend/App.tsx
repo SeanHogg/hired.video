@@ -23,6 +23,7 @@ import { initializeErrorTracking, reportError, reportMessage } from "@/lib/error
 // Critical components loaded immediately
 import AIChatPanel from "./components/AIChatPanel";
 import FloatingAIButton from "./components/FloatingAIButton";
+import ChatPanel from "./components/ChatPanel";
 import MobileBottomNav from "./components/MobileBottomNav";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
@@ -606,6 +607,9 @@ const App = () => (
                   {/* Global AI Components - Available on all pages */}
                   <FloatingAIButton />
                   <AIChatPanel />
+                  {/* Global human-to-human chat mini-windows. Opened by the
+                      CommunicationHub bell in the Navigation header. */}
+                  <ChatPanel />
                   <PWAInstallPrompt />
                 </BrowserRouter>
               </TooltipProvider>

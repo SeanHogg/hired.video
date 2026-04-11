@@ -22,7 +22,6 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import ChatPanel from "@/components/ChatPanel";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -574,9 +573,6 @@ export default function Feed() {
         onPostCreated={handlePostCreated}
         initialMode={createPostMode}
       />
-
-      {/* Footer Chat Panel */}
-      <ChatPanel />
     </div>
   );
 }

@@ -23,7 +23,6 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import ChatPanel from "@/components/ChatPanel";
 import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { Button } from "@/components/ui/button";
@@ -912,8 +911,6 @@ export default function Home() {
         onPostCreated={handlePostCreated}
         initialMode={createPostMode}
       />
-
-      <ChatPanel />
     </div>
   );
 }
