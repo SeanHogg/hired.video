@@ -18,7 +18,7 @@ export const feedPosts = pgTable("feed_posts", {
   linkTitle: varchar("link_title", { length: 500 }),
   linkDescription: text("link_description"),
   linkImageUrl: varchar("link_image_url", { length: 2000 }),
-  privacy: varchar("privacy", { length: 50 }).default("Public").notNull(), // Public | Connections | Private
+  privacy: varchar("privacy", { length: 50 }).default("Public").notNull(), // Public | Recruiter | Connections | Private
   media: jsonb("media").default([]).$type<Array<{
     id: string; mediaType: "Image" | "Video"; mediaUrl: string;
     thumbnailUrl?: string; altText?: string; displayOrder: number;

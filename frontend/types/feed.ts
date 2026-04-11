@@ -51,7 +51,7 @@ export interface FeedPost {
   linkTitle?: string;
   linkDescription?: string;
   linkImageUrl?: string;
-  privacy: 'Public' | 'Private' | 'Connections';
+  privacy: 'Public' | 'Recruiter' | 'Connections' | 'Private';
   createdAt: string;
   updatedAt: string;
   media: FeedPostMedia[];
@@ -66,7 +66,7 @@ export interface FeedPost {
 export interface CreateFeedPostRequest {
   content: string;
   linkUrl?: string;
-  privacy: 'Public' | 'Private' | 'Connections';
+  privacy: 'Public' | 'Recruiter' | 'Connections' | 'Private';
   media: CreateFeedPostMediaRequest[];
 }
 
@@ -80,7 +80,7 @@ export interface CreateFeedPostMediaRequest {
 
 export interface UpdateFeedPostRequest {
   content: string;
-  privacy: 'Public' | 'Private' | 'Connections';
+  privacy: 'Public' | 'Recruiter' | 'Connections' | 'Private';
   media: CreateFeedPostMediaRequest[];
 }
 
@@ -139,7 +139,7 @@ export interface FeedFilters {
 
 export interface CreatePostData {
   content: string;
-  privacy: 'Public' | 'Private' | 'Connections';
+  privacy: 'Public' | 'Recruiter' | 'Connections' | 'Private';
   linkUrl?: string;
   mediaFiles: File[];
 }

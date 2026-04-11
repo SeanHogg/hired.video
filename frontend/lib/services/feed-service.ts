@@ -75,7 +75,7 @@ export const FeedPostSchema = z.object({
   linkTitle: z.string().optional(),
   linkDescription: z.string().optional(),
   linkImageUrl: z.string().optional(),
-  privacy: z.enum(["Public", "Private", "Connections"]),
+  privacy: z.enum(["Public", "Recruiter", "Connections", "Private"]),
   createdAt: z.string(),
   updatedAt: z.string(),
   media: z.array(FeedPostMediaSchema),
@@ -99,7 +99,7 @@ export const FeedPostsResponseSchema = z.object({
 export const CreateFeedPostRequestSchema = z.object({
   content: z.string(),
   linkUrl: z.string().url().optional(),
-  privacy: z.enum(["Public", "Private", "Connections"]),
+  privacy: z.enum(["Public", "Recruiter", "Connections", "Private"]),
   media: z.array(z.object({
     mediaType: z.enum(["Image", "Video"]),
     mediaUrl: z.string(),
@@ -114,7 +114,7 @@ export const CreateFeedPostRequestSchema = z.object({
 
 export const UpdateFeedPostRequestSchema = z.object({
   content: z.string().min(1, "Content is required"),
-  privacy: z.enum(["Public", "Private", "Connections"]),
+  privacy: z.enum(["Public", "Recruiter", "Connections", "Private"]),
   media: z.array(z.object({
     mediaType: z.enum(["Image", "Video"]),
     mediaUrl: z.string(),

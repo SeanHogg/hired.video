@@ -1,8 +1,54 @@
 import { Hono } from "hono";
 import { eq, and, desc, inArray, sql, ilike } from "drizzle-orm";
-import type { Variables } from "../types/index.js";
+import type { Variables, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+
+// ─── Privacy / visibility helpers ────────────────────────────────────────────
+// Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
+//   Public      → anyone (logged in or out)
+//   Recruiter   → recruiters, employers, super-admins, and the author
+//   Connections → author only (connection graph not yet wired in — treat as private-to-author)
+//   Private     → author only
+// Community posts (premium Employee Community feature) are stored in this table with
+// privacy="Private" AND a "company:{id}:{channel}" tag. They must never appear in the
+// public feed, even for their own author — that feed lives at /api/community/posts.
+const FEED_PRIVACY_VALUES = ["Public", "Recruiter", "Connections", "Private"] as const;
+type FeedPrivacy = (typeof FEED_PRIVACY_VALUES)[number];
+
+function normalizePrivacy(value: unknown, fallback: FeedPrivacy = "Public"): FeedPrivacy {
+  return (FEED_PRIVACY_VALUES as readonly string[]).includes(String(value))
+    ? (String(value) as FeedPrivacy)
+    : fallback;
+}
+
+function isRecruiterLike(user: JwtPayload | undefined): boolean {
+  if (!user) return false;
+  const roles = user.roles ?? [];
+  return (
+    Boolean(user.isSuperAdmin) ||
+    roles.includes("recruiter") ||
+    roles.includes("employer") ||
+    roles.includes("admin")
+  );
+}
+
+/**
+ * SQL predicate enforcing feed visibility rules.
+ *
+ * Always excludes community posts (any tag starting with "company:") — those belong to
+ * the premium Employee Community surface, not the public feed.
+ */
+function feedVisibilityCondition(currentUserId: string, isRecruiter: boolean) {
+  const privacyClause = isRecruiter
+    ? sql`(${feedPosts.privacy} IN ('Public', 'Recruiter') OR ${feedPosts.userId} = ${currentUserId})`
+    : sql`(${feedPosts.privacy} = 'Public' OR ${feedPosts.userId} = ${currentUserId})`;
+  // Community posts store tags as raw string elements like "company:uuid:channel".
+  // Regular feed posts store tags as objects ({"tagType":..., "tagValue":...}), so the
+  // quoted "company: prefix reliably distinguishes them in the jsonb text form.
+  const excludeCommunity = sql`NOT (${feedPosts.tags}::text LIKE '%"company:%')`;
+  return sql`${privacyClause} AND ${excludeCommunity}`;
+}
 
 const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, users, userProfiles, notifications } = schema;
 
@@ -84,7 +130,7 @@ function toPostDto(
     linkTitle: post.linkTitle ?? undefined,
     linkDescription: post.linkDescription ?? undefined,
     linkImageUrl: post.linkImageUrl ?? undefined,
-    privacy: post.privacy as "Public" | "Connections" | "Private",
+    privacy: post.privacy as FeedPrivacy,
     createdAt: new Date(post.createdAt).toISOString(),
     updatedAt: new Date(post.updatedAt).toISOString(),
     media: post.media ?? [],
@@ -159,9 +205,11 @@ feedRoutes.get("/posts", async (c) => {
   const tag = c.req.query("tag")?.toLowerCase() ?? "";
   const db = getDb();
 
-  const whereClause = tag
+  const visibility = feedVisibilityCondition(currentUserId, isRecruiterLike(c.var.user));
+  const tagFilter = tag
     ? sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${feedPosts.tags}) t WHERE lower(t->>'tagValue') = ${tag} AND t->>'tagType' = 'Hashtag')`
-    : undefined;
+    : null;
+  const whereClause = tagFilter ? sql`${visibility} AND ${tagFilter}` : visibility;
 
   const [totalRow, postRows] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(feedPosts).where(whereClause),
@@ -190,7 +238,12 @@ feedRoutes.get("/posts/:postId", async (c) => {
   const currentUserId = c.var.user?.sub ?? "";
   const db = getDb();
 
-  const [post] = await db.select().from(feedPosts).where(eq(feedPosts.id, postId)).limit(1);
+  const visibility = feedVisibilityCondition(currentUserId, isRecruiterLike(c.var.user));
+  const [post] = await db
+    .select()
+    .from(feedPosts)
+    .where(sql`${eq(feedPosts.id, postId)} AND ${visibility}`)
+    .limit(1);
   if (!post) return c.json(error("NOT_FOUND", "Post not found"), 404);
 
   const [dto] = await fetchPostDtos([post], currentUserId, db);
@@ -210,8 +263,7 @@ feedRoutes.post("/posts", async (c) => {
       userId,
       content,
       linkUrl: typeof body.linkUrl === "string" ? body.linkUrl : null,
-      privacy:
-        body.privacy === "Private" || body.privacy === "Connections" ? String(body.privacy) : "Public",
+      privacy: normalizePrivacy(body.privacy, "Public"),
       media: Array.isArray(body.media)
         ? (body.media as any[]).map((m: any, idx: number) => ({
             id: crypto.randomUUID(),
@@ -252,10 +304,9 @@ feedRoutes.put("/posts/:postId", async (c) => {
     .update(feedPosts)
     .set({
       content: newContent,
-      privacy:
-        body.privacy === "Private" || body.privacy === "Connections" || body.privacy === "Public"
-          ? String(body.privacy)
-          : existing.privacy,
+      privacy: body.privacy !== undefined
+        ? normalizePrivacy(body.privacy, existing.privacy as FeedPrivacy)
+        : existing.privacy,
       tags: buildTagsField(newContent),
       updatedAt: new Date(),
     } as any)
@@ -434,10 +485,11 @@ feedRoutes.get("/search", async (c) => {
   const offset = (pageNumber - 1) * pageSize;
 
   const db = getDb();
+  const visibility = feedVisibilityCondition(currentUserId, isRecruiterLike(c.var.user));
   const postRows = await db
     .select()
     .from(feedPosts)
-    .where(ilike(feedPosts.content, `%${searchTerm}%`))
+    .where(sql`${ilike(feedPosts.content, `%${searchTerm}%`)} AND ${visibility}`)
     .orderBy(desc(feedPosts.createdAt))
     .limit(pageSize)
     .offset(offset);
@@ -451,7 +503,8 @@ feedRoutes.get("/trending-tags", async (c) => {
   const db = getDb();
   const limit = Math.min(50, Number(c.req.query("limit") ?? "20") || 20);
 
-  // Unnest the tags JSONB array and count each hashtag
+  // Only count hashtags from Public posts and exclude community posts — trending tags
+  // are anonymous-visible, so they must never leak content from non-public posts.
   const rows = await db.execute(sql`
     SELECT
       lower(tag->>'tagValue') AS tag,
@@ -460,6 +513,8 @@ feedRoutes.get("/trending-tags", async (c) => {
          jsonb_array_elements(tags) AS tag
     WHERE tag->>'tagType' = 'Hashtag'
       AND created_at > now() - interval '30 days'
+      AND privacy = 'Public'
+      AND NOT (tags::text LIKE '%"company:%')
     GROUP BY lower(tag->>'tagValue')
     ORDER BY post_count DESC
     LIMIT ${limit}

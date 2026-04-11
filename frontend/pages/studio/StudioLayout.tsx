@@ -32,6 +32,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/lib/seo";
@@ -394,6 +401,9 @@ export default function StudioLayout() {
   useEffect(() => {
     localStorage.setItem("studio_sidebar_hidden", studioSidebarHidden ? "1" : "0");
   }, [studioSidebarHidden]);
+  /** Controls the mobile off-canvas drawer for the studio tools sidebar.
+   *  Desktop uses the inline panel + studioSidebarHidden toggle instead. */
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   /** Tracks whether we've already attempted the auto-load-latest-or-open-wizard
    *  bootstrap, so it only runs once per studio session. */
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -419,22 +429,34 @@ export default function StudioLayout() {
   const dragStartRef = useRef({ y: 0, height: 0 });
 
   // ── Video panel drag-to-resize ────────────────────────────────────────────
+  // Supports mouse (desktop) and touch (mobile). The handle is also keyboard-
+  // focusable — see the separator element below for arrow-key support.
   useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
+    function applyDelta(clientY: number) {
       if (!isDraggingRef.current) return;
-      const delta = e.clientY - dragStartRef.current.y;
+      const delta = clientY - dragStartRef.current.y;
       const newHeight = Math.max(80, dragStartRef.current.height + delta);
       setVideoHeight(newHeight);
       localStorage.setItem("studio_video_height", String(newHeight));
     }
-    function onMouseUp() {
-      isDraggingRef.current = false;
+    function onMouseMove(e: MouseEvent) { applyDelta(e.clientY); }
+    function onTouchMove(e: TouchEvent) {
+      if (!isDraggingRef.current) return;
+      const t = e.touches[0];
+      if (t) { applyDelta(t.clientY); e.preventDefault(); }
     }
+    function endDrag() { isDraggingRef.current = false; }
     document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("mouseup", endDrag);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", endDrag);
+    document.addEventListener("touchcancel", endDrag);
     return () => {
       document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("mouseup", endDrag);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", endDrag);
+      document.removeEventListener("touchcancel", endDrag);
     };
   }, []);
 
@@ -1073,9 +1095,53 @@ export default function StudioLayout() {
           onSidebarToggle={() => setSidebarCollapsed((c) => !c)}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <div className="pt-16 flex h-[calc(100vh-64px)] overflow-hidden">
+        {/* Mobile off-canvas drawer for the studio tools sidebar. Rendered
+            outside the flex row so the sheet's backdrop covers the whole page.
+            On md+ screens the inline sidebar below is used instead. */}
+        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+          <SheetContent
+            side="left"
+            className="md:hidden p-0 w-[88vw] max-w-sm overflow-y-auto flex flex-col"
+            aria-describedby="studio-tools-description"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Studio tools</SheetTitle>
+              <SheetDescription id="studio-tools-description">
+                Projects, templates, themes, backgrounds and media for the current video.
+              </SheetDescription>
+            </SheetHeader>
+            <StudioSidebar
+              onCollapseSidebar={() => setMobileSidebarOpen(false)}
+              projects={projects}
+              activeProjectId={state.projectId}
+              projectName={state.name}
+              onProjectNameChange={(name) => patchState({ name })}
+              onSave={handleSave}
+              isSaving={isSaving}
+              onCreateNew={handleCreateNew}
+              onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
+              onProjectSelect={(id) => { handleProjectSelect(id); setMobileSidebarOpen(false); }}
+              onDeleteProject={handleDeleteProject}
+              onTemplateLoad={(t) => { handleTemplateLoad(t); setMobileSidebarOpen(false); }}
+              onBackgroundSelect={handleBackgroundSelect}
+              script={state.script}
+              onScriptChange={handleScriptChange}
+              contentTemplate={contentTemplate}
+              onContentTemplateSelect={handleContentTemplateSelect}
+              focusedSceneId={focusedSceneId}
+              state={state}
+              onStateChange={patchState}
+            />
+          </SheetContent>
+        </Sheet>
+
+        {/* Content area — on mobile reserves 4rem for the fixed bottom nav so
+            the editor doesn't get clipped behind it. 100dvh handles mobile
+            browser chrome resizing better than 100vh. */}
+        <div className="pt-16 flex h-[calc(100dvh-64px-4rem)] md:h-[calc(100vh-64px)] overflow-hidden">
+          {/* Desktop inline sidebar — hidden on mobile where the drawer is used. */}
           {studioSidebarHidden ? (
-            <div className="w-8 shrink-0 border-r bg-card flex flex-col items-center py-2">
+            <div className="hidden md:flex w-8 shrink-0 border-r bg-card flex-col items-center py-2">
               <button
                 type="button"
                 title="Show sidebar"
@@ -1087,31 +1153,50 @@ export default function StudioLayout() {
               </button>
             </div>
           ) : (
-          <StudioSidebar
-            onCollapseSidebar={() => setStudioSidebarHidden(true)}
-            projects={projects}
-            activeProjectId={state.projectId}
-            projectName={state.name}
-            onProjectNameChange={(name) => patchState({ name })}
-            onSave={handleSave}
-            isSaving={isSaving}
-            onCreateNew={handleCreateNew}
-            onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
-            onProjectSelect={handleProjectSelect}
-            onDeleteProject={handleDeleteProject}
-            onTemplateLoad={handleTemplateLoad}
-            onBackgroundSelect={handleBackgroundSelect}
-            script={state.script}
-            onScriptChange={handleScriptChange}
-            contentTemplate={contentTemplate}
-            onContentTemplateSelect={handleContentTemplateSelect}
-            focusedSceneId={focusedSceneId}
-            state={state}
-            onStateChange={patchState}
-          />
+          <div className="hidden md:block shrink-0">
+            <StudioSidebar
+              onCollapseSidebar={() => setStudioSidebarHidden(true)}
+              projects={projects}
+              activeProjectId={state.projectId}
+              projectName={state.name}
+              onProjectNameChange={(name) => patchState({ name })}
+              onSave={handleSave}
+              isSaving={isSaving}
+              onCreateNew={handleCreateNew}
+              onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
+              onProjectSelect={handleProjectSelect}
+              onDeleteProject={handleDeleteProject}
+              onTemplateLoad={handleTemplateLoad}
+              onBackgroundSelect={handleBackgroundSelect}
+              script={state.script}
+              onScriptChange={handleScriptChange}
+              contentTemplate={contentTemplate}
+              onContentTemplateSelect={handleContentTemplateSelect}
+              focusedSceneId={focusedSceneId}
+              state={state}
+              onStateChange={patchState}
+            />
+          </div>
           )}
 
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            {/* Mobile-only tools bar — 44px hit target, opens the drawer and
+                shows current project name for quick orientation. */}
+            <div className="md:hidden shrink-0 flex items-center gap-2 px-3 py-2 border-b bg-card">
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-md border bg-background text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Open studio tools"
+              >
+                <PanelLeftOpen className="w-4 h-4" aria-hidden="true" />
+                Tools
+              </button>
+              <span className="text-xs text-muted-foreground truncate flex-1" aria-live="polite">
+                {state.name || "Untitled project"}
+              </span>
+            </div>
+
             {/* Video preview — height controlled by drag handle */}
             <div className="shrink-0 overflow-hidden border-b" style={{ height: videoHeight }}>
               <StudioPreview
@@ -1141,42 +1226,78 @@ export default function StudioLayout() {
               />
             </div>
 
-            {/* Drag handle — grab to resize video preview */}
+            {/* Drag handle — grab to resize video preview. Larger hit target
+                on mobile (h-4) and keyboard/touch accessible via role=separator. */}
             <div
-              className="shrink-0 h-2 flex items-center justify-center cursor-row-resize bg-border/30 hover:bg-primary/20 transition-colors group border-b"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize video preview"
+              aria-valuenow={Math.round(videoHeight)}
+              aria-valuemin={80}
+              tabIndex={0}
+              className="shrink-0 h-4 md:h-2 flex items-center justify-center cursor-row-resize touch-none bg-border/30 hover:bg-primary/20 focus-visible:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors group border-b"
               onMouseDown={(e) => {
                 isDraggingRef.current = true;
                 dragStartRef.current = { y: e.clientY, height: videoHeight };
                 e.preventDefault();
               }}
+              onTouchStart={(e) => {
+                const t = e.touches[0];
+                if (!t) return;
+                isDraggingRef.current = true;
+                dragStartRef.current = { y: t.clientY, height: videoHeight };
+              }}
+              onKeyDown={(e) => {
+                const step = e.shiftKey ? 40 : 10;
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setVideoHeight((h) => {
+                    const next = Math.max(80, h - step);
+                    localStorage.setItem("studio_video_height", String(next));
+                    return next;
+                  });
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setVideoHeight((h) => {
+                    const next = h + step;
+                    localStorage.setItem("studio_video_height", String(next));
+                    return next;
+                  });
+                }
+              }}
             >
-              <GripHorizontal className="w-4 h-3 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+              <GripHorizontal className="w-6 h-3 md:w-4 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" aria-hidden="true" />
             </div>
 
-            {/* Timeline — collapsible, collapsed by default */}
+            {/* Timeline — collapsible, collapsed by default. 44px touch
+                target on mobile for easier tapping. */}
             <div className="shrink-0 border-b">
               <button
                 type="button"
-                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                aria-expanded={timelineOpen}
+                aria-controls="studio-timeline-panel"
+                className="w-full flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] md:min-h-0 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
                 onClick={() => setTimelineOpen((v) => !v)}
               >
-                {timelineOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                {timelineOpen ? <ChevronDown className="w-3 h-3" aria-hidden="true" /> : <ChevronRight className="w-3 h-3" aria-hidden="true" />}
                 Timeline
               </button>
-              {timelineOpen && (
-                state.script ? (
-                  <NLETimeline
-                    script={state.script}
-                    onScriptChange={handleScriptChange}
-                    currentTime={currentTime}
-                    onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
-                  />
-                ) : (
-                  <div className="px-5 py-3 text-xs text-muted-foreground">
-                    Generate a script to see the timeline
-                  </div>
-                )
-              )}
+              <div id="studio-timeline-panel" hidden={!timelineOpen}>
+                {timelineOpen && (
+                  state.script ? (
+                    <NLETimeline
+                      script={state.script}
+                      onScriptChange={handleScriptChange}
+                      currentTime={currentTime}
+                      onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
+                    />
+                  ) : (
+                    <div className="px-5 py-3 text-xs text-muted-foreground">
+                      Generate a script to see the timeline
+                    </div>
+                  )
+                )}
+              </div>
             </div>
 
             {/* Prompt / Storyboard / Actions editor — same flow for all templates */}

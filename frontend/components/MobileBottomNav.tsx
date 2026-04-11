@@ -1,21 +1,102 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Briefcase, FileText, Users, TrendingUp } from "lucide-react";
+import {
+  Home,
+  Briefcase,
+  FileText,
+  Users,
+  TrendingUp,
+  LogIn,
+  Video,
+  PlusSquare,
+  Share2,
+  Shield,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { USER_ROLES } from "@shared/user-roles";
 import { cn } from "@/lib/utils";
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+/** Return the 5 footer items for the given role. Keeps Home first and the
+ * primary authenticated destination (Dashboard) last for muscle memory. */
+function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] {
+  if (!isAuthenticated) {
+    return [
+      { label: "Home", href: "/", icon: Home },
+      { label: "Jobs", href: "/jobs", icon: Briefcase },
+      { label: "Resumes", href: "/resumes", icon: FileText },
+      { label: "People", href: "/people", icon: Users },
+      { label: "Login", href: "/login", icon: LogIn },
+    ];
+  }
+
+  switch (role) {
+    case USER_ROLES.JOB_SEEKER:
+      return [
+        { label: "Home", href: "/", icon: Home },
+        { label: "Jobs", href: "/jobs", icon: Briefcase },
+        { label: "Resumes", href: "/resumes", icon: FileText },
+        { label: "Studio", href: "/studio", icon: Video },
+        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
+      ];
+
+    case USER_ROLES.EMPLOYER:
+      return [
+        { label: "Home", href: "/", icon: Home },
+        { label: "Post Job", href: "/post-a-job", icon: PlusSquare },
+        { label: "Jobs", href: "/jobs", icon: Briefcase },
+        { label: "People", href: "/people", icon: Users },
+        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
+      ];
+
+    case USER_ROLES.AFFILIATE:
+      return [
+        { label: "Home", href: "/", icon: Home },
+        { label: "Jobs", href: "/jobs", icon: Briefcase },
+        { label: "Resumes", href: "/resumes", icon: FileText },
+        { label: "Affiliate", href: "/affiliate/dashboard", icon: Share2 },
+        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
+      ];
+
+    case USER_ROLES.ADMIN:
+    case USER_ROLES.SUPER_ADMIN:
+      return [
+        { label: "Home", href: "/", icon: Home },
+        { label: "Jobs", href: "/jobs", icon: Briefcase },
+        { label: "People", href: "/people", icon: Users },
+        { label: "Admin", href: "/admin/dashboard", icon: Shield },
+        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
+      ];
+
+    case USER_ROLES.RECRUITER:
+    default:
+      // Recruiter + unknown/unset roles fall back to the original menu.
+      return [
+        { label: "Home", href: "/", icon: Home },
+        { label: "Jobs", href: "/jobs", icon: Briefcase },
+        { label: "Resumes", href: "/resumes", icon: FileText },
+        { label: "People", href: "/people", icon: Users },
+        { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
+      ];
+  }
+}
 
 export default function MobileBottomNav() {
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, impersonationSession } = useAuth();
+  const { personaPreview } = usePersonaPreview();
 
-  const items = [
-    { label: "Home", href: "/", icon: Home },
-    { label: "Jobs", href: "/jobs", icon: Briefcase },
-    { label: "Resumes", href: "/resumes", icon: FileText },
-    { label: "People", href: "/people", icon: Users },
-    isAuthenticated
-      ? { label: "Dashboard", href: "/dashboard", icon: TrendingUp }
-      : { label: "Login", href: "/login", icon: TrendingUp },
-  ];
+  // Effective role mirrors Dashboard.tsx — impersonation > SuperAdmin preview > actual role.
+  const effectiveRole: string | null =
+    impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
+
+  const items = itemsForRole(effectiveRole, isAuthenticated);
 
   return (
     <nav
@@ -50,4 +131,3 @@ export default function MobileBottomNav() {
     </nav>
   );
 }
-
