@@ -26,6 +26,16 @@ import {
   ShoppingCart,
   Plus,
   Minus,
+  Chrome,
+  Sparkles,
+  Mic,
+  Share2,
+  LayoutGrid,
+  Search,
+  Eye,
+  Palette,
+  Lock,
+  Download,
 } from "lucide-react";
 import { PREMIUM_MONTHLY_PRICE as basePrice } from "@shared/pricing";
 import { TRUST_SIGNALS } from "@/lib/constants";
@@ -95,24 +105,30 @@ export default function Pricing() {
     [USER_ROLES.JOB_SEEKER]: {
       label: "Job Seeker",
       freeDescription:
-        "Get started with tools to build and share your video resume.",
+        "Get started with AI video resumes, the Chrome extension, and your career home.",
       premiumDescription:
-        "Unlock advanced branding, analytics, and AI to land roles faster.",
+        "Unlock unlimited AI, voice cloning, premium studio features, and priority matching.",
       freeFeatures: [
-        "Create video resumes",
-        "Basic resume analytics",
-        "AI assistance (10/mo)",
-        "Apply to jobs",
-        "Profile hosting",
-        "Community access",
+        "1 published AI video resume (unlimited drafts)",
+        "ATS-friendly resume builder",
+        "Chrome extension — job tracking & match scoring",
+        "AI assistance (10/mo) — token-metered",
+        "Career Home dashboard & community feed",
+        "Unlimited networking — connections & followers",
+        "Apply to jobs with video intros",
+        "AI interview practice (limited)",
+        "Public profile hosting (hired.video branded)",
       ],
       premiumFeatures: [
-        "Advanced video templates",
-        "Unlimited AI assistance",
-        "Interview practice & feedback",
-        "Resume optimization",
-        "Priority job matching",
-        "Salary insights",
+        "Unlimited AI video resumes",
+        "AI Studio — Brand Kits, 1080p, watermark-free",
+        "Voice cloning & premium TTS voices",
+        "YouTube publishing + LinkedIn post AI",
+        "Unlimited AI assistance (all tools)",
+        "Resume Tailor — per-job variations",
+        "Unlimited AI interview practice",
+        "Priority job matching & salary insights",
+        "Video & profile analytics",
       ],
       unitLabel: "per month",
       userCountLabel: "",
@@ -120,26 +136,29 @@ export default function Pricing() {
     [USER_ROLES.RECRUITER]: {
       label: "Recruiter",
       freeDescription:
-        "Essential ATS and CRM to start sourcing and tracking candidates.",
+        "Essential ATS, Chrome sourcing, and visual pipeline for individual recruiters.",
       premiumDescription:
-        "Scale your recruiting with automation, outreach, and analytics.",
+        "Scale your team with AI candidate matching, automation, and analytics.",
       freeFeatures: [
         "Applicant Tracking System (ATS)",
-        "Unlimited job postings",
-        "Recruiting CRM",
+        "Unlimited job postings (Google for Jobs indexed)",
+        "Recruiter Chrome extension — profile & company extraction",
+        "Unlimited searchable talent pool",
+        "Visual Kanban hiring pipeline",
         "Basic interview scheduling",
         "Up to 2 team members",
-        "AI assistance (10/mo)",
+        "AI assistance (10/mo) — token-metered",
       ],
       premiumFeatures: [
-        "Exclusive job boards + bidding",
-        "Advanced pipeline & automation",
-
-        "Smart outreach campaigns",
-
+        "Unlimited talent pool & candidate imports",
+        "AI candidate ↔ job match scoring",
+        "Smart outreach campaigns & follow-ups",
         "AI message personalization",
-        "Performance dashboards",
-        "Unlimited seats",
+        "Bulk resume scoring & screening",
+        "Video resume screening & transcript search",
+        "Performance dashboards & team leaderboards",
+        "Unlimited seats & team collaboration",
+        "Exclusive job boards + bidding",
       ],
       unitLabel: "per seat / month",
       userCountLabel: "Seats",
@@ -147,23 +166,28 @@ export default function Pricing() {
     [USER_ROLES.EMPLOYER]: {
       label: "Employer",
       freeDescription:
-        "Core HR tools to start hiring and organizing candidates.",
+        "Core HR tools to start hiring with a video-first candidate experience.",
       premiumDescription:
-        "All-in-one HR suite with engagement and advanced analytics.",
+        "All-in-one HR suite with engagement, onboarding, and advanced analytics.",
       freeFeatures: [
-        "ATS + Job postings",
+        "ATS + unlimited job postings",
+        "Google for Jobs structured-data indexing",
         "Recruiting & Sales CRM",
+        "Video resume screening",
+        "Recruiter Chrome extension",
         "1 admin user",
         "Up to 2 employees",
-        "Basic scheduling",
         "AI assistance (10/mo)",
       ],
       premiumFeatures: [
-        "Employee community (Engage/Inform/Inspire)",
-        "Hiring & Onboarding (Offers)",
+        "Employee community (Engage / Inform / Inspire)",
+        "Hiring & Onboarding (offers, contracts)",
         "Performance management",
-        "Calendar & notifications",
-        "Advanced analytics & API",
+        "Company video promos via AI Studio",
+        "Brand kits & company-wide templates",
+        "Calendar & smart notifications",
+        "Advanced analytics, time-to-hire, API access",
+        "GDPR data-residency & SOC 2 (Enterprise)",
         "Unlimited users",
       ],
       unitLabel: "per user / month",
@@ -173,17 +197,21 @@ export default function Pricing() {
 
     [USER_ROLES.AFFILIATE]: {
       label: "Affiliate",
-      freeDescription: "Earn 25% commission from referred subscribers.",
+      freeDescription: "Earn 25% commission on first-month subscriptions you refer.",
       premiumDescription: "Affiliates earn commissions; no paid plan required.",
       freeFeatures: [
-        "Unique referral link",
-        "Dashboard with referrals & payouts",
+        "Unique referral link with click tracking",
+        "25% first-month commission",
+        "Real-time referrals & payouts dashboard",
         "$25 minimum payout threshold",
+        "PayPal & bank transfer payouts",
+        "Referral attribution for job seekers, recruiters & employers",
       ],
       premiumFeatures: [
-        "Priority support",
-        "Advanced tracking (coming soon)",
-        "Payout history export",
+        "Priority affiliate support",
+        "Advanced tracking & cohort analytics (coming soon)",
+        "Payout history export (CSV)",
+        "Co-marketing assets & brand kit",
       ],
       unitLabel: "",
       userCountLabel: "",
@@ -660,19 +688,153 @@ export default function Pricing() {
                         </td>
                       </tr>
 
-                      {/* Video Resume Features */}
+                      {/* Browser Extensions */}
                       <tr className="bg-muted/20">
                         <td
                           className="p-4 font-semibold text-sm uppercase tracking-wide"
                           colSpan={3}
                         >
-                          Video Resume Features
+                          Browser Extensions (Chrome / Edge / Brave)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Chrome className="h-4 w-4 text-muted-foreground" />
+                          Job Seeker Chrome Extension
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Chrome className="h-4 w-4 text-muted-foreground" />
+                          Recruiter Chrome Extension
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          One-click job tracking from 16+ boards
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          Auto-detect job banners
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          AI resume ↔ job match scoring (in-extension)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Included · uses AI tokens
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                          AI resume tailoring per job (in-extension)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Included · uses AI tokens
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Candidate profile extraction (LinkedIn, Indeed)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Included · uses AI tokens"}
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Unlimited"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          Company page extraction (LinkedIn, Glassdoor)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Included · uses AI tokens"}
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Unlimited"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          Application tracking — which resume went where
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+
+                      {/* AI Video Studio */}
+                      <tr className="bg-muted/20">
+                        <td
+                          className="p-4 font-semibold text-sm uppercase tracking-wide"
+                          colSpan={3}
+                        >
+                          AI Video Studio
                         </td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Video className="h-4 w-4 text-muted-foreground" />
-                          AI Video Script Generation
+                          AI Video Script Generation (4-scene)
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
@@ -684,25 +846,181 @@ export default function Pricing() {
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Video className="h-4 w-4 text-muted-foreground" />
-                          Video Resume Creation
+                          AI-generated video resume drafts
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
+                          Unlimited
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced + Templates
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Share2 className="h-4 w-4 text-muted-foreground" />
+                          Published / downloadable video resumes
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          1 published
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground" />
+                          Video resume templates & themes
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Basic (5)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Premium library (50+)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          Animated scenes & motion presets
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Minimal only
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Minimal / Moderate / Cinematic
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Palette className="h-4 w-4 text-muted-foreground" />
+                          Brand Kits — colors, logo, fonts
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                          720p MP4 export
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                          1080p MP4 export
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground" />
+                          Vertical 9:16 export (TikTok, Reels, LinkedIn)
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          Watermark
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          hired.video watermark
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Watermark-free
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Mic className="h-4 w-4 text-muted-foreground" />
+                          AI voice cloning (your own voice)
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Mic className="h-4 w-4 text-muted-foreground" />
+                          Voice Marketplace (Kokoro, Piper, VibeVoice)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          1 free voice (Web Speech)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Full marketplace + creator revenue share
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Share2 className="h-4 w-4 text-muted-foreground" />
+                          One-click YouTube publishing
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                          LinkedIn Post AI (hook, caption, hashtags)
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Share2 className="h-4 w-4 text-muted-foreground" />
+                          Public share link, embed code & QR code
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          Video Analytics & Performance
+                          Video view analytics & engagement
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Basic
+                          Basic (views only)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced + AI Insights
+                          Advanced (heatmaps, CTA clicks, campaigns)
                         </td>
                       </tr>
                       <tr>
@@ -715,6 +1033,18 @@ export default function Pricing() {
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
                           AI-Powered (Unlimited)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                          ATS-friendly PDF & Word (.docx) export
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
 
@@ -785,6 +1115,284 @@ export default function Pricing() {
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                          AI Resume Tailor — per-job variations
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          3 variations / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          AI Resume Consolidator — merge multiple resumes
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          AI Resume Roast — brutally honest feedback
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          3 roasts / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          AI Resume Summarizer
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          5 summaries / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          AI Value Proposition Builder
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          3 pitches / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Brain className="h-4 w-4 text-muted-foreground" />
+                          AI Sentiment & Tone Analysis
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          PDF → JSON resume parser
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          5 parses / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          24/7 AI Career Coach (chat)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          20 messages / mo
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                          AI Next-Best-Action recommendations
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Daily
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Real-time
+                        </td>
+                      </tr>
+
+                      {/* Sourcing & Talent Pipeline — recruiter / employer */}
+                      <tr className="bg-muted/20">
+                        <td
+                          className="p-4 font-semibold text-sm uppercase tracking-wide"
+                          colSpan={3}
+                        >
+                          Sourcing & Talent Pipeline
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          Searchable talent pool
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              Unlimited
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              Unlimited
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                          Visual Kanban hiring pipeline (6 stages)
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          AI candidate ↔ job match scoring
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          Candidate tags, notes & custom fields
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          Saved searches & talent lists
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Up to 3"}
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Unlimited"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Send className="h-4 w-4 text-muted-foreground" />
+                          In-app candidate messaging & outreach log
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground" />
+                          Video resume transcript search
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                          Bulk CSV import / export to ATS
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          Company database (extracted + manual)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Up to 50"}
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          {persona === USER_ROLES.JOB_SEEKER
+                            ? "—"
+                            : "Unlimited"}
                         </td>
                       </tr>
 
@@ -936,6 +1544,120 @@ export default function Pricing() {
                         </td>
                       </tr>
 
+                      {/* Career Home & Community */}
+                      <tr className="bg-muted/20">
+                        <td
+                          className="p-4 font-semibold text-sm uppercase tracking-wide"
+                          colSpan={3}
+                        >
+                          Career Home & Community
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          Career Home unified dashboard
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          Community feed (text, video, article posts)
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                          Per-post privacy controls (public / connections / private)
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Professional networking (connections, followers)
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Unlimited
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          Career resilience tools
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-muted-foreground" />
+                          Personal brand / creator studio
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          White-label marketing — remove hired.video branding
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          hired.video branded
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Opt-out available
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          Google for Jobs structured-data publishing
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+
                       {/* Analytics & Reporting */}
                       <tr className="bg-muted/20">
                         <td
@@ -943,6 +1665,62 @@ export default function Pricing() {
                           colSpan={3}
                         >
                           Analytics & Reporting
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          Resume & profile view tracking
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Basic
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Advanced (viewer identity, time on page)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                          Pipeline conversion funnel
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-muted-foreground" />
+                          Weekly digest emails
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Team activity leaderboards
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          {persona === USER_ROLES.JOB_SEEKER ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <Check className="h-5 w-5 text-green-600 mx-auto" />
+                          )}
                         </td>
                       </tr>
                       <tr>
@@ -1062,16 +1840,76 @@ export default function Pricing() {
                           className="p-4 font-semibold text-sm uppercase tracking-wide"
                           colSpan={3}
                         >
-                          Support & Security
+                          Compliance, Security & Support
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                          Encryption at rest & in transit
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
                         </td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Shield className="h-4 w-4 text-muted-foreground" />
-                          Data Security & Privacy
+                          GDPR compliance (data export & right-to-delete)
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          SOC 2 Type II certification
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          In progress
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Enterprise tier
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          Regional data residency
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Enterprise tier
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                          SSO (SAML / OIDC)
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Enterprise tier
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-muted-foreground" />
+                          Audit logs
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4">
                           <Check className="h-5 w-5 text-green-600 mx-auto" />
@@ -1083,16 +1921,40 @@ export default function Pricing() {
                           Customer Support
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Email
+                          Email (48h)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Priority + Live Chat
+                          Priority + Live Chat (4h)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          Dedicated customer success manager
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4 text-sm text-muted-foreground">
+                          Enterprise tier
                         </td>
                       </tr>
                       <tr>
                         <td className="p-4 flex items-center gap-2">
                           <Globe className="h-4 w-4 text-muted-foreground" />
                           API Access
+                        </td>
+                        <td className="text-center p-4">
+                          <span className="text-muted-foreground">—</span>
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          Custom integrations
                         </td>
                         <td className="text-center p-4">
                           <span className="text-muted-foreground">—</span>
