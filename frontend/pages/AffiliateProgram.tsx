@@ -1,6 +1,7 @@
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO } from "@/lib/seo";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -225,6 +226,54 @@ export default function AffiliateProgram() {
               </CardContent>
             </Card>
           </section>
+
+          {/* FAQ */}
+          <MarketingFAQ
+            schemaId="affiliate-program"
+            subheading="How commissions, payouts, and attribution work on the hired.video affiliate program."
+            items={[
+              {
+                question: "How much do affiliates earn?",
+                answer:
+                  "You earn 25% commission on the first month of every paid subscription your referrals purchase. One-time payment per referral — for example, if your referral buys a $20/month plan, you earn $5 once when they convert.",
+              },
+              {
+                question: "When do I get paid?",
+                answer:
+                  "Payouts become eligible as soon as the referred user's first-month subscription charge clears. You can request a payout any time after your balance reaches the $25 minimum threshold.",
+              },
+              {
+                question: "What payment methods do you support?",
+                answer:
+                  "We support standard payout methods including PayPal and bank transfer. You'll configure your preferred method inside your affiliate settings once your account is approved.",
+              },
+              {
+                question: "How are referrals tracked?",
+                answer:
+                  "Every affiliate gets a unique referral link with a ?ref= parameter. When someone clicks your link and signs up, the attribution is stored in their account and credited to you at conversion time. Attribution lasts through the browser session, so you don't lose credit if they sign up a few minutes later.",
+              },
+              {
+                question: "Can I promote hired.video on social media?",
+                answer:
+                  "Absolutely. Affiliates share hired.video on YouTube, LinkedIn, TikTok, newsletters, and blogs. We just ask that you disclose the affiliate relationship per FTC / local guidelines and don't run paid ads that compete with our own brand keywords.",
+              },
+              {
+                question: "Do I need an audience to apply?",
+                answer:
+                  "No minimum audience size — we approve most applications within 48 hours. Career coaches, content creators, recruiters, HR consultants, and anyone who talks to job seekers are all great fits.",
+              },
+              {
+                question: "Can I refer recruiters and employers, not just job seekers?",
+                answer:
+                  "Yes. You earn commission on any paid plan — job seeker, recruiter, or employer. Recruiter and employer plans are typically higher-priced, so those referrals can be especially valuable.",
+              },
+              {
+                question: "Is there a referral cap?",
+                answer:
+                  "No. There's no cap on how much you can earn or how many people you can refer. Top affiliates earn four figures monthly by consistently recommending hired.video to their audience.",
+              },
+            ]}
+          />
 
           {/* Final CTA */}
           <section className="max-w-6xl mx-auto px-6 py-10">

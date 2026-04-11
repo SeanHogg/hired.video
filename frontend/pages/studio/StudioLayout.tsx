@@ -56,6 +56,7 @@ import { defaultStudioState } from "@/types/studio";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import MarketingFAQ from "@/components/MarketingFAQ";
 
 import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
@@ -345,33 +346,91 @@ function Landing() {
           </div>
         </div>
 
-        {/* Final CTA */}
-        <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-          <h3 className="text-2xl font-bold mb-4">
+      </div>
+
+      {/* FAQ */}
+      <MarketingFAQ
+        schemaId="studio"
+        subheading="The quick answers to what creators ask before they generate their first AI video resume."
+        items={[
+          {
+            question: "Do I need to record myself on camera?",
+            answer:
+              "No. Our AI generates a polished animated video from your written resume — no camera, microphone, or editing skills required. If you'd rather record yourself, you can upload a selfie-style video and the Studio will cut it into your scenes.",
+          },
+          {
+            question: "How long does it take to make a video resume?",
+            answer:
+              "Most people finish their first video in about 60 seconds of wall-clock time. Paste your resume, pick a theme, and the AI handles the script, timing, and scene transitions. You can then edit anything you like before exporting.",
+          },
+          {
+            question: "What does the AI actually generate?",
+            answer:
+              "The AI writes a 4-scene script — hook, experience, achievements, and call-to-action — tailored to your role and target job. It also chooses typography, motion intensity, and scene timing. You can tweak any scene with plain-English instructions.",
+          },
+          {
+            question: "Can I use my own branding?",
+            answer:
+              "Yes. Save your colors, logo, and font once in a Brand Kit and every new video automatically applies your brand identity. Great for recruiters, creators, and companies producing multiple videos.",
+          },
+          {
+            question: "Where can I publish my video?",
+            answer:
+              "One click publishes directly to YouTube, or you can export MP4 and share manually. We also generate a public link with an embed snippet you can drop into LinkedIn, personal websites, or email signatures. Our AI LinkedIn post generator writes the hook, caption, and hashtags for you.",
+          },
+          {
+            question: "Is the Studio free?",
+            answer:
+              "Your first AI-generated video is free on every account. Paid plans unlock unlimited generations, premium themes, 1080p export without watermark, voice cloning, brand kits, and video analytics. See the pricing page for current tiers.",
+          },
+          {
+            question: "What video formats and resolutions do you support?",
+            answer:
+              "Export as MP4 in 720p or 1080p. Minimal, moderate, and cinematic motion presets. 16:9 landscape and 9:16 vertical (for TikTok, Reels, and LinkedIn short-form) are both supported.",
+          },
+          {
+            question: "Can recruiters and companies use the Studio too?",
+            answer:
+              "Yes — the Studio is designed for candidates, recruiters, and companies. Use it to create video resumes, video job ads, company promos, or recruiter personal-brand videos. Every use case uses the same AI engine with different templates.",
+          },
+        ]}
+      />
+
+      {/* Final CTA */}
+      <div className="max-w-4xl mx-auto px-4 pb-16">
+        <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
+          <h3 className="text-3xl font-bold mb-4">
             Ready to Create Your Video Resume?
           </h3>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join thousands of professionals who have transformed their job search with video.
           </p>
-          <Link to="/signup">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-            >
-              Get Started Free
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/signup">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+              >
+                Get Started Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link to="/pricing">
+              <Button size="lg" variant="outline">
+                View Pricing
+              </Button>
+            </Link>
+          </div>
         </div>
-
       </div>
+
       <Footer />
     </div>
   );
 }
 
 export default function StudioLayout() {
-  useSEO("/studio", { title: "Studio — hired.video", description: "Create your AI video resume" });
+  useSEO("/studio");
 
   const { user } = useAuth();
   const { toast } = useToast();

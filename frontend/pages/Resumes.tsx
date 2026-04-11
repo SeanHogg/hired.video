@@ -31,6 +31,7 @@ import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeUploadSheet from "@/components/ResumeUploadSheet";
 import Sidebar from "@/components/Sidebar";
@@ -1091,14 +1092,65 @@ export default function Resumes() {
                 </div>
               </div>
 
-              {/* Final CTA */}
-              <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
-                <h3 className="text-2xl font-bold mb-4">
+            </div>
+
+            {/* FAQ */}
+            <MarketingFAQ
+              schemaId="resumes"
+              subheading="Everything people ask before building their first video resume on hired.video."
+              items={[
+                {
+                  question: "What is a video resume?",
+                  answer:
+                    "A video resume is a short 30–90 second video in which you introduce yourself, explain your experience, and make a case for why you're a great fit. On hired.video, AI can generate a polished video resume directly from your existing written resume — you don't need a camera or editing skills.",
+                },
+                {
+                  question: "Do I still need a traditional resume?",
+                  answer:
+                    "Yes. Most applications still require a text resume (for ATS parsing), so hired.video lets you build both: an ATS-friendly written resume and an AI-generated video resume that pairs with it. Many members share the video via a link on their written resume and LinkedIn profile.",
+                },
+                {
+                  question: "How long should my video resume be?",
+                  answer:
+                    "We recommend 30–90 seconds. Long enough to make a real impression, short enough that recruiters actually watch it all the way through. Our AI scripts are tuned to this length by default.",
+                },
+                {
+                  question: "Can I edit my video resume after creating it?",
+                  answer:
+                    "Yes. You can edit the script, swap scenes, change the theme, re-record any section, or regenerate the whole video with a new angle. Every video is saved as a project you can come back to any time.",
+                },
+                {
+                  question: "Is my video resume private?",
+                  answer:
+                    "Every video is private by default. You choose when to publish it, and you can pick public (indexed, shareable link), unlisted (link only), or private (just you). You can revoke a share link any time.",
+                },
+                {
+                  question: "How do recruiters find my video resume?",
+                  answer:
+                    "If you publish your video publicly, it appears in the hired.video resume gallery and can be surfaced by our AI matching engine when recruiters search for candidates. You can also share your personal link directly on LinkedIn, email signatures, and written resumes.",
+                },
+                {
+                  question: "Does hired.video work with ATS systems?",
+                  answer:
+                    "Yes. Written resumes built on hired.video export to clean, ATS-parseable PDFs (or .docx) that work with Workday, Greenhouse, Lever, Taleo, iCIMS, and most other ATS platforms. Our resume optimizer also flags wording or structure issues that commonly break ATS parsing.",
+                },
+                {
+                  question: "What does a video resume cost?",
+                  answer:
+                    "Your first video resume is free. Paid plans unlock unlimited video generations, advanced themes, voiceover cloning, video analytics, and removing the hired.video watermark. See the pricing page for current tiers.",
+                },
+              ]}
+            />
+
+            {/* Final CTA */}
+            <div className="max-w-4xl mx-auto px-4 pb-16">
+              <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
+                <h3 className="text-3xl font-bold mb-4">
                   Ready to Create Your Video Resume?
                 </h3>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
                   Join thousands of professionals who have transformed their
-                  careers with video resumes.
+                  careers with video resumes. Free to start.
                 </p>
                 {isAuthenticated ? (
                   <Link to="/resumes/upload/video">

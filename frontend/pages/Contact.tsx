@@ -16,6 +16,7 @@ import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -255,34 +256,11 @@ export default function Contact() {
           </section>
 
           {/* FAQ Section */}
-          <section className="py-16">
-            <div className="max-w-4xl mx-auto px-6">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4">
-                  Frequently Asked Questions
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  Find answers to common questions about hired.video
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                {faqs.map((faq, index) => (
-                  <Card key={index}>
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-start gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                        {faq.question}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground ml-8">{faq.answer}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
+          <MarketingFAQ
+            schemaId="contact"
+            subheading="Quick answers before you reach out — most common questions are handled here."
+            items={faqs}
+          />
         </div>
 
         <Footer />

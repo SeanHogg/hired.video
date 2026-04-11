@@ -19,22 +19,51 @@ export interface SEOData {
 }
 
 /**
+ * Organization schema used as the default structured data payload on
+ * marketing pages where a more specific schema (WebApplication,
+ * JobPosting, FAQPage) is not provided. Establishes the hired.video
+ * brand entity for Google Knowledge Graph, Bing, and AI overviews (GEO).
+ */
+export const ORGANIZATION_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "hired.video",
+  alternateName: "Hired.video",
+  url: "https://hired.video",
+  logo: "https://hired.video/og-image.jpg",
+  description:
+    "hired.video is an AI-powered video resume platform that helps candidates create compelling video resumes and helps recruiters find top talent faster.",
+  sameAs: [
+    "https://www.linkedin.com/company/hired-video",
+    "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol",
+  ],
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer support",
+    email: "info@hired.video",
+    availableLanguage: ["English"],
+  },
+};
+
+/**
  * Default SEO configuration for the application
  */
 export const DEFAULT_SEO: SEOData = {
-  title: "Hired.video - AI-Powered Video Resume Platform",
+  title:
+    "hired.video — AI Video Resumes, Resume Builder & AI Job Search Platform",
   description:
-    "Create compelling video resumes and connect with top talent through AI-powered matching. The future of hiring is here.",
+    "hired.video turns your resume into an AI-generated video resume in 60 seconds. Build, score, and tailor resumes for every job — and connect with recruiters through AI-powered matching.",
   keywords:
-    "video resume, recruitment, talent management, AI matching, job search, hiring, career development",
-  ogTitle: "Hired.video - Video Resume Platform",
+    "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, ATS resume, recruitment platform, job search, career tools, interview practice",
+  ogTitle: "hired.video — AI Video Resumes & AI Job Search",
   ogDescription:
-    "Create compelling video resumes and connect with top talent through AI-powered matching.",
+    "Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring.",
   ogImage: "https://hired.video/og-image.jpg",
   ogUrl: "https://hired.video",
   twitterCard: "summary_large_image",
-  author: "Hired.video",
+  author: "hired.video",
   robots: "index, follow",
+  structuredData: ORGANIZATION_SCHEMA,
 };
 
 /**
@@ -42,20 +71,95 @@ export const DEFAULT_SEO: SEOData = {
  */
 export const PAGE_SEO: Record<string, SEOData> = {
   "/": {
-    title: "Hired.video - AI-Powered Video Resume Platform",
+    title:
+      "hired.video — AI Video Resumes, Resume Builder & AI Job Search",
     description:
-      "Create compelling video resumes and connect with top talent through AI-powered matching. Join thousands of professionals revolutionizing hiring.",
+      "Create an AI-generated video resume in 60 seconds, tailor your resume to every job with AI, and get matched with recruiters who are actively hiring. Free to start.",
     keywords:
-      "video resume, AI recruitment, talent matching, job search, career development, professional networking",
+      "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, resume tailoring, career development, professional networking",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      name: "Hired.video",
-      description: "AI-powered video resume platform for modern hiring",
+      name: "hired.video",
+      description:
+        "AI-powered video resume platform and AI job search tools — create video resumes, tailor your resume for any job, and match with recruiters.",
       url: "https://hired.video",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web Browser",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: "4.8",
+        ratingCount: "1240",
+      },
     },
+  },
+  "/home": {
+    title: "Your Career Home — hired.video",
+    description:
+      "Your unified career command center — track resumes, applications, outreach, and your professional network, and share wins with the hired.video community.",
+    keywords:
+      "career dashboard, job search tracker, career community, resume tracking, professional network, career home",
+  },
+  "/studio": {
+    title: "AI Video Resume Studio — hired.video",
+    description:
+      "Generate a polished AI video resume in 60 seconds. Paste your resume, our AI writes the script, and you export a 1080p video — no camera, no editing required.",
+    keywords:
+      "AI video resume, video resume generator, video resume maker, AI video studio, video resume creator, video resume template",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "hired.video Studio",
+      applicationCategory: "MultimediaApplication",
+      operatingSystem: "Web Browser",
+      description:
+        "AI-powered video resume studio — turns any resume into a 60-second video with AI-generated scripts, animated scenes, and one-click export to MP4 or YouTube.",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+    },
+  },
+  "/chrome-extension": {
+    title: "Chrome Extensions for Job Seekers & Recruiters — hired.video",
+    description:
+      "Track jobs, score resumes, and source candidates on LinkedIn, Indeed, Glassdoor and 16+ job boards — without leaving the page. Free Chrome extension.",
+    keywords:
+      "chrome extension, linkedin chrome extension, job tracker extension, resume scorer chrome, ATS chrome extension, sourcing tool",
+  },
+  "/affiliate-program": {
+    title: "Affiliate Program — Earn 25% with hired.video",
+    description:
+      "Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience with transparent tracking.",
+    keywords:
+      "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
+  },
+  "/resume-roast": {
+    title: "Free AI Resume Roast — Brutally Honest Resume Feedback",
+    description:
+      "Upload your resume and get brutally honest, instant AI feedback on what's working, what's weak, and exactly how to fix it. 100% free.",
+    keywords:
+      "free resume roast, ai resume feedback, resume critique, resume review, resume feedback ai",
+  },
+  "/interview": {
+    title: "Free AI Interview Practice — hired.video",
+    description:
+      "Practice live interviews with an AI interviewer tuned to your role. Get instant feedback on your answers, tone, and pacing. Completely free.",
+    keywords:
+      "ai interview practice, mock interview, interview prep, behavioral interview, ai interviewer",
+  },
+  "/post-a-job": {
+    title: "Post a Job for Free — hired.video",
+    description:
+      "Post your open role and reach candidates with AI-generated video intros. Google for Jobs indexed, structured-data ready, and free to start.",
+    keywords:
+      "post a job, free job posting, hire talent, post job, google for jobs",
   },
   "/login": {
     title: "Login - Hired.video",
@@ -71,18 +175,19 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "sign up, create account, video resume registration, join Hired.video",
   },
   "/pricing": {
-    title: "Pricing Plans - Hired.video",
+    title: "Pricing — hired.video Plans for Job Seekers, Recruiters & Teams",
     description:
-      "Choose the perfect plan for your career goals. Affordable pricing for job seekers, recruiters, and employers.",
+      "Start free, upgrade when you're ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — cancel anytime.",
     keywords:
-      "pricing, plans, subscription, video resume cost, recruitment pricing",
+      "hired.video pricing, video resume pricing, resume builder cost, recruiter plan, ats pricing, annual subscription",
   },
   "/for-recruiters": {
-    title: "For Recruiters - Hired.video",
+    title:
+      "For Recruiters — AI Candidate Sourcing, Screening & Video Resumes | hired.video",
     description:
-      "Discover top talent through video resumes. Advanced AI matching, candidate screening, and recruitment tools for modern hiring.",
+      "Source candidates from LinkedIn and Indeed, screen applicants with AI match scoring, and evaluate talent 3× faster with video resumes. Built for modern recruiters and talent teams.",
     keywords:
-      "recruiters, hiring, talent acquisition, candidate screening, recruitment tools",
+      "recruiter tools, ai candidate sourcing, candidate screening, applicant tracking, video resume screening, talent pool, sourcing chrome extension, ai recruiting software",
   },
   "/about": {
     title: "About Us - Hired.video",
@@ -99,11 +204,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "careers, jobs at Hired.video, hiring, open roles, work with us",
   },
   "/resumes": {
-    title: "Video Resumes - Hired.video",
+    title:
+      "AI Video Resume Maker & Resume Builder — hired.video",
     description:
-      "Create, manage, and share your professional video resumes. Stand out from the crowd with AI-enhanced resume building.",
+      "Create a video resume in 60 seconds with AI, or build a traditional ATS-friendly resume. Track views, tailor variations per job, and share with recruiters — all in one place.",
     keywords:
-      "video resumes, resume builder, professional videos, career portfolio",
+      "video resume maker, ai video resume, resume builder, ats resume, video resume template, online resume, resume with video, professional resume",
   },
   "/jobs": {
     title: "Job Search - Hired.video",

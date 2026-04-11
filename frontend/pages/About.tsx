@@ -19,6 +19,7 @@ import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -345,6 +346,50 @@ export default function About() {
               </div>
             </div>
           </section>
+
+          {/* FAQ Section */}
+          <MarketingFAQ
+            schemaId="about"
+            heading="About hired.video"
+            subheading="Who we are, what we're building, and how we think about the future of hiring."
+            items={[
+              {
+                question: "What is hired.video?",
+                answer:
+                  "hired.video is an AI-powered career platform that combines AI video resumes, AI resume building and scoring, job matching, interview practice, a career community feed, and sourcing tools for recruiters — all in one workspace. It replaces the patchwork of tools most people use to run their job search.",
+              },
+              {
+                question: "Who founded hired.video?",
+                answer:
+                  "hired.video was founded by a team of engineers, recruiters, and designers who believed that traditional text resumes were an inefficient way to showcase human talent. We're based in North America and serve members globally.",
+              },
+              {
+                question: "Where is hired.video available?",
+                answer:
+                  "hired.video is available worldwide via the web app at hired.video and through our Chrome extensions on the Chrome Web Store. The platform is primarily English today, with localization in progress.",
+              },
+              {
+                question: "How does hired.video make money?",
+                answer:
+                  "We operate a freemium subscription model. Core career tools — building a resume, generating a video, tracking applications, joining the community — are free. Paid plans unlock unlimited AI generations, advanced analytics, team seats, and recruiter features. We don't sell user data, and we never will.",
+              },
+              {
+                question: "How do you handle my data and privacy?",
+                answer:
+                  "Your data is yours. All content you create is private by default. We're GDPR compliant, encrypt data at rest and in transit, and support full data export and deletion at any time. You can read the full details on our Privacy Policy page.",
+              },
+              {
+                question: "Is hired.video hiring?",
+                answer:
+                  "Yes! We're always looking for people who care about reshaping how professionals showcase their talents. Check the Careers page for current open roles, and if nothing fits you today, feel free to reach out anyway.",
+              },
+              {
+                question: "How can I contact the team?",
+                answer:
+                  "Email us at info@hired.video, open the live chat from the bottom-right of any page, or use the Contact form. We respond within 24 hours on business days and typically much faster.",
+              },
+            ]}
+          />
 
           {/* CTA Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">

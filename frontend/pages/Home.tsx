@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ZodError } from "zod";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -11,12 +11,20 @@ import {
   TrendingUp,
   Users,
   Video as VideoIcon,
+  CheckCircle2,
+  Star,
+  FileText,
+  Eye,
+  BarChart3,
+  Target,
+  Zap,
 } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ChatPanel from "@/components/ChatPanel";
+import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -31,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useSEO } from "@/lib/seo";
 import { createRolePermissions } from "@/lib/role-utils";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
@@ -64,7 +73,143 @@ import {
 
 type PostMode = "text" | "video" | "photo" | "article";
 
-// ─── Unauthenticated marketing page (consolidated from Dashboard + Feed) ─────
+const HOME_STATS = [
+  { stat: "500K+", label: "Professionals tracking their careers" },
+  { stat: "3×", label: "More interviews with a video resume" },
+  { stat: "60s", label: "Average time to generate a video resume" },
+  { stat: "24/7", label: "AI career coach, always on" },
+];
+
+const HOME_FEATURES = [
+  {
+    icon: VideoIcon,
+    title: "Unified Career Dashboard",
+    description:
+      "Every resume, application, outreach thread, and interview in one view — tuned to your role (job seeker, recruiter, or employer).",
+    bullets: [
+      "Role-specific widgets",
+      "Application status at a glance",
+      "Last-touched activity timeline",
+    ],
+    border: "border-brand-purple/20 hover:border-brand-purple/40",
+    iconColor: "text-brand-purple",
+  },
+  {
+    icon: Sparkles,
+    title: "AI Next Best Action",
+    description:
+      "Your home screen doesn't just show data — it tells you what to do next. Tailor a resume, follow up on a stalled app, or practice an interview.",
+    bullets: [
+      "Daily recommendations",
+      "Smart reminders",
+      "1-click jump to tools",
+    ],
+    border: "border-brand-blue/20 hover:border-brand-blue/40",
+    iconColor: "text-brand-blue",
+  },
+  {
+    icon: MessageSquare,
+    title: "Career Community Feed",
+    description:
+      "Share wins, ask for advice, and celebrate offers with a feed built for professionals — not doomscrolling.",
+    bullets: [
+      "Text, video, and article posts",
+      "Privacy controls per post",
+      "Hashtag-powered discovery",
+    ],
+    border: "border-primary/20 hover:border-primary/40",
+    iconColor: "text-primary",
+  },
+];
+
+const HOME_HOW_IT_WORKS = [
+  {
+    icon: FileText,
+    step: "1. Sign Up Free",
+    desc: "Create your free account. No credit card, no gimmicks.",
+  },
+  {
+    icon: Sparkles,
+    step: "2. Build or Import",
+    desc: "Upload an existing resume or let our AI build one with you.",
+  },
+  {
+    icon: Eye,
+    step: "3. Track Everything",
+    desc: "Applications, outreach, and interviews — always up to date.",
+  },
+  {
+    icon: TrendingUp,
+    step: "4. Land the Offer",
+    desc: "Follow AI recommendations until you're shaking hands on the new role.",
+  },
+];
+
+const HOME_TESTIMONIALS = [
+  {
+    quote:
+      "Having every job, resume version, and follow-up in one place changed my search. I finally stopped losing track of which resume went to which company.",
+    name: "Alicia Thompson",
+    title: "Data Analyst",
+  },
+  {
+    quote:
+      "The AI next-best-action feature is wild — it prompted me to follow up with a recruiter on a Tuesday morning and I had an offer by Friday.",
+    name: "Marco Silva",
+    title: "Sales Engineer",
+  },
+  {
+    quote:
+      "I use hired.video Home every morning with my coffee. Dashboard + community feed + video resume studio — it's the only tab I need open during a job search.",
+    name: "Nina Patel",
+    title: "UX Designer",
+  },
+];
+
+const HOME_FAQ = [
+  {
+    question: "What is hired.video?",
+    answer:
+      "hired.video is an AI-powered career platform that combines a video resume studio, an ATS-friendly resume builder, an AI job-matching engine, interview practice, and a career community feed. Think of it as the one tab you keep open during your entire job search.",
+  },
+  {
+    question: "Is hired.video free to use?",
+    answer:
+      "Yes. Creating an account, building resumes, generating one video resume, tracking applications, and using the community feed are all free forever. Paid plans unlock unlimited video resumes, advanced AI tools, analytics, and recruiter features.",
+  },
+  {
+    question: "Who is hired.video for?",
+    answer:
+      "hired.video is built for three personas: job seekers who want to stand out and stay organized, recruiters who need a modern sourcing + screening workflow, and employers who want to hire faster with video-first applications. The dashboard adapts automatically to your role.",
+  },
+  {
+    question: "How is hired.video different from LinkedIn?",
+    answer:
+      "LinkedIn is a professional network. hired.video is a career workspace. We don't replace LinkedIn — we integrate with it via our Chrome extension. The difference: LinkedIn shows you who you know; hired.video helps you actually run your job search and build a standout video resume.",
+  },
+  {
+    question: "Do I need a camera to make a video resume?",
+    answer:
+      "No. You can paste any resume into our AI Studio and export a polished 60-second video with animated scenes, professional typography, and optional voiceover — no camera, microphone, or editing skills required. If you prefer to record yourself, we support that too.",
+  },
+  {
+    question: "Does hired.video work with ATS (Applicant Tracking Systems)?",
+    answer:
+      "Yes. Every resume built in hired.video exports to an ATS-friendly PDF, with clean structure that parses cleanly in Workday, Greenhouse, Lever, Taleo, and most other major ATS platforms. You can also export your resume as Word (.docx) or plain text.",
+  },
+  {
+    question: "Is my data private?",
+    answer:
+      "Your resumes, applications, and videos are private to you by default. You explicitly choose what to share publicly and who can see each feed post. We're GDPR-compliant, we never sell your data, and you can export or delete everything at any time.",
+  },
+  {
+    question: "How do I get started?",
+    answer:
+      "Click Get Started Free at the top of this page, create your account in under 30 seconds, and the onboarding will guide you through building your first resume or generating a video. Most users have a shareable video resume in under 5 minutes.",
+  },
+];
+
+// ─── Unauthenticated marketing page ──────────────────────────────────────────
 function HomeMarketingPage({
   sidebarOpen,
   closeSidebar,
@@ -78,6 +223,9 @@ function HomeMarketingPage({
   openSidebar: () => void;
   toggleSidebar: () => void;
 }) {
+  const location = useLocation();
+  useSEO(location.pathname);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
       <Sidebar
@@ -92,7 +240,7 @@ function HomeMarketingPage({
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16">
+        <main className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">
@@ -106,12 +254,12 @@ function HomeMarketingPage({
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Command Center + Career Community
+                Your AI-Powered Career Command Center
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Track your resumes, jobs, outreach, and network — and share
-                wins, ask for advice, and celebrate offers with professionals on
-                the same journey. All on one page.
+                Track resumes, applications, outreach, and interviews in one
+                place — get AI recommendations on your next best move, and
+                share wins with a community built for working professionals.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -129,75 +277,225 @@ function HomeMarketingPage({
                   </Button>
                 </Link>
               </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Free forever • No credit card required • Cancel any upgrade
+                anytime
+              </p>
             </div>
 
-            {/* Benefits grid — 6 cards combining both marketing narratives */}
-            <div className="grid md:grid-cols-3 gap-6 mb-16">
-              <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
-                <CardHeader>
-                  <VideoIcon className="h-10 w-10 text-brand-purple mb-4" />
-                  <CardTitle>Unified Dashboard</CardTitle>
-                  <CardDescription>
-                    See your latest resumes, applications, and outreach stats
-                    at a glance.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+            {/* Stats */}
+            <div className="grid md:grid-cols-4 gap-6 mb-16">
+              {HOME_STATS.map((s) => (
+                <div key={s.stat} className="text-center">
+                  <div className="text-3xl font-bold text-primary mb-2">
+                    {s.stat}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
 
-              <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
-                <CardHeader>
-                  <Briefcase className="h-10 w-10 text-brand-blue mb-4" />
-                  <CardTitle>Actionable Insights</CardTitle>
-                  <CardDescription>
-                    AI-powered recommendations for your next best step.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+            {/* Features */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-4">
+                Everything You Need in One Place
+              </h2>
+              <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+                Three tools that work together: a unified dashboard, an AI that
+                tells you what to do next, and a community that has your back.
+              </p>
+              <div className="grid md:grid-cols-3 gap-8">
+                {HOME_FEATURES.map(
+                  ({ icon: Icon, title, description, bullets, border, iconColor }) => (
+                    <Card
+                      key={title}
+                      className={`${border} transition-colors`}
+                    >
+                      <CardHeader>
+                        <Icon className={`h-10 w-10 ${iconColor} mb-4`} />
+                        <CardTitle>{title}</CardTitle>
+                        <CardDescription>{description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 text-sm">
+                          {bullets.map((b) => (
+                            <div key={b} className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              {b}
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ),
+                )}
+              </div>
+            </div>
 
-              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
-                <CardHeader>
-                  <Users className="h-10 w-10 text-primary mb-4" />
-                  <CardTitle>Network Growth</CardTitle>
-                  <CardDescription>
-                    Track connections and outreach performance over time.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+            {/* How It Works */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-12">
+                How It Works
+              </h2>
+              <div className="grid md:grid-cols-4 gap-8">
+                {HOME_HOW_IT_WORKS.map(({ icon: Icon, step, desc }) => (
+                  <div key={step} className="text-center">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icon className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="font-semibold mb-2">{step}</h3>
+                    <p className="text-sm text-muted-foreground">{desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-              <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
-                <CardHeader>
-                  <MessageSquare className="h-10 w-10 text-brand-purple mb-4" />
-                  <CardTitle>Share Career Milestones</CardTitle>
-                  <CardDescription>
-                    Announce new roles, celebrate promotions, share lessons
-                    learned.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+            {/* Tool highlights — cross-links to the other marketing pages */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-4">
+                Explore the Tools Inside hired.video
+              </h2>
+              <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+                Every tool is built to work on its own — or as part of the full
+                career workflow. Try the ones that fit where you are right now.
+              </p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {
+                    icon: VideoIcon,
+                    title: "Video Studio",
+                    desc: "AI-generated video resumes in 60 seconds",
+                    href: "/studio",
+                  },
+                  {
+                    icon: FileText,
+                    title: "Resume Builder",
+                    desc: "ATS-ready resumes with AI tailoring",
+                    href: "/resumes",
+                  },
+                  {
+                    icon: Target,
+                    title: "AI Job Match",
+                    desc: "Score yourself against any job posting",
+                    href: "/tools/job-resume-match",
+                  },
+                  {
+                    icon: Zap,
+                    title: "Interview Practice",
+                    desc: "Mock interviews with instant AI feedback",
+                    href: "/interview",
+                  },
+                  {
+                    icon: BarChart3,
+                    title: "Resume Scorer",
+                    desc: "Grade any resume in under 10 seconds",
+                    href: "/tools/ai-resume-scorer",
+                  },
+                  {
+                    icon: Users,
+                    title: "For Recruiters",
+                    desc: "Sourcing, pipeline, and video screening",
+                    href: "/for-recruiters",
+                  },
+                  {
+                    icon: Briefcase,
+                    title: "Job Board",
+                    desc: "Browse open roles with video intros",
+                    href: "/jobs",
+                  },
+                  {
+                    icon: Sparkles,
+                    title: "AI Career Coach",
+                    desc: "Chat with a 24/7 career-aware AI",
+                    href: "/ai-coach",
+                  },
+                ].map(({ icon: Icon, title, desc, href }) => (
+                  <Link
+                    key={title}
+                    to={href}
+                    className="group p-5 rounded-xl border border-border hover:border-primary/40 hover:shadow-sm transition-all"
+                  >
+                    <Icon className="h-7 w-7 text-primary mb-3" />
+                    <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
+                      {title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
 
-              <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
-                <CardHeader>
-                  <Sparkles className="h-10 w-10 text-brand-blue mb-4" />
-                  <CardTitle>Hashtag-Powered Discovery</CardTitle>
-                  <CardDescription>
-                    Tag posts with topics to reach the right professionals.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-primary/20 hover:border-primary/40 transition-colors">
-                <CardHeader>
-                  <TrendingUp className="h-10 w-10 text-primary mb-4" />
-                  <CardTitle>Privacy Controls</CardTitle>
-                  <CardDescription>
-                    Choose who sees each post — public, connections, or
-                    private.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+            {/* Testimonials */}
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-center mb-12">
+                Trusted by Professionals Everywhere
+              </h2>
+              <div className="grid md:grid-cols-3 gap-8">
+                {HOME_TESTIMONIALS.map((t) => (
+                  <Card key={t.name}>
+                    <CardContent className="p-6">
+                      <div className="flex items-center mb-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className="h-4 w-4 fill-yellow-400 text-yellow-400"
+                          />
+                        ))}
+                      </div>
+                      <p className="text-sm mb-4">&ldquo;{t.quote}&rdquo;</p>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-brand-purple to-brand-blue rounded-full" />
+                        <div>
+                          <p className="font-medium text-sm">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.title}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* FAQ */}
+          <MarketingFAQ
+            schemaId="home"
+            subheading="Answers to the questions new members ask most — about pricing, privacy, and how hired.video fits into your job search."
+            items={HOME_FAQ}
+          />
+
+          {/* Final CTA */}
+          <div className="max-w-4xl mx-auto px-4 py-16">
+            <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
+              <h3 className="text-3xl font-bold mb-4">
+                Ready to Run Your Whole Career From One Tab?
+              </h3>
+              <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+                Join thousands of professionals who've replaced their messy
+                spreadsheets, lost follow-ups, and forgotten resume versions
+                with a single, AI-powered career home.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/signup">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                  >
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/pricing">
+                  <Button size="lg" variant="outline">
+                    View Pricing
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </main>
 
         <Footer />
       </div>

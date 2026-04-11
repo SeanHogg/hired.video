@@ -3,6 +3,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -311,6 +312,49 @@ export default function ChromeExtension() {
               </div>
             </div>
           </section>
+
+          {/* FAQ */}
+          <MarketingFAQ
+            schemaId="chrome-extension"
+            subheading="Everything people ask before installing the hired.video Chrome extensions."
+            items={[
+              {
+                question: "Is the Chrome extension free?",
+                answer:
+                  "Yes. The Job Seeker extension is free to install and includes one-click job tracking, resume match scoring, and AI resume tailoring. The Recruiter extension is in early access — request access on this page. Premium features are gated behind paid hired.video plans, but the core extension is free.",
+              },
+              {
+                question: "Which job boards are supported?",
+                answer:
+                  "The extensions auto-detect jobs, profiles, and companies on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, CareerBuilder, Dice, SimplyHired, Lever, Greenhouse, Workday, Wellfound, Built In, and generic fallbacks for most other sites. 16+ boards total.",
+              },
+              {
+                question: "Do I need a hired.video account to use the extension?",
+                answer:
+                  "Yes — the extension syncs your tracked jobs, scored resumes, and talent pool to your hired.video account. Create a free account at hired.video/signup if you don't already have one. Everything persists across devices.",
+              },
+              {
+                question: "How does the AI match score work?",
+                answer:
+                  "When you click Score on a job posting, the extension sends the job description to hired.video's AI, which compares it against your master resume — skills, experience level, keywords, and required qualifications. You get a score and a list of specific gaps to improve.",
+              },
+              {
+                question: "Is my browsing data private?",
+                answer:
+                  "The extension only activates on job board and profile pages, and it only sends data to hired.video when you explicitly click Track, Score, or Extract. We don't track your general browsing, we don't share data with third parties, and we don't inject ads. Read the privacy policy for full details.",
+              },
+              {
+                question: "Does the extension work on Edge, Firefox, or Safari?",
+                answer:
+                  "The extensions are built for Chrome and Chromium-based browsers (Brave, Edge, Arc, Opera). A Firefox version is on the roadmap. Safari is not currently supported.",
+              },
+              {
+                question: "How do I get early access to the Recruiter extension?",
+                answer:
+                  "Click 'Request Early Access' on this page or email info@hired.video. We onboard new recruiter teams in weekly cohorts and give early-access users a discount on the recruiter plan when it launches.",
+              },
+            ]}
+          />
 
           {/* Final CTA */}
           <section className="py-16 px-6 bg-gradient-to-r from-blue-600 to-purple-600">
