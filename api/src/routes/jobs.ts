@@ -297,20 +297,14 @@ const extractHandler = async (c: any) => {
 
   if (!result.ok || !result.parsed) {
     // If AI extraction fails but we have hints from the content script,
-    // create a minimal job from the hints + raw description text rather
-    // than rejecting the request entirely.
+    // create a minimal job from the hints + MD description rather than
+    // rejecting the request entirely.
     if (hintTitle) {
-      const strippedHtml = html
-        .replace(/<script[\s\S]*?<\/script>/gi, "")
-        .replace(/<style[\s\S]*?<\/style>/gi, "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      // Try to extract the "About the job" section from the text
-      const aboutIdx = strippedHtml.toLowerCase().indexOf("about the job");
-      const descText = aboutIdx >= 0
-        ? strippedHtml.slice(aboutIdx + 14, aboutIdx + 5000).trim()
-        : strippedHtml.slice(0, 3000);
+      const markdown = jobService.htmlToMarkdown(html);
+      // Try to extract the "About the job" section from the text.
+      const aboutIdx = markdown.toLowerCase().indexOf("about the job");
+      const descText =
+        aboutIdx >= 0 ? markdown.slice(aboutIdx, aboutIdx + 8000).trim() : markdown.slice(0, 8000);
 
       (result as any).ok = true;
       (result as any).parsed = {

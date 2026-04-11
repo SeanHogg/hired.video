@@ -2,7 +2,39 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { HIRED_VIDEO_SEED_COMPANY } from "./services/job.js";
 
-const { users, jobItems } = schema;
+const { users, companyProfiles } = schema;
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100);
+}
+
+async function ensureCompanyProfile(
+  db: ReturnType<typeof getDb>,
+  ownerId: string,
+  name: string,
+  description: string,
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: companyProfiles.id })
+    .from(companyProfiles)
+    .where(eq(companyProfiles.name, name))
+    .limit(1);
+  if (existing) return;
+
+  await db.insert(companyProfiles).values({
+    ownerId,
+    name,
+    slug: toSlug(name),
+    description,
+    isVerified: true,
+    isActive: true,
+  } as any);
+  console.log("[seed] Created company profile", name);
+}
 
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -76,51 +108,22 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
       console.log("[seed] Refreshed super admin password and role");
     }
 
-    // Seed an example job/company record to make the company visible in UI
-    const [existingJob] = await db
-      .select()
-      .from(jobItems)
-      .where(eq(jobItems.company, companyName))
-      .limit(1);
-
-    if (!existingJob && userId) {
-      await db.insert(jobItems).values({
-        postedByUserId: userId,
-        title: `${companyName} - Sample Job`,
-        description: `This is a sample job posting for ${companyName}.`,
-        company: companyName,
-        location: "Remote",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
-      console.log("[seed] Created sample job for company", companyName);
-    }
-
-    // hired.video Community — placeholder company that owns jobs tracked
-    // through the Chrome extension. Seeds a single sample job so the
-    // company surfaces on the public board even before any user has
-    // tracked anything.
-    const [existingCommunityJob] = await db
-      .select()
-      .from(jobItems)
-      .where(eq(jobItems.company, HIRED_VIDEO_SEED_COMPANY))
-      .limit(1);
-
-    if (!existingCommunityJob && userId) {
-      await db.insert(jobItems).values({
-        postedByUserId: userId,
-        title: "Welcome to the hired.video community board",
-        description:
-          "This is the placeholder posting for jobs tracked by hired.video community members through the Chrome extension. As soon as anyone tracks a job from a webpage, it will appear here and on their personal tracker.",
-        company: HIRED_VIDEO_SEED_COMPANY,
-        location: "Remote",
-        isActive: true,
-        isRemote: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
-      console.log("[seed] Created hired.video community placeholder job");
+    // Seed company profiles (not fake jobs) so the companies surface on
+    // the public board. Idempotent on name — if the profile already
+    // exists, nothing happens. No placeholder jobs are created.
+    if (userId) {
+      await ensureCompanyProfile(
+        db,
+        userId,
+        companyName,
+        `${companyName} — seeded company profile.`,
+      );
+      await ensureCompanyProfile(
+        db,
+        userId,
+        HIRED_VIDEO_SEED_COMPANY,
+        "Placeholder company for jobs tracked by hired.video community members through the Chrome extension. Tracked jobs that don't specify a company are attributed here.",
+      );
     }
 
     seeded = true;

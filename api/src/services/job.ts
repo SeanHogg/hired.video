@@ -512,7 +512,9 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
 
         return {
           title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
-          description: stripHtml(item.description ?? "") || stripHtml(html).slice(0, 5000),
+          description:
+            htmlToMarkdown(item.description ?? "") ||
+            htmlToMarkdown(html).slice(0, 8000),
           company:
             stripHtml(
               item.hiringOrganization?.name ??
@@ -551,11 +553,12 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   const docTitle = matchMeta(html, /<title[^>]*>([^<]+)<\/title>/i);
 
   const title = ogTitle || docTitle || fallbackTitle(url);
-  const description = ogDesc || metaDesc || stripHtml(html).slice(0, 5000) || url;
+  const markdown = htmlToMarkdown(html);
+  const description = markdown || ogDesc || metaDesc || url;
 
   return {
     title: title.slice(0, 250),
-    description,
+    description: description.slice(0, 8000),
     company: ogSite || undefined,
     location: undefined,
     isRemote: undefined,
@@ -606,23 +609,35 @@ const CLASSIFICATION_THRESHOLD = 0.7;
  */
 async function classifyWithLLM(
   apiKey: string,
-  input: { url: string; html: string; hint: ParsedJob },
+  input: { url: string; markdown: string; hint: ParsedJob },
 ): Promise<JobClassification> {
-  // Strip the HTML down to plain text — saves tokens and gets the LLM
-  // closer to the user-visible content.
-  const text = stripHtml(input.html).slice(0, 12_000);
+  // The caller has already converted HTML → Markdown so paragraph breaks,
+  // bullet lists, and section headers (`**Qualifications**`, `## About`,
+  // etc.) are all intact. Slice generously — we want enough room for
+  // long descriptions.
+  const markdown = input.markdown.slice(0, 16_000);
 
   const systemPrompt = [
     "You are a strict classifier and structured-extractor for job postings.",
-    "STEP 1 — classify: decide whether the page contains a job posting the user is currently looking at.",
-    "  ACCEPT (isJobPosting=true) when:",
-    "    - The page text describes one specific role with a title, employer, and responsibilities/requirements. Even if other jobs are listed in a nearby sidebar/rail, treat the prominently-featured job as THE job.",
-    "    - The text begins with or prominently displays a single job title (e.g. 'Director of Software Engineering'), employer name, and a multi-paragraph job description.",
-    "  REJECT (isJobPosting=false) when:",
-    "    - There is no single dominant role — the page is purely a search results list, a company homepage, an article about jobs, a resume, or a profile.",
-    "    - You cannot identify ONE specific role title and employer from the text.",
+    "Your input is a Markdown document (not HTML) derived from a job page. Paragraph breaks, bullet lists (- item), and bold section headers (**Qualifications**, **Benefits**, etc.) carry meaning — use them.",
     "",
-    "STEP 2 — if accepted, extract the fields below from the page text. Use null/empty array when truly absent. Be conservative — never make up data. When the text contains multiple jobs but one is clearly featured, extract from the featured one.",
+    "STEP 1 — classify: decide whether the input describes a single job posting.",
+    "  ACCEPT (isJobPosting=true) when:",
+    "    - The text describes one specific role with responsibilities and/or requirements.",
+    "    - The role does not need an explicit 'Title:' line — infer the title from phrases like 'We're looking for a Senior Product Manager' or from a bold heading that names the role.",
+    "  REJECT (isJobPosting=false) when:",
+    "    - There is no single dominant role — the text is a search results list, a company homepage, an article about jobs, a resume, or a profile.",
+    "",
+    "STEP 2 — if accepted, extract the fields below. Rules:",
+    "  - Never invent data. Use null for missing scalars and [] for missing lists.",
+    "  - title: infer from role mentions in the body text when no explicit title line exists. Title-case it (e.g. 'Senior Product And AI Leader').",
+    "  - company: infer from 'About <Company>' sections, possessive mentions ('<Company>'s goal', 'at <Company>'), or sign-offs. Return the employer name only — not the job board (LinkedIn, Indeed, etc).",
+    "  - description: the FULL multi-paragraph role description as Markdown. Preserve paragraph breaks with actual \\n\\n between paragraphs. Keep **bold** on inline section labels. DO NOT duplicate content that belongs in responsibilities/requirements/qualifications/benefits — those should be pulled into their own arrays and removed from the description body. Aim for 2-6 paragraphs that cover the company pitch, the mission of the role, and any context that isn't a bulleted list.",
+    "  - responsibilities: every bullet under headings like 'What You'll Do', 'Responsibilities', 'The Role', 'Product Leadership', 'AI Acceleration', etc. Merge sub-sections when they are clearly part of the same 'what you will do' block.",
+    "  - requirements: bullets under 'Requirements', 'What We're Looking For', 'Must Have', 'Basic Qualifications'.",
+    "  - qualifications: bullets under 'Qualifications', 'Preferred Qualifications', 'Nice To Have', 'Bonus If You Have', 'Education'.",
+    "  - benefits: bullets under 'Benefits', 'Perks', 'What We Offer', 'Compensation'. Include salary range lines.",
+    "  - skills: concrete technologies, tools, or hard skills mentioned anywhere (e.g. ['TypeScript','AWS','LLM platforms','Product management']).",
     "",
     "Return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
     "{",
@@ -630,8 +645,9 @@ async function classifyWithLLM(
     '  "confidence": number between 0 and 1,',
     '  "reason": short string (1 sentence) explaining the decision,',
     '  "job": {',
-    '    "title": string — the role title, e.g. "Senior Director of Software Engineering",',
-    '    "company": string — the hiring company name (NOT the job board),',
+    '    "title": string,',
+    '    "company": string,',
+    '    "location": string — human-readable, e.g. "San Francisco, CA" or "Remote",',
     '    "city": string,',
     '    "state": string,',
     '    "country": string,',
@@ -641,16 +657,16 @@ async function classifyWithLLM(
     '    "salaryMin": annual base salary minimum in dollars (number, no formatting),',
     '    "salaryMax": annual base salary maximum in dollars (number, no formatting),',
     '    "salaryCurrency": ISO 4217 code, default "USD",',
-    '    "description": clean markdown summary of the role (1-3 paragraphs, <2000 chars),',
-    '    "responsibilities": string[] — bulleted "what you will do" items,',
-    '    "requirements": string[] — bulleted "what we are looking for" items,',
-    '    "qualifications": string[] — degrees / certifications / years of experience requirements,',
-    '    "benefits": string[] — perks, benefits, time off, equity, insurance items,',
-    '    "skills": string[] — technical skills and tools mentioned (e.g. ["TypeScript","AWS","Postgres"])',
+    '    "description": multi-paragraph Markdown string, paragraph breaks with \\n\\n,',
+    '    "responsibilities": string[],',
+    '    "requirements": string[],',
+    '    "qualifications": string[],',
+    '    "benefits": string[],',
+    '    "skills": string[]',
     "  }",
     "}",
     "",
-    'When isJobPosting is false, set "job" to null. Be conservative: when in doubt, return false.',
+    'When isJobPosting is false, set "job" to null.',
   ].join("\n");
 
   const userMessage = [
@@ -658,8 +674,9 @@ async function classifyWithLLM(
     `Hint title: ${input.hint.title || "(none)"}`,
     `Hint company: ${input.hint.company || "(none)"}`,
     "",
-    "Page text:",
-    text,
+    "--- MARKDOWN ---",
+    markdown,
+    "--- END MARKDOWN ---",
   ].join("\n");
 
   return callLLMJson(
@@ -668,7 +685,7 @@ async function classifyWithLLM(
       systemPrompt,
       userMessage,
       temperature: 0.1,
-      maxTokens: 1500,
+      maxTokens: 4000,
       responseFormat: "json_object",
     },
     ClassificationSchema,
@@ -705,15 +722,25 @@ export async function extractAndClassifyJob(input: {
     return { ok: true, confidence: 1, parsed: splitDescriptionSections(heuristic) };
   }
 
-  // No JSON-LD. Try the LLM classifier.
+  // No JSON-LD. Convert HTML → Markdown once; we pass the same MD to
+  // the LLM and keep it around as the heuristic description fallback.
+  const markdown = htmlToMarkdown(input.html);
+
+  // No AI configured — accept the heuristic parse (with MD description)
+  // rather than blocking the user. Dev/self-hosted deployments without
+  // an OpenRouter key still get the same UX as before.
   if (!input.apiKey) {
-    // No AI configured — accept the heuristic parse rather than blocking
-    // the user. Dev mode + self-hosted deployments without an OpenRouter
-    // key still get the same UX as before.
-    return { ok: true, confidence: 0.5, parsed: splitDescriptionSections(heuristic) };
+    return {
+      ok: true,
+      confidence: 0.5,
+      parsed: splitDescriptionSections({
+        ...heuristic,
+        description: markdown || heuristic.description,
+      }),
+    };
   }
 
-  if (!input.html || stripHtml(input.html).length < 200) {
+  if (!markdown || markdown.length < 200) {
     return {
       ok: false,
       confidence: 0,
@@ -726,14 +753,21 @@ export async function extractAndClassifyJob(input: {
   try {
     classification = await classifyWithLLM(input.apiKey, {
       url: input.url ?? "",
-      html: input.html,
+      markdown,
       hint: heuristic,
     });
   } catch (err) {
     console.warn("[jobs/extract] LLM classification failed, falling open:", err);
     // Don't punish the user for an upstream LLM outage — fall through
-    // to the heuristic parse.
-    return { ok: true, confidence: 0.5, parsed: splitDescriptionSections(heuristic) };
+    // to the heuristic parse (with the structured MD description).
+    return {
+      ok: true,
+      confidence: 0.5,
+      parsed: splitDescriptionSections({
+        ...heuristic,
+        description: markdown || heuristic.description,
+      }),
+    };
   }
 
   if (!classification.isJobPosting || classification.confidence < CLASSIFICATION_THRESHOLD) {
@@ -795,18 +829,112 @@ function matchMeta(html: string, pattern: RegExp): string | undefined {
 
 function stripHtml(text: unknown): string {
   if (typeof text !== "string") return "";
+  return decodeHtmlEntities(
+    text
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function decodeHtmlEntities(text: string): string {
   return text
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&rsquo;/g, "’")
+    .replace(/&lsquo;/g, "‘")
+    .replace(/&rdquo;/g, "”")
+    .replace(/&ldquo;/g, "“")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const n = Number(code);
+      return Number.isFinite(n) ? String.fromCharCode(n) : "";
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const n = parseInt(code, 16);
+      return Number.isFinite(n) ? String.fromCharCode(n) : "";
+    });
+}
+
+/**
+ * HTML → Markdown-ish plain text. Preserves structural signals the LLM
+ * (and the section splitter) need: paragraph breaks, bullet lists, bold
+ * section headers. Pure string ops — we run inside a Cloudflare Worker
+ * so there is no DOM.
+ *
+ * Used as the *first pass* of the extract pipeline: HTML comes in, MD
+ * goes out, then the LLM parses the MD into structured job fields.
+ * `stripHtml()` (which collapses all whitespace) is kept only for
+ * short single-field values like company/title.
+ */
+export function htmlToMarkdown(input: unknown): string {
+  if (typeof input !== "string" || !input) return "";
+
+  let text = input;
+
+  // 1. Drop script/style blocks entirely.
+  text = text
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+
+  // 2. Inline formatting first so headers that wrap <strong> still work.
+  //    LinkedIn uses `<strong>Qualifications\n\n</strong>` as pseudo-headings,
+  //    so when the original inner content contains a newline we surface the
+  //    bold as a block-level element (separate paragraph) rather than inline.
+  text = text.replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, _tag, inner) => {
+    const raw = String(inner);
+    const t = raw.trim();
+    if (!t) return "";
+    if (/\n/.test(raw)) return `\n\n**${t}**\n\n`;
+    return `**${t}**`;
+  });
+  text = text.replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, _tag, inner) => {
+    const t = String(inner).trim();
+    return t ? `*${t}*` : "";
+  });
+  // Links → just the anchor text (URLs clutter the LLM context).
+  text = text.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1");
+
+  // 3. Block elements → surround with newlines so structure survives.
+  text = text.replace(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi, "\n\n# $1\n\n");
+  text = text.replace(/<h2\b[^>]*>([\s\S]*?)<\/h2>/gi, "\n\n## $1\n\n");
+  text = text.replace(/<h3\b[^>]*>([\s\S]*?)<\/h3>/gi, "\n\n### $1\n\n");
+  text = text.replace(/<h4\b[^>]*>([\s\S]*?)<\/h4>/gi, "\n\n#### $1\n\n");
+  text = text.replace(/<h5\b[^>]*>([\s\S]*?)<\/h5>/gi, "\n\n##### $1\n\n");
+  text = text.replace(/<h6\b[^>]*>([\s\S]*?)<\/h6>/gi, "\n\n###### $1\n\n");
+  text = text.replace(/<hr\s*\/?>/gi, "\n\n---\n\n");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<p\b[^>]*>/gi, "");
+  text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1");
+  text = text.replace(/<\/(ul|ol)>/gi, "\n\n");
+  text = text.replace(/<(ul|ol)\b[^>]*>/gi, "\n");
+  text = text.replace(/<\/(div|section|article|header|footer|main|aside)>/gi, "\n");
+  text = text.replace(/<(div|section|article|header|footer|main|aside)\b[^>]*>/gi, "");
+
+  // 4. Strip every remaining tag and decode entities.
+  text = text.replace(/<[^>]+>/g, "");
+  text = decodeHtmlEntities(text);
+
+  // 5. Normalize whitespace while preserving newlines.
+  text = text
+    .split("\n")
+    .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return text.trim();
 }
 
 function fallbackTitle(url: string): string {
@@ -901,7 +1029,8 @@ export function splitDescriptionSections(parsed: ParsedJob): ParsedJob {
     {
       key: "benefits",
       patterns: [
-        /benefits?\s*(?:&|and)?\s*perks?/i,
+        // Matches "Benefits", "Benefit", "Benefits & Perks", "Benefits and Perks".
+        /benefits?(?:\s*(?:&|and)\s*perks?)?/i,
         /what\s+we\s+offer/i,
         /why\s+(?:join|work)/i,
         /compensation/i,
@@ -936,8 +1065,11 @@ export function splitDescriptionSections(parsed: ParsedJob): ParsedJob {
     if (matched) continue;
 
     if (currentKey && buckets[currentKey]) {
-      // Strip leading bullet chars.
-      const clean = line.replace(/^[\s•\-–—*·▪►●○◦→⮞\d.)\]]+\s*/, "").trim();
+      // Strip leading bullet chars or numbered-list prefixes like "1.", "2)".
+      // Do NOT eat bare leading digits — "5+ years" must stay intact.
+      const clean = line
+        .replace(/^(?:[\s•\-–—*·▪►●○◦→⮞]+|\d+[.)\]])\s*/, "")
+        .trim();
       if (clean.length > 10) buckets[currentKey].push(clean);
     } else {
       cleanDescription.push(line);
