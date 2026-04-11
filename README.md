@@ -447,9 +447,11 @@ User (browser)
 
 ### Usage Limits
 
-- Free: 10 requests/month (`FREE_AI_MONTHLY_LIMIT`), enforced client-side + server-side
-- Pro/Enterprise: unlimited
-- Client check in `ai-service.ts`; server check via `checkAIUsage` middleware
+- Free: 50,000 tokens/month (`FREE_AI_MONTHLY_TOKENS`), enforced client-side + server-side
+- Pro: 5,000,000 tokens/month fair-use cap (`PRO_AI_MONTHLY_TOKENS`)
+- Top-up packs available via `TOKEN_PACKS` SKUs in `shared/pricing.ts`
+- Client check in `ai-service.ts`; server check via `checkTokenBudget` middleware
+- Note: legacy `FREE_AI_MONTHLY_LIMIT` (request-count) is being phased out — see Phase 1 of pricing rework
 
 ---
 

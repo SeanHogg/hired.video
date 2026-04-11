@@ -37,7 +37,7 @@ import {
   Lock,
   Download,
 } from "lucide-react";
-import { PREMIUM_MONTHLY_PRICE as basePrice } from "@shared/pricing";
+import { PRO_MONTHLY_PRICE as basePrice } from "@shared/pricing";
 import { TRUST_SIGNALS } from "@/lib/constants";
 
 import { useEffect, useState } from "react";
@@ -107,7 +107,7 @@ export default function Pricing() {
       freeDescription:
         "Get started with AI video resumes, the Chrome extension, and your career home.",
       premiumDescription:
-        "Unlock unlimited AI, voice cloning, premium studio features, and priority matching.",
+        "Unlock unlimited AI, voice cloning, Pro studio features, and priority matching.",
       freeFeatures: [
         "1 published AI video resume (unlimited drafts)",
         "ATS-friendly resume builder",
@@ -122,7 +122,7 @@ export default function Pricing() {
       premiumFeatures: [
         "Unlimited AI video resumes",
         "AI Studio — Brand Kits, 1080p, watermark-free",
-        "Voice cloning & premium TTS voices",
+        "Voice cloning & full TTS voice marketplace",
         "YouTube publishing + LinkedIn post AI",
         "Unlimited AI assistance (all tools)",
         "Resume Tailor — per-job variations",
@@ -270,8 +270,8 @@ export default function Pricing() {
 
   const handleAddToCart = () => {
     addItem({
-      id: `premium-${selectedUsers}-${isAnnual ? "annual" : "monthly"}`,
-      name: "Premium Plan",
+      id: `pro-${selectedUsers}-${isAnnual ? "annual" : "monthly"}`,
+      name: "Pro Plan",
       price: calculatePrice(selectedUsers, isAnnual),
       type: "plan",
       billingCycle: isAnnual ? "annual" : "monthly",
@@ -427,7 +427,7 @@ export default function Pricing() {
                 </CardContent>
               </Card>
 
-              {/* Premium Plan */}
+              {/* Pro Plan */}
               <Card className="relative border-2 border-primary shadow-lg">
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                   <Badge className="bg-gradient-to-r from-brand-purple to-brand-blue text-white px-4 py-1">
@@ -435,7 +435,7 @@ export default function Pricing() {
                   </Badge>
                 </div>
                 <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl">Premium</CardTitle>
+                  <CardTitle className="text-2xl">Pro</CardTitle>
 
                   {/* Pricing Summary & (Conditional) User Selection */}
                   <div className="mt-4 space-y-4">
@@ -598,9 +598,7 @@ export default function Pricing() {
                           Features
                         </th>
                         <th className="text-center p-4 font-semibold">Free</th>
-                        <th className="text-center p-4 font-semibold">
-                          Premium
-                        </th>
+                        <th className="text-center p-4 font-semibold">Pro</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">

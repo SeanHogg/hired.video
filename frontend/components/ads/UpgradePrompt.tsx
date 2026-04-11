@@ -7,7 +7,7 @@ import { useSubscription } from "@/lib/hooks/useSubscription";
 interface UpgradePromptProps {
   /** Short label for the gated feature, e.g. "Salary Calculator" */
   featureName: string;
-  /** One-line explanation of what the user gets with Premium */
+  /** One-line explanation of what the user gets with Pro */
   benefit?: string;
   /** Display as inline banner (default) or as a blocking overlay */
   variant?: "banner" | "overlay";
@@ -18,7 +18,7 @@ interface UpgradePromptProps {
 
 /**
  * Shows an upgrade call-to-action when the current user is on the free plan.
- * Renders nothing for Premium users.
+ * Renders nothing for Pro users.
  */
 export function UpgradePrompt({
   featureName,
@@ -49,7 +49,7 @@ export function UpgradePrompt({
             {benefit && <p className="text-sm text-muted-foreground mt-1">{benefit}</p>}
           </div>
           <Button asChild className="w-full">
-            <Link to="/settings/billing">Upgrade to Premium</Link>
+            <Link to="/settings/billing">Upgrade to Pro</Link>
           </Button>
           <button
             onClick={handleDismiss}
@@ -69,7 +69,7 @@ export function UpgradePrompt({
       <div className="flex items-center gap-3">
         <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
         <p className="text-sm">
-          <span className="font-medium">{featureName} is a Premium feature.</span>
+          <span className="font-medium">{featureName} is a Pro feature.</span>
           {benefit && <span className="text-muted-foreground"> {benefit}</span>}
         </p>
       </div>

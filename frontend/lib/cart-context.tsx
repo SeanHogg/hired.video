@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import React, { createContext, useContext, useReducer } from "react";
+import { PRO_MONTHLY_PRICE } from "@shared/pricing";
 
 export interface CartItem {
   id: string;
@@ -165,8 +166,7 @@ const calculatePlanPrice = (
   users: number,
   billingCycle: "monthly" | "annual",
 ): number => {
-  const basePrice = 9.95; // per user per month
-  const monthlyTotal = basePrice * users;
+  const monthlyTotal = PRO_MONTHLY_PRICE * users;
   if (billingCycle === "annual") {
     return monthlyTotal * 12 * 0.8; // 20% annual discount
   }

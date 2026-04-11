@@ -60,8 +60,8 @@ export function AIUsageLimitBanner({
         <div className={cn("px-4 py-2 border-b bg-gradient-to-r from-brand-purple/10 to-brand-blue/10", className)}>
           <div className="flex items-center gap-2 text-xs">
             <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="font-medium text-primary">Premium</span>
-            <span className="text-muted-foreground">Unlimited AI requests</span>
+            <span className="font-medium text-primary">Pro</span>
+            <span className="text-muted-foreground">Unlimited AI tokens</span>
           </div>
         </div>
       );
@@ -83,14 +83,14 @@ export function AIUsageLimitBanner({
               </div>
               <div className="text-muted-foreground">
                 You&apos;ve used all {usage.limit} AI requests included in your free plan this month.
-                Upgrade to Premium for unlimited access.
+                Upgrade to Pro for unlimited access, or buy a token pack to keep going.
               </div>
             </div>
             <div className="flex gap-2">
               <Button asChild size="sm" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
                 <Link to={upgradeUrl}>
                   <Crown className="h-3 w-3 mr-1" />
-                  Upgrade to Premium
+                  Upgrade to Pro
                 </Link>
               </Button>
               {onDismiss && (
@@ -118,7 +118,7 @@ export function AIUsageLimitBanner({
           <span>
             Monthly limit reached.{" "}
             <Link to={upgradeUrl} className="underline font-medium">
-              Upgrade to Premium
+              Upgrade to Pro
             </Link>{" "}
             for unlimited access.
           </span>
@@ -242,7 +242,7 @@ export function AIUsageLimitErrorBanner({
           <Button asChild size="sm" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
             <Link to={upgradeUrl}>
               <Zap className="h-3 w-3 mr-1" />
-              Upgrade to Premium
+              Upgrade to Pro
             </Link>
           </Button>
           {onDismiss && (

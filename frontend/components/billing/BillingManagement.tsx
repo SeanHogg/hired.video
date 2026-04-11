@@ -142,7 +142,7 @@ export function BillingManagement() {
                 <CardTitle className="flex items-center justify-between">
                   Current Plan
                   <Badge variant={subscription.isPremium ? "default" : "secondary"}>
-                    {subscription.isPremium ? "Premium" : "Free"}
+                    {subscription.isPremium ? "Pro" : "Free"}
                   </Badge>
                 </CardTitle>
               </CardHeader>

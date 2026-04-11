@@ -8,6 +8,8 @@ import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 export interface SubscriptionSummary {
   planId: string; // free | pro | enterprise
   planName: string;
+  /** True for any paid tier (pro, enterprise). Field name kept for backwards
+   *  compatibility — backend still ships `isPremium`. */
   isPremium: boolean;
   price: number;
   currency: string; // e.g., USD
