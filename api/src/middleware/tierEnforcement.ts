@@ -1,6 +1,6 @@
 import type { MiddlewareHandler, Context } from "hono";
 import type { Variables } from "../types/index.js";
-import { getSubscription, getMonthlyAIUsage } from "../services/billing.js";
+import { getSubscription, getTokenBudgetSummary } from "../services/billing.js";
 import { FREE_TEAM_MEMBER_LIMIT } from "../../../shared/pricing.js";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
@@ -44,10 +44,18 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
 }
 
 // ---------------------------------------------------------------------------
-// checkAIUsage — call inside a route handler before spending tokens.
-// Returns an error Response if the free-tier limit is exceeded, otherwise null.
+// checkTokenBudget — call inside a route handler before issuing an LLM call.
+// Returns an error Response if the user has zero tokens available across
+// both monthly allowance AND purchased pack balance. Otherwise returns null
+// and the route can proceed.
+//
+// NOTE: This is a forward-looking gate, not a precise debit. We allow the
+// call if remaining > 0, then `recordTokenUsage()` debits the actual amount
+// after OpenRouter responds. A user with 100 tokens left can theoretically
+// make a 5,000-token call and go into a 4,900-token deficit — the NEXT call
+// is blocked. Cleaner UX than mid-call abort, and the overage is bounded.
 // ---------------------------------------------------------------------------
-export async function checkAIUsage(c: AppCtx): Promise<Response | null> {
+export async function checkTokenBudget(c: AppCtx): Promise<Response | null> {
   const userId = c.var.user?.sub;
   if (!userId) return null;
 
@@ -64,26 +72,39 @@ export async function checkAIUsage(c: AppCtx): Promise<Response | null> {
     return null;
   }
 
-  const sub = await getSubscription(userId);
-  if (sub.isPremium) return null; // unlimited
+  const summary = await getTokenBudgetSummary(userId);
+  if (summary.isUnlimited) return null;
+  if (summary.totalAvailable > 0) return null;
 
-  const usage = await getMonthlyAIUsage(userId);
-  if ((usage.remaining ?? 1) <= 0) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "USAGE_LIMIT_EXCEEDED",
-          message: `You've used all ${usage.limit} AI requests included in your free plan this month. Upgrade to Premium for unlimited access.`,
-          upgradeUrl: "/settings/billing",
-          usage: { used: usage.used, limit: usage.limit },
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "TOKEN_BUDGET_EXCEEDED",
+        message: summary.isPro
+          ? `You've used all ${summary.monthlyLimit.toLocaleString()} AI tokens in your Pro plan this month. Buy a token pack to keep going, or wait for next month's reset.`
+          : `You've used all ${summary.monthlyLimit.toLocaleString()} free AI tokens this month. Upgrade to Pro for ${(1_000_000).toLocaleString()} tokens per month, or buy a token pack.`,
+        upgradeUrl: "/pricing",
+        budget: {
+          monthlyUsed: summary.monthlyUsed,
+          monthlyLimit: summary.monthlyLimit,
+          monthlyRemaining: summary.monthlyRemaining,
+          packBalance: summary.packBalance,
+          totalAvailable: summary.totalAvailable,
+          plan: summary.planId,
         },
       },
-      429,
-    ) as Response;
-  }
-  return null;
+    },
+    429,
+  ) as Response;
 }
+
+/**
+ * @deprecated Use `checkTokenBudget`. Alias kept so call sites that haven't
+ * been migrated yet still work — both names point at the new token-aware
+ * implementation.
+ */
+export const checkAIUsage = checkTokenBudget;
 
 // ---------------------------------------------------------------------------
 // checkTeamSize — call before creating a new team invite.

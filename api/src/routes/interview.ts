@@ -5,8 +5,9 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
-import { checkAIUsage } from "../middleware/tierEnforcement.js";
+import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
+import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { recordTokenUsage } from "../services/billing.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -176,7 +177,7 @@ function canUseObjectStorage(): boolean {
 // POST /api/interview/questions
 // Generate interview questions from a job description (no session created)
 interviewRoutes.post("/questions", async (c) => {
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
@@ -188,6 +189,7 @@ interviewRoutes.post("/questions", async (c) => {
 
   const { jobDescription, resumeText, type, count } = parsed.data;
   const apiKey = getApiKey(c.env);
+  const userId = c.var.user?.sub;
 
   if (apiKey) {
     try {
@@ -206,7 +208,16 @@ JSON schema:
 
       const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nCandidate Resume:\n${resumeText.slice(0, 2000)}` : ""}`;
 
-      const result = await callLLMJson(apiKey, { systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
+      const { data: result, usage } = await callLLMJsonWithUsage(apiKey, { systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
+      if (userId) {
+        void recordTokenUsage({
+          userId,
+          model: usage.model,
+          featureKey: "interview_questions",
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+        });
+      }
       return c.json(ok(result));
     } catch (err) {
       console.error("[interview/questions] LLM call failed, using mock:", err);
@@ -357,7 +368,7 @@ interviewRoutes.post("/sessions/:id/answers", async (c) => {
 // POST /api/interview/answers/:answerId/analyze
 // Run AI analysis on a single answer
 interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const user = c.var.user;
@@ -417,7 +428,15 @@ Schema:
       const jobContext = extra.data.jobDescription ? `\nJob context: ${extra.data.jobDescription.slice(0, 500)}` : "";
       const userContent = `Question: ${extra.data.question}${jobContext}\n\nCandidate's answer:\n${extra.data.transcript.slice(0, 2000)}`;
 
-      feedbackResult = await callLLMJson(apiKey, { systemPrompt, userMessage: userContent }, FeedbackSchema);
+      const llmResult = await callLLMJsonWithUsage(apiKey, { systemPrompt, userMessage: userContent }, FeedbackSchema);
+      feedbackResult = llmResult.data;
+      void recordTokenUsage({
+        userId: user.sub,
+        model: llmResult.usage.model,
+        featureKey: "interview_analyze",
+        promptTokens: llmResult.usage.promptTokens,
+        completionTokens: llmResult.usage.completionTokens,
+      });
     } catch (err) {
       console.error("[interview/analyze] LLM call failed, using mock:", err);
       feedbackResult = buildMockFeedback(extra.data.question, extra.data.transcript);

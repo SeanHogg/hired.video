@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
+import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
+import { recordTokenUsage } from "../services/billing.js";
+import { checkTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -152,7 +154,9 @@ Rules:
 - improvedExamples: take 1–2 actual bullet points from the resume and rewrite them. Quote them accurately — preserve their original structure.
 - Return ONLY valid JSON`;
 
-// POST /api/resume/roast — no auth required (public tool)
+// POST /api/resume/roast — public tool. Authenticated users get billed
+// against their token budget; anonymous users get free roasts (loss-leader
+// for the marketing landing page).
 resumeRoastRoutes.post("/roast", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = RoastRequestSchema.safeParse(body);
@@ -161,15 +165,34 @@ resumeRoastRoutes.post("/roast", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()), 400);
   }
 
+  // For authenticated users, gate against their token budget. Anonymous
+  // users skip the gate (public marketing tool).
+  const userId = c.var.user?.sub;
+  if (userId) {
+    const limitError = await checkTokenBudget(c as any);
+    if (limitError) return limitError;
+  }
+
   const apiKey = getApiKey(c.env);
   if (apiKey) {
     try {
-      const roast = await callLLMJson(apiKey, {
-        model: "google/gemini-flash-1.5",
+      const { data: roast, usage } = await callLLMJsonWithUsage(apiKey, {
         temperature: 0.8,
         systemPrompt: ROAST_SYSTEM_PROMPT,
         userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
       }, RoastResponseSchema);
+
+      // Bill the call to the user's token budget if signed in.
+      if (userId) {
+        void recordTokenUsage({
+          userId,
+          model: usage.model,
+          featureKey: "resume_roast",
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+        });
+      }
+
       return c.json(ok(roast));
     } catch (err) {
       console.error("[resume/roast] LLM error, falling back to mock:", err);

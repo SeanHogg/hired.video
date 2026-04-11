@@ -3,9 +3,10 @@ import { eq, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMWithMessages, getApiKey, MODEL_CATALOG } from "../services/ai.js";
+import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/ai.js";
 import type { LLMMessage } from "../services/ai.js";
-import { checkAIUsage } from "../middleware/tierEnforcement.js";
+import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { recordTokenUsage } from "../services/billing.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
 
@@ -53,7 +54,7 @@ function generateMockResponse(input: string): { message: string; usage: { prompt
 // POST /api/ai/context — legacy context-aware assistant (mock)
 // ---------------------------------------------------------------------------
 aiRoutes.post("/context", async (c) => {
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
   const body = await c.req.json().catch(() => ({}));
   const userMessage = typeof body?.message === "string" ? body.message : "";
@@ -77,7 +78,7 @@ aiRoutes.post("/chat", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => ({}));
@@ -137,6 +138,7 @@ aiRoutes.post("/chat", async (c) => {
   let responseMessage: string;
   let promptTokens: number;
   let completionTokens: number;
+  let model = "mock";
 
   const apiKey = getApiKey((c.env as any) ?? {});
   if (apiKey) {
@@ -151,13 +153,15 @@ aiRoutes.post("/chat", async (c) => {
         { role: "user", content: userMessage },
       ];
 
-      responseMessage = await callLLMWithMessages(apiKey, {
+      const result = await callLLMWithMessagesAndUsage(apiKey, {
         messages: llmMessages,
         responseFormat: "text",
         temperature: 0.7,
       });
-      promptTokens = estimateTokens(llmMessages.map((m) => m.content).join(" "));
-      completionTokens = estimateTokens(responseMessage);
+      responseMessage = result.content;
+      promptTokens = result.usage.promptTokens;
+      completionTokens = result.usage.completionTokens;
+      model = result.usage.model;
     } catch {
       const mock = generateMockResponse(userMessage);
       responseMessage = mock.message;
@@ -179,17 +183,16 @@ aiRoutes.post("/chat", async (c) => {
     { sessionId, role: "assistant", content: responseMessage, tokensUsed: completionTokens },
   ] as any);
 
-  // Track usage
+  // Track usage via the central recorder (debits monthly OR pack bucket).
   if (totalTokens > 0) {
-    await db.insert(schema.aiUsageRecords).values({
+    await recordTokenUsage({
       userId,
-      model: "google/gemini-flash-1.5",
+      model,
       featureKey: "chat",
       promptTokens,
       completionTokens,
-      totalTokens,
       sessionId,
-    } as any);
+    });
   }
 
   return c.json(success({ message: responseMessage, sessionId, usage: { promptTokens, completionTokens, totalTokens } }), 200);

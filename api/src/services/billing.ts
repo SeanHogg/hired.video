@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lt, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sql, sum } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import type {
   AIUsageMonthDTO,
@@ -6,9 +6,21 @@ import type {
   PaymentMethodDTO,
   SubscriptionSummaryDTO,
 } from "../../../shared/billing.js";
-import { FREE_AI_MONTHLY_LIMIT } from "../../../shared/pricing.js";
+import {
+  FREE_AI_MONTHLY_TOKENS,
+  PRO_AI_MONTHLY_TOKENS,
+} from "../../../shared/pricing.js";
 
-const { subscriptions, subscriptionPlans, paymentMethods, invoices, aiUsageRecords, users } = schema;
+const {
+  subscriptions,
+  subscriptionPlans,
+  paymentMethods,
+  invoices,
+  aiUsageRecords,
+  userTokenBalance,
+  tokenPackPurchases,
+  users,
+} = schema;
 
 // ---------------------------------------------------------------------------
 // Subscription cache (#8)
@@ -152,7 +164,14 @@ export async function getInvoices(userId: string): Promise<InvoiceDTO[]> {
   }));
 }
 
-export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+// ---------------------------------------------------------------------------
+// Token usage helpers (true token metering, replaces request-count gate)
+// ---------------------------------------------------------------------------
+
+/** Sum of `totalTokens` debited from the monthly bucket for the current
+ *  calendar month (UTC). Pack-debited tokens are excluded — they're tracked
+ *  separately in `userTokenBalance.lifetimeConsumed`. */
+async function getMonthlyTokensUsed(userId: string): Promise<number> {
   const db = getDb();
   const now = new Date();
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -164,54 +183,238 @@ export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO
     .where(
       and(
         eq(aiUsageRecords.userId, userId),
+        eq(aiUsageRecords.source, "monthly"),
         gte(aiUsageRecords.createdAt, periodStart),
         lt(aiUsageRecords.createdAt, periodEnd),
       ),
     );
 
-  const used = Number(row?.used ?? 0);
+  return Number(row?.used ?? 0);
+}
+
+/**
+ * Composite token-budget summary used by both the gate check and the
+ * frontend pill / banner. Returns the user's monthly allowance + spend,
+ * the purchased pack balance, and the total tokens still available across
+ * both buckets.
+ */
+export interface TokenBudgetSummary {
+  /** Plan slug — "free" | "pro" | "admin" | "enterprise". */
+  planId: string;
+  isPro: boolean;
+  /** Monthly tokens included in the current plan. */
+  monthlyLimit: number;
+  /** Monthly tokens used so far this calendar month. */
+  monthlyUsed: number;
+  monthlyRemaining: number;
+  /** Tokens available from purchased one-off packs (no expiry). */
+  packBalance: number;
+  /** monthlyRemaining + packBalance — what the gate checks against. */
+  totalAvailable: number;
+  /** True for SuperAdmin / Admin internal users. Bypass all gates. */
+  isUnlimited: boolean;
+}
+
+export async function getTokenBudgetSummary(userId: string): Promise<TokenBudgetSummary> {
+  const sub = await getSubscription(userId);
+
+  // Admin / SuperAdmin / "admin" plan id are internal users — unlimited.
+  const db = getDb();
+  const [userRow] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const isInternal = userRow?.role === "SuperAdmin" || userRow?.role === "Admin";
+  const isPro = sub.isPremium && !isInternal;
+
+  if (isInternal) {
+    return {
+      planId: sub.planId,
+      isPro: false,
+      monthlyLimit: Number.POSITIVE_INFINITY,
+      monthlyUsed: 0,
+      monthlyRemaining: Number.POSITIVE_INFINITY,
+      packBalance: 0,
+      totalAvailable: Number.POSITIVE_INFINITY,
+      isUnlimited: true,
+    };
+  }
+
+  const monthlyLimit = isPro ? PRO_AI_MONTHLY_TOKENS : FREE_AI_MONTHLY_TOKENS;
+  const monthlyUsed = await getMonthlyTokensUsed(userId);
+  const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
+
+  const [balanceRow] = await db
+    .select({ balance: userTokenBalance.balance })
+    .from(userTokenBalance)
+    .where(eq(userTokenBalance.userId, userId))
+    .limit(1);
+  const packBalance = balanceRow?.balance ?? 0;
+
   return {
-    year: now.getUTCFullYear(),
-    month: now.getUTCMonth() + 1,
-    used,
-    limit: FREE_AI_MONTHLY_LIMIT,
-    remaining: Math.max(0, FREE_AI_MONTHLY_LIMIT - used),
+    planId: sub.planId,
+    isPro,
+    monthlyLimit,
+    monthlyUsed,
+    monthlyRemaining,
+    packBalance,
+    totalAvailable: monthlyRemaining + packBalance,
     isUnlimited: false,
   };
 }
 
-export async function getPremiumAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+/**
+ * Record an AI call to the audit log AND debit the right bucket. Call this
+ * AFTER the LLM call returns successfully — it uses the actual prompt/
+ * completion token counts from OpenRouter's `usage` field, not estimates.
+ *
+ * Logic: if the user still has monthly allowance remaining, debit there.
+ * Otherwise debit the pack balance (and decrement `userTokenBalance`).
+ * If both are exhausted, the call is recorded as overage in the monthly
+ * bucket — the gate will block the NEXT call, but we don't mid-call abort.
+ */
+export async function recordTokenUsage(args: {
+  userId: string;
+  model: string;
+  featureKey: string;
+  promptTokens: number;
+  completionTokens: number;
+  cost?: number;
+  sessionId?: string;
+}): Promise<void> {
   const db = getDb();
+  const totalTokens = args.promptTokens + args.completionTokens;
+  if (totalTokens <= 0) return;
+
+  // Decide source bucket based on the user's CURRENT monthly remaining.
+  // We don't try to split a single call across both buckets — we pick one
+  // and debit the whole call there. Cleaner accounting, slight overage drift.
+  const summary = await getTokenBudgetSummary(args.userId);
+  let source: "monthly" | "pack" = "monthly";
+  if (!summary.isUnlimited && summary.monthlyRemaining < totalTokens && summary.packBalance > 0) {
+    source = "pack";
+  }
+
+  // Always insert the audit row.
+  await db
+    .insert(aiUsageRecords)
+    .values({
+      userId: args.userId,
+      model: args.model,
+      featureKey: args.featureKey,
+      promptTokens: args.promptTokens,
+      completionTokens: args.completionTokens,
+      totalTokens,
+      cost: String(args.cost ?? 0),
+      source,
+      sessionId: args.sessionId ?? null,
+    } as any)
+    .catch((err) => {
+      console.warn(`[billing] recordTokenUsage insert failed for ${args.featureKey}:`, err);
+    });
+
+  // If we billed against the pack, decrement the balance row atomically.
+  if (source === "pack") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.insert(userTokenBalance) as any)
+      .values({
+        userId: args.userId,
+        balance: 0,
+        lifetimeGranted: 0,
+        lifetimeConsumed: totalTokens,
+      })
+      .onConflictDoUpdate({
+        target: userTokenBalance.userId,
+        set: {
+          balance: sql`GREATEST(0, ${userTokenBalance.balance} - ${totalTokens})`,
+          lifetimeConsumed: sql`${userTokenBalance.lifetimeConsumed} + ${totalTokens}`,
+          updatedAt: new Date(),
+        },
+      })
+      .catch((err: unknown) => {
+        console.warn(`[billing] pack debit failed for ${args.userId}:`, err);
+      });
+  }
+}
+
+/**
+ * Add tokens to a user's purchased pack balance. Called after a successful
+ * Stripe charge for a TOKEN_PACK SKU. Idempotent on the audit row level —
+ * caller must guard against double-credit by checking the
+ * `tokenPackPurchases.stripePaymentIntentId` first.
+ */
+export async function grantTokenPack(args: {
+  userId: string;
+  packId: string;
+  tokens: number;
+  pricePaid: number;
+  currency?: string;
+  stripePaymentIntentId?: string;
+}): Promise<void> {
+  const db = getDb();
+
+  // Audit row.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db.insert(tokenPackPurchases) as any).values({
+    userId: args.userId,
+    packId: args.packId,
+    tokensGranted: args.tokens,
+    pricePaid: String(args.pricePaid),
+    currency: args.currency ?? "USD",
+    stripePaymentIntentId: args.stripePaymentIntentId ?? null,
+    status: "paid",
+  });
+
+  // Increment balance.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db.insert(userTokenBalance) as any)
+    .values({
+      userId: args.userId,
+      balance: args.tokens,
+      lifetimeGranted: args.tokens,
+      lifetimeConsumed: 0,
+    })
+    .onConflictDoUpdate({
+      target: userTokenBalance.userId,
+      set: {
+        balance: sql`${userTokenBalance.balance} + ${args.tokens}`,
+        lifetimeGranted: sql`${userTokenBalance.lifetimeGranted} + ${args.tokens}`,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Backwards-compatible legacy DTO shape
+// ---------------------------------------------------------------------------
+
+/**
+ * @deprecated Returns the legacy `AIUsageMonthDTO` shape for the existing
+ * `/api/Billing/ai-usage/month` endpoint. New code should call
+ * `getTokenBudgetSummary` and use the new `/api/Billing/token-budget` endpoint.
+ */
+export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+  const summary = await getTokenBudgetSummary(userId);
   const now = new Date();
-  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-
-  const [row] = await db
-    .select({ used: sum(aiUsageRecords.totalTokens) })
-    .from(aiUsageRecords)
-    .where(
-      and(
-        eq(aiUsageRecords.userId, userId),
-        gte(aiUsageRecords.createdAt, periodStart),
-        lt(aiUsageRecords.createdAt, periodEnd),
-      ),
-    );
-
-  const used = Number(row?.used ?? 0);
   return {
     year: now.getUTCFullYear(),
     month: now.getUTCMonth() + 1,
-    used,
-    limit: null,
-    remaining: null,
-    isUnlimited: true,
+    used: summary.monthlyUsed,
+    limit: summary.isUnlimited ? null : summary.monthlyLimit,
+    remaining: summary.isUnlimited ? null : summary.totalAvailable,
+    isUnlimited: summary.isUnlimited,
   };
 }
 
-/** Returns correct usage DTO based on the user's subscription tier. */
+/** @deprecated Use `getTokenBudgetSummary` instead. */
+export async function getPremiumAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+  return getMonthlyAIUsage(userId);
+}
+
+/** @deprecated Use `getTokenBudgetSummary` instead. */
 export async function getAIUsageForUser(userId: string): Promise<AIUsageMonthDTO> {
-  const sub = await getSubscription(userId);
-  return sub.isPremium ? getPremiumAIUsage(userId) : getMonthlyAIUsage(userId);
+  return getMonthlyAIUsage(userId);
 }
 
 export async function deletePaymentMethod(userId: string, paymentMethodId: string): Promise<string> {

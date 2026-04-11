@@ -1196,8 +1196,11 @@ export default function StudioLayout() {
 
         {/* Content area — on mobile reserves 4rem for the fixed bottom nav so
             the editor doesn't get clipped behind it. 100dvh handles mobile
-            browser chrome resizing better than 100vh. */}
-        <div className="pt-16 flex h-[calc(100dvh-64px-4rem)] md:h-[calc(100vh-64px)] overflow-hidden">
+            browser chrome resizing better than 100vh. mt-16 (not pt-16) so the
+            box itself starts below the fixed top nav rather than padding
+            inside the box — otherwise the box bottom sits 64px above the
+            bottom nav and leaves dead white space. */}
+        <div className="mt-16 flex h-[calc(100dvh-64px-4rem)] md:h-[calc(100vh-64px)] overflow-hidden">
           {/* Desktop inline sidebar — hidden on mobile where the drawer is used. */}
           {studioSidebarHidden ? (
             <div className="hidden md:flex w-8 shrink-0 border-r bg-card flex-col items-center py-2">

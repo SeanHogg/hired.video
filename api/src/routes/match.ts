@@ -5,8 +5,9 @@ import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
-import { checkAIUsage, requirePremium } from "../middleware/tierEnforcement.js";
+import { callLLMJsonWithUsage, getApiKey, type LLMUsage } from "../services/ai.js";
+import { checkTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
+import { recordTokenUsage } from "../services/billing.js";
 
 export const matchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -265,19 +266,16 @@ function keywordScore(jobText: string, resumeText: string): { score: number; mes
   };
 }
 
-/** Record AI usage for billing/audit. Fire-and-forget. */
-function recordAIUsage(userId: string, featureKey: string, promptLen: number, completionLen: number) {
-  const db = getDb();
-  db.insert(schema.aiUsageRecords)
-    .values({
-      userId,
-      model: "openrouter/free",
-      featureKey,
-      promptTokens: Math.round(promptLen / 4),
-      completionTokens: Math.round(completionLen / 4),
-      totalTokens: Math.round((promptLen + completionLen) / 4),
-    } as any)
-    .catch((err) => console.warn(`[match] Failed to record AI usage for ${featureKey}:`, err));
+/** Record AI usage for billing/audit using REAL token counts from the
+ *  OpenRouter response. Fire-and-forget. */
+function recordMatchUsage(userId: string, featureKey: string, usage: LLMUsage) {
+  void recordTokenUsage({
+    userId,
+    model: usage.model,
+    featureKey,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+  });
 }
 
 // =====================================================================
@@ -300,7 +298,7 @@ async function resolveMatchContext(c: Context<{ Variables: Variables }>): Promis
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
@@ -335,7 +333,7 @@ matchRoutes.post("/analyze", async (c) => {
 
   if (ctx.apiKey) {
     try {
-      const result = await callLLMJson(
+      const { data: result, usage } = await callLLMJsonWithUsage(
         ctx.apiKey,
         {
           systemPrompt: `You are a professional resume analyst. Evaluate how well a resume matches a job description and return a JSON response.
@@ -352,7 +350,7 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
         AnalyzeResponseSchema,
       );
 
-      recordAIUsage(ctx.userId, "match_analyze", ctx.jobText.length + ctx.resumeText.length, JSON.stringify(result).length);
+      recordMatchUsage(ctx.userId, "match_analyze", usage);
       return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -387,7 +385,7 @@ matchRoutes.post("/tailor", async (c) => {
         ? `\n\nPRIOR SCORE ANALYSIS (address these specific gaps):\n${ctx.priorRecommendations}\n`
         : "";
 
-      const result = await callLLMJson(
+      const { data: result, usage } = await callLLMJsonWithUsage(
         ctx.apiKey,
         {
           systemPrompt: `You are an expert resume writer. Your job is to:
@@ -410,7 +408,7 @@ Rules:
         TailorResponseSchema,
       );
 
-      recordAIUsage(ctx.userId, "match_tailor", ctx.jobText.length + ctx.resumeText.length, result.markdownResume.length);
+      recordMatchUsage(ctx.userId, "match_tailor", usage);
       return c.json(success({ ...result, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
     } catch (err) {
       console.error("[match/tailor] LLM failed:", err instanceof Error ? err.message : err);
@@ -438,7 +436,7 @@ matchRoutes.post("/byid", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
@@ -457,7 +455,7 @@ matchRoutes.post("/byid", async (c) => {
 
   if (apiKey) {
     try {
-      const result = await callLLMJson(
+      const { data: result, usage } = await callLLMJsonWithUsage(
         apiKey,
         {
           systemPrompt: "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
@@ -467,6 +465,7 @@ matchRoutes.post("/byid", async (c) => {
         },
         AnalyzeResponseSchema,
       );
+      recordMatchUsage(userId, "match_byid", usage);
       return c.json(success({ ...result, jobId, resumeId }), 200);
     } catch (err) {
       console.error("[match/byid] LLM failed:", err instanceof Error ? err.message : err);
@@ -482,7 +481,7 @@ matchRoutes.post("/bycontent", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const limitError = await checkAIUsage(c as any);
+  const limitError = await checkTokenBudget(c as any);
   if (limitError) return limitError;
 
   const body = await c.req.json().catch(() => null);
@@ -495,7 +494,7 @@ matchRoutes.post("/bycontent", async (c) => {
 
   if (apiKey) {
     try {
-      const result = await callLLMJson(
+      const { data: result, usage } = await callLLMJsonWithUsage(
         apiKey,
         {
           systemPrompt: "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
@@ -505,6 +504,7 @@ matchRoutes.post("/bycontent", async (c) => {
         },
         AnalyzeResponseSchema,
       );
+      recordMatchUsage(userId, "match_bycontent", usage);
       return c.json(success(result), 200);
     } catch (err) {
       console.error("[match/bycontent] LLM failed:", err instanceof Error ? err.message : err);
@@ -535,7 +535,7 @@ matchRoutes.post("/insights", requirePremium("Career Insights"), async (c) => {
   if (!apiKey) return c.json(error("AI_ERROR", "AI service not configured. Please contact support."), 503);
 
   try {
-    const result = await callLLMJson(
+    const { data: result, usage } = await callLLMJsonWithUsage(
       apiKey,
       {
         systemPrompt: `You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.`,
@@ -567,7 +567,7 @@ Return JSON matching this structure exactly:
       InsightsResponseSchema,
     );
 
-    recordAIUsage(userId, "match_insights", jobText.length + resumeText.length, JSON.stringify(result).length);
+    recordMatchUsage(userId, "match_insights", usage);
     return c.json(success({ ...result, resumeId: resume.id }), 200);
   } catch (err) {
     console.error("[match/insights] LLM failed:", err instanceof Error ? err.message : err);

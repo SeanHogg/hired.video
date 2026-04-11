@@ -187,7 +187,7 @@ export default function Pricing() {
         "Brand kits & company-wide templates",
         "Calendar & smart notifications",
         "Advanced analytics, time-to-hire, API access",
-        "GDPR data-residency & SOC 2 (Enterprise)",
+        "GDPR data-residency & SOC 2 (on the roadmap)",
         "Unlimited users",
       ],
       unitLabel: "per user / month",
@@ -1874,7 +1874,7 @@ export default function Pricing() {
                           In progress
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Enterprise tier
+                          On the roadmap
                         </td>
                       </tr>
                       <tr>
@@ -1886,7 +1886,7 @@ export default function Pricing() {
                           <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Enterprise tier
+                          On the roadmap
                         </td>
                       </tr>
                       <tr>
@@ -1898,7 +1898,7 @@ export default function Pricing() {
                           <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Enterprise tier
+                          On the roadmap
                         </td>
                       </tr>
                       <tr>
@@ -1934,7 +1934,7 @@ export default function Pricing() {
                           <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Enterprise tier
+                          On the roadmap
                         </td>
                       </tr>
                       <tr>

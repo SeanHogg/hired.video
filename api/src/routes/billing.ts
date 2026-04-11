@@ -42,6 +42,38 @@ billingRoutes.get("/ai-usage/month", async (c) => {
   return c.json(ok(await billingService.getAIUsageForUser(userId)), 200);
 });
 
+/**
+ * GET /api/Billing/token-budget — full token-budget summary for the current
+ * user. Used by the sidebar AITokenPill, the AIUsageLimitBanner, and the
+ * "buy more tokens" sheet. Replaces the request-count `/ai-usage/month`
+ * shape with true token metering.
+ */
+billingRoutes.get("/token-budget", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const summary = await billingService.getTokenBudgetSummary(userId);
+  return c.json(
+    ok({
+      planId: summary.planId,
+      isPro: summary.isPro,
+      isUnlimited: summary.isUnlimited,
+      monthly: {
+        used: summary.monthlyUsed,
+        limit: summary.isUnlimited ? null : summary.monthlyLimit,
+        remaining: summary.isUnlimited ? null : summary.monthlyRemaining,
+        resetAt: new Date(
+          Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1),
+        ).toISOString(),
+      },
+      pack: {
+        balance: summary.packBalance,
+      },
+      totalAvailable: summary.isUnlimited ? null : summary.totalAvailable,
+    }),
+    200,
+  );
+});
+
 billingRoutes.post("/refund-request", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);

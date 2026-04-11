@@ -209,8 +209,8 @@ export function EmulationHeaderControls() {
 
   return (
     <div className="flex items-center gap-1.5">
-      {/* Status badge */}
-      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
+      {/* Status badge — desktop only; mobile relies on tinted nav background */}
+      <span className={`hidden sm:inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold text-xs ${badgeCls}`}>
         <AlertTriangle className="h-3 w-3" />
         {isImpersonating ? "EMULATING" : "ROLE PREVIEW"}
       </span>

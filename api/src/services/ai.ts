@@ -23,6 +23,26 @@ export interface LLMMessagesOptions {
   temperature?: number;
   messages: LLMMessage[];
   responseFormat?: "json_object" | "text";
+  maxTokens?: number;
+}
+
+/**
+ * Token usage parsed from the OpenRouter `usage` field. Use this to bill
+ * the user for the actual tokens consumed (do NOT estimate from text length —
+ * that approach is wildly inaccurate, especially for non-English content).
+ */
+export interface LLMUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Model that actually answered (after fallback chain). May differ from the
+   *  requested model. */
+  model: string;
+}
+
+export interface LLMResult {
+  content: string;
+  usage: LLMUsage;
 }
 
 // ─── Free model fallback chain ──────────────────────────────────────────────
@@ -47,6 +67,9 @@ const FREE_FALLBACK_MODELS = [
 
 /**
  * Call OpenRouter with a single model. Internal — use callLLM() for automatic fallback.
+ * Returns both the content and the parsed token usage from OpenRouter's
+ * `usage` field. If OpenRouter doesn't ship usage (some free models omit it),
+ * fall back to a coarse character-based estimate.
  */
 async function callOpenRouter(
   apiKey: string,
@@ -57,7 +80,7 @@ async function callOpenRouter(
     responseFormat?: "json_object" | "text";
     maxTokens?: number;
   } = {},
-): Promise<string> {
+): Promise<LLMResult> {
   const {
     temperature = 0.7,
     responseFormat = "json_object",
@@ -68,6 +91,8 @@ async function callOpenRouter(
     model,
     temperature,
     messages,
+    // Always ask for usage so token billing is accurate.
+    usage: { include: true },
   };
   if (responseFormat === "json_object") {
     body.response_format = { type: "json_object" };
@@ -92,24 +117,58 @@ async function callOpenRouter(
     throw new Error(`OpenRouter ${res.status} [${model}]: ${errBody.slice(0, 200)}`);
   }
 
-  const json = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+    model?: string;
+  };
   const content = json.choices?.[0]?.message?.content;
   if (!content) throw new Error(`Empty LLM response from ${model}`);
-  return content;
+
+  // Prefer OpenRouter's reported usage. Fall back to a coarse char/4 estimate
+  // for the rare model that doesn't include it.
+  const promptTokens =
+    json.usage?.prompt_tokens ??
+    Math.round(messages.reduce((acc, m) => acc + m.content.length, 0) / 4);
+  const completionTokens =
+    json.usage?.completion_tokens ?? Math.round(content.length / 4);
+  const totalTokens =
+    json.usage?.total_tokens ?? promptTokens + completionTokens;
+
+  return {
+    content,
+    usage: {
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      model: json.model ?? model,
+    },
+  };
 }
 
 /**
  * Call the OpenRouter chat-completions endpoint with automatic model fallback.
+ * Returns BOTH the content and the parsed token usage so the caller can
+ * record exact billing data via `recordTokenUsage()`.
  *
  * Tries the requested model first, then falls back through FREE_FALLBACK_MODELS
  * until one succeeds. Logs each failure for debugging.
  *
  * @param apiKey   – pass `c.env.OPENROUTER_API_KEY` from the route handler
  * @param options  – prompt, model, temperature, etc.
- * @returns        the raw string content of the first choice
+ * @returns        { content, usage } — content is the raw string from the
+ *                 first choice; usage is the parsed prompt/completion/total
+ *                 tokens reported by OpenRouter (or estimated if missing).
  * @throws         only if ALL models in the chain fail
  */
-export async function callLLM(apiKey: string, options: LLMOptions): Promise<string> {
+export async function callLLMWithUsage(
+  apiKey: string,
+  options: LLMOptions,
+): Promise<LLMResult> {
   const {
     model = "qwen/qwen3.6-plus:free",
     temperature = 0.7,
@@ -142,32 +201,66 @@ export async function callLLM(apiKey: string, options: LLMOptions): Promise<stri
 }
 
 /**
+ * Backwards-compatible wrapper around `callLLMWithUsage` that returns only
+ * the content string. Prefer `callLLMWithUsage` in new code so token usage
+ * can be recorded against the user's billing.
+ *
+ * @deprecated Use `callLLMWithUsage` and pass the resulting `usage` to
+ *             `recordTokenUsage()` so the call is billed correctly.
+ */
+export async function callLLM(apiKey: string, options: LLMOptions): Promise<string> {
+  const result = await callLLMWithUsage(apiKey, options);
+  return result.content;
+}
+
+/**
  * Call the LLM and parse the JSON response against a Zod schema.
- * Strips markdown code fences before parsing.
+ * Strips markdown code fences before parsing. Returns ONLY the parsed result —
+ * use `callLLMJsonWithUsage` if you need to bill for the call.
+ *
+ * @deprecated Use `callLLMJsonWithUsage` for billable routes.
  */
 export async function callLLMJson<T>(
   apiKey: string,
   options: LLMOptions,
   schema: z.ZodType<T>,
 ): Promise<T> {
-  const raw = await callLLM(apiKey, { ...options, responseFormat: "json_object" });
-  const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const parsed = schema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
-  return parsed.data;
+  const result = await callLLMJsonWithUsage(apiKey, options, schema);
+  return result.data;
 }
 
 /**
- * Call the OpenRouter chat-completions endpoint with a full messages array.
- * Preferred over callLLM for multi-turn conversations.
- * Includes the same model fallback chain.
+ * Same as `callLLMJson` but returns the parsed Zod result alongside the raw
+ * token usage from OpenRouter. Use this in any route that needs to record
+ * billing via `recordTokenUsage()`.
  */
-export async function callLLMWithMessages(apiKey: string, options: LLMMessagesOptions): Promise<string> {
+export async function callLLMJsonWithUsage<T>(
+  apiKey: string,
+  options: LLMOptions,
+  schema: z.ZodType<T>,
+): Promise<{ data: T; usage: LLMUsage }> {
+  const result = await callLLMWithUsage(apiKey, { ...options, responseFormat: "json_object" });
+  const stripped = result.content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  const parsed = schema.safeParse(JSON.parse(stripped));
+  if (!parsed.success) throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
+  return { data: parsed.data, usage: result.usage };
+}
+
+/**
+ * Call the OpenRouter chat-completions endpoint with a full messages array
+ * AND return the parsed token usage. Preferred over `callLLMWithMessages`
+ * for multi-turn conversations that need to be billed.
+ */
+export async function callLLMWithMessagesAndUsage(
+  apiKey: string,
+  options: LLMMessagesOptions,
+): Promise<LLMResult> {
   const {
     model = "qwen/qwen3.6-plus:free",
     temperature = 0.7,
     messages,
     responseFormat = "text",
+    maxTokens,
   } = options;
 
   // Build ordered model list: requested model first, then fallbacks (deduped)
@@ -176,7 +269,7 @@ export async function callLLMWithMessages(apiKey: string, options: LLMMessagesOp
 
   for (const m of modelsToTry) {
     try {
-      return await callOpenRouter(apiKey, m, messages, { temperature, responseFormat });
+      return await callOpenRouter(apiKey, m, messages, { temperature, responseFormat, maxTokens });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`[${m}] ${msg}`);
@@ -185,6 +278,18 @@ export async function callLLMWithMessages(apiKey: string, options: LLMMessagesOp
   }
 
   throw new Error(`All LLM models failed:\n${errors.join("\n")}`);
+}
+
+/**
+ * Backwards-compatible wrapper that returns only the content string.
+ * @deprecated Use `callLLMWithMessagesAndUsage` and bill the call.
+ */
+export async function callLLMWithMessages(
+  apiKey: string,
+  options: LLMMessagesOptions,
+): Promise<string> {
+  const result = await callLLMWithMessagesAndUsage(apiKey, options);
+  return result.content;
 }
 
 /**
