@@ -276,14 +276,38 @@ export class CompanyService {
 
   /**
    * Get specific company by ID (legacy metadata-only)
-   * Note: Many pages use full profile; prefer getCompanyProfileById for details pages
+   * Note: Many pages use full profile; prefer getCompanyProfileById for details pages.
+   * The /api/Companies/:id endpoint now returns the nested CompanyProfile shape, so
+   * we fetch the profile and project it down to the flat metadata fields callers expect.
    */
   async getCompanyById(id: string): Promise<CompanyMetadata> {
-    const response = await apiClient.get<CompanyMetadata>(
-      `/api/Companies/${id}`,
-      CompanyMetadataSchema,
-    );
-    return response.data;
+    const profile = await this.getCompanyProfileById(id);
+    const hq = profile.data.headquarters;
+    const location = hq
+      ? [hq.city, hq.state, hq.country].filter(Boolean).join(", ") || hq.address || null
+      : null;
+    return {
+      id: profile.id,
+      slug: profile.slug,
+      name: profile.data.name,
+      logo: profile.data.logo,
+      tagline: profile.data.tagline,
+      description: profile.data.description,
+      website: profile.data.contact?.website ?? undefined,
+      industry: profile.data.industry,
+      size: profile.data.size,
+      location: location ?? undefined,
+      status: profile.status,
+      visibility: profile.visibility,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      founded: profile.data.founded,
+      views: profile.views,
+      followers: profile.followers,
+      jobCount: profile.jobCount,
+      activeJobCount: profile.activeJobCount,
+      userId: profile.userId,
+    };
   }
 
   /**

@@ -21,15 +21,94 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
     slug: row.slug,
     description: row.description,
     website: row.website,
+    logo: row.logoUrl,
     logoUrl: row.logoUrl,
     industry: row.industry,
     size: row.size,
     foundedYear: row.foundedYear,
+    founded: row.foundedYear,
     headquarters: row.headquarters,
+    location: row.headquarters,
     isVerified: row.isVerified,
     isActive: row.isActive,
+    status: row.isActive ? "active" : "inactive",
+    visibility: "public",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+// Build the rich CompanyProfile shape the frontend's CompanyProfileSchema expects.
+// The DB row is flat metadata; nested objects (data.headquarters, data.contact, etc.)
+// are constructed here so Zod validation on the client side passes.
+function rowToCompanyProfile(
+  row: typeof companyProfiles.$inferSelect,
+  counts: { jobCount: number; activeJobCount: number; followers: number },
+  viewerId: string | null,
+) {
+  const isOwner = viewerId !== null && viewerId === row.ownerId;
+  return {
+    id: row.id,
+    slug: row.slug ?? row.id,
+    data: {
+      name: row.name,
+      logo: row.logoUrl,
+      website: row.website,
+      tagline: null,
+      description: row.description,
+      industry: row.industry,
+      size: row.size,
+      founded: row.foundedYear,
+      headquarters: row.headquarters
+        ? { address: row.headquarters, city: row.headquarters }
+        : {},
+      locations: [],
+      contact: {
+        email: null,
+        phone: null,
+        website: row.website,
+        linkedin: null,
+        twitter: null,
+        facebook: null,
+      },
+      benefits: {
+        healthInsurance: false,
+        dentalInsurance: false,
+        visionInsurance: false,
+        retirement401k: false,
+        retirementPlan: false,
+        stockOptions: false,
+        paidTimeOff: false,
+        parentalLeave: false,
+        flexibleSchedule: false,
+        remoteWork: false,
+        learningBudget: false,
+        professionalDevelopment: false,
+        gymMembership: false,
+        freeFood: false,
+        commuteBenefits: false,
+        other: [],
+      },
+      culture: [],
+      technologies: [],
+      perks: [],
+      mission: null,
+      vision: null,
+      values: [],
+    },
+    status: row.isActive ? "active" : "inactive",
+    visibility: "public",
+    onboardingTasks: [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    views: 0,
+    followers: counts.followers,
+    jobCount: counts.jobCount,
+    activeJobCount: counts.activeJobCount,
+    userId: row.ownerId,
+    teamMembers: [],
+    canEdit: isOwner,
+    isOwner,
   };
 }
 
@@ -148,12 +227,33 @@ companyRoutes.post("/", async (c) => {
   return c.json(success(rowToCompanyMeta(row)), 201);
 });
 
-// Get by ID
+// Get by ID — returns the full CompanyProfile shape consumed by CompanyDetail.tsx
 companyRoutes.get("/:id", async (c) => {
   const db = getDb();
-  const [row] = await db.select().from(companyProfiles).where(eq(companyProfiles.id, c.req.param("id"))).limit(1);
+  const id = c.req.param("id");
+  const [row] = await db.select().from(companyProfiles).where(eq(companyProfiles.id, id)).limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  return c.json(success(rowToCompanyMeta(row)), 200);
+
+  const [jobsRow, activeJobsRow, followersRow] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(eq(jobItems.company, id)),
+    db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(and(eq(jobItems.company, id), eq(jobItems.isActive, true))),
+    db.select({ count: sql<number>`count(*)::int` }).from(companyFollowers).where(eq(companyFollowers.companyId, id)),
+  ]);
+
+  return c.json(
+    success(
+      rowToCompanyProfile(
+        row,
+        {
+          jobCount: jobsRow[0]?.count ?? 0,
+          activeJobCount: activeJobsRow[0]?.count ?? 0,
+          followers: followersRow[0]?.count ?? 0,
+        },
+        userId(c),
+      ),
+    ),
+    200,
+  );
 });
 
 // Update company

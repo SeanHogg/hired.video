@@ -62,7 +62,10 @@ function toResumeItem(resume: typeof resumeInformation.$inferSelect) {
     type: "resume" as const,
     title: resume.title,
     name: resume.title,
-    isPublic: resume.status === "published",
+    // privacyLevel: 0=public, 1=recruiter-only, 2=connections, 10=private.
+    // The search endpoint is anonymous, so anything returned here is public by definition.
+    isPublic: resume.privacyLevel === 0,
+    privacyLevel: resume.privacyLevel,
     templateName: "Default",
     createdAt: resume.createdAt.toISOString(),
     updatedAt: resume.updatedAt.toISOString(),
@@ -134,9 +137,14 @@ searchRoutes.get("/public", async (c) => {
 
   const db = getDb();
 
+  // Companies: only list active profiles (soft-delete / hidden companies stay out).
+  const companyActiveClause = eq(companyProfiles.isActive, true);
   const companyWhere = search
-    ? or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`))
-    : undefined;
+    ? and(
+        companyActiveClause,
+        or(ilike(companyProfiles.name, `%${search}%`), ilike(companyProfiles.description, `%${search}%`)),
+      )
+    : companyActiveClause;
   const companyPromise = includeCompanies
     ? db
         .select()
@@ -146,22 +154,32 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof companyProfiles.$inferSelect[]);
 
+  // People: only list users whose profileVisibility is "public". Users without a
+  // profile row are excluded because profile is required to enforce visibility.
+  const peopleVisibilityClause = eq(userProfiles.profileVisibility, "public");
   const peopleWhere = search
-    ? or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))
-    : undefined;
+    ? and(
+        peopleVisibilityClause,
+        or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`)),
+      )
+    : peopleVisibilityClause;
   const peoplePromise = includePeople
     ? db
         .select({ user: users, profile: userProfiles })
         .from(users)
-        .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+        .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
         .where(peopleWhere)
         .orderBy(desc(users.createdAt))
         .limit(100)
     : Promise.resolve([] as Array<{ user: typeof users.$inferSelect; profile: typeof userProfiles.$inferSelect | null }>);
 
+  // Resumes: ONLY return resumes with privacyLevel=0 (public). Everything else
+  // (recruiter-only, connections, private, draft) must be invisible on the public
+  // search surface — this endpoint is anonymous.
+  const resumePublicClause = eq(resumeInformation.privacyLevel, 0);
   const resumesWhere = search
-    ? ilike(resumeInformation.title, `%${search}%`)
-    : undefined;
+    ? and(resumePublicClause, ilike(resumeInformation.title, `%${search}%`))
+    : resumePublicClause;
   const resumesPromise = includeResumes
     ? db
         .select()

@@ -78,8 +78,8 @@ export default function CompanyDetail() {
         setError(null);
         const companyData = await companyService.getCompanyProfileById(id);
         setCompany(companyData);
-      } catch {
-        // Error already handled by setting error state
+      } catch (err) {
+        console.error("Failed to load company:", err);
         setError("Failed to load company. Please try again.");
       } finally {
         setIsLoading(false);

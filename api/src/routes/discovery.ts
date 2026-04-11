@@ -50,7 +50,9 @@ discoveryRoutes.get("/talent-feed", async (c) => {
       updatedAt: profileTable.updatedAt,
     })
     .from(profileTable)
-    .where(profileTable.isPublic ? eq(profileTable.isPublic, true) : sql`true`)
+    // profileVisibility: "public" means the user opted into public discovery feeds.
+    // Anything else (private, connections) must never surface here.
+    .where(eq(profileTable.profileVisibility, "public"))
     .orderBy(desc(profileTable.updatedAt))
     .limit(limit)
     .offset(offset)
@@ -90,7 +92,9 @@ discoveryRoutes.get("/talent-feed/:userId", async (c) => {
     .where(eq(profileTable.userId, c.req.param("userId")))
     .limit(1);
 
-  if (!profile) return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  if (!profile || profile.profileVisibility !== "public") {
+    return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  }
   return c.json(success(profile), 200);
 });
 
