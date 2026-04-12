@@ -645,8 +645,8 @@ export default function Home() {
       onRefresh: refreshDashboard,
     };
 
-    if (rolePermissions.isSuperAdmin) return <ProductDashboard />;
-    if (rolePermissions.isAdmin) return <AdminDashboard {...commonProps} />;
+    if (rolePermissions.isSuperAdmin || rolePermissions.isAdmin)
+      return <AdminDashboard {...commonProps} />;
     if (rolePermissions.isJobSeeker)
       return <JobSeekerDashboard {...commonProps} />;
     if (rolePermissions.isRecruiter)

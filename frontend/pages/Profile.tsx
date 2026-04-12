@@ -54,6 +54,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
+import useDashboard from "@/hooks/dashboard/useDashboard";
+import ProfileStatistics from "@/components/dashboard/shared/ProfileStatistics";
+import ApplicationStatistics from "@/components/dashboard/shared/ApplicationStatistics";
+import JobMatchesCard from "@/components/dashboard/shared/JobMatchesCard";
+import UpcomingInterviewsCard from "@/components/dashboard/shared/UpcomingInterviewsCard";
 import { userService } from "@/lib/services/user-service";
 import {
   roleToSelectValue,
@@ -83,6 +88,7 @@ function ProfileContent() {
   const [slugSaving, setSlugSaving] = useState(false);
 
   const { user, isAuthenticated, refreshUser } = useAuth();
+  const { dashboardData, loading: dashboardLoading } = useDashboard();
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
@@ -736,6 +742,26 @@ function ProfileContent() {
 
               </CardContent>
             </Card>
+
+            {/* Job Seeker Dashboard Cards */}
+            {(() => {
+              const rp = createRolePermissions(user?.role);
+              if (!rp.isJobSeeker) return null;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const dd = dashboardData as any;
+              return (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    <ProfileStatistics stats={dd?.profileStats} loading={dashboardLoading} />
+                    <ApplicationStatistics stats={dd?.applicationStats} loading={dashboardLoading} />
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    <JobMatchesCard matches={dd?.jobMatches} loading={dashboardLoading} />
+                    <UpcomingInterviewsCard interviews={dd?.upcomingInterviews} loading={dashboardLoading} />
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Quick Actions */}
             <Card>

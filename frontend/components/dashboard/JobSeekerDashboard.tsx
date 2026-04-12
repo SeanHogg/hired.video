@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  Eye,
-  FileText,
-  Target,
-  Calendar,
-  TrendingUp,
-} from "lucide-react";
-import { Link } from "react-router-dom";
+import { TrendingUp } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,11 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import OnboardingProgress from "./shared/OnboardingProgress";
 import WelcomeHero from "./shared/WelcomeHero";
+import ProfileStatistics from "./shared/ProfileStatistics";
+import ApplicationStatistics from "./shared/ApplicationStatistics";
+import JobMatchesCard from "./shared/JobMatchesCard";
+import UpcomingInterviewsCard from "./shared/UpcomingInterviewsCard";
 
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -85,279 +80,14 @@ export function JobSeekerDashboard({
 
       {/* Profile & Application Stats Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Profile Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
-              Profile Statistics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
-              <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
-                <div className="text-lg sm:text-2xl font-bold text-primary">
-                  {dashboardData.profileStats?.totalViews ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">Total Views</div>
-              </div>
-              <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
-                <div className="text-lg sm:text-2xl font-bold text-blue-600">
-                  {dashboardData.profileStats?.viewsThisWeek ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">This Week</div>
-              </div>
-              <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
-                <div className="text-lg sm:text-2xl font-bold text-green-600">
-                  {dashboardData.profileStats?.viewsThisMonth ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">This Month</div>
-              </div>
-              <div className="text-center p-2 sm:p-3 bg-muted/30 rounded-lg">
-                <div
-                  className={`text-lg sm:text-2xl font-bold ${(dashboardData.profileStats?.viewsChangePercentage ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}
-                >
-                  {(dashboardData.profileStats?.viewsChangePercentage ?? 0) >= 0
-                    ? "+"
-                    : ""}
-                  {dashboardData.profileStats?.viewsChangePercentage ?? 0}%
-                </div>
-                <div className="text-xs text-muted-foreground">Change</div>
-              </div>
-            </div>
-
-            {/* Recent Viewers */}
-            {dashboardData.profileStats?.recentViewers &&
-              dashboardData.profileStats.recentViewers.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Recent Viewers
-                  </h4>
-                  {dashboardData.profileStats.recentViewers
-                    .slice(0, 3)
-                    .map((viewer, index) => (
-                      <div
-                        key={viewer.userId || index}
-                        className="flex items-center justify-between p-2 bg-muted/20 rounded"
-                      >
-                        <div>
-                          <div className="text-sm font-medium">
-                            {viewer.name}
-                          </div>
-                          {viewer.company && (
-                            <div className="text-xs text-muted-foreground">
-                              {viewer.company}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(viewer.viewedAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-          </CardContent>
-        </Card>
-
-        {/* Application Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Application Statistics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-primary">
-                  {dashboardData.applicationStats?.totalApplications ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Total Applications
-                </div>
-              </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {dashboardData.applicationStats?.pendingApplications ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">Pending</div>
-              </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {dashboardData.applicationStats?.interviewRequests ?? 0}
-                </div>
-                <div className="text-xs text-muted-foreground">Interviews</div>
-              </div>
-              <div className="text-center p-3 bg-muted/30 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {dashboardData.applicationStats?.successRate ?? 0}%
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Success Rate
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Applications */}
-            {dashboardData.applicationStats?.recentApplications &&
-              dashboardData.applicationStats.recentApplications.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Recent Applications
-                  </h4>
-                  {dashboardData.applicationStats.recentApplications
-                    .slice(0, 3)
-                    .map((app, index) => (
-                      <div
-                        key={app.applicationId || index}
-                        className="flex items-center justify-between p-2 bg-muted/20 rounded"
-                      >
-                        <div>
-                          <div className="text-sm font-medium">
-                            {app.jobTitle}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {app.company}
-                          </div>
-                        </div>
-                        <Badge
-                          variant={
-                            app.status === "pending"
-                              ? "secondary"
-                              : app.status === "accepted"
-                                ? "default"
-                                : "destructive"
-                          }
-                          className="text-xs"
-                        >
-                          {app.status}
-                        </Badge>
-                      </div>
-                    ))}
-                </div>
-              )}
-          </CardContent>
-        </Card>
+        <ProfileStatistics stats={dashboardData.profileStats} loading={loading} />
+        <ApplicationStatistics stats={dashboardData.applicationStats} loading={loading} />
       </div>
 
       {/* Job Matches & Interviews Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Job Matches */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Job Matches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.jobMatches && dashboardData.jobMatches.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.jobMatches.slice(0, 4).map((job, index) => (
-                  <div
-                    key={job.jobId || index}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{job.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {job.company} • {job.location}
-                      </div>
-                      {job.salary && (
-                        <div className="text-xs text-green-600">
-                          {job.salary}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-primary">
-                        {job.matchScore}%
-                      </div>
-                      <div className="text-xs text-muted-foreground">Match</div>
-                    </div>
-                  </div>
-                ))}
-                <Button variant="outline" className="w-full">
-                  View All Matches
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Target className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No job matches yet
-                </p>
-                <Button variant="outline" size="sm" className="mt-2">
-                  Find Jobs
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Interviews */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Upcoming Interviews
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.upcomingInterviews &&
-            dashboardData.upcomingInterviews.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.upcomingInterviews
-                  .slice(0, 4)
-                  .map((interview, index) => (
-                    <div
-                      key={interview.id || index}
-                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                    >
-                      <div>
-                        <div className="font-medium text-sm">
-                          {interview.jobTitle}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {interview.company}
-                        </div>
-                        <div className="text-xs text-blue-600">
-                          {interview.type}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-medium">
-                          {new Date(
-                            interview.scheduledTime,
-                          ).toLocaleDateString()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(
-                            interview.scheduledTime,
-                          ).toLocaleTimeString()}
-                        </div>
-                        <Badge variant="secondary" className="text-xs mt-1">
-                          {interview.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                <Button variant="outline" className="w-full">
-                  View All Interviews
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No upcoming interviews
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <JobMatchesCard matches={dashboardData.jobMatches} loading={loading} />
+        <UpcomingInterviewsCard interviews={dashboardData.upcomingInterviews} loading={loading} />
       </div>
 
       {/* Messages widget intentionally removed — unified into the
