@@ -741,7 +741,6 @@ export default function Home() {
               </div>
             </div>
 
-            <ReferralBanner />
             <div className="flex justify-center mb-4">
               <AdSlot slot="dashboard-banner" size="banner" />
             </div>
@@ -794,6 +793,8 @@ export default function Home() {
                 Share career wins, ask for advice, celebrate offers.
               </p>
             </div>
+
+            <ReferralBanner />
 
             <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
               {/* LEFT — Profile card + Recent Activity */}

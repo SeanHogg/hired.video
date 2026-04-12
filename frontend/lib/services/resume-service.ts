@@ -791,15 +791,19 @@ export class ResumeService {
       slug?: string;
     },
   ): Promise<FrontendResume> {
-    // Backend UpdateResume expects [FromBody] string of the raw resume JSON
-    const raw = updates.data ? JSON.stringify(updates.data) : undefined;
-    const body = raw !== undefined ? JSON.stringify(raw) : undefined; // JSON string literal
-
     const qs = updates.slug ? `?slug=${encodeURIComponent(updates.slug)}` : "";
+
+    // Send structured payload matching UpdateResumeSchema so the backend
+    // can update title, content, isMaster, and privacy in a single call.
+    const payload: Record<string, unknown> = {};
+    if (updates.name !== undefined) payload.title = updates.name;
+    if (updates.data !== undefined) payload.content = updates.data;
+    if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
+    if (updates.privacy !== undefined) payload.privacy = updates.privacy;
 
     const response = await apiClient.put<any>(
       `/api/resumes/${id}${qs}`,
-      body,
+      payload,
       z.any(),
     );
 

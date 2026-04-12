@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { ApiErrorEvent } from "@shared/errors/apiErrorEvent";
 import { API_ERROR_EVENT } from "@shared/errors/apiErrorEvent";
+import { useAuth } from "@/lib/auth";
 
 interface ToastEntry extends ApiErrorEvent {
   id: string;
@@ -26,6 +27,8 @@ const MAX_TOASTS = 5;
  * Renders nothing until an error event fires — safe to mount unconditionally.
  */
 export default function GlobalErrorHandler() {
+  const { user, isSuperAdmin } = useAuth();
+  const visible = isSuperAdmin || user?.email === "seanhogg@gmail.com";
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
 
   // ── Listen for API error events ──────────────────────────────────────
@@ -96,7 +99,7 @@ export default function GlobalErrorHandler() {
   }, []);
 
   // ── Render nothing when idle ─────────────────────────────────────────
-  if (toasts.length === 0) return null;
+  if (!visible || toasts.length === 0) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-full max-w-[420px]">

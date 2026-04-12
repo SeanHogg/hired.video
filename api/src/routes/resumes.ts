@@ -59,12 +59,19 @@ function ensureId(item: Record<string, unknown>, resumeId: string, section: stri
 
 function rowToLegacyResume(row: typeof resumes.$inferSelect) {
   const c = (row.content ?? {}) as Record<string, unknown>;
-  const basics = (c.basics ?? {}) as Record<string, unknown>;
-  const loc = basics.location as Record<string, unknown> | null | undefined;
+
+  // Helper: content may arrive with lowercase (AI-parsed / JSON Resume) or
+  // PascalCase (frontend ResumeData) keys.  Check both.
+  const ci = (key: string) => c[key] ?? c[key.charAt(0).toUpperCase() + key.slice(1)];
+  const prop = (obj: Record<string, unknown>, key: string) =>
+    obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
+
+  const basics = ((ci("basics") ?? {}) as Record<string, unknown>);
+  const loc = (prop(basics, "location") as Record<string, unknown> | null | undefined);
   const rid = row.id;
 
   const ensureArr = (key: string) => {
-    const arr = c[key];
+    const arr = ci(key);
     return Array.isArray(arr) ? arr.map((item: any, i: number) => ensureId(item, rid, key, i)) : [];
   };
 
@@ -87,23 +94,23 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     views: 0,
-    metaData: Array.isArray(c.metaData) ? c.metaData : undefined,
+    metaData: Array.isArray(ci("metaData")) ? ci("metaData") : undefined,
     metaResume: {
       basics: {
-        id: basics.id || basics.Id || `${rid}-basics-0`,
-        name: basics.name ?? row.title ?? "",
-        label: basics.label ?? "",
-        image: basics.image ?? "",
-        email: basics.email ?? "",
-        phone: basics.phone ?? "",
-        url: basics.url ?? "",
-        summary: basics.summary ?? "",
+        id: prop(basics, "id") || prop(basics, "Id") || `${rid}-basics-0`,
+        name: prop(basics, "name") ?? row.title ?? "",
+        label: prop(basics, "label") ?? "",
+        image: prop(basics, "image") ?? "",
+        email: prop(basics, "email") ?? "",
+        phone: prop(basics, "phone") ?? "",
+        url: prop(basics, "url") ?? "",
+        summary: prop(basics, "summary") ?? "",
         location: loc ? {
-          address: loc.address ?? "",
-          postalCode: loc.postalCode ?? "",
-          city: loc.city ?? "",
-          countryCode: loc.countryCode ?? "",
-          region: loc.region ?? "",
+          address: prop(loc, "address") ?? "",
+          postalCode: prop(loc, "postalCode") ?? "",
+          city: prop(loc, "city") ?? "",
+          countryCode: prop(loc, "countryCode") ?? "",
+          region: prop(loc, "region") ?? "",
         } : null,
       },
       work: ensureArr("work"),
@@ -549,7 +556,7 @@ resumeRoutes.get("/withownership", async (c) => {
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
   const result = rows.map((r) => {
     const content = (r.content ?? {}) as Record<string, unknown>;
-    const basics = (content.basics ?? {}) as Record<string, unknown>;
+    const basics = (content.basics ?? content.Basics ?? {}) as Record<string, unknown>;
     return {
       id: r.id,
       slug: r.slug ?? r.id,
@@ -562,7 +569,7 @@ resumeRoutes.get("/withownership", async (c) => {
       createdAt: new Date(r.createdAt).toISOString(),
       updatedAt: new Date(r.updatedAt).toISOString(),
       views: 0,
-      summary: (basics.summary as string) ?? "",
+      summary: (basics.summary ?? basics.Summary ?? "") as string,
       userId: r.userId,
       ownership: "owned" as const,
     };
@@ -797,9 +804,15 @@ resumeRoutes.put("/:id", async (c) => {
   }
 
   if (parsed.success) {
+    // Map schema fields to actual DB columns
+    const { privacy, rawText, ...dbFields } = parsed.data;
+    const setData: Record<string, unknown> = { ...dbFields, ...(slugUpdate ?? {}), updatedAt: new Date() };
+    if (privacy !== undefined) {
+      setData.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
+    }
     const [updated] = await db
       .update(resumes)
-      .set({ ...parsed.data, ...(slugUpdate ?? {}), updatedAt: new Date() } as any)
+      .set(setData as any)
       .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
