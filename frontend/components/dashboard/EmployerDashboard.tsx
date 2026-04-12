@@ -19,7 +19,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
-import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
 
 import type { EmployerDashboard as EmployerDashboardType } from "@/lib/services/dashboard-service";
@@ -559,14 +558,6 @@ export function EmployerDashboard({
         </Card>
       )}
 
-      {/* Recent Activity */}
-      <ActivityFeed
-        activities={dashboardData.recentActivity || []}
-        loading={loading}
-        onViewAll={() => {
-          /* TODO: Implement view all activity */
-        }}
-      />
     </div>
   );
 }

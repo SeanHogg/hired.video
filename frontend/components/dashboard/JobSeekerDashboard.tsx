@@ -21,9 +21,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
-import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
-import ToolsCTA from "./shared/ToolsCTA";
 
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -163,9 +161,6 @@ export function JobSeekerDashboard({
         completionPercentage={dashboardData.onboardingCompletionPercentage}
         loading={loading}
       />
-
-      {/* Tools CTA Banner */}
-      <ToolsCTA variant="banner" />
 
       {/* Metrics Grid */}
       <MetricGrid
@@ -503,14 +498,6 @@ export function JobSeekerDashboard({
         </Card>
       )}
 
-      {/* Recent Activity */}
-      <ActivityFeed
-        activities={dashboardData.recentActivity || []}
-        loading={loading}
-        onViewAll={() => {
-          /* TODO: Implement view all activity */
-        }}
-      />
     </div>
   );
 }

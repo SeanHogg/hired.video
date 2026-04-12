@@ -53,8 +53,9 @@ import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import ProductDashboard from "@/pages/admin/ProductDashboard";
 import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
 
-// Quick Actions (moved from dashboard section to feed sidebar)
+// Shared dashboard components (moved to feed sidebar)
 import QuickActions from "@/components/dashboard/shared/QuickActions";
+import ActivityFeed from "@/components/dashboard/shared/ActivityFeed";
 
 // Feed data + components (reused from Feed.tsx)
 import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
@@ -795,9 +796,15 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
-              {/* LEFT — Profile card */}
-              <div className="hidden lg:block sticky top-24">
+              {/* LEFT — Profile card + Recent Activity */}
+              <div className="hidden lg:block sticky top-24 space-y-4">
                 <FeedProfileCard user={user as never} />
+                <ActivityFeed
+                  activities={dashboardData?.recentActivity || []}
+                  loading={dashboardLoading}
+                  maxItems={5}
+                  showViewAll={false}
+                />
               </div>
 
               {/* CENTER — Post composer + filter tabs + posts */}

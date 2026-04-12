@@ -17,7 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
-import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
 
 import type { BaseDashboard } from "@/lib/services/dashboard-service";
@@ -472,19 +471,6 @@ export function AdminDashboard({
         </Card>
       )}
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <ActivityFeed
-          activities={dashboardData.recentActivity || []}
-          loading={loading}
-          onViewAll={() => {
-            /* TODO: Implement view all activity */
-          }}
-          title="System Activity"
-        />
-
-      </div>
     </div>
   );
 }
