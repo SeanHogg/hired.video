@@ -741,6 +741,157 @@ resumeRoutes.post("/:id/publish", async (c) => {
   return c.json(ok(rowToLegacyResume(updated)), 200);
 });
 
+/**
+ * Convert a JSON Resume content object to formatted Markdown.
+ * Handles the standard JSON Resume schema (basics, work, education,
+ * skills, volunteer, projects, certificates) as well as legacy flat
+ * formats. Falls back to JSON.stringify only if the content is
+ * completely unrecognisable.
+ */
+function jsonResumeToMarkdown(content: Record<string, unknown> | null, fallbackTitle: string): string {
+  if (!content || typeof content !== "object") return `# ${fallbackTitle}\n`;
+  const c = content as Record<string, unknown>;
+  const sections: string[] = [];
+
+  // Helper to coerce arrays
+  const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+  // ---- Basics / Contact ----
+  const basics = (c.basics ?? c.Basics) as Record<string, unknown> | undefined;
+  if (basics && typeof basics === "object") {
+    const name = basics.name ?? basics.Name ?? fallbackTitle;
+    sections.push(`# ${name}`);
+    const subtitle = basics.label ?? basics.Label;
+    if (subtitle) sections.push(`**${subtitle}**`);
+    const contact: string[] = [];
+    if (basics.email ?? basics.Email) contact.push(String(basics.email ?? basics.Email));
+    if (basics.phone ?? basics.Phone) contact.push(String(basics.phone ?? basics.Phone));
+    const loc = basics.location as Record<string, unknown> | undefined;
+    if (loc && typeof loc === "object") {
+      const locParts = [loc.city, loc.region, loc.countryCode].filter(Boolean);
+      if (locParts.length) contact.push(locParts.join(", "));
+    }
+    if (basics.url ?? basics.website) contact.push(String(basics.url ?? basics.website));
+    if (contact.length) sections.push(contact.join(" | "));
+    const summary = basics.summary ?? basics.Summary;
+    if (summary) sections.push(`\n## Summary\n\n${summary}`);
+  } else {
+    // Legacy flat format
+    const name = c.name ?? c.fullName ?? fallbackTitle;
+    sections.push(`# ${name}`);
+    const title = c.headline ?? c.title ?? c.label;
+    if (title) sections.push(`**${title}**`);
+    const summary = c.summary ?? c.objective;
+    if (summary) sections.push(`\n## Summary\n\n${summary}`);
+  }
+
+  // ---- Skills ----
+  const skills = c.skills ?? c.Skills;
+  if (Array.isArray(skills) && skills.length) {
+    const lines = skills.map((s: unknown) => {
+      if (typeof s === "string") return `- ${s}`;
+      if (s && typeof s === "object") {
+        const sk = s as Record<string, unknown>;
+        const name = sk.name ?? sk.Name ?? "";
+        const kw = Array.isArray(sk.keywords ?? sk.Keywords)
+          ? (sk.keywords ?? sk.Keywords) as string[]
+          : [];
+        return kw.length ? `- **${name}**: ${kw.join(", ")}` : `- ${name}`;
+      }
+      return "";
+    }).filter(Boolean);
+    if (lines.length) sections.push(`\n## Skills\n\n${lines.join("\n")}`);
+  } else if (typeof skills === "string" && skills.trim()) {
+    sections.push(`\n## Skills\n\n${skills}`);
+  }
+
+  // ---- Work Experience ----
+  const work = arr(c.work ?? c.Work ?? c.experience ?? c.workExperience ?? c.Experience);
+  if (work.length) {
+    const entries = work.map((item: unknown) => {
+      if (!item || typeof item !== "object") return "";
+      const j = item as Record<string, unknown>;
+      const company = j.name ?? j.Name ?? j.company ?? j.employer ?? "";
+      const position = j.position ?? j.Position ?? j.title ?? "";
+      const dates = [j.startDate ?? j.StartDate, j.endDate ?? j.EndDate ?? "Present"]
+        .filter(Boolean).join(" – ");
+      const lines: string[] = [`### ${position}${company ? ` — ${company}` : ""}`];
+      if (dates) lines.push(`*${dates}*`);
+      const summary = j.summary ?? j.Summary ?? j.description;
+      if (summary) lines.push(`\n${summary}`);
+      const highlights = (j.highlights ?? j.Highlights) as string[] | undefined;
+      if (Array.isArray(highlights) && highlights.length) {
+        lines.push(highlights.map(h => `- ${h}`).join("\n"));
+      }
+      return lines.join("\n");
+    }).filter(Boolean);
+    if (entries.length) sections.push(`\n## Experience\n\n${entries.join("\n\n")}`);
+  }
+
+  // ---- Education ----
+  const education = arr(c.education ?? c.Education);
+  if (education.length) {
+    const entries = education.map((item: unknown) => {
+      if (!item || typeof item !== "object") return "";
+      const e = item as Record<string, unknown>;
+      const institution = e.institution ?? e.Institution ?? e.school ?? "";
+      const degree = [e.studyType ?? e.StudyType, e.area ?? e.Area]
+        .filter(Boolean).join(" in ") || (e.degree ?? e.program ?? "");
+      const dates = [e.startDate ?? e.StartDate, e.endDate ?? e.EndDate]
+        .filter(Boolean).join(" – ");
+      const line = `### ${degree}${institution ? ` — ${institution}` : ""}`;
+      return dates ? `${line}\n*${dates}*` : line;
+    }).filter(Boolean);
+    if (entries.length) sections.push(`\n## Education\n\n${entries.join("\n\n")}`);
+  }
+
+  // ---- Volunteer ----
+  const volunteer = arr(c.volunteer ?? c.Volunteer);
+  if (volunteer.length) {
+    const entries = volunteer.map((item: unknown) => {
+      if (!item || typeof item !== "object") return "";
+      const v = item as Record<string, unknown>;
+      const position = v.position ?? v.Position ?? "";
+      const org = v.organization ?? v.Organization ?? "";
+      return `### ${position}${org ? ` — ${org}` : ""}`;
+    }).filter(Boolean);
+    if (entries.length) sections.push(`\n## Volunteer\n\n${entries.join("\n\n")}`);
+  }
+
+  // ---- Projects ----
+  const projects = arr(c.projects ?? c.Projects);
+  if (projects.length) {
+    const entries = projects.map((item: unknown) => {
+      if (!item || typeof item !== "object") return "";
+      const p = item as Record<string, unknown>;
+      const name = p.name ?? p.Name ?? "";
+      const desc = p.description ?? p.Description ?? "";
+      return desc ? `### ${name}\n${desc}` : `### ${name}`;
+    }).filter(Boolean);
+    if (entries.length) sections.push(`\n## Projects\n\n${entries.join("\n\n")}`);
+  }
+
+  // ---- Certificates ----
+  const certs = arr(c.certificates ?? c.Certificates);
+  if (certs.length) {
+    const entries = certs.map((item: unknown) => {
+      if (!item || typeof item !== "object") return "";
+      const ct = item as Record<string, unknown>;
+      const name = ct.name ?? ct.Name ?? "";
+      const issuer = ct.issuer ?? ct.Issuer;
+      return issuer ? `- **${name}** — ${issuer}` : `- ${name}`;
+    }).filter(Boolean);
+    if (entries.length) sections.push(`\n## Certifications\n\n${entries.join("\n")}`);
+  }
+
+  // If we extracted nothing meaningful, fall back to JSON
+  if (sections.length <= 1) {
+    return `# ${fallbackTitle}\n\n${JSON.stringify(content, null, 2)}`;
+  }
+
+  return sections.join("\n");
+}
+
 resumeRoutes.get("/:id/export", async (c) => {
   const id = c.req.param("id");
   const user = c.var.user;
@@ -757,12 +908,14 @@ resumeRoutes.get("/:id/export", async (c) => {
 
   const content = row.content as Record<string, unknown> | null;
 
-  if (format === "md" || format === "markdown") {
-    // Return markdown if stored, otherwise serialise the JSON
-    const md = typeof content?.markdown === "string"
+  // Resolve markdown: prefer stored markdown, then convert JSON Resume to markdown
+  const resolveMarkdown = () =>
+    typeof content?.markdown === "string"
       ? content.markdown
-      : `# ${row.title}\n\n${JSON.stringify(content, null, 2)}`;
-    return new Response(md, {
+      : jsonResumeToMarkdown(content, row.title);
+
+  if (format === "md" || format === "markdown") {
+    return new Response(resolveMarkdown(), {
       status: 200,
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
@@ -774,11 +927,8 @@ resumeRoutes.get("/:id/export", async (c) => {
   if (format === "pdf" || format === "docx") {
     // PDF/DOCX generation requires an external rendering service (e.g. Puppeteer,
     // Gotenberg, or a managed PDF API). Until one is configured, return the
-    // markdown/JSON so the Chrome extension can still download something useful.
-    const md = typeof content?.markdown === "string"
-      ? content.markdown
-      : `# ${row.title}\n\n${JSON.stringify(content, null, 2)}`;
-    return new Response(md, {
+    // markdown so the Chrome extension can still download something useful.
+    return new Response(resolveMarkdown(), {
       status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
