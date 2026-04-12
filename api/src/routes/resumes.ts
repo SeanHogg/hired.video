@@ -5,6 +5,13 @@ import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume-merge.js";
+import {
+  buildMetaResume,
+  extractJson as extractJsonUtil,
+  isParseComplete as isParseCompleteUtil,
+  parseResumeWithRegex as parseResumeWithRegexUtil,
+  ciGet,
+} from "../services/resume-parse.js";
 
 const { resumeInformation: resumes, watchedResumes } = schema;
 
@@ -52,28 +59,9 @@ const LEVEL_TO_PRIVACY: Record<number, string> = {
   10: "private",
 };
 
-function ensureId(item: Record<string, unknown>, resumeId: string, section: string, index: number): Record<string, unknown> {
-  if (item.id || item.Id) return item;
-  return { ...item, id: `${resumeId}-${section}-${index}` };
-}
-
 function rowToLegacyResume(row: typeof resumes.$inferSelect) {
   const c = (row.content ?? {}) as Record<string, unknown>;
-
-  // Helper: content may arrive with lowercase (AI-parsed / JSON Resume) or
-  // PascalCase (frontend ResumeData) keys.  Check both.
-  const ci = (key: string) => c[key] ?? c[key.charAt(0).toUpperCase() + key.slice(1)];
-  const prop = (obj: Record<string, unknown>, key: string) =>
-    obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
-
-  const basics = ((ci("basics") ?? {}) as Record<string, unknown>);
-  const loc = (prop(basics, "location") as Record<string, unknown> | null | undefined);
   const rid = row.id;
-
-  const ensureArr = (key: string) => {
-    const arr = ci(key);
-    return Array.isArray(arr) ? arr.map((item: any, i: number) => ensureId(item, rid, key, i)) : [];
-  };
 
   return {
     id: rid,
@@ -94,37 +82,8 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     views: 0,
-    metaData: Array.isArray(ci("metaData")) ? ci("metaData") : undefined,
-    metaResume: {
-      basics: {
-        id: prop(basics, "id") || prop(basics, "Id") || `${rid}-basics-0`,
-        name: prop(basics, "name") ?? row.title ?? "",
-        label: prop(basics, "label") ?? "",
-        image: prop(basics, "image") ?? "",
-        email: prop(basics, "email") ?? "",
-        phone: prop(basics, "phone") ?? "",
-        url: prop(basics, "url") ?? "",
-        summary: prop(basics, "summary") ?? "",
-        location: loc ? {
-          address: prop(loc, "address") ?? "",
-          postalCode: prop(loc, "postalCode") ?? "",
-          city: prop(loc, "city") ?? "",
-          countryCode: prop(loc, "countryCode") ?? "",
-          region: prop(loc, "region") ?? "",
-        } : null,
-      },
-      work: ensureArr("work"),
-      education: ensureArr("education"),
-      volunteer: ensureArr("volunteer"),
-      awards: ensureArr("awards"),
-      certificates: ensureArr("certificates"),
-      publications: ensureArr("publications"),
-      skills: ensureArr("skills"),
-      languages: ensureArr("languages"),
-      interests: ensureArr("interests"),
-      references: ensureArr("references"),
-      projects: ensureArr("projects"),
-    },
+    metaData: Array.isArray(ciGet(c, "metaData")) ? ciGet(c, "metaData") : undefined,
+    metaResume: buildMetaResume(c, rid, row.title),
   };
 }
 
@@ -254,37 +213,11 @@ const RESUME_PARSE_PROMPT = `You are a resume parser. Extract structured informa
 }
 Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
 
-/** Strip markdown fences and extract the first JSON object from an LLM response. */
-function extractJson(raw: string): Record<string, unknown> {
-  // Strip ```json ... ``` or ``` ... ``` fences
-  let cleaned = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  // Try direct parse first
-  try { return JSON.parse(cleaned); } catch { /* fall through */ }
-  // Find the first { and last } to handle surrounding text / truncation
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start !== -1 && end > start) {
-    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { /* fall through */ }
-  }
-  throw new Error("No valid JSON found in LLM response");
-}
-
-/** Check whether a parsed JSON Resume has meaningful content. */
-function isParseComplete(parsed: Record<string, unknown>): boolean {
-  const basics = parsed.basics as Record<string, unknown> | undefined;
-  const hasName = !!(basics && (basics.name || basics.Name));
-
-  // Arrays must contain at least one item with a non-empty identifying field —
-  // placeholder objects like { area: "", institution: "" } don't count.
-  const hasContent = (arr: unknown, keys: string[]) =>
-    Array.isArray(arr) && arr.some((item: any) => keys.some((k) => typeof item[k] === "string" && item[k].trim().length > 0));
-
-  const hasWork = hasContent(parsed.work, ["name", "Name", "position", "Position"]);
-  const hasSkills = hasContent(parsed.skills, ["name", "Name"]);
-  const hasEducation = hasContent(parsed.education, ["institution", "Institution", "area", "Area"]);
-  // Need at least a name + one substantive section
-  return hasName && (hasWork || hasSkills || hasEducation);
-}
+// extractJson, isParseComplete, and parseResumeWithRegex are imported
+// from ../services/resume-parse.js — aliased below for local use.
+const extractJson = extractJsonUtil;
+const isParseComplete = isParseCompleteUtil;
+const parseResumeWithRegex = parseResumeWithRegexUtil;
 
 const SECTION_PROMPTS: Record<string, string> = {
   basics: `Extract ONLY the contact/summary info. Return JSON: { "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "city": "", "region": "", "countryCode": "" } } }`,
@@ -405,170 +338,6 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     }
   }
   return merged;
-}
-
-/** Regex-based resume parser — extracts basic fields when AI is unavailable. */
-function parseResumeWithRegex(text: string): Record<string, unknown> {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-
-  // Name: usually the first non-empty line
-  const name = lines[0]?.replace(/[▪•|].*$/, "").trim() ?? "";
-
-  // Email
-  const emailMatch = text.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
-  const email = emailMatch?.[0] ?? "";
-
-  // Phone
-  const phoneMatch = text.match(/(\+?\d[\d\s\-().]{7,}\d)/);
-  const phone = phoneMatch?.[1]?.trim() ?? "";
-
-  // URL
-  const urlMatch = text.match(/https?:\/\/[^\s,)]+/);
-  const url = urlMatch?.[0] ?? "";
-
-  // Summary: look for "Profile", "Summary", "Objective" section
-  let summary = "";
-  const summaryIdx = lines.findIndex((l) => /^(profile|summary|objective)\b/i.test(l));
-  if (summaryIdx !== -1) {
-    const nextSectionIdx = lines.findIndex((l, i) => i > summaryIdx && /^(work|experience|education|skills|volunteer)\b/i.test(l));
-    summary = lines.slice(summaryIdx + 1, nextSectionIdx !== -1 ? nextSectionIdx : summaryIdx + 5).join(" ").trim();
-  }
-
-  // Work: look for company + position patterns
-  const work: Array<Record<string, unknown>> = [];
-  const workIdx = lines.findIndex((l) => /^(work\s+experience|experience|employment)\b/i.test(l));
-  const workEndIdx = lines.findIndex((l, i) => i > (workIdx === -1 ? 0 : workIdx) && /^(education|skills|volunteer|volunteering|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
-  if (workIdx !== -1) {
-    const endIdx = workEndIdx !== -1 ? workEndIdx : lines.length;
-    // Find lines with dates (MM/YYYY or YYYY patterns)
-    const datePattern = /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
-    for (let i = workIdx + 1; i < endIdx; i++) {
-      const dateMatch = lines[i].match(datePattern);
-      if (dateMatch) {
-        // The date line may be preceded by position (i-1) and company (i-2)
-        // or by a combined company/position line (i-1).
-        let companyName = "";
-        let position = "";
-        const prevLine = (i - 1 > workIdx ? lines[i - 1] : "") ?? "";
-        const prevPrevLine = (i - 2 > workIdx ? lines[i - 2] : "") ?? "";
-
-        // Check if prev line looks like a bullet or a repeated header — skip those
-        const isBullet = /^[⦁•▪\-*]/.test(prevLine);
-        const isHeader = /^(sean|profile|work|experience)/i.test(prevLine);
-
-        if (!isBullet && !isHeader && prevLine) {
-          // Check if prevPrevLine looks like a company (contains ▪, |, location indicators)
-          if (prevPrevLine && /[▪•|]/.test(prevPrevLine) && !/^[⦁•▪\-*]/.test(prevPrevLine)) {
-            // Company on prevPrevLine, position on prevLine
-            const compParts = prevPrevLine.split(/[▪•|]/);
-            companyName = compParts[0]?.trim() ?? "";
-            position = prevLine.trim();
-          } else {
-            // Single line with company/position
-            const parts = prevLine.split(/[|▪•]/);
-            companyName = parts[0]?.trim() ?? "";
-            position = parts[1]?.trim() ?? parts[0]?.trim() ?? "";
-          }
-        }
-
-        work.push({
-          name: companyName,
-          position,
-          startDate: dateMatch[1],
-          endDate: dateMatch[2],
-          summary: "",
-          highlights: [],
-          url: "",
-        });
-      }
-      // Bullet points
-      if (/^[⦁•▪\-*]/.test(lines[i]) && work.length > 0) {
-        const hl = (work[work.length - 1].highlights as string[]) ?? [];
-        hl.push(lines[i].replace(/^[⦁•▪\-*]\s*/, ""));
-        work[work.length - 1].highlights = hl;
-      }
-    }
-  }
-
-  // Skills: look for "Skills" section
-  const skills: Array<Record<string, string>> = [];
-  const skillsIdx = lines.findIndex((l) => /^skills\b/i.test(l));
-  if (skillsIdx !== -1) {
-    const nextSection = lines.findIndex((l, i) => i > skillsIdx && /^(education|volunteer|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
-    const skillLines = lines.slice(skillsIdx + 1, nextSection !== -1 ? nextSection : skillsIdx + 20);
-    for (const sl of skillLines) {
-      if (sl.length > 2) skills.push({ name: sl.replace(/^[⦁•▪\-*]\s*/, ""), level: "" });
-    }
-  }
-
-  // Education
-  const education: Array<Record<string, unknown>> = [];
-  const eduIdx = lines.findIndex((l) => /^education\b/i.test(l));
-  if (eduIdx !== -1) {
-    const eduEndIdx = lines.findIndex((l, i) => i > eduIdx && /^(volunteer|volunteering|skills|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
-    const eduEnd = eduEndIdx !== -1 ? eduEndIdx : Math.min(eduIdx + 15, lines.length);
-    const datePattern = /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
-    for (let i = eduIdx + 1; i < eduEnd; i++) {
-      if (/university|college|institute|school/i.test(lines[i])) {
-        const parts = lines[i].split(",");
-        const institution = parts[0]?.trim() ?? "";
-        const area = parts[1]?.trim() ?? "";
-        // Check next line for dates
-        let startDate = "";
-        let endDate = "";
-        if (i + 1 < eduEnd) {
-          const dm = lines[i + 1].match(datePattern);
-          if (dm) { startDate = dm[1]; endDate = dm[2]; i++; }
-        }
-        education.push({ institution, area, studyType: "", startDate, endDate, score: "", courses: [], url: "" });
-      }
-    }
-  }
-
-  // Volunteering
-  const volunteer: Array<Record<string, unknown>> = [];
-  const volIdx = lines.findIndex((l) => /^(volunteer|volunteering)\b/i.test(l));
-  if (volIdx !== -1) {
-    const volEndIdx = lines.findIndex((l, i) => i > volIdx && /^(skills|awards|certif|publicat|languages|interests|references|projects|education)\b/i.test(l));
-    const volEnd = volEndIdx !== -1 ? volEndIdx : Math.min(volIdx + 15, lines.length);
-    for (let i = volIdx + 1; i < volEnd; i++) {
-      // Format: "SCORE Mentors, Certified Business Mentor (12/2022 - Present)"
-      const volMatch = lines[i].match(/^(.+?),\s*(.+?)(?:\s*\((.+?)\s*[-–—]\s*(.+?)\))?$/);
-      if (volMatch) {
-        volunteer.push({
-          organization: volMatch[1]?.trim() ?? "",
-          position: volMatch[2]?.trim() ?? "",
-          startDate: volMatch[3]?.trim() ?? "",
-          endDate: volMatch[4]?.trim() ?? "",
-          summary: "",
-          highlights: [],
-          url: "",
-        });
-      }
-    }
-  }
-
-  // Location: try to extract city/region from the header area
-  let location: Record<string, string> | null = null;
-  const locMatch = text.match(/(?:▪|•|\|)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z]{2})\b/);
-  if (locMatch) {
-    location = { city: locMatch[1], region: locMatch[2], countryCode: "", address: "", postalCode: "" };
-  }
-
-  return {
-    basics: { name, label: "", email, phone, url, summary, location },
-    work,
-    education,
-    skills,
-    volunteer,
-    awards: [],
-    certificates: [],
-    publications: [],
-    languages: [],
-    interests: [],
-    references: [],
-    projects: [],
-  };
 }
 
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
