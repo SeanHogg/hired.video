@@ -442,6 +442,8 @@ export interface ParsedJob {
   requirements?: string[];
   qualifications?: string[];
   benefits?: string[];
+  /** Direct-apply or canonical job URL extracted from JSON-LD or the source page. */
+  applyUrl?: string;
   /** "high" when JSON-LD JobPosting was found, "low" otherwise. */
   confidence: "high" | "low";
 }
