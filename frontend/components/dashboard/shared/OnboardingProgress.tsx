@@ -1,5 +1,5 @@
-import React from "react";
-import { Target, ArrowRight } from "lucide-react";
+import React, { useState } from "react";
+import { Target, ArrowRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Card,
@@ -21,6 +21,8 @@ interface OnboardingProgressProps {
   maxVisibleTasks?: number;
 }
 
+const DISMISS_KEY = "onboarding_progress_dismissed_v1";
+
 export function OnboardingProgress({
   tasks,
   completionPercentage,
@@ -29,6 +31,14 @@ export function OnboardingProgress({
   showAllTasksLink = true,
   maxVisibleTasks = 2,
 }: OnboardingProgressProps) {
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem(DISMISS_KEY));
+    } catch {
+      return false;
+    }
+  });
+
   const completedTasksCount = tasks.filter((task) => task.completed).length;
   const progressPercentage = completionPercentage ?? (
     tasks.length > 0
@@ -36,10 +46,17 @@ export function OnboardingProgress({
       : 0
   );
 
-  // Don't show the component if progress is 100%
-  if (progressPercentage >= 100) {
+  // Don't show the component if progress is 100% or dismissed
+  if (progressPercentage >= 100 || dismissed) {
     return null;
   }
+
+  const handleDismiss = () => {
+    try {
+      localStorage.setItem(DISMISS_KEY, "1");
+    } catch {}
+    setDismissed(true);
+  };
 
   if (loading) {
     return (
@@ -76,8 +93,16 @@ export function OnboardingProgress({
   const remainingTasksCount = incompleteTasks.length - maxVisibleTasks;
 
   return (
-    <Card className="border-primary/20 bg-primary/5">
-      <CardHeader>
+    <Card className="relative border-primary/20 bg-primary/5">
+      <button
+        type="button"
+        onClick={handleDismiss}
+        className="absolute top-3 right-3 p-1 rounded hover:bg-muted text-muted-foreground transition-colors z-10"
+        title="Dismiss"
+      >
+        <X className="h-4 w-4" />
+      </button>
+      <CardHeader className="pr-10">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
