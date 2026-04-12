@@ -50,7 +50,7 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import ProductDashboard from "@/pages/admin/ProductDashboard";
+
 import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
 
 // Shared dashboard components (moved to feed sidebar)
