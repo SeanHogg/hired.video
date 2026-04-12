@@ -200,13 +200,13 @@ export const CompanyFiltersSchema = z.object({
 });
 
 export const PaginatedCompaniesSchema = z.object({
-  items: z.array(CompanyMetadataSchema).nullable(),
-  total: z.number().nullable(),
-  page: z.number().nullable(),
-  limit: z.number().nullable(),
-  totalPages: z.number().nullable().optional(),
-  hasNextPage: z.boolean().nullable().optional(),
-  hasPreviousPage: z.boolean().nullable().optional(),
+  items: z.array(CompanyMetadataSchema).nullish(),
+  total: z.number().nullish(),
+  page: z.number().nullish(),
+  limit: z.number().nullish(),
+  totalPages: z.number().nullish().optional(),
+  hasNextPage: z.boolean().nullish().optional(),
+  hasPreviousPage: z.boolean().nullish().optional(),
 });
 
 // ============================================================================

@@ -9,16 +9,16 @@ export const JobBoardDTOSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
-  description: z.string().nullable(),
-  logoUrl: z.string().nullable(),
-  websiteUrl: z.string().nullable(),
+  description: z.string().nullish(),
+  logoUrl: z.string().nullish(),
+  websiteUrl: z.string().nullish(),
   category: z.string(),
   tier: z.string(),
-  costPerPosting: z.number().nullable(),
+  costPerPosting: z.number().nullish(),
   isActive: z.boolean(),
   requiresApiKey: z.boolean(),
   supportsAutoPosting: z.boolean(),
-  maxPostingDuration: z.number().nullable(),
+  maxPostingDuration: z.number().nullish(),
 });
 
 export const JobBoardPostingDTOSchema = z.object({
@@ -29,14 +29,14 @@ export const JobBoardPostingDTOSchema = z.object({
   jobBoardId: z.string(),
   jobBoardName: z.string(),
   status: z.string(),
-  externalPostingId: z.string().nullable(),
-  externalUrl: z.string().nullable(),
+  externalPostingId: z.string().nullish(),
+  externalUrl: z.string().nullish(),
   postedAt: z.string(),
-  expiresAt: z.string().nullable(),
+  expiresAt: z.string().nullish(),
   views: z.number(),
   clicks: z.number(),
   applications: z.number(),
-  cost: z.number().nullable(),
+  cost: z.number().nullish(),
 });
 
 export const BoardPerformanceDTOSchema = z.object({
@@ -63,8 +63,8 @@ export const JobBoardStatsDTOSchema = z.object({
 export const PostJobToBoardsRequestSchema = z.object({
   jobId: z.string(),
   boardIds: z.array(z.string()),
-  expirationDate: z.string().nullable().optional(),
-  customFields: z.record(z.string(), z.string()).nullable().optional(),
+  expirationDate: z.string().nullish().optional(),
+  customFields: z.record(z.string(), z.string()).nullish().optional(),
 });
 
 // ============================================================================

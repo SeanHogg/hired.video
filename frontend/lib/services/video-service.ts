@@ -21,14 +21,14 @@ export const VideoSchema = z.object({
   resumeId: z.string(),
   userId: z.string(),
   status: z.nativeEnum(VideoGenerationStatus),
-  filePath: z.string().nullable(),
+  filePath: z.string().nullish(),
   includeAvatar: z.boolean(),
-  scenePrompt: z.string().nullable(),
-  errorMessage: z.string().nullable(),
-  operationId: z.string().nullable(),
-  generatedImagePath: z.string().nullable(),
-  generationStartedAt: z.string().nullable(),
-  generationCompletedAt: z.string().nullable(),
+  scenePrompt: z.string().nullish(),
+  errorMessage: z.string().nullish(),
+  operationId: z.string().nullish(),
+  generatedImagePath: z.string().nullish(),
+  generationStartedAt: z.string().nullish(),
+  generationCompletedAt: z.string().nullish(),
   retryCount: z.number(),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
@@ -54,9 +54,9 @@ export const VideoStatusResponseSchema = z.object({
   id: z.string(),
   status: z.nativeEnum(VideoGenerationStatus),
   progressPercentage: z.number(),
-  estimatedTimeRemaining: z.number().nullable(),
-  errorMessage: z.string().nullable(),
-  filePath: z.string().nullable(),
+  estimatedTimeRemaining: z.number().nullish(),
+  errorMessage: z.string().nullish(),
+  filePath: z.string().nullish(),
 });
 
 export type VideoStatusResponse = z.infer<typeof VideoStatusResponseSchema>;
@@ -178,7 +178,7 @@ export const videoService = {
   ): Promise<ApiSuccessResponse<Video | null>> {
     return apiClient.get(
       `/api/Video/resume/${resumeId}/active`,
-      VideoSchema.nullable(),
+      VideoSchema.nullish(),
     );
   },
 };

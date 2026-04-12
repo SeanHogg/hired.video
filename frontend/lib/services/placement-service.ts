@@ -17,12 +17,12 @@ const PlacementDTOSchema = z.object({
   commissionPercentage: z.number(),
   commissionAmount: z.number(),
   commissionStatus: z.string(),
-  commissionPaidDate: z.string().nullable(),
-  paymentReference: z.string().nullable(),
-  guaranteePeriodDays: z.number().nullable(),
-  guaranteeEndDate: z.string().nullable(),
-  guaranteeMetStatus: z.boolean().nullable(),
-  notes: z.string().nullable(),
+  commissionPaidDate: z.string().nullish(),
+  paymentReference: z.string().nullish(),
+  guaranteePeriodDays: z.number().nullish(),
+  guaranteeEndDate: z.string().nullish(),
+  guaranteeMetStatus: z.boolean().nullish(),
+  notes: z.string().nullish(),
   placedAt: z.string(),
   updatedAt: z.string(),
 });
@@ -39,23 +39,23 @@ const CommissionSummaryDTOSchema = z.object({
 
 const PlacementResponseSchema = z.object({
   success: z.boolean(),
-  data: PlacementDTOSchema.nullable(),
-  errorMessage: z.string().nullable(),
-  errorCode: z.string().nullable(),
+  data: PlacementDTOSchema.nullish(),
+  errorMessage: z.string().nullish(),
+  errorCode: z.string().nullish(),
 });
 
 const PlacementListResponseSchema = z.object({
   success: z.boolean(),
-  data: z.array(PlacementDTOSchema).nullable(),
-  errorMessage: z.string().nullable(),
-  errorCode: z.string().nullable(),
+  data: z.array(PlacementDTOSchema).nullish(),
+  errorMessage: z.string().nullish(),
+  errorCode: z.string().nullish(),
 });
 
 const CommissionSummaryResponseSchema = z.object({
   success: z.boolean(),
-  data: CommissionSummaryDTOSchema.nullable(),
-  errorMessage: z.string().nullable(),
-  errorCode: z.string().nullable(),
+  data: CommissionSummaryDTOSchema.nullish(),
+  errorMessage: z.string().nullish(),
+  errorCode: z.string().nullish(),
 });
 
 // TypeScript types

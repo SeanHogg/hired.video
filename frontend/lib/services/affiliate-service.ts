@@ -34,7 +34,7 @@ const PayoutSchema = z.object({
   amountCents: z.number(),
   status: z.union([z.number(), z.string()]),
   requestedAt: z.string(),
-  paidAt: z.string().nullable().optional(),
+  paidAt: z.string().nullish().optional(),
 });
 
 const DashboardSchema = z.object({
@@ -54,7 +54,7 @@ const AffiliateProfileSchema = z.object({
   referralCode: z.string(),
   isActive: z.boolean().optional().default(true),
   creationDateTime: z.string().optional(),
-  updateDateTime: z.string().nullable().optional(),
+  updateDateTime: z.string().nullish().optional(),
 });
 export type AffiliateProfile = z.infer<typeof AffiliateProfileSchema>;
 
@@ -78,8 +78,8 @@ const AffiliatePayoutSummarySchema = z.object({
   amountCents: z.number(),
   status: z.string(),
   requestedAt: z.string(),
-  paidAt: z.string().nullable().optional(),
-  providerReferenceId: z.string().nullable().optional(),
+  paidAt: z.string().nullish().optional(),
+  providerReferenceId: z.string().nullish().optional(),
 });
 
 const AffiliateAdminStatsSchema = z.object({
@@ -105,8 +105,8 @@ export type AffiliateAdminStats = z.infer<typeof AffiliateAdminStatsSchema>;
 const AffiliateManagementSchema = z.object({
   userId: z.string(),
   email: z.string(),
-  firstName: z.string().nullable().optional(),
-  lastName: z.string().nullable().optional(),
+  firstName: z.string().nullish().optional(),
+  lastName: z.string().nullish().optional(),
   referralCode: z.string(),
   isActive: z.boolean(),
   isSuspended: z.boolean(),
@@ -120,8 +120,8 @@ const AffiliateManagementSchema = z.object({
 const AffiliateDetailSchema = z.object({
   userId: z.string(),
   email: z.string(),
-  firstName: z.string().nullable().optional(),
-  lastName: z.string().nullable().optional(),
+  firstName: z.string().nullish().optional(),
+  lastName: z.string().nullish().optional(),
   referralCode: z.string(),
   isActive: z.boolean(),
   isSuspended: z.boolean(),

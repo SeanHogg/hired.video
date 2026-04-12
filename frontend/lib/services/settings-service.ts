@@ -76,18 +76,18 @@ export const JobPreferencesSchema = z.object({
   willingToRelocate: z.boolean().optional(),
 
   // Salary preferences
-  minSalaryExpectation: z.number().nullable().optional(),
-  maxSalaryExpectation: z.number().nullable().optional(),
+  minSalaryExpectation: z.number().nullish().optional(),
+  maxSalaryExpectation: z.number().nullish().optional(),
   salaryCurrency: z.string().optional(),
   salaryPeriod: z.string().optional(), // yearly, monthly, hourly
 
   // Availability
-  availableFrom: z.string().nullable().optional(), // ISO date string
-  noticePeriodDays: z.number().nullable().optional(),
+  availableFrom: z.string().nullish().optional(), // ISO date string
+  noticePeriodDays: z.number().nullish().optional(),
 
   // Advanced preferences
   preferredWorkingHours: z.array(z.string()).optional(),
-  jobMatchThreshold: z.number().nullable().optional(),
+  jobMatchThreshold: z.number().nullish().optional(),
   onlyExactMatches: z.boolean().optional(),
   excludedCompanies: z.array(z.string()).optional(),
   excludedKeywords: z.array(z.string()).optional(),

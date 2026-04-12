@@ -15,17 +15,17 @@ const SubmissionDTOSchema = z.object({
   jobId: z.string(),
   jobTitle: z.string(),
   companyName: z.string(),
-  resumeId: z.string().nullable(),
-  coverLetter: z.string().nullable(),
-  recruiterNotes: z.string().nullable(),
-  proposedSalary: z.number().nullable(),
-  availableStartDate: z.string().nullable(),
+  resumeId: z.string().nullish(),
+  coverLetter: z.string().nullish(),
+  recruiterNotes: z.string().nullish(),
+  proposedSalary: z.number().nullish(),
+  availableStartDate: z.string().nullish(),
   status: z.string(),
-  statusNotes: z.string().nullable(),
-  interviewDate: z.string().nullable(),
-  withdrawalReason: z.string().nullable(),
-  withdrawalNotes: z.string().nullable(),
-  withdrawnAt: z.string().nullable(),
+  statusNotes: z.string().nullish(),
+  interviewDate: z.string().nullish(),
+  withdrawalReason: z.string().nullish(),
+  withdrawalNotes: z.string().nullish(),
+  withdrawnAt: z.string().nullish(),
   submittedAt: z.string(),
   updatedAt: z.string(),
 });
@@ -35,15 +35,15 @@ export type SubmissionDTO = z.infer<typeof SubmissionDTOSchema>;
 const SubmissionListResponseSchema = z.object({
   success: z.boolean(),
   data: z.array(SubmissionDTOSchema),
-  errorMessage: z.string().nullable(),
-  errorCode: z.string().nullable(),
+  errorMessage: z.string().nullish(),
+  errorCode: z.string().nullish(),
 });
 
 const SubmissionResponseSchema = z.object({
   success: z.boolean(),
-  data: SubmissionDTOSchema.nullable(),
-  errorMessage: z.string().nullable(),
-  errorCode: z.string().nullable(),
+  data: SubmissionDTOSchema.nullish(),
+  errorMessage: z.string().nullish(),
+  errorCode: z.string().nullish(),
 });
 
 // ============================================================================
