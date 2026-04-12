@@ -206,15 +206,15 @@ export default function MetadataModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Manage Resume Media</DialogTitle>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+          <DialogHeader className="min-w-0">
+            <DialogTitle className="text-lg sm:text-xl pr-8">Manage Resume Media</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">
               Add videos, images, and links to enhance your resume sections.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             <div className="flex justify-between items-center">
               <Button type="button" variant="outline" size="sm" onClick={addMeta} className="min-h-[44px]">
                 Add Media
@@ -228,24 +228,24 @@ export default function MetadataModal({
             ) : (
               <div className="space-y-4">
                 {metaData.map((m, i) => (
-                  <div key={m.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 border rounded-lg p-3 sm:p-4">
-                    <div className="sm:col-span-1 lg:col-span-2">
+                  <div key={m.id} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 border rounded-lg p-3 sm:p-4 min-w-0">
+                    <div className="min-w-0 sm:col-span-1 lg:col-span-2">
                       <Label className="text-sm">Label</Label>
                       <Input
                         value={m.name}
                         onChange={(e) => updateMeta(i, "name", e.target.value)}
                         placeholder="e.g., Demo Reel"
-                        className="min-h-[44px]"
+                        className="min-h-[44px] w-full"
                       />
                     </div>
-                    <div className="sm:col-span-1 lg:col-span-2">
+                    <div className="min-w-0 sm:col-span-1 lg:col-span-2">
                       <Label className="text-sm">URL</Label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 min-w-0">
                         <Input
                           value={m.url}
                           onChange={(e) => updateMeta(i, "url", e.target.value)}
                           placeholder="https://..."
-                          className="min-h-[44px]"
+                          className="min-h-[44px] min-w-0 flex-1"
                         />
                         <Button
                           type="button"
@@ -256,11 +256,11 @@ export default function MetadataModal({
                           title="Pick from Studio"
                         >
                           <Video className="h-4 w-4" />
-                          Studio
+                          <span className="hidden sm:inline">Studio</span>
                         </Button>
                       </div>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <Label>Type</Label>
                       <Select value={String(m.metaType)} onValueChange={(val) => updateMeta(i, "metaType", Number(val))}>
                         <SelectTrigger>
@@ -275,7 +275,7 @@ export default function MetadataModal({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <Label>Section</Label>
                       <Select value={m.referenceId || ""} onValueChange={(val) => updateMeta(i, "referenceId", val)}>
                         <SelectTrigger>

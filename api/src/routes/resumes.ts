@@ -657,12 +657,32 @@ resumeRoutes.put("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
   const parsed = UpdateResumeSchema.safeParse(body);
+  const db = getDb();
+
+  // Slug arrives as a querystring param from updateResumeData on the frontend.
+  // Reject UUID-shaped slugs since the GET handler treats UUIDs as ids.
+  let slugUpdate: { slug: string } | undefined;
+  const slugQuery = c.req.query("slug");
+  if (typeof slugQuery === "string" && slugQuery.trim().length > 0) {
+    const slug = slugQuery.trim();
+    if (UUID_RE.test(slug)) {
+      return c.json(fail("INVALID_SLUG", "Slug must not look like a UUID"), 400);
+    }
+    const [taken] = await db
+      .select({ id: resumes.id })
+      .from(resumes)
+      .where(and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, id)))
+      .limit(1);
+    if (taken) {
+      return c.json(fail("SLUG_TAKEN", "Slug is already in use"), 409);
+    }
+    slugUpdate = { slug };
+  }
 
   if (parsed.success) {
-    const db = getDb();
     const [updated] = await db
       .update(resumes)
-      .set({ ...parsed.data, updatedAt: new Date() } as any)
+      .set({ ...parsed.data, ...(slugUpdate ?? {}), updatedAt: new Date() } as any)
       .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
@@ -671,10 +691,9 @@ resumeRoutes.put("/:id", async (c) => {
 
   // Legacy update path where body is serialized resume content string literal
   const content = await parseBodyToContent(c);
-  const db = getDb();
   const [updated] = await db
     .update(resumes)
-    .set({ content, updatedAt: new Date() } as any)
+    .set({ content, ...(slugUpdate ?? {}), updatedAt: new Date() } as any)
     .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
