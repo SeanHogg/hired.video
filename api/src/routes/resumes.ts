@@ -44,6 +44,14 @@ const PRIVACY_TO_LEVEL: Record<string, number> = {
   draft: 10,
 };
 
+// Reverse map: stored integer → privacy string
+const LEVEL_TO_PRIVACY: Record<number, string> = {
+  0: "public",
+  1: "recruiter_only",
+  2: "connections",
+  10: "private",
+};
+
 function ensureId(item: Record<string, unknown>, resumeId: string, section: string, index: number): Record<string, unknown> {
   if (item.id || item.Id) return item;
   return { ...item, id: `${resumeId}-${section}-${index}` };
@@ -539,7 +547,26 @@ resumeRoutes.get("/withownership", async (c) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  const result = rows.map((r) => ({ ...rowToLegacyResume(r), ownership: "owned" }));
+  const result = rows.map((r) => {
+    const content = (r.content ?? {}) as Record<string, unknown>;
+    const basics = (content.basics ?? {}) as Record<string, unknown>;
+    return {
+      id: r.id,
+      slug: r.slug ?? r.id,
+      name: r.title ?? "",
+      title: r.title ?? "",
+      privacy: LEVEL_TO_PRIVACY[r.privacyLevel] ?? "private",
+      isMaster: r.isMaster,
+      isActive: r.isActive,
+      parentId: r.parentId ?? null,
+      createdAt: new Date(r.createdAt).toISOString(),
+      updatedAt: new Date(r.updatedAt).toISOString(),
+      views: 0,
+      summary: (basics.summary as string) ?? "",
+      userId: r.userId,
+      ownership: "owned" as const,
+    };
+  });
   return c.json(ok(result), 200);
 });
 
@@ -761,8 +788,18 @@ resumeRoutes.delete("/:id", async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
   const db = getDb();
-  const [existing] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
+  const [existing] = await db.select({ id: resumes.id, isMaster: resumes.isMaster }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!existing) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+
+  // If deleting a master, unparent its variations so they become standalone
+  // resumes instead of being orphaned.
+  if (existing.isMaster) {
+    await db
+      .update(resumes)
+      .set({ parentId: null, updatedAt: new Date() } as any)
+      .where(and(eq(resumes.parentId, id), eq(resumes.userId, user.sub)));
+  }
+
   // Defense-in-depth: include userId in the DELETE WHERE clause so that a
   // future refactor that drops the existence check above can't silently
   // become an authorization bypass.

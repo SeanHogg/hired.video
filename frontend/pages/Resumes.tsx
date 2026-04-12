@@ -488,13 +488,23 @@ export default function Resumes() {
     const prevGroups = [...masterResumeGroups];
     const nextResumes = prevResumes.filter((r) => r.id !== item.id);
 
-    // Also remove from master groups if present; drop entire group if its master was deleted
-    const nextGroups = prevGroups
-      .filter((g) => g.masterResume.id !== item.id)
-      .map((g) => ({
-        ...g,
-        variations: g.variations.filter((v) => v.id !== item.id),
-      }));
+    // Update master groups: if a master was deleted, unparent its variations
+    // (promote them to standalone groups) instead of dropping them.
+    const nextGroups: typeof prevGroups = [];
+    for (const g of prevGroups) {
+      if (g.masterResume.id === item.id) {
+        // Master deleted — each variation becomes its own standalone group
+        for (const v of g.variations) {
+          nextGroups.push({ masterResume: { ...v, isMaster: false, parentId: null }, variations: [] });
+        }
+      } else {
+        // Not the deleted master — just filter the variation out if it was a variation delete
+        nextGroups.push({
+          ...g,
+          variations: g.variations.filter((v) => v.id !== item.id),
+        });
+      }
+    }
 
     setResumes(nextResumes);
     optimisticActions.updateState({ resumes: nextResumes, masterGroups: nextGroups });
