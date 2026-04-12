@@ -602,6 +602,7 @@ const ClassificationSchema = z.object({
       requirements: z.array(z.string()).optional(),
       qualifications: z.array(z.string()).optional(),
       benefits: z.array(z.string()).optional(),
+      applyUrl: z.string().optional(),
     })
     .nullable()
     .optional(),
@@ -648,6 +649,7 @@ async function classifyWithLLM(
     "  - qualifications: bullets under 'Qualifications', 'Preferred Qualifications', 'Nice To Have', 'Bonus If You Have', 'Education'.",
     "  - benefits: bullets under 'Benefits', 'Perks', 'What We Offer', 'Compensation'. Include salary range lines.",
     "  - skills: concrete technologies, tools, or hard skills mentioned anywhere (e.g. ['TypeScript','AWS','LLM platforms','Product management']).",
+    "  - applyUrl: the direct application URL if one is mentioned or linked in the text (e.g. 'Apply at https://workday.com/homedepot/apply/123'). This is often a different domain from where the job is posted (Workday, Greenhouse, Lever, etc.). null if not found.",
     "",
     "Return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
     "{",
@@ -672,7 +674,8 @@ async function classifyWithLLM(
     '    "requirements": string[],',
     '    "qualifications": string[],',
     '    "benefits": string[],',
-    '    "skills": string[]',
+    '    "skills": string[],',
+    '    "applyUrl": string or null — direct application URL if found',
     "  }",
     "}",
     "",
@@ -827,6 +830,7 @@ export async function extractAndClassifyJob(input: {
         ? aiJob.qualifications
         : heuristic.qualifications,
       benefits: aiJob.benefits?.length ? aiJob.benefits : heuristic.benefits,
+      applyUrl: aiJob.applyUrl || heuristic.applyUrl,
       confidence: "high",
     }),
   };

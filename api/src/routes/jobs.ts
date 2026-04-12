@@ -359,7 +359,8 @@ const extractHandler = async (c: any) => {
         const db = getDb();
         await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
       }
-      return c.json(success(dedup.existingJob), 200);
+      const dedupApplyUrl = parsed.applyUrl || dedup.existingJob.sourceUrl || sourceUrl || undefined;
+      return c.json(success({ ...dedup.existingJob, applyUrl: dedupApplyUrl }), 200);
     }
 
     if (dedup.outcome === 'fuzzy' && dedup.existingJob) {
@@ -368,7 +369,8 @@ const extractHandler = async (c: any) => {
         const db = getDb();
         await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
       }
-      return c.json(success(dedup.existingJob), 200);
+      const dedupApplyUrl = parsed.applyUrl || dedup.existingJob.sourceUrl || sourceUrl || undefined;
+      return c.json(success({ ...dedup.existingJob, applyUrl: dedupApplyUrl }), 200);
     }
 
     if (dedup.candidates && dedup.candidates.length > 0) {
@@ -416,7 +418,12 @@ const extractHandler = async (c: any) => {
     { track },
   );
 
-  return c.json(success(created), 201);
+  // Attach applyUrl from the parsed data — this is the direct application
+  // link (e.g. Workday, Greenhouse) which may differ from the sourceUrl
+  // (where the job was found). Falls back to sourceUrl if none was extracted.
+  const applyUrl = parsed.applyUrl || sourceUrl || undefined;
+
+  return c.json(success({ ...created, applyUrl }), 201);
 };
 jobRoutes.post("/Extract", extractHandler);
 jobRoutes.post("/extract", extractHandler);
