@@ -341,6 +341,7 @@ export default function Signup() {
 
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
+                        autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 pr-10"
@@ -370,6 +371,7 @@ export default function Signup() {
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Confirm your password"
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="pl-10 pr-10"

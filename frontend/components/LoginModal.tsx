@@ -206,6 +206,7 @@ export default function LoginModal({
                         id="signin-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
+                        autoComplete="current-password"
                         value={formData.password}
                         onChange={(e) =>
                           handleInputChange("password", e.target.value)
@@ -302,6 +303,7 @@ export default function LoginModal({
                         id="signup-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
+                        autoComplete="new-password"
                         value={formData.password}
                         onChange={(e) =>
                           handleInputChange("password", e.target.value)

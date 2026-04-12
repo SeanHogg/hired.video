@@ -286,6 +286,7 @@ export default function ResetPassword() {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your new password"
+                        autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
@@ -317,6 +318,7 @@ export default function ResetPassword() {
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Confirm your new password"
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         disabled={loading}

@@ -125,7 +125,7 @@ export default function AffiliateProgram() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Password</label>
-                      <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                      <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
                       <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
                     </div>
                     {error && <p className="text-sm text-red-600">{error}</p>}

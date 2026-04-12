@@ -202,6 +202,7 @@ export const ForcePasswordChangeModal: React.FC<
                 id="newPassword"
                 name="newPassword"
                 type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
                 value={formData.newPassword}
                 onChange={handleInputChange}
                 placeholder="Enter your new password"
@@ -277,6 +278,7 @@ export const ForcePasswordChangeModal: React.FC<
                 id="confirmPassword"
                 name="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
+                autoComplete="new-password"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
                 placeholder="Confirm your new password"
