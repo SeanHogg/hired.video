@@ -139,7 +139,9 @@ function resumeContentToText(content: unknown): string {
   const parts: string[] = [];
   const c = content as Record<string, unknown>;
 
-  // --- Basics / contact (JSON Resume: c.basics) ---
+  // --- Structured JSON Resume fields (canonical source of truth) ---
+
+  // Basics / contact (JSON Resume: c.basics)
   const basics = (c.basics ?? c.Basics) as Record<string, unknown> | undefined;
   if (basics && typeof basics === "object") {
     if (basics.name || basics.Name) parts.push(`Name: ${basics.name ?? basics.Name}`);
@@ -154,7 +156,7 @@ function resumeContentToText(content: unknown): string {
     if (c.summary || c.objective) parts.push(`Summary: ${c.summary ?? c.objective}`);
   }
 
-  // --- Skills (JSON Resume: c.skills[].name + keywords) ---
+  // Skills (JSON Resume: c.skills[].name + keywords)
   const skills = c.skills ?? c.Skills;
   if (Array.isArray(skills)) {
     const list = skills.map((s: unknown) => {
@@ -172,7 +174,7 @@ function resumeContentToText(content: unknown): string {
     parts.push(`\nSkills: ${skills}`);
   }
 
-  // --- Work experience (JSON Resume: c.work[].name/position/summary/highlights) ---
+  // Work experience (JSON Resume: c.work[].name/position/summary/highlights)
   for (const job of asArray(c.work ?? c.Work ?? c.experience ?? c.workExperience ?? c.Experience)) {
     if (!job || typeof job !== "object") continue;
     const j = job as Record<string, unknown>;
@@ -188,7 +190,7 @@ function resumeContentToText(content: unknown): string {
     }
   }
 
-  // --- Education (JSON Resume: c.education[].institution/area/studyType) ---
+  // Education (JSON Resume: c.education[].institution/area/studyType)
   for (const edu of asArray(c.education ?? c.Education)) {
     if (!edu || typeof edu !== "object") continue;
     const e = edu as Record<string, unknown>;
@@ -198,36 +200,40 @@ function resumeContentToText(content: unknown): string {
     parts.push(`Education: ${degree} at ${institution}${dates ? ` (${dates})` : ""}`);
   }
 
-  // --- Volunteer ---
+  // Volunteer
   for (const v of asArray(c.volunteer ?? c.Volunteer)) {
     if (!v || typeof v !== "object") continue;
     const vol = v as Record<string, unknown>;
     parts.push(`Volunteer: ${vol.position ?? vol.Position ?? ""} at ${vol.organization ?? vol.Organization ?? ""}`);
   }
 
-  // --- Projects ---
+  // Projects
   for (const p of asArray(c.projects ?? c.Projects)) {
     if (!p || typeof p !== "object") continue;
     const proj = p as Record<string, unknown>;
     parts.push(`Project: ${proj.name ?? proj.Name ?? ""} - ${proj.description ?? proj.Description ?? ""}`);
   }
 
-  // --- Certificates ---
+  // Certificates
   for (const cert of asArray(c.certificates ?? c.Certificates)) {
     if (!cert || typeof cert !== "object") continue;
     const ct = cert as Record<string, unknown>;
     parts.push(`Certificate: ${ct.name ?? ct.Name ?? ""} (${ct.issuer ?? ct.Issuer ?? ""})`);
   }
 
-  // --- Serialized / markdown fallbacks ---
+  // If structured fields yielded content, use it
+  const structured = parts.join("\n").trim();
+  if (structured) return structured.slice(0, TEXT_CAP);
+
+  // --- Fallbacks for resumes without populated structured fields ---
   if (c.resumeSerialized && typeof c.resumeSerialized === "string") {
-    try { return resumeContentToText(JSON.parse(c.resumeSerialized)); } catch { parts.push(c.resumeSerialized.slice(0, 4000)); }
+    try { return resumeContentToText(JSON.parse(c.resumeSerialized)); } catch { /* fall through */ }
   }
-  if (c.markdown && typeof c.markdown === "string") {
-    parts.push(c.markdown.slice(0, 4000));
+  if (c.markdown && typeof c.markdown === "string" && c.markdown.trim()) {
+    return c.markdown.slice(0, TEXT_CAP);
   }
 
-  return (parts.join("\n") || JSON.stringify(content).slice(0, 4000)).slice(0, TEXT_CAP);
+  return JSON.stringify(content).slice(0, 4000).slice(0, TEXT_CAP);
 }
 
 function asArray(val: unknown): unknown[] {

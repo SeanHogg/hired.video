@@ -254,41 +254,98 @@ function extractJson(raw: string): Record<string, unknown> {
   throw new Error("No valid JSON found in LLM response");
 }
 
-async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record<string, unknown>> {
-  // Primary: Cloudflare Workers AI
-  const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
-  if (cfAi) {
+/** Check whether a parsed JSON Resume has meaningful content. */
+function isParseComplete(parsed: Record<string, unknown>): boolean {
+  const basics = parsed.basics as Record<string, unknown> | undefined;
+  const hasName = !!(basics && (basics.name || basics.Name));
+  const hasWork = Array.isArray(parsed.work) && parsed.work.length > 0;
+  const hasSkills = Array.isArray(parsed.skills) && parsed.skills.length > 0;
+  const hasEducation = Array.isArray(parsed.education) && parsed.education.length > 0;
+  // Need at least a name + one substantive section
+  return hasName && (hasWork || hasSkills || hasEducation);
+}
+
+const SECTION_PROMPTS: Record<string, string> = {
+  basics: `Extract ONLY the contact/summary info. Return JSON: { "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "city": "", "region": "", "countryCode": "" } } }`,
+  work: `Extract ONLY work experience. Return JSON: { "work": [{ "name": "<company>", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
+  education: `Extract ONLY education. Return JSON: { "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "" }] }`,
+  skills: `Extract ONLY skills. Return JSON: { "skills": [{ "name": "<category>", "keywords": ["skill1", "skill2"] }] }`,
+  certificates: `Extract ONLY certifications/licenses. Return JSON: { "certificates": [{ "name": "", "issuer": "", "date": "" }] }`,
+};
+
+/** Run sectional parsing: prompt the AI once per section and merge results. */
+async function parseResumeSectional(
+  callAI: (systemPrompt: string, userMessage: string) => Promise<string>,
+  resumeText: string,
+): Promise<Record<string, unknown>> {
+  const merged: Record<string, unknown> = {};
+  for (const [section, prompt] of Object.entries(SECTION_PROMPTS)) {
     try {
+      const raw = await callAI(
+        `You are a resume parser. ${prompt} Return only valid JSON, no markdown.`,
+        resumeText,
+      );
+      const parsed = extractJson(raw);
+      if (parsed[section] !== undefined) {
+        merged[section] = parsed[section];
+      }
+    } catch (err) {
+      console.warn(`[parse-sectional] ${section} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+  return merged;
+}
+
+async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record<string, unknown>> {
+  // Helper to call whichever AI provider is available
+  const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+
+  const callAI = async (systemPrompt: string, userMessage: string): Promise<string> => {
+    if (cfAi) {
       const aiResponse = await (cfAi as any).run("@cf/meta/llama-3.1-8b-instruct", {
         messages: [
-          { role: "system", content: RESUME_PARSE_PROMPT },
-          { role: "user", content: resumeText.slice(0, 6000) },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage.slice(0, 6000) },
         ],
       });
-      const result = typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
-      return extractJson(result);
-    } catch (cfErr) {
-      console.error("[parse] CF AI error:", cfErr instanceof Error ? cfErr.message : String(cfErr));
+      return typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
     }
-  }
-
-  // Fallback: OpenRouter
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  if (apiKey) {
-    try {
-      const result = await callLLM(apiKey, {
-        systemPrompt: RESUME_PARSE_PROMPT,
-        userMessage: resumeText.slice(0, 12000),
+    if (apiKey) {
+      return await callLLM(apiKey, {
+        systemPrompt,
+        userMessage: userMessage.slice(0, 12000),
         responseFormat: "text",
       });
-      return extractJson(result);
-    } catch (llmErr) {
-      console.error("[parse] OpenRouter error:", llmErr instanceof Error ? llmErr.message : String(llmErr));
     }
+    throw new Error("No AI provider available");
+  };
+
+  // 1. Try full single-pass parse
+  try {
+    const raw = await callAI(RESUME_PARSE_PROMPT, resumeText);
+    const result = extractJson(raw);
+    if (isParseComplete(result)) return result;
+
+    // Single pass returned sparse results — fall through to sectional
+    console.warn("[parse] Single-pass result incomplete, trying sectional parse");
+  } catch (err) {
+    console.error("[parse] Single-pass failed:", err instanceof Error ? err.message : err);
   }
 
-  // Fallback: regex-based extraction when AI is unavailable
-  console.warn("[parse] All AI providers failed. Using regex fallback for:", resumeText.slice(0, 80));
+  // 2. Sectional fallback: prompt per section and merge
+  try {
+    const sectional = await parseResumeSectional(callAI, resumeText);
+    if (isParseComplete(sectional)) return sectional;
+
+    // Even sectional was sparse — return whatever we got
+    if (Object.keys(sectional).length > 0) return sectional;
+  } catch (err) {
+    console.error("[parse] Sectional parse failed:", err instanceof Error ? err.message : err);
+  }
+
+  // 3. Last resort: regex-based extraction
+  console.warn("[parse] All AI approaches failed. Using regex fallback for:", resumeText.slice(0, 80));
   return parseResumeWithRegex(resumeText);
 }
 
@@ -1035,15 +1092,39 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
   const [parent] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
   if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
 
-  // When resumeData (markdown string) is supplied by the Chrome extension or other
-  // clients, store it alongside the structured content so it can be rendered/exported.
+  // Start with the parent's structured content as a base.
   const baseContent: Record<string, unknown> = typeof parent.content === "object" && parent.content !== null
     ? { ...(parent.content as Record<string, unknown>) }
     : {};
 
-  if (typeof body?.resumeData === "string" && body.resumeData.trim()) {
-    baseContent.markdown = body.resumeData.trim();
+  const markdownText = typeof body?.resumeData === "string" ? body.resumeData.trim() : "";
+
+  if (markdownText) {
+    // Keep the raw markdown for export/display.
+    baseContent.markdown = markdownText;
+
+    // Parse the markdown back into the canonical JSON Resume structure
+    // so that scoring, analysis, and all downstream consumers work from
+    // structured data — not raw text.
+    try {
+      const parsed = await parseResumeTextWithAI(c, markdownText);
+      if (parsed && typeof parsed === "object") {
+        // Overwrite structured fields with freshly parsed data, keeping
+        // markdown and variationDescription alongside.
+        for (const key of ["basics", "work", "education", "skills",
+          "volunteer", "awards", "certificates", "publications",
+          "languages", "interests", "references", "projects"]) {
+          if ((parsed as any)[key] !== undefined) {
+            baseContent[key] = (parsed as any)[key];
+          }
+        }
+      }
+    } catch (parseErr) {
+      console.warn("[createvariation] AI parse of markdown failed, keeping parent JSON:", parseErr);
+      // Non-fatal — variation is still created with parent's JSON + markdown
+    }
   }
+
   if (typeof body?.description === "string") {
     baseContent.variationDescription = body.description;
   }
