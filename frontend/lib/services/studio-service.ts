@@ -218,9 +218,9 @@ export const StudioProjectStatusResponseSchema = z.object({
   id: z.string(),
   status: z.nativeEnum(StudioProjectStatus),
   progressPercentage: z.number(),
-  youtubeVideoId: z.string().nullable(),
-  videoUrl: z.string().nullable(),
-  errorMessage: z.string().nullable(),
+  youtubeVideoId: z.string().nullish(),
+  videoUrl: z.string().nullish(),
+  errorMessage: z.string().nullish(),
 });
 
 export type StudioProjectStatusResponse = z.infer<
@@ -240,12 +240,12 @@ export interface PublishVideoRequest {
 
 export const ResumeVideoSchema = z.object({
   id: z.string(),
-  title: z.string().nullable(),
-  videoUrl: z.string().nullable(),
-  youtubeUrl: z.string().nullable(),
-  youtubeVideoId: z.string().nullable(),
-  thumbnailUrl: z.string().nullable(),
-  privacyStatus: z.string().nullable(),
+  title: z.string().nullish(),
+  videoUrl: z.string().nullish(),
+  youtubeUrl: z.string().nullish(),
+  youtubeVideoId: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
+  privacyStatus: z.string().nullish(),
   status: z.string(),
   createdAt: z.string(),
 });
@@ -254,26 +254,26 @@ export type ResumeVideo = z.infer<typeof ResumeVideoSchema>;
 export const PublicVideoSchema = z.object({
   id: z.string(),
   title: z.string(),
-  videoUrl: z.string().nullable(),
-  youtubeUrl: z.string().nullable(),
-  youtubeVideoId: z.string().nullable(),
-  thumbnailUrl: z.string().nullable(),
-  description: z.string().nullable(),
+  videoUrl: z.string().nullish(),
+  youtubeUrl: z.string().nullish(),
+  youtubeVideoId: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
+  description: z.string().nullish(),
   ownerName: z.string(),
-  resumeId: z.string().nullable(),
+  resumeId: z.string().nullish(),
   createdAt: z.string(),
 });
 export type PublicVideo = z.infer<typeof PublicVideoSchema>;
 
 export const UserVideoSchema = z.object({
   id: z.string(),
-  title: z.string().nullable(),
-  videoUrl: z.string().nullable(),
-  youtubeUrl: z.string().nullable(),
-  youtubeVideoId: z.string().nullable(),
-  thumbnailUrl: z.string().nullable(),
-  description: z.string().nullable(),
-  privacyStatus: z.string().nullable(),
+  title: z.string().nullish(),
+  videoUrl: z.string().nullish(),
+  youtubeUrl: z.string().nullish(),
+  youtubeVideoId: z.string().nullish(),
+  thumbnailUrl: z.string().nullish(),
+  description: z.string().nullish(),
+  privacyStatus: z.string().nullish(),
   createdAt: z.string(),
 });
 export type UserVideo = z.infer<typeof UserVideoSchema>;
@@ -286,10 +286,10 @@ export const VideoCampaignSchema = z.object({
   id: z.string(),
   userId: z.string(),
   name: z.string(),
-  description: z.string().nullable(),
-  utmSource: z.string().nullable(),
-  utmMedium: z.string().nullable(),
-  utmCampaign: z.string().nullable(),
+  description: z.string().nullish(),
+  utmSource: z.string().nullish(),
+  utmMedium: z.string().nullish(),
+  utmCampaign: z.string().nullish(),
   status: z.string(),
   videoIds: z.array(z.string()),
   createdAt: z.string(),
