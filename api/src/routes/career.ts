@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
+import { extractJson as extractJsonShared } from "../services/resume-parse.js";
 
 export const careerRoutes = new Hono<{ Variables: Variables }>();
 
@@ -161,11 +162,11 @@ function buildFallbackReport(role: string, score: number, skills: string[]): any
   };
 }
 
+/** Extract JSON from LLM output — delegates to shared resume-parse utility.
+ *  Returns null instead of throwing on failure for backward compat. */
 function extractJson(text: string): any | null {
   try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]);
+    return extractJsonShared(text);
   } catch {
     return null;
   }

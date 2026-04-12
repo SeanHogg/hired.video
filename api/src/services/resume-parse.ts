@@ -379,3 +379,112 @@ export function parseResumeWithRegex(
     projects: [],
   };
 }
+
+// ─── Resume content → plain text ───────────────────────────────────────────
+
+function asArray(val: unknown): unknown[] {
+  return Array.isArray(val) ? val : [];
+}
+
+/**
+ * Convert a resume JSON content blob to readable plain text.
+ * Handles both JSON Resume (lowercase) and frontend (PascalCase) keys,
+ * plus legacy flat formats.
+ */
+export function resumeContentToText(content: unknown, maxLength = 8000): string {
+  if (!content || typeof content !== "object") return "";
+  const parts: string[] = [];
+  const c = content as Record<string, unknown>;
+
+  // Basics / contact
+  const basics = (c.basics ?? c.Basics) as Record<string, unknown> | undefined;
+  if (basics && typeof basics === "object") {
+    if (basics.name || basics.Name) parts.push(`Name: ${basics.name ?? basics.Name}`);
+    if (basics.label || basics.Label) parts.push(`Title: ${basics.label ?? basics.Label}`);
+    if (basics.email || basics.Email) parts.push(`Email: ${basics.email ?? basics.Email}`);
+    if (basics.phone || basics.Phone) parts.push(`Phone: ${basics.phone ?? basics.Phone}`);
+    if (basics.summary || basics.Summary) parts.push(`Summary: ${basics.summary ?? basics.Summary}`);
+  } else {
+    if (c.name || c.fullName) parts.push(`Name: ${c.name ?? c.fullName}`);
+    if (c.headline || c.title || c.label) parts.push(`Title: ${c.headline ?? c.title ?? c.label}`);
+    if (c.summary || c.objective) parts.push(`Summary: ${c.summary ?? c.objective}`);
+  }
+
+  // Skills
+  const skills = c.skills ?? c.Skills;
+  if (Array.isArray(skills)) {
+    const list = skills.map((s: unknown) => {
+      if (typeof s === "string") return s;
+      if (s && typeof s === "object") {
+        const sk = s as Record<string, unknown>;
+        const name = sk.name ?? sk.Name ?? "";
+        const kw = Array.isArray(sk.keywords ?? sk.Keywords) ? (sk.keywords ?? sk.Keywords) as string[] : [];
+        return kw.length ? `${name} (${kw.join(", ")})` : String(name);
+      }
+      return "";
+    }).filter(Boolean);
+    if (list.length) parts.push(`\nSkills: ${list.join(", ")}`);
+  } else if (typeof skills === "string") {
+    parts.push(`\nSkills: ${skills}`);
+  }
+
+  // Work experience
+  for (const job of asArray(c.work ?? c.Work ?? c.experience ?? c.workExperience ?? c.Experience)) {
+    if (!job || typeof job !== "object") continue;
+    const j = job as Record<string, unknown>;
+    const company = j.name ?? j.Name ?? j.company ?? j.employer ?? "";
+    const position = j.position ?? j.Position ?? j.title ?? "";
+    const dates = [j.startDate ?? j.StartDate, j.endDate ?? j.EndDate ?? "Present"].filter(Boolean).join(" - ");
+    parts.push(`\nJob: ${position} at ${company} (${dates})`);
+    if (j.summary ?? j.Summary) parts.push(String(j.summary ?? j.Summary).slice(0, 500));
+    if (j.description) parts.push(String(j.description).slice(0, 500));
+    const highlights = (j.highlights ?? j.Highlights) as string[] | undefined;
+    if (Array.isArray(highlights) && highlights.length) {
+      parts.push(highlights.map((h) => `- ${h}`).join("\n"));
+    }
+  }
+
+  // Education
+  for (const edu of asArray(c.education ?? c.Education)) {
+    if (!edu || typeof edu !== "object") continue;
+    const e = edu as Record<string, unknown>;
+    const institution = e.institution ?? e.Institution ?? e.school ?? "";
+    const degree = [e.studyType ?? e.StudyType, e.area ?? e.Area].filter(Boolean).join(" in ") || (e.degree ?? e.program ?? "");
+    const dates = [e.startDate ?? e.StartDate, e.endDate ?? e.EndDate].filter(Boolean).join(" - ");
+    parts.push(`Education: ${degree} at ${institution}${dates ? ` (${dates})` : ""}`);
+  }
+
+  // Volunteer
+  for (const v of asArray(c.volunteer ?? c.Volunteer)) {
+    if (!v || typeof v !== "object") continue;
+    const vol = v as Record<string, unknown>;
+    parts.push(`Volunteer: ${vol.position ?? vol.Position ?? ""} at ${vol.organization ?? vol.Organization ?? ""}`);
+  }
+
+  // Projects
+  for (const p of asArray(c.projects ?? c.Projects)) {
+    if (!p || typeof p !== "object") continue;
+    const proj = p as Record<string, unknown>;
+    parts.push(`Project: ${proj.name ?? proj.Name ?? ""} - ${proj.description ?? proj.Description ?? ""}`);
+  }
+
+  // Certificates
+  for (const cert of asArray(c.certificates ?? c.Certificates)) {
+    if (!cert || typeof cert !== "object") continue;
+    const ct = cert as Record<string, unknown>;
+    parts.push(`Certificate: ${ct.name ?? ct.Name ?? ""} (${ct.issuer ?? ct.Issuer ?? ""})`);
+  }
+
+  const structured = parts.join("\n").trim();
+  if (structured) return structured.slice(0, maxLength);
+
+  // Fallbacks
+  if (c.resumeSerialized && typeof c.resumeSerialized === "string") {
+    try { return resumeContentToText(JSON.parse(c.resumeSerialized), maxLength); } catch { /* fall through */ }
+  }
+  if (c.markdown && typeof c.markdown === "string" && c.markdown.trim()) {
+    return c.markdown.slice(0, maxLength);
+  }
+
+  return JSON.stringify(content).slice(0, maxLength);
+}

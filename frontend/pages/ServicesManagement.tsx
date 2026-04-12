@@ -23,9 +23,10 @@ import {
   Briefcase,
   TrendingUp,
   Settings as SettingsIcon,
+  Link2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -74,6 +75,9 @@ import {
   subscribeToPush,
 } from "@/lib/push-notifications";
 import { toast } from "sonner";
+import { USER_ROLES } from "@shared/user-roles";
+import affiliateService from "@/lib/services/affiliate-service";
+import { AffiliateDashboardContent } from "./AffiliateDashboard";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
