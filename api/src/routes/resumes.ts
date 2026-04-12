@@ -273,9 +273,15 @@ function extractJson(raw: string): Record<string, unknown> {
 function isParseComplete(parsed: Record<string, unknown>): boolean {
   const basics = parsed.basics as Record<string, unknown> | undefined;
   const hasName = !!(basics && (basics.name || basics.Name));
-  const hasWork = Array.isArray(parsed.work) && parsed.work.length > 0;
-  const hasSkills = Array.isArray(parsed.skills) && parsed.skills.length > 0;
-  const hasEducation = Array.isArray(parsed.education) && parsed.education.length > 0;
+
+  // Arrays must contain at least one item with a non-empty identifying field —
+  // placeholder objects like { area: "", institution: "" } don't count.
+  const hasContent = (arr: unknown, keys: string[]) =>
+    Array.isArray(arr) && arr.some((item: any) => keys.some((k) => typeof item[k] === "string" && item[k].trim().length > 0));
+
+  const hasWork = hasContent(parsed.work, ["name", "Name", "position", "Position"]);
+  const hasSkills = hasContent(parsed.skills, ["name", "Name"]);
+  const hasEducation = hasContent(parsed.education, ["institution", "Institution", "area", "Area"]);
   // Need at least a name + one substantive section
   return hasName && (hasWork || hasSkills || hasEducation);
 }
@@ -330,38 +336,75 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
       return await callLLM(apiKey, {
         systemPrompt,
         userMessage: userMessage.slice(0, 12000),
-        responseFormat: "text",
+        responseFormat: "json_object",
       });
     }
     throw new Error("No AI provider available");
   };
 
+  let bestResult: Record<string, unknown> | null = null;
+
   // 1. Try full single-pass parse
   try {
     const raw = await callAI(RESUME_PARSE_PROMPT, resumeText);
     const result = extractJson(raw);
-    if (isParseComplete(result)) return result;
-
-    // Single pass returned sparse results — fall through to sectional
-    console.warn("[parse] Single-pass result incomplete, trying sectional parse");
+    if (isParseComplete(result)) {
+      bestResult = result;
+    } else {
+      console.warn("[parse] Single-pass result incomplete, trying sectional parse");
+      if (Object.keys(result).length > 0) bestResult = result;
+    }
   } catch (err) {
     console.error("[parse] Single-pass failed:", err instanceof Error ? err.message : err);
   }
 
   // 2. Sectional fallback: prompt per section and merge
-  try {
-    const sectional = await parseResumeSectional(callAI, resumeText);
-    if (isParseComplete(sectional)) return sectional;
-
-    // Even sectional was sparse — return whatever we got
-    if (Object.keys(sectional).length > 0) return sectional;
-  } catch (err) {
-    console.error("[parse] Sectional parse failed:", err instanceof Error ? err.message : err);
+  if (!bestResult || !isParseComplete(bestResult)) {
+    try {
+      const sectional = await parseResumeSectional(callAI, resumeText);
+      if (isParseComplete(sectional)) {
+        bestResult = sectional;
+      } else if (Object.keys(sectional).length > 0) {
+        bestResult = bestResult ? { ...bestResult, ...sectional } : sectional;
+      }
+    } catch (err) {
+      console.error("[parse] Sectional parse failed:", err instanceof Error ? err.message : err);
+    }
   }
 
-  // 3. Last resort: regex-based extraction
-  console.warn("[parse] All AI approaches failed. Using regex fallback for:", resumeText.slice(0, 80));
-  return parseResumeWithRegex(resumeText);
+  // 3. Always run regex extraction and fill any sections the AI missed.
+  // The regex parser is reliable for well-structured resumes even when AI
+  // models return sparse results.
+  const regexResult = parseResumeWithRegex(resumeText);
+
+  if (!bestResult) return regexResult;
+
+  // Merge: for each section, keep the AI result if it has content, otherwise use regex
+  const merged = { ...bestResult };
+  const sectionKeys = ["basics", "work", "education", "skills", "volunteer", "awards", "certificates", "publications", "languages", "interests", "references", "projects"];
+  for (const key of sectionKeys) {
+    const aiVal = merged[key];
+    const regexVal = regexResult[key];
+    if (key === "basics") {
+      // Merge basics fields individually — fill empty AI fields with regex values
+      const aiBas = (aiVal ?? {}) as Record<string, unknown>;
+      const regBas = (regexVal ?? {}) as Record<string, unknown>;
+      const mergedBasics: Record<string, unknown> = { ...regBas, ...aiBas };
+      // Only overwrite with regex if AI field is empty/missing
+      for (const [k, v] of Object.entries(regBas)) {
+        if (!mergedBasics[k] || (typeof mergedBasics[k] === "string" && !(mergedBasics[k] as string).trim())) {
+          mergedBasics[k] = v;
+        }
+      }
+      merged.basics = mergedBasics;
+    } else if (!Array.isArray(aiVal) || aiVal.length === 0) {
+      // AI returned empty array for this section — use regex
+      if (Array.isArray(regexVal) && regexVal.length > 0) {
+        merged[key] = regexVal;
+      }
+    }
+  }
+  return merged;
 }
 
 /** Regex-based resume parser — extracts basic fields when AI is unavailable. */
@@ -394,21 +437,48 @@ function parseResumeWithRegex(text: string): Record<string, unknown> {
   // Work: look for company + position patterns
   const work: Array<Record<string, unknown>> = [];
   const workIdx = lines.findIndex((l) => /^(work\s+experience|experience|employment)\b/i.test(l));
+  const workEndIdx = lines.findIndex((l, i) => i > (workIdx === -1 ? 0 : workIdx) && /^(education|skills|volunteer|volunteering|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
   if (workIdx !== -1) {
+    const endIdx = workEndIdx !== -1 ? workEndIdx : lines.length;
     // Find lines with dates (MM/YYYY or YYYY patterns)
     const datePattern = /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
-    for (let i = workIdx + 1; i < lines.length; i++) {
+    for (let i = workIdx + 1; i < endIdx; i++) {
       const dateMatch = lines[i].match(datePattern);
       if (dateMatch) {
-        // Previous line is likely company/position
-        const titleLine = lines[i - 1] ?? lines[i];
-        const parts = titleLine.split(/[|▪•,]/);
+        // The date line may be preceded by position (i-1) and company (i-2)
+        // or by a combined company/position line (i-1).
+        let companyName = "";
+        let position = "";
+        const prevLine = (i - 1 > workIdx ? lines[i - 1] : "") ?? "";
+        const prevPrevLine = (i - 2 > workIdx ? lines[i - 2] : "") ?? "";
+
+        // Check if prev line looks like a bullet or a repeated header — skip those
+        const isBullet = /^[⦁•▪\-*]/.test(prevLine);
+        const isHeader = /^(sean|profile|work|experience)/i.test(prevLine);
+
+        if (!isBullet && !isHeader && prevLine) {
+          // Check if prevPrevLine looks like a company (contains ▪, |, location indicators)
+          if (prevPrevLine && /[▪•|]/.test(prevPrevLine) && !/^[⦁•▪\-*]/.test(prevPrevLine)) {
+            // Company on prevPrevLine, position on prevLine
+            const compParts = prevPrevLine.split(/[▪•|]/);
+            companyName = compParts[0]?.trim() ?? "";
+            position = prevLine.trim();
+          } else {
+            // Single line with company/position
+            const parts = prevLine.split(/[|▪•]/);
+            companyName = parts[0]?.trim() ?? "";
+            position = parts[1]?.trim() ?? parts[0]?.trim() ?? "";
+          }
+        }
+
         work.push({
-          name: parts[0]?.trim() ?? "",
-          position: parts[1]?.trim() ?? parts[0]?.trim() ?? "",
+          name: companyName,
+          position,
           startDate: dateMatch[1],
           endDate: dateMatch[2],
+          summary: "",
           highlights: [],
+          url: "",
         });
       }
       // Bullet points
@@ -432,23 +502,65 @@ function parseResumeWithRegex(text: string): Record<string, unknown> {
   }
 
   // Education
-  const education: Array<Record<string, string>> = [];
+  const education: Array<Record<string, unknown>> = [];
   const eduIdx = lines.findIndex((l) => /^education\b/i.test(l));
   if (eduIdx !== -1) {
-    for (let i = eduIdx + 1; i < Math.min(eduIdx + 10, lines.length); i++) {
+    const eduEndIdx = lines.findIndex((l, i) => i > eduIdx && /^(volunteer|volunteering|skills|awards|certif|publicat|languages|interests|references|projects)\b/i.test(l));
+    const eduEnd = eduEndIdx !== -1 ? eduEndIdx : Math.min(eduIdx + 15, lines.length);
+    const datePattern = /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
+    for (let i = eduIdx + 1; i < eduEnd; i++) {
       if (/university|college|institute|school/i.test(lines[i])) {
         const parts = lines[i].split(",");
-        education.push({ institution: parts[0]?.trim() ?? "", area: parts[1]?.trim() ?? "", studyType: "" });
+        const institution = parts[0]?.trim() ?? "";
+        const area = parts[1]?.trim() ?? "";
+        // Check next line for dates
+        let startDate = "";
+        let endDate = "";
+        if (i + 1 < eduEnd) {
+          const dm = lines[i + 1].match(datePattern);
+          if (dm) { startDate = dm[1]; endDate = dm[2]; i++; }
+        }
+        education.push({ institution, area, studyType: "", startDate, endDate, score: "", courses: [], url: "" });
       }
     }
   }
 
+  // Volunteering
+  const volunteer: Array<Record<string, unknown>> = [];
+  const volIdx = lines.findIndex((l) => /^(volunteer|volunteering)\b/i.test(l));
+  if (volIdx !== -1) {
+    const volEndIdx = lines.findIndex((l, i) => i > volIdx && /^(skills|awards|certif|publicat|languages|interests|references|projects|education)\b/i.test(l));
+    const volEnd = volEndIdx !== -1 ? volEndIdx : Math.min(volIdx + 15, lines.length);
+    for (let i = volIdx + 1; i < volEnd; i++) {
+      // Format: "SCORE Mentors, Certified Business Mentor (12/2022 - Present)"
+      const volMatch = lines[i].match(/^(.+?),\s*(.+?)(?:\s*\((.+?)\s*[-–—]\s*(.+?)\))?$/);
+      if (volMatch) {
+        volunteer.push({
+          organization: volMatch[1]?.trim() ?? "",
+          position: volMatch[2]?.trim() ?? "",
+          startDate: volMatch[3]?.trim() ?? "",
+          endDate: volMatch[4]?.trim() ?? "",
+          summary: "",
+          highlights: [],
+          url: "",
+        });
+      }
+    }
+  }
+
+  // Location: try to extract city/region from the header area
+  let location: Record<string, string> | null = null;
+  const locMatch = text.match(/(?:▪|•|\|)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z]{2})\b/);
+  if (locMatch) {
+    location = { city: locMatch[1], region: locMatch[2], countryCode: "", address: "", postalCode: "" };
+  }
+
   return {
-    basics: { name, label: "", email, phone, url, summary, location: null },
+    basics: { name, label: "", email, phone, url, summary, location },
     work,
     education,
     skills,
-    volunteer: [],
+    volunteer,
     awards: [],
     certificates: [],
     publications: [],
