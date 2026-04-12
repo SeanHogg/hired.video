@@ -54,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
+import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ProfileStatistics from "@/components/dashboard/shared/ProfileStatistics";
 import ApplicationStatistics from "@/components/dashboard/shared/ApplicationStatistics";
@@ -87,8 +88,12 @@ function ProfileContent() {
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugSaving, setSlugSaving] = useState(false);
 
-  const { user, isAuthenticated, refreshUser } = useAuth();
+  const { user, isAuthenticated, refreshUser, impersonationSession } = useAuth();
+  const { personaPreview } = usePersonaPreview();
   const { dashboardData, loading: dashboardLoading } = useDashboard();
+
+  // Effective role: impersonation > persona preview > actual
+  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
   // Ensure we have fresh user data only on /profile
   useEffect(() => {
@@ -369,7 +374,7 @@ function ProfileContent() {
 
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="outline">
-                        {formatRoleForDisplay(formData.role)}
+                        {formatRoleForDisplay(effectiveRole ?? formData.role)}
                       </Badge>
                       {user?.subscription && user.subscription !== "free" && (
                         <Badge variant="secondary" className="capitalize">
@@ -745,7 +750,7 @@ function ProfileContent() {
 
             {/* Job Seeker Dashboard Cards */}
             {(() => {
-              const rp = createRolePermissions(user?.role);
+              const rp = createRolePermissions(effectiveRole);
               if (!rp.isJobSeeker) return null;
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const dd = dashboardData as any;
@@ -775,7 +780,7 @@ function ProfileContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   {/* Role-based quick actions */}
                   {(() => {
-                    const rolePermissions = createRolePermissions(user?.role);
+                    const rolePermissions = createRolePermissions(effectiveRole);
                     if (rolePermissions.isJobSeeker) {
                       return (
                         <>
