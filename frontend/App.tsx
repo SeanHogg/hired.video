@@ -535,6 +535,7 @@ const App = () => (
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/help" element={<Help />} />
                       <Route path="/contact" element={<Contact />} />
+                      <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
                       <Route
                         path="/privacy-policy"
                         element={<PrivacyPolicy />}
