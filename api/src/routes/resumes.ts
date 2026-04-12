@@ -1058,7 +1058,7 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
       parentId: parent.id,
       isMaster: false,
       isActive: false,
-      privacyLevel: parent.privacyLevel,
+      privacyLevel: 10, // variations are always private
     } as any)
     .returning();
   return c.json(ok(rowToLegacyResume(created)), 201);
