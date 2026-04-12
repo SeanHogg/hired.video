@@ -68,6 +68,7 @@ const UpdateProfileSchema = z.object({
   industries: z.array(z.string()).optional(),
   preferredRoles: z.array(z.string()).optional(),
   role: z.string().optional(),
+  profileVisibility: z.enum(["public", "private", "connections"]).optional(),
 });
 
 const SendConnectionRequestSchema = z.object({
@@ -173,6 +174,7 @@ function toUserProfileDto(
     isPremium: row.role === "SuperAdmin" || row.role === "Admin",
     isDemo: false,
     isVerified: row.emailVerified,
+    profileVisibility: profile?.profileVisibility ?? "public",
     openToWork: profile?.openToWork ?? false,
     openToRemote: profile?.openToRemote ?? false,
     salaryCurrency: profile?.salaryCurrency ?? "USD",
@@ -360,6 +362,7 @@ userRoutes.put("/profile", async (c) => {
     skills: d.skills ?? [],
     industries: d.industries ?? [],
     preferredRoles: d.preferredRoles ?? [],
+    ...(d.profileVisibility ? { profileVisibility: d.profileVisibility } : {}),
     updatedAt: new Date(),
   } as any;
 
@@ -441,6 +444,7 @@ userRoutes.put("/me", async (c) => {
     skills: d.skills ?? [],
     industries: d.industries ?? [],
     preferredRoles: d.preferredRoles ?? [],
+    ...(d.profileVisibility ? { profileVisibility: d.profileVisibility } : {}),
     updatedAt: new Date(),
   } as any;
 

@@ -56,6 +56,7 @@ import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirem
 import { useAuth } from "@/lib/auth";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
+import ProfileInsights from "@/components/profile/ProfileInsights";
 import ProfileStatistics from "@/components/dashboard/shared/ProfileStatistics";
 import ApplicationStatistics from "@/components/dashboard/shared/ApplicationStatistics";
 import JobMatchesCard from "@/components/dashboard/shared/JobMatchesCard";
@@ -311,8 +312,10 @@ function ProfileContent() {
                             if (!file) return;
                             try {
                               setSaving(true);
-                              await uploadAvatar(file);
-                              // Optimistically update UI
+                              const avatarUrl = await uploadAvatar(file);
+                              if (avatarUrl) {
+                                await updateProfile({ profilePicture: avatarUrl });
+                              }
                               await refreshUser();
                             } catch (err) {
                               console.error("Avatar upload failed", err);
@@ -747,6 +750,9 @@ function ProfileContent() {
 
               </CardContent>
             </Card>
+
+            {/* Profile Insights — visibility, persona, metrics */}
+            <ProfileInsights effectiveRole={effectiveRole} />
 
             {/* Job Seeker Dashboard Cards */}
             {(() => {

@@ -69,6 +69,7 @@ export const UserProfileDTOSchema = z.object({
     currentCompany: z.string().optional().default(""),
   }),
   role: z.union([z.string(), z.number()]),
+  profileVisibility: z.enum(["public", "private", "connections"]).optional().default("public"),
   isPremium: z.boolean().optional(),
   isDemo: z.boolean().optional(),
   createdAt: z.string().optional(),
@@ -153,6 +154,7 @@ export type UserProfile = {
   salaryExpectation?: number;
   salaryCurrency?: string;
   yearsOfExperience?: number;
+  profileVisibility?: "public" | "private" | "connections";
   isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -412,6 +414,7 @@ export class AuthService {
       currentCompany: dto.data.currentCompany,
       skills: undefined,
       openToWork: undefined,
+      profileVisibility: dto.profileVisibility ?? "public",
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
@@ -467,6 +470,12 @@ export class AuthService {
     // Years of experience
     if (anyUpdates.yearsOfExperience !== undefined) payload.yearsOfExperience = anyUpdates.yearsOfExperience;
 
+    // Profile picture / avatar
+    if (updates.profilePicture !== undefined) payload.avatar = updates.profilePicture;
+
+    // Profile visibility
+    if (anyUpdates.profileVisibility !== undefined) payload.profileVisibility = anyUpdates.profileVisibility;
+
     // Role / persona
     if (anyUpdates.role !== undefined) payload.role = anyUpdates.role;
 
@@ -497,6 +506,7 @@ export class AuthService {
       currentCompany: dto.data.currentCompany,
       skills: undefined,
       openToWork: undefined,
+      profileVisibility: dto.profileVisibility ?? "public",
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
