@@ -143,6 +143,87 @@ affiliateRoutes.post("/click", async (c) => {
 
 // ─── Stats & analytics ────────────────────────────────────────────────────────
 
+/** GET /api/affiliates/dashboard — aggregated dashboard data for the frontend */
+affiliateRoutes.get("/dashboard", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const db = getDb();
+  const [profile] = await db
+    .select({ id: schema.affiliateProfiles.id })
+    .from(schema.affiliateProfiles)
+    .where(eq(schema.affiliateProfiles.userId, userId))
+    .limit(1);
+
+  if (!profile) {
+    return c.json(ok({
+      referrals: [],
+      conversions: [],
+      payouts: [],
+      totals: { pendingCents: 0, paidCents: 0 },
+    }), 200);
+  }
+
+  const referrals = await db
+    .select()
+    .from(schema.affiliateReferrals)
+    .where(eq(schema.affiliateReferrals.affiliateId, profile.id))
+    .orderBy(desc(schema.affiliateReferrals.createdAt))
+    .limit(100);
+
+  const conversions = await db
+    .select()
+    .from(schema.affiliateConversions)
+    .where(eq(schema.affiliateConversions.affiliateId, profile.id))
+    .orderBy(desc(schema.affiliateConversions.createdAt))
+    .limit(100);
+
+  const payouts = await db
+    .select()
+    .from(schema.affiliatePayouts)
+    .where(eq(schema.affiliatePayouts.affiliateId, profile.id))
+    .orderBy(desc(schema.affiliatePayouts.createdAt))
+    .limit(50);
+
+  const [pendingRow] = await db
+    .select({ earned: sum(schema.affiliateConversions.commission) })
+    .from(schema.affiliateConversions)
+    .where(and(eq(schema.affiliateConversions.affiliateId, profile.id), eq(schema.affiliateConversions.status, "pending")));
+
+  const [paidRow] = await db
+    .select({ earned: sum(schema.affiliateConversions.commission) })
+    .from(schema.affiliateConversions)
+    .where(and(eq(schema.affiliateConversions.affiliateId, profile.id), eq(schema.affiliateConversions.status, "paid")));
+
+  return c.json(ok({
+    referrals: referrals.map((r) => ({
+      id: r.id,
+      referredUserId: r.referredUserId,
+      referralCode: r.referralCode ?? "",
+      createdAt: new Date(r.createdAt).toISOString(),
+    })),
+    conversions: conversions.map((cv) => ({
+      id: cv.id,
+      referredUserId: cv.referralId ?? "",
+      subscriptionAmountCents: Math.round(Number(cv.revenue ?? 0) * 100),
+      commissionAmountCents: Math.round(Number(cv.commission ?? 0) * 100),
+      status: cv.status,
+      createdAt: new Date(cv.createdAt).toISOString(),
+    })),
+    payouts: payouts.map((p) => ({
+      id: p.id,
+      amountCents: Math.round(Number(p.amount ?? 0) * 100),
+      status: p.status,
+      requestedAt: new Date(p.createdAt).toISOString(),
+      paidAt: p.processedAt ? new Date(p.processedAt).toISOString() : null,
+    })),
+    totals: {
+      pendingCents: Math.round(Number(pendingRow?.earned ?? 0) * 100),
+      paidCents: Math.round(Number(paidRow?.earned ?? 0) * 100),
+    },
+  }), 200);
+});
+
 /** GET /api/affiliates/stats — earnings, clicks, conversions summary */
 affiliateRoutes.get("/stats", async (c) => {
   const userId = uid(c);
