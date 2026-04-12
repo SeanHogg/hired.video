@@ -29,6 +29,7 @@ import {
 } from "./errors";
 import { logApiCall } from "./logger";
 import { runtimeConfig } from "./runtime-config";
+import { dispatchApiError } from "@shared/errors/apiErrorEvent";
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -548,6 +549,8 @@ export class ApiClient {
     // Apply request interceptors
     const processedConfig = await this.applyRequestInterceptors(config);
 
+    let lastRequestId: string | undefined;
+
     while (attempt < maxAttempts) {
       const logId = ++_logIdCounter;
       const startTime = Date.now();
@@ -568,6 +571,7 @@ export class ApiClient {
         });
 
         const response = await this.executeRequest(url, processedConfig);
+        lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
         // Clone the response so we can read the body for logging without consuming it
         const clonedResponse = response.clone();
@@ -620,6 +624,17 @@ export class ApiClient {
         ) {
           const processedError =
             await this.applyErrorInterceptors(normalizedError);
+
+          dispatchApiError({
+            method,
+            url,
+            status: processedError.statusCode,
+            code: processedError.code,
+            message: processedError.message,
+            details: processedError.context,
+            requestId: lastRequestId,
+          });
+
           throw processedError;
         }
 
@@ -658,8 +673,10 @@ export class ApiClient {
     });
 
     let responseData: unknown;
+    let lastRequestId: string | undefined;
     try {
       const response = await this.executeRequest(url, { method: "GET" });
+      lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
       try {
         responseData = await response.json();
@@ -696,11 +713,23 @@ export class ApiClient {
 
       return { data: responseData as T };
     } catch (error) {
+      const normalized = normalizeError(error);
       const entry = findLogEntry(logId);
       if (entry && !entry.durationMs) {
-        entry.error = error instanceof Error ? error.message : String(error);
+        entry.error = normalized.message;
         entry.durationMs = Date.now() - startTime;
       }
+
+      dispatchApiError({
+        method: "GET",
+        url,
+        status: normalized.statusCode,
+        code: normalized.code,
+        message: normalized.message,
+        details: normalized.context,
+        requestId: lastRequestId,
+      });
+
       throw error;
     }
   }
@@ -724,11 +753,13 @@ export class ApiClient {
       timestamp: new Date().toISOString(),
     });
 
+    let lastRequestId: string | undefined;
     try {
       // Apply request interceptors (e.g., Authorization header injection)
       const processedConfig = await this.applyRequestInterceptors(config);
 
       const response = await this.executeRequest(url, processedConfig);
+      lastRequestId = response.headers.get("x-request-id") ?? undefined;
 
       let responseData: unknown;
       try {
@@ -766,11 +797,23 @@ export class ApiClient {
 
       return { data: responseData as T };
     } catch (error) {
+      const normalized = normalizeError(error);
       const entry = findLogEntry(logId);
       if (entry && !entry.durationMs) {
-        entry.error = error instanceof Error ? error.message : String(error);
+        entry.error = normalized.message;
         entry.durationMs = Date.now() - startTime;
       }
+
+      dispatchApiError({
+        method,
+        url,
+        status: normalized.statusCode,
+        code: normalized.code,
+        message: normalized.message,
+        details: normalized.context,
+        requestId: lastRequestId,
+      });
+
       throw error;
     }
   }
