@@ -56,6 +56,8 @@ import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
 // Shared dashboard components (moved to feed sidebar)
 import QuickActions from "@/components/dashboard/shared/QuickActions";
 import ActivityFeed from "@/components/dashboard/shared/ActivityFeed";
+import OnboardingProgress from "@/components/dashboard/shared/OnboardingProgress";
+import WelcomeHero from "@/components/dashboard/shared/WelcomeHero";
 
 // Feed data + components (reused from Feed.tsx)
 import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
@@ -720,67 +722,71 @@ export default function Home() {
         />
 
         <div className="pt-16 pb-20">
-          {/* ── Dashboard section ── */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <div className="mb-6 sm:mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="flex-1">
-                  <h1 className="text-2xl sm:text-3xl font-bold">
-                    {dashboardData?.title ?? "Your Home"}
-                  </h1>
-                  <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                    {dashboardData?.description ??
-                      "Your dashboard and community feed in one place."}
-                  </p>
-                  {lastRefresh && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Last updated: {lastRefresh.toLocaleString()}
-                    </p>
-                  )}
+          {/* ── Dashboard section (hidden for job seekers) ── */}
+          {!rolePermissions.isJobSeeker && (
+            <>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                <div className="mb-6 sm:mb-8">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1">
+                      <h1 className="text-2xl sm:text-3xl font-bold">
+                        {dashboardData?.title ?? "Your Home"}
+                      </h1>
+                      <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                        {dashboardData?.description ??
+                          "Your dashboard and community feed in one place."}
+                      </p>
+                      {lastRefresh && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Last updated: {lastRefresh.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="flex justify-center mb-4">
-              <AdSlot slot="dashboard-banner" size="banner" />
-            </div>
+                <div className="flex justify-center mb-4">
+                  <AdSlot slot="dashboard-banner" size="banner" />
+                </div>
 
-            {dashboardLoading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  Loading dashboard...
-                </p>
+                {dashboardLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      Loading dashboard...
+                    </p>
+                  </div>
+                ) : dashboardError ? (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                      <span className="flex-1">{dashboardError}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={refreshDashboard}
+                        className="min-h-[44px] w-full sm:w-auto"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Retry
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                ) : dashboardData ? (
+                  getDashboardComponent()
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground py-8">
+                    No dashboard data available
+                  </div>
+                )}
               </div>
-            ) : dashboardError ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <span className="flex-1">{dashboardError}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={refreshDashboard}
-                    className="min-h-[44px] w-full sm:w-auto"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Retry
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            ) : dashboardData ? (
-              getDashboardComponent()
-            ) : (
-              <div className="text-center text-sm text-muted-foreground py-8">
-                No dashboard data available
-              </div>
-            )}
-          </div>
 
-          {/* ── Divider between Dashboard and Feed ── */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <Separator className="my-4" />
-          </div>
+              {/* ── Divider between Dashboard and Feed ── */}
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <Separator className="my-4" />
+              </div>
+            </>
+          )}
 
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
@@ -808,8 +814,11 @@ export default function Home() {
                 />
               </div>
 
-              {/* CENTER — Post composer + filter tabs + posts */}
+              {/* CENTER — Feed notifications + Post composer + filter tabs + posts */}
               <div className="min-w-0 space-y-4">
+                {/* Feed notification items */}
+                <WelcomeHero />
+
                 <PostComposerBar user={user as never} onOpen={openCreate} />
 
                 <div className="bg-card rounded-xl overflow-hidden border">
@@ -905,8 +914,13 @@ export default function Home() {
                 )}
               </div>
 
-              {/* RIGHT — Quick Actions + Suggestions */}
+              {/* RIGHT — Onboarding + Quick Actions + Suggestions */}
               <div className="hidden lg:block sticky top-24 space-y-4">
+                <OnboardingProgress
+                  tasks={dashboardData?.onboardingTasks || []}
+                  completionPercentage={dashboardData?.onboardingCompletionPercentage}
+                  loading={dashboardLoading}
+                />
                 <QuickActions userRole={effectiveRole} />
                 <FeedRightPanel />
               </div>

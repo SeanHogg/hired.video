@@ -13,6 +13,7 @@ export type CrudAction = "create" | "read" | "update" | "delete";
 
 export type AdminResource =
   | "dashboard"
+  | "feed"
   | "users"
   | "roles"
   | "jobs"
@@ -25,6 +26,7 @@ export type AdminResource =
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
   SuperAdmin: {
     dashboard: ["read"],
+    feed:      ["create", "read", "update", "delete"],
     users:     ["create", "read", "update", "delete"],
     roles:     ["create", "read", "update", "delete"],
     jobs:      ["create", "read", "update", "delete"],
@@ -35,6 +37,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
   },
   Admin: {
     dashboard: ["read"],
+    feed:      ["create", "read", "update", "delete"],
     users:     ["read"],
     roles:     ["read"],
     jobs:      ["read", "update"],
@@ -86,6 +89,7 @@ export function useAdminPermissions(): AdminPermissions {
 /** All admin resources in display order */
 export const ADMIN_RESOURCES: AdminResource[] = [
   "dashboard",
+  "feed",
   "users",
   "roles",
   "jobs",
@@ -104,6 +108,7 @@ export const CRUD_LABELS: Record<CrudAction, string> = {
 
 export const RESOURCE_LABELS: Record<AdminResource, string> = {
   dashboard: "Overview",
+  feed:      "Feed",
   users:     "Users",
   roles:     "Roles",
   jobs:      "Jobs",

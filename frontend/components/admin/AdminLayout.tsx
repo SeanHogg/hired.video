@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation, Navigate } from "react-router-dom";
 import {
   BarChart3,
+  Megaphone,
   Users,
   Shield,
   Briefcase,
@@ -19,6 +20,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 
 const TABS: { resource: AdminResource; label: string; href: string; icon: React.ElementType }[] = [
   { resource: "dashboard", label: "Overview",  href: "/admin/dashboard", icon: BarChart3  },
+  { resource: "feed",      label: "Feed",      href: "/admin/feed",      icon: Megaphone  },
   { resource: "users",     label: "Users",     href: "/admin/users",     icon: Users      },
   { resource: "roles",     label: "Roles",     href: "/admin/roles",     icon: Shield     },
   { resource: "jobs",      label: "Jobs",      href: "/admin/jobs",      icon: Briefcase  },

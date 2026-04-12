@@ -8,8 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { MetricGrid } from "./shared/MetricCard";
-import OnboardingProgress from "./shared/OnboardingProgress";
-import WelcomeHero from "./shared/WelcomeHero";
 import ProfileStatistics from "./shared/ProfileStatistics";
 import ApplicationStatistics from "./shared/ApplicationStatistics";
 import JobMatchesCard from "./shared/JobMatchesCard";
@@ -53,23 +51,8 @@ export function JobSeekerDashboard({
     );
   }
 
-  const onboardingPct = dashboardData.onboardingCompletionPercentage ?? 0;
-  const hasProfileViews = (dashboardData.profileStats?.totalViews ?? 0) > 0;
-  const hasApplications =
-    (dashboardData.applicationStats?.totalApplications ?? 0) > 0;
-  const isFirstRun = onboardingPct < 40 && !hasProfileViews && !hasApplications;
-
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* First-Run Welcome Hero — three primary paths to time-to-value */}
-      {isFirstRun && <WelcomeHero />}
-
-      {/* Onboarding Progress */}
-      <OnboardingProgress
-        tasks={dashboardData.onboardingTasks || []}
-        completionPercentage={dashboardData.onboardingCompletionPercentage}
-        loading={loading}
-      />
 
       {/* Metrics Grid */}
       <MetricGrid
