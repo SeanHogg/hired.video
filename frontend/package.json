@@ -30,7 +30,6 @@
     "quality-check:required": "node ./scripts/quality-check.mjs --required-only"
   },
   "dependencies": {
-    "@microsoft/signalr": "^9.0.6",
     "@sentry/react": "^10.12.0",
     "dotenv": "^17.2.0",
     "jszip": "^3.10.1",

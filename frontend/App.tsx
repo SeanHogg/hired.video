@@ -111,6 +111,7 @@ const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
+const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const RolesPermissions = lazy(() => import("./pages/admin/RolesPermissions"));
 const JobsManagement = lazy(() => import("./pages/admin/JobsManagement"));
@@ -522,6 +523,7 @@ const App = () => (
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
+                      <Route path="/admin/feed"              element={<AdminLayout><FeedManagement /></AdminLayout>} />
                       <Route path="/admin/users"             element={<AdminLayout><UserManagement /></AdminLayout>} />
                       <Route path="/admin/roles"             element={<AdminLayout><RolesPermissions /></AdminLayout>} />
                       <Route path="/admin/jobs"              element={<AdminLayout><JobsManagement /></AdminLayout>} />

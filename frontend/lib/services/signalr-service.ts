@@ -1,4 +1,16 @@
-import * as signalR from "@microsoft/signalr";
+/**
+ * SSE Notification Service
+ *
+ * Replaces the @microsoft/signalr client with a native fetch-based SSE reader.
+ * Cloudflare Workers serve raw SSE (not SignalR-framed), so we parse events
+ * directly.  The backend endpoint dumps unread notifications then closes, so
+ * we reconnect on a configurable interval (heartbeat).
+ *
+ * Public API is kept compatible with the old SignalRService so that
+ * `use-signalr.ts` and `use-comm-hub.ts` work without changes.
+ */
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface Notification {
   id: string;
@@ -19,210 +31,287 @@ export interface UserStatusUpdate {
 
 export type NotificationHandler = (notification: Notification) => void;
 export type UserStatusHandler = (statusUpdate: UserStatusUpdate) => void;
-export type ConnectionStateHandler = (
-  state: signalR.HubConnectionState,
-) => void;
+export type ConnectionStateHandler = (state: ConnectionState) => void;
 
-class SignalRService {
-  private connection: signalR.HubConnection | null = null;
+/** Mirrors the subset of HubConnectionState the UI cares about. */
+export enum ConnectionState {
+  Disconnected = "Disconnected",
+  Connecting = "Connecting",
+  Connected = "Connected",
+  Reconnecting = "Reconnecting",
+}
+
+// ── Retry config ─────────────────────────────────────────────────────────────
+
+const BACKOFF_MS = [0, 2_000, 10_000, 30_000]; // same as old signalr config
+const MAX_BACKOFF_MS = 30_000;
+
+// ── Service ──────────────────────────────────────────────────────────────────
+
+class NotificationSSEService {
   private notificationHandlers: NotificationHandler[] = [];
   private userStatusHandlers: UserStatusHandler[] = [];
   private connectionStateHandlers: ConnectionStateHandler[] = [];
 
-  constructor() {
-    this.initializeConnection();
-  }
+  private _state: ConnectionState = ConnectionState.Disconnected;
+  private abortController: AbortController | null = null;
+  private retryCount = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private stopped = false;
 
-  private initializeConnection(): void {
-    const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-    this.connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${apiBaseUrl}/api/hubs/notifications`, {
-        accessTokenFactory: () => {
-          // Get the auth token from localStorage
-          return localStorage.getItem("authToken") || "";
-        },
-        withCredentials: true,
-      })
-      .withAutomaticReconnect({
-        nextRetryDelayInMilliseconds: (retryContext) => {
-          // Exponential backoff: 0, 2, 10, 30 seconds, then 30 seconds
-          if (retryContext.previousRetryCount === 0) return 0;
-          if (retryContext.previousRetryCount === 1) return 2000;
-          if (retryContext.previousRetryCount === 2) return 10000;
-          return 30000;
-        },
-      })
-      .configureLogging(signalR.LogLevel.Information)
-      .build();
-
-    this.setupEventHandlers();
-  }
-
-  private setupEventHandlers(): void {
-    if (!this.connection) return;
-
-    // Handle incoming notifications
-    this.connection.on("ReceiveNotification", (notification: Notification) => {
-      console.log("Received notification:", notification);
-      this.notificationHandlers.forEach((handler) => handler(notification));
-    });
-
-    // Handle user status changes
-    this.connection.on(
-      "UserStatusChanged",
-      (statusUpdate: UserStatusUpdate) => {
-        console.log("User status changed:", statusUpdate);
-        this.userStatusHandlers.forEach((handler) => handler(statusUpdate));
-      },
-    );
-
-    // Handle broadcast messages
-    this.connection.on("BroadcastMessage", (data: any) => {
-      console.log("Broadcast message:", data);
-      const notification: Notification = {
-        id: `broadcast_${Date.now()}`,
-        title: "System Announcement",
-        message: data.message,
-        type: "info",
-        data: data,
-        timestamp: data.timestamp,
-        isRead: false,
-      };
-      this.notificationHandlers.forEach((handler) => handler(notification));
-    });
-
-    // Handle connection state changes
-    this.connection.onreconnecting(() => {
-      console.log("SignalR reconnecting...");
-      this.connectionStateHandlers.forEach((handler) =>
-        handler(signalR.HubConnectionState.Reconnecting),
-      );
-    });
-
-    this.connection.onreconnected(() => {
-      console.log("SignalR reconnected");
-      this.connectionStateHandlers.forEach((handler) =>
-        handler(signalR.HubConnectionState.Connected),
-      );
-    });
-
-    this.connection.onclose(() => {
-      console.log("SignalR connection closed");
-      this.connectionStateHandlers.forEach((handler) =>
-        handler(signalR.HubConnectionState.Disconnected),
-      );
-    });
-  }
+  // ── Connection lifecycle ─────────────────────────────────────────────────
 
   async start(): Promise<void> {
-    if (!this.connection) {
-      this.initializeConnection();
+    if (
+      this._state === ConnectionState.Connected ||
+      this._state === ConnectionState.Connecting
+    ) {
+      return;
     }
 
-    if (this.connection?.state === signalR.HubConnectionState.Disconnected) {
-      try {
-        await this.connection.start();
-        console.log("SignalR connection started");
-        this.connectionStateHandlers.forEach((handler) =>
-          handler(signalR.HubConnectionState.Connected),
-        );
-      } catch (error) {
-        console.error("Error starting SignalR connection:", error);
-        throw error;
-      }
-    }
+    this.stopped = false;
+    this.retryCount = 0;
+    await this.connect();
   }
 
   async stop(): Promise<void> {
-    if (
-      this.connection &&
-      this.connection.state !== signalR.HubConnectionState.Disconnected
-    ) {
-      try {
-        await this.connection.stop();
-        console.log("SignalR connection stopped");
-      } catch (error) {
-        console.error("Error stopping SignalR connection:", error);
+    this.stopped = true;
+    this.clearRetryTimer();
+    this.abortController?.abort();
+    this.abortController = null;
+    this.setState(ConnectionState.Disconnected);
+  }
+
+  // ── Internal connect ─────────────────────────────────────────────────────
+
+  private async connect(): Promise<void> {
+    if (this.stopped) return;
+
+    const apiBaseUrl =
+      (window as any).APP_CONFIG?.API_URL ||
+      import.meta.env.VITE_API_URL ||
+      "http://localhost:5000";
+
+    const token = localStorage.getItem("authToken") || "";
+    if (!token) {
+      this.setState(ConnectionState.Disconnected);
+      return;
+    }
+
+    this.setState(
+      this.retryCount === 0
+        ? ConnectionState.Connecting
+        : ConnectionState.Reconnecting,
+    );
+
+    this.abortController?.abort();
+    this.abortController = new AbortController();
+
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/hubs/notifications`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "text/event-stream",
+          },
+          credentials: "include",
+          signal: this.abortController.signal,
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error(`SSE HTTP ${res.status}`);
       }
+
+      this.retryCount = 0;
+      this.setState(ConnectionState.Connected);
+
+      await this.readStream(res);
+
+      // Stream closed normally — schedule reconnect to pick up new events
+      if (!this.stopped) {
+        this.scheduleReconnect();
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError" || this.stopped) return;
+      console.warn("[NotificationSSE] connection error:", err.message);
+      this.scheduleReconnect();
     }
   }
 
-  async joinGroup(groupName: string): Promise<void> {
-    if (this.connection?.state === signalR.HubConnectionState.Connected) {
-      try {
-        await this.connection.invoke("JoinGroup", groupName);
-        console.log(`Joined group: ${groupName}`);
-      } catch (error) {
-        console.error(`Error joining group ${groupName}:`, error);
+  // ── SSE stream reader ────────────────────────────────────────────────────
+
+  private async readStream(res: Response): Promise<void> {
+    const reader = res.body?.getReader();
+    if (!reader) return;
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse complete SSE blocks (double-newline delimited)
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || ""; // keep incomplete tail
+
+        for (const block of parts) {
+          this.parseSSEBlock(block);
+        }
       }
+
+      // Flush remaining buffer
+      if (buffer.trim()) {
+        this.parseSSEBlock(buffer);
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
-  async leaveGroup(groupName: string): Promise<void> {
-    if (this.connection?.state === signalR.HubConnectionState.Connected) {
-      try {
-        await this.connection.invoke("LeaveGroup", groupName);
-        console.log(`Left group: ${groupName}`);
-      } catch (error) {
-        console.error(`Error leaving group ${groupName}:`, error);
+  private parseSSEBlock(block: string): void {
+    let eventType = "message";
+    let dataLines: string[] = [];
+
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event: ")) {
+        eventType = line.slice(7).trim();
+      } else if (line.startsWith("data: ")) {
+        dataLines.push(line.slice(6));
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5));
       }
+    }
+
+    if (dataLines.length === 0) return;
+
+    const raw = dataLines.join("\n");
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return; // skip malformed data
+    }
+
+    this.handleEvent(eventType, data);
+  }
+
+  private handleEvent(eventType: string, data: any): void {
+    switch (eventType) {
+      case "notification": {
+        const notification: Notification = {
+          id: data.id,
+          title: data.title ?? "",
+          message: data.message ?? "",
+          type: data.type ?? "info",
+          data: data.data,
+          timestamp: data.createdAt ?? data.timestamp ?? new Date().toISOString(),
+          isRead: data.isRead ?? false,
+        };
+        this.notificationHandlers.forEach((h) => h(notification));
+        break;
+      }
+      case "userStatus": {
+        const status: UserStatusUpdate = {
+          userId: data.userId,
+          userName: data.userName ?? "",
+          status: data.status,
+          timestamp: data.timestamp ?? new Date().toISOString(),
+        };
+        this.userStatusHandlers.forEach((h) => h(status));
+        break;
+      }
+      case "connected":
+      case "summary":
+        // lifecycle events — no action needed
+        break;
+      default:
+        break;
     }
   }
 
-  async updateStatus(
-    status: "online" | "away" | "busy" | "offline",
-  ): Promise<void> {
-    if (this.connection?.state === signalR.HubConnectionState.Connected) {
-      try {
-        await this.connection.invoke("UpdateStatus", status);
-        console.log(`Status updated to: ${status}`);
-      } catch (error) {
-        console.error(`Error updating status to ${status}:`, error);
-      }
+  // ── Reconnection ─────────────────────────────────────────────────────────
+
+  private scheduleReconnect(): void {
+    if (this.stopped) return;
+
+    this.setState(ConnectionState.Reconnecting);
+    const delay =
+      BACKOFF_MS[Math.min(this.retryCount, BACKOFF_MS.length - 1)] ??
+      MAX_BACKOFF_MS;
+    this.retryCount++;
+
+    this.clearRetryTimer();
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  private clearRetryTimer(): void {
+    if (this.retryTimer != null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
     }
   }
 
-  // Event handler registration methods
+  // ── State management ─────────────────────────────────────────────────────
+
+  private setState(state: ConnectionState): void {
+    if (this._state === state) return;
+    this._state = state;
+    this.connectionStateHandlers.forEach((h) => h(state));
+  }
+
+  // ── Public event registration ────────────────────────────────────────────
+
   onNotification(handler: NotificationHandler): () => void {
     this.notificationHandlers.push(handler);
     return () => {
-      const index = this.notificationHandlers.indexOf(handler);
-      if (index > -1) {
-        this.notificationHandlers.splice(index, 1);
-      }
+      const i = this.notificationHandlers.indexOf(handler);
+      if (i > -1) this.notificationHandlers.splice(i, 1);
     };
   }
 
   onUserStatusChange(handler: UserStatusHandler): () => void {
     this.userStatusHandlers.push(handler);
     return () => {
-      const index = this.userStatusHandlers.indexOf(handler);
-      if (index > -1) {
-        this.userStatusHandlers.splice(index, 1);
-      }
+      const i = this.userStatusHandlers.indexOf(handler);
+      if (i > -1) this.userStatusHandlers.splice(i, 1);
     };
   }
 
   onConnectionStateChange(handler: ConnectionStateHandler): () => void {
     this.connectionStateHandlers.push(handler);
     return () => {
-      const index = this.connectionStateHandlers.indexOf(handler);
-      if (index > -1) {
-        this.connectionStateHandlers.splice(index, 1);
-      }
+      const i = this.connectionStateHandlers.indexOf(handler);
+      if (i > -1) this.connectionStateHandlers.splice(i, 1);
     };
   }
 
-  get connectionState(): signalR.HubConnectionState {
-    return this.connection?.state || signalR.HubConnectionState.Disconnected;
+  // ── Stubs for features that need server-side support ─────────────────────
+  // SSE is server→client only.  These are no-ops kept for API compatibility.
+
+  async joinGroup(_groupName: string): Promise<void> {}
+  async leaveGroup(_groupName: string): Promise<void> {}
+  async updateStatus(
+    _status: "online" | "away" | "busy" | "offline",
+  ): Promise<void> {}
+
+  get connectionState(): ConnectionState {
+    return this._state;
   }
 
   get isConnected(): boolean {
-    return this.connection?.state === signalR.HubConnectionState.Connected;
+    return this._state === ConnectionState.Connected;
   }
 }
 
 // Export a singleton instance
-export const signalRService = new SignalRService();
+export const signalRService = new NotificationSSEService();
 export default signalRService;

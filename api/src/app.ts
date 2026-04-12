@@ -130,7 +130,7 @@ export function createApp() {
         // Return a non-matching literal origin to effectively deny browser CORS.
         return "null";
       },
-      allowHeaders: ["Content-Type", "Authorization", "X-Emulation-Token"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Emulation-Token", "X-Requested-With"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),

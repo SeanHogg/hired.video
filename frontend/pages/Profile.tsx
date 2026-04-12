@@ -388,6 +388,17 @@ function ProfileContent() {
 
                     {!isEditing ? (
                       <div className="space-y-2 text-sm text-muted-foreground">
+                        {formData.headline && (
+                          <p className="text-sm text-foreground font-medium">
+                            {formData.headline}
+                          </p>
+                        )}
+                        {(formData.title || formData.company) && (
+                          <div className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4" />
+                            {formData.title}{formData.title && formData.company ? " at " : ""}{formData.company}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4" />
                           {formData.email}
@@ -402,6 +413,14 @@ function ProfileContent() {
                           <MapPin className="h-4 w-4" />
                           {formData.location}
                         </div>
+                        {formData.website && (
+                          <div className="flex items-center gap-2">
+                            <ExternalLink className="h-4 w-4" />
+                            <a href={formData.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                              {formData.website}
+                            </a>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
                           {joinedText}
@@ -740,11 +759,70 @@ function ProfileContent() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-medium mb-3">About</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {formData.bio}
-                    </p>
+                  <div className="mt-6 space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">About</h3>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {formData.bio}
+                      </p>
+                    </div>
+
+                    {/* Social Profiles */}
+                    {(formData.linkedIn || formData.gitHub || formData.twitter) && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-3">Social Profiles</h3>
+                        <div className="space-y-2 text-sm">
+                          {formData.linkedIn && (
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                              <a href={formData.linkedIn} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                LinkedIn
+                              </a>
+                            </div>
+                          )}
+                          {formData.gitHub && (
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                              <a href={formData.gitHub} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                GitHub
+                              </a>
+                            </div>
+                          )}
+                          {formData.twitter && (
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                              <a href={formData.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                Twitter
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Skills */}
+                    {formData.skills && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-3">Skills</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {formData.skills.split(",").map(s => s.trim()).filter(Boolean).map((skill) => (
+                            <Badge key={skill} variant="secondary">{skill}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Industries */}
+                    {formData.industries && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-3">Industries</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {formData.industries.split(",").map(s => s.trim()).filter(Boolean).map((industry) => (
+                            <Badge key={industry} variant="outline">{industry}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { HubConnectionState } from "@microsoft/signalr";
 import signalRService, {
+  ConnectionState,
   Notification,
   UserStatusUpdate,
   NotificationHandler,
@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 
 export interface UseSignalRReturn {
   isConnected: boolean;
-  connectionState: HubConnectionState;
+  connectionState: ConnectionState;
   notifications: Notification[];
   userStatuses: Map<string, UserStatusUpdate>;
   connect: () => Promise<void>;
@@ -28,8 +28,8 @@ export interface UseSignalRReturn {
 export function useSignalR(): UseSignalRReturn {
   const { user, isAuthenticated } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionState, setConnectionState] = useState<HubConnectionState>(
-    HubConnectionState.Disconnected,
+  const [connectionState, setConnectionState] = useState<ConnectionState>(
+    ConnectionState.Disconnected,
   );
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [userStatuses, setUserStatuses] = useState<
@@ -39,7 +39,11 @@ export function useSignalR(): UseSignalRReturn {
   // Handle incoming notifications
   const handleNotification: NotificationHandler = useCallback(
     (notification: Notification) => {
-      setNotifications((prev) => [notification, ...prev].slice(0, 50)); // Keep only last 50 notifications
+      setNotifications((prev) => {
+        // Deduplicate by id
+        if (prev.some((n) => n.id === notification.id)) return prev;
+        return [notification, ...prev].slice(0, 50);
+      });
     },
     [],
   );
@@ -58,53 +62,38 @@ export function useSignalR(): UseSignalRReturn {
 
   // Handle connection state changes
   const handleConnectionStateChange: ConnectionStateHandler = useCallback(
-    (state: HubConnectionState) => {
+    (state: ConnectionState) => {
       setConnectionState(state);
-      setIsConnected(state === HubConnectionState.Connected);
+      setIsConnected(state === ConnectionState.Connected);
     },
     [],
   );
 
-  // Connect to SignalR
+  // Connect
   const connect = useCallback(async () => {
-    if (!isAuthenticated || !user) {
-      console.log("Cannot connect to SignalR: user not authenticated");
-      return;
-    }
+    if (!isAuthenticated || !user) return;
 
     try {
       await signalRService.start();
-      console.log("SignalR connected successfully");
     } catch (error) {
-      console.error("Failed to connect to SignalR:", error);
+      console.error("Failed to connect to notification stream:", error);
     }
   }, [isAuthenticated, user]);
 
-  // Disconnect from SignalR
+  // Disconnect
   const disconnect = useCallback(async () => {
     try {
       await signalRService.stop();
-      console.log("SignalR disconnected successfully");
     } catch (error) {
-      console.error("Failed to disconnect from SignalR:", error);
+      console.error("Failed to disconnect from notification stream:", error);
     }
   }, []);
 
-  // Join a group
-  const joinGroup = useCallback(async (groupName: string) => {
-    await signalRService.joinGroup(groupName);
-  }, []);
-
-  // Leave a group
-  const leaveGroup = useCallback(async (groupName: string) => {
-    await signalRService.leaveGroup(groupName);
-  }, []);
-
-  // Update user status
+  // No-ops kept for API compatibility (SSE is server→client only)
+  const joinGroup = useCallback(async (_groupName: string) => {}, []);
+  const leaveGroup = useCallback(async (_groupName: string) => {}, []);
   const updateStatus = useCallback(
-    async (status: "online" | "away" | "busy" | "offline") => {
-      await signalRService.updateStatus(status);
-    },
+    async (_status: "online" | "away" | "busy" | "offline") => {},
     [],
   );
 
@@ -172,44 +161,6 @@ export function useSignalR(): UseSignalRReturn {
       setUserStatuses(new Map());
     }
   }, [isAuthenticated, disconnect]);
-
-  // Update status to online when connected
-  useEffect(() => {
-    if (isConnected && isAuthenticated) {
-      updateStatus("online");
-    }
-  }, [isConnected, isAuthenticated, updateStatus]);
-
-  // Handle page visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (isConnected && isAuthenticated) {
-        const status = document.hidden ? "away" : "online";
-        updateStatus(status);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [isConnected, isAuthenticated, updateStatus]);
-
-  // Handle pagehide instead of beforeunload to preserve BFCache
-  useEffect(() => {
-    const handlePageHide = () => {
-      if (isConnected && isAuthenticated) {
-        updateStatus("offline");
-      }
-    };
-
-    window.addEventListener("pagehide", handlePageHide);
-
-    return () => {
-      window.removeEventListener("pagehide", handlePageHide);
-    };
-  }, [isConnected, isAuthenticated, updateStatus]);
 
   return {
     isConnected,
