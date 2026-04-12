@@ -512,6 +512,12 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
         const requirements = parseStringList(item.requirements ?? item.experienceRequirements);
         const benefits = parseStringList(item.jobBenefits ?? item.benefits);
 
+        // Apply URL: prefer directApply (explicit apply link) over url
+        // (canonical job page). Both are standard schema.org JobPosting fields.
+        const directApplyRaw = typeof item.directApply === "string" ? item.directApply.trim() : "";
+        const urlRaw = typeof item.url === "string" ? item.url.trim() : "";
+        const applyUrl = directApplyRaw || urlRaw || url || undefined;
+
         return {
           title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
           description:
@@ -539,6 +545,7 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
           requirements: requirements.length > 0 ? requirements : undefined,
           qualifications: qualifications.length > 0 ? qualifications : undefined,
           benefits: benefits.length > 0 ? benefits : undefined,
+          applyUrl,
           confidence: "high",
         };
       }
@@ -564,6 +571,7 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
     company: ogSite || undefined,
     location: undefined,
     isRemote: undefined,
+    applyUrl: url || undefined,
     confidence: "low",
   };
 }
