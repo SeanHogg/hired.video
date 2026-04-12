@@ -1,10 +1,10 @@
 import React from "react";
-import { Briefcase, Target, Calendar, UserPlus } from "lucide-react";
+import { Briefcase, Target, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
-import OnboardingProgress from "./shared/OnboardingProgress";
+import NewCandidatesCard from "./shared/NewCandidatesCard";
+import ScheduledInterviewsCard from "./shared/ScheduledInterviewsCard";
 
 import type { BaseDashboard } from "@/lib/services/dashboard-service";
 
@@ -95,13 +95,6 @@ export function RecruiterDashboard({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Onboarding Progress */}
-      <OnboardingProgress
-        tasks={dashboardData.onboardingTasks || []}
-        completionPercentage={dashboardData.onboardingCompletionPercentage}
-        loading={loading}
-      />
-
       {/* Metrics Grid */}
       <MetricGrid
         metrics={dashboardData.metrics || []}
@@ -257,103 +250,8 @@ export function RecruiterDashboard({
 
       {/* Lists Row - New Candidates, Interviews */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* New Candidates */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              New Candidates
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.newCandidates &&
-            dashboardData.newCandidates.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.newCandidates.map((candidate, index) => (
-                  <div
-                    key={candidate.userId || index}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                  >
-                    <div>
-                      <div className="font-medium text-sm">
-                        {candidate.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {candidate.jobTitle}
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      New
-                    </Badge>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" className="w-full">
-                  View All Candidates
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <UserPlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No new candidates
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Scheduled Interviews */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Upcoming Interviews
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dashboardData.scheduledInterviews &&
-            dashboardData.scheduledInterviews.length > 0 ? (
-              <div className="space-y-3">
-                {dashboardData.scheduledInterviews.map((interview, index) => (
-                  <div
-                    key={interview.id || index}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                  >
-                    <div>
-                      <div className="font-medium text-sm">
-                        {interview.candidateName}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {interview.jobTitle}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs font-medium">
-                        {interview.date}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {interview.time}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button variant="outline" size="sm" className="w-full">
-                  View All Interviews
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No scheduled interviews
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Message Statistics card removed — unified into the
-            CommunicationHub bell in the header. */}
+        <NewCandidatesCard candidates={dashboardData.newCandidates} loading={loading} />
+        <ScheduledInterviewsCard interviews={dashboardData.scheduledInterviews} loading={loading} />
       </div>
 
     </div>

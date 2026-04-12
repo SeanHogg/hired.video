@@ -8,3 +8,5 @@ export { ProfileStatistics } from "./ProfileStatistics";
 export { ApplicationStatistics } from "./ApplicationStatistics";
 export { JobMatchesCard } from "./JobMatchesCard";
 export { UpcomingInterviewsCard } from "./UpcomingInterviewsCard";
+export { NewCandidatesCard } from "./NewCandidatesCard";
+export { ScheduledInterviewsCard } from "./ScheduledInterviewsCard";
