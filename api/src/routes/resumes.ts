@@ -682,6 +682,39 @@ resumeRoutes.post("/createfromfile", async (c) => {
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
 
+/**
+ * POST /api/resumes/createfromtext
+ *
+ * Chrome extension endpoint: accepts pre-extracted plain text instead of
+ * a binary file.  This avoids binary-parsing issues (PDFs read via
+ * file.text() produce garbage and "unsupported Unicode escape sequence"
+ * errors in the DB).  The extension extracts text client-side and sends
+ * it here as JSON.
+ */
+resumeRoutes.post("/createfromtext", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : "Uploaded Resume";
+  const text = typeof body?.text === "string" ? body.text : "";
+
+  if (!text || text.trim().length < 10) {
+    return c.json(fail("VALIDATION_ERROR", "Resume text is too short or empty. Please try a different file."), 422);
+  }
+
+  const db = getDb();
+  const [created] = await db
+    .insert(resumes)
+    .values({
+      userId: user.sub,
+      title,
+      content: { raw: text },
+      status: "draft",
+    } as any)
+    .returning();
+
+  return c.json(ok(rowToLegacyResume(created)), 201);
+});
+
 resumeRoutes.post("/summarize", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const resumeText = typeof body?.resumeText === "string" ? body.resumeText : "";
