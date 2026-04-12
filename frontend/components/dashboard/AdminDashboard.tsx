@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
-import QuickActions from "./shared/QuickActions";
+
 import type { BaseDashboard } from "@/lib/services/dashboard-service";
 
 interface AdminDashboardProps {
@@ -484,8 +484,6 @@ export function AdminDashboard({
           title="System Activity"
         />
 
-        {/* Quick Actions */}
-        <QuickActions userRole="admin" loading={loading} />
       </div>
     </div>
   );

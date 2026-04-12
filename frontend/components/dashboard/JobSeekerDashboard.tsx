@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
-import QuickActions from "./shared/QuickActions";
+
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
 interface JobSeekerDashboardProps {
@@ -553,20 +553,14 @@ export function JobSeekerDashboard({
         </Card>
       )}
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <ActivityFeed
-          activities={dashboardData.recentActivity || []}
-          loading={loading}
-          onViewAll={() => {
-            /* TODO: Implement view all activity */
-          }}
-        />
-
-        {/* Quick Actions */}
-        <QuickActions userRole="jobseeker" loading={loading} />
-      </div>
+      {/* Recent Activity */}
+      <ActivityFeed
+        activities={dashboardData.recentActivity || []}
+        loading={loading}
+        onViewAll={() => {
+          /* TODO: Implement view all activity */
+        }}
+      />
     </div>
   );
 }

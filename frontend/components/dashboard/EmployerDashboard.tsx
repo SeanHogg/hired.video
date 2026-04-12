@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
-import QuickActions from "./shared/QuickActions";
+
 import type { EmployerDashboard as EmployerDashboardType } from "@/lib/services/dashboard-service";
 
 interface EmployerDashboardProps {
@@ -559,20 +559,14 @@ export function EmployerDashboard({
         </Card>
       )}
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <ActivityFeed
-          activities={dashboardData.recentActivity || []}
-          loading={loading}
-          onViewAll={() => {
-            /* TODO: Implement view all activity */
-          }}
-        />
-
-        {/* Quick Actions */}
-        <QuickActions userRole="employer" loading={loading} />
-      </div>
+      {/* Recent Activity */}
+      <ActivityFeed
+        activities={dashboardData.recentActivity || []}
+        loading={loading}
+        onViewAll={() => {
+          /* TODO: Implement view all activity */
+        }}
+      />
     </div>
   );
 }

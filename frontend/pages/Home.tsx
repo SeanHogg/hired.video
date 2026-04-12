@@ -53,6 +53,9 @@ import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import ProductDashboard from "@/pages/admin/ProductDashboard";
 import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
 
+// Quick Actions (moved from dashboard section to feed sidebar)
+import QuickActions from "@/components/dashboard/shared/QuickActions";
+
 // Feed data + components (reused from Feed.tsx)
 import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
 import type {
@@ -894,8 +897,9 @@ export default function Home() {
                 )}
               </div>
 
-              {/* RIGHT — Suggestions */}
-              <div className="hidden lg:block sticky top-24">
+              {/* RIGHT — Quick Actions + Suggestions */}
+              <div className="hidden lg:block sticky top-24 space-y-4">
+                <QuickActions userRole={effectiveRole} />
                 <FeedRightPanel />
               </div>
             </div>
