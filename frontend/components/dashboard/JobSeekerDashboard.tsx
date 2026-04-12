@@ -5,9 +5,6 @@ import {
   Target,
   Calendar,
   TrendingUp,
-  Wrench,
-  Mic,
-  Brain,
   ArrowRight,
   Film,
   Chrome,
@@ -26,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { MetricGrid } from "./shared/MetricCard";
 import ActivityFeed from "./shared/ActivityFeed";
 import OnboardingProgress from "./shared/OnboardingProgress";
+import ToolsCTA from "./shared/ToolsCTA";
 
 import type { JobSeekerDashboard as JobSeekerDashboardType } from "@/lib/services/dashboard-service";
 
@@ -167,55 +165,7 @@ export function JobSeekerDashboard({
       />
 
       {/* Tools CTA Banner */}
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 via-white to-blue-50">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                <Wrench className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-lg">Sharpen Your Edge with Tools</h3>
-                  <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">New</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Interview practice, AI career coach, resume scoring, tailoring, salary calculator, and more —
-                  all in one place.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Link to="/interview">
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
-                      <Mic className="h-3 w-3 mr-1" /> Interview Practice
-                    </Badge>
-                  </Link>
-                  <Link to="/chat">
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
-                      <Brain className="h-3 w-3 mr-1" /> AI Coach
-                    </Badge>
-                  </Link>
-                  <Link to="/tools/resume-tailor">
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
-                      <FileText className="h-3 w-3 mr-1" /> Resume Tailor
-                    </Badge>
-                  </Link>
-                  <Link to="/tools/ai-resume-scorer">
-                    <Badge variant="secondary" className="cursor-pointer hover:bg-purple-100">
-                      <Target className="h-3 w-3 mr-1" /> Resume Scorer
-                    </Badge>
-                  </Link>
-                </div>
-              </div>
-            </div>
-            <Link to="/tools" className="shrink-0">
-              <Button className="bg-purple-600 hover:bg-purple-700 w-full lg:w-auto">
-                Explore All Tools
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+      <ToolsCTA variant="banner" />
 
       {/* Metrics Grid */}
       <MetricGrid

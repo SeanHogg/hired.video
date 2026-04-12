@@ -50,6 +50,7 @@ import type {
 import FeedPostCard from "@/components/feed/FeedPostCard";
 import CreatePostModal from "@/components/feed/CreatePostModal";
 import FeedProfileCard from "@/components/feed/FeedProfileCard";
+import ToolsCTA from "@/components/dashboard/shared/ToolsCTA";
 import { CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -209,6 +210,9 @@ export function PostComposerBar({
 export function FeedRightPanel() {
   return (
     <div className="space-y-4">
+      {/* Sharpen Your Edge with Tools */}
+      <ToolsCTA variant="compact" />
+
       {/* Add to your feed */}
       <Card>
         <CardHeader className="pb-2 pt-4 px-4">
