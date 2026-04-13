@@ -251,14 +251,14 @@ export function parseResumeWithRegex(
     }
   }
 
-  // Skills: look for "Skills" section
+  // Skills: look for "Skills" section header first
   const skills: Array<Record<string, string>> = [];
   const skillsIdx = lines.findIndex((l) => /^skills\b/i.test(l));
   if (skillsIdx !== -1) {
     const nextSection = lines.findIndex(
       (l, i) =>
         i > skillsIdx &&
-        /^(education|volunteer|awards|certif|publicat|languages|interests|references|projects)\b/i.test(
+        /^(work|experience|education|volunteer|volunteering|awards|certif|publicat|languages|interests|references|projects)\b/i.test(
           l,
         ),
     );
@@ -269,6 +269,24 @@ export function parseResumeWithRegex(
     for (const sl of skillLines) {
       if (sl.length > 2)
         skills.push({ name: sl.replace(/^[⦁•▪\-*]\s*/, ""), level: "" });
+    }
+  }
+
+  // Fallback: if no Skills section, extract from "Technologies:" bullet lines
+  if (skills.length === 0) {
+    for (const line of lines) {
+      const techMatch = line.match(
+        /^[⦁•▪\-*]?\s*(?:technologies|tech stack|tools|technical skills)\s*[:\-]\s*(.+)/i,
+      );
+      if (techMatch) {
+        const items = techMatch[1]
+          .split(/[,;]/)
+          .map((s) => s.replace(/\(.*?\)/g, "").trim())
+          .filter((s) => s.length > 1);
+        for (const item of items) {
+          skills.push({ name: item, level: "" });
+        }
+      }
     }
   }
 

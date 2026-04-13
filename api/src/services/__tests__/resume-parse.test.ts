@@ -506,6 +506,49 @@ Senior Dev
       assert.equal(work[0].startDate, "2020");
       assert.equal(work[0].endDate, "2023");
     });
+
+    it("extracts skills from Technologies: bullet when no Skills header", () => {
+      const text = `Sean Hogg
+Work Experience
+Acme Corp ▪ Troy, Michigan
+CTO
+10/2022 - Present
+⦁ Technologies: BlockChain, .net, Python, Claude/ChatGTP, chatbotAI
+Education
+University of Windsor, Computer Science
+01/1999 – 12/2004`;
+      const result = parseResumeWithRegex(text);
+      const skills = result.skills as any[];
+      assert.ok(skills.length >= 3, `Expected at least 3 skills from Technologies line, got ${skills.length}`);
+      assert.ok(skills.some((s: any) => s.name.includes("Python")), "Should extract Python");
+    });
+
+    it("extracts skills from Tech Stack: line", () => {
+      const text = `Name
+Work Experience
+Co
+Dev
+2020 - 2023
+⦁ Tech Stack: React, Node.js, PostgreSQL, Docker`;
+      const skills = (parseResumeWithRegex(text)).skills as any[];
+      assert.ok(skills.length >= 3, `Expected at least 3 skills, got ${skills.length}`);
+    });
+
+    it("prefers Skills section over Technologies fallback", () => {
+      const text = `Name
+Skills
+JavaScript
+Python
+Work Experience
+Co
+Dev
+2020 - 2023
+⦁ Technologies: Obscure-Framework, Another-Framework`;
+      const skills = (parseResumeWithRegex(text)).skills as any[];
+      // Should get Skills section entries, not Technologies bullet
+      assert.ok(skills.some((s: any) => s.name === "JavaScript"));
+      assert.ok(!skills.some((s: any) => s.name.includes("Obscure")));
+    });
   });
 });
 
