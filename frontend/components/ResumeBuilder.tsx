@@ -598,11 +598,35 @@ export default function ResumeBuilder({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Resume Builder
           </CardTitle>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onCancel} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!isFormValid() || saving}
+            >
+              {saving ? (
+                <>
+                  <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Resume Settings */}
@@ -905,31 +929,6 @@ export default function ResumeBuilder({
 
       </Tabs>
 
-      {/* Action Buttons */}
-      <div className="flex gap-3 justify-end">
-        <Button variant="outline" onClick={onCancel} disabled={saving}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={!isFormValid() || saving}
-        >
-          {saving ? (
-            <>
-              <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              Save Resume
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }
