@@ -165,17 +165,13 @@
 }
 
 .max-w-7xl,
-.max-w-6xl {
+.max-w-6xl,
+.max-w-4xl {
   max-width: none !important;
 }
 
 .space-x-3 > :not([hidden]) ~ :not([hidden]) {
   margin-left: 0 !important;
-}
-
-.pricing-page .max-w-4xl,
-.services-page .max-w-4xl {
-  max-width: none !important;
 }
 
 /* ─── Footer padding ────────────────────────────────────────────────── */

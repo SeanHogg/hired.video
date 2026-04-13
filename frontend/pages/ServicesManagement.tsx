@@ -554,7 +554,7 @@ export default function ServicesManagement() {
   }
 
   return (
-    <div className="services-page min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation
