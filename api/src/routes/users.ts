@@ -22,6 +22,7 @@ const profileCols = {
   salaryCurrency: userProfiles.salaryCurrency, salaryExpectation: userProfiles.salaryExpectation,
   skills: userProfiles.skills, industries: userProfiles.industries, preferredRoles: userProfiles.preferredRoles,
   profileVisibility: userProfiles.profileVisibility, customUrlSlug: userProfiles.customUrlSlug,
+  providesServices: userProfiles.providesServices,
   updatedAt: userProfiles.updatedAt,
 } as const;
 
@@ -118,6 +119,7 @@ function toUserProfileDto(
     salaryCurrency?: string | null; salaryExpectation?: number | null;
     yearsOfExperience?: number | null;
     skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
+    providesServices?: boolean | null;
     updatedAt?: Date | string | null;
   } | null,
   privacyOptions?: {
@@ -183,6 +185,7 @@ function toUserProfileDto(
     skills: profile?.skills ?? [],
     industries: profile?.industries ?? [],
     preferredRoles: profile?.preferredRoles ?? [],
+    providesServices: profile?.providesServices ?? false,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(profileUpdatedAt).toISOString(),
   };

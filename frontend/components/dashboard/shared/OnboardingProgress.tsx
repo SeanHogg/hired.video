@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Target, ArrowRight, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { OnboardingTask } from "@/lib/services/dashboard-service";
+import { taskService } from "@/lib/services/task-service";
 
 interface OnboardingProgressProps {
   tasks: OnboardingTask[];
@@ -88,9 +89,38 @@ export function OnboardingProgress({
     );
   }
 
-  const incompleteTasks = tasks.filter((task) => !task.completed);
+  const navigate = useNavigate();
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set());
+
+  const handleComplete = async (task: OnboardingTask) => {
+    setCompletingId(task.id);
+    try {
+      await taskService.completeTask(task.id);
+    } catch {
+      // Best-effort — still navigate even if API fails
+    }
+    setLocalCompleted((prev) => new Set(prev).add(task.id));
+    setCompletingId(null);
+    onTaskComplete?.(task.id);
+    if (task.url) {
+      navigate(task.url);
+    }
+  };
+
+  const incompleteTasks = tasks.filter(
+    (task) => !task.completed && !localCompleted.has(task.id),
+  );
+  const effectiveCompleted = completedTasksCount + localCompleted.size;
+  const effectivePercentage = tasks.length > 0
+    ? Math.round((effectiveCompleted / tasks.length) * 100)
+    : progressPercentage;
+
+  // Hide if all tasks completed (including locally completed ones)
+  if (effectivePercentage >= 100) return null;
+
   const visibleTasks = incompleteTasks.slice(0, maxVisibleTasks);
-  const remainingTasksCount = incompleteTasks.length - maxVisibleTasks;
+  const remainingTasksCount = Math.max(0, incompleteTasks.length - maxVisibleTasks);
 
   return (
     <Card className="relative border-primary/20 bg-primary/5">
@@ -110,19 +140,19 @@ export function OnboardingProgress({
               Complete Your Setup
             </CardTitle>
             <CardDescription>
-              {completedTasksCount} of {tasks.length} tasks completed
+              {effectiveCompleted} of {tasks.length} tasks completed
             </CardDescription>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-primary">
-              {progressPercentage}%
+              {effectivePercentage}%
             </div>
             <div className="text-xs text-muted-foreground">Complete</div>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Progress value={progressPercentage} className="h-3 mb-4" />
+        <Progress value={effectivePercentage} className="h-3 mb-4" />
         <div className="grid gap-2">
           {visibleTasks.map((task) => (
             <div
@@ -143,30 +173,19 @@ export function OnboardingProgress({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onTaskComplete?.(task.id)}
-                asChild={!!task.url}
+                onClick={() => handleComplete(task)}
+                disabled={completingId === task.id}
               >
-                {task.url ? (
-                  <Link to={task.url}>
-                    Complete
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </Link>
-                ) : (
-                  <>
-                    Complete
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </>
-                )}
+                {completingId === task.id ? "..." : "Complete"}
+                <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
           ))}
         </div>
         {remainingTasksCount > 0 && showAllTasksLink && (
-          <Link to="/tasks">
-            <Button variant="link" className="mt-2 p-0">
-              View all tasks ({remainingTasksCount} remaining)
-            </Button>
-          </Link>
+          <Button variant="link" className="mt-2 p-0" onClick={() => navigate("/tasks")}>
+            View all tasks ({remainingTasksCount} remaining)
+          </Button>
         )}
       </CardContent>
     </Card>

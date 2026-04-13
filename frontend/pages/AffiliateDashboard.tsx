@@ -32,7 +32,7 @@ function AffiliateDashboardContent() {
     // Protect route: affiliate role only
     // Backend roles include Affiliate = 50; frontend may have string roles; be permissive here and rely on backend auth too
     if (!isAuthenticated) {
-      navigate("/login?next=/services?expand=affiliate");
+      navigate("/login?next=/services");
     }
   }, [isAuthenticated, navigate]);
 
@@ -117,8 +117,8 @@ function AffiliateDashboardContent() {
   const handleAddPaymentMethod = async () => {
     try {
       setPaymentMethodsLoading(true);
-      const successUrl = `${window.location.origin}/services?expand=affiliate&pm_success=true`;
-      const cancelUrl = `${window.location.origin}/services?expand=affiliate`;
+      const successUrl = `${window.location.origin}/services?pm_success=true`;
+      const cancelUrl = `${window.location.origin}/services`;
       const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
       window.location.href = setupUrl;
     } catch (e) {

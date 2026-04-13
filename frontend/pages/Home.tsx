@@ -34,26 +34,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
-import { createRolePermissions } from "@/lib/role-utils";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
-import AdSlot from "@/components/ads/AdSlot";
 
-// Role-specific dashboard components
-import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
-import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
-import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-
-import { AffiliateDashboardContent } from "@/pages/AffiliateDashboard";
-
-// Shared dashboard components (moved to feed sidebar)
+// Shared dashboard components (used in feed sidebar)
 import QuickActions from "@/components/dashboard/shared/QuickActions";
 import ActivityFeed from "@/components/dashboard/shared/ActivityFeed";
 import OnboardingProgress from "@/components/dashboard/shared/OnboardingProgress";
@@ -524,9 +513,6 @@ export default function Home() {
   const {
     dashboardData,
     loading: dashboardLoading,
-    error: dashboardError,
-    lastRefresh,
-    refreshDashboard,
   } = useDashboard();
 
   // Feed state
@@ -546,7 +532,6 @@ export default function Home() {
   // Effective role: impersonation > persona preview > actual
   const effectiveRole =
     impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
-  const rolePermissions = createRolePermissions(effectiveRole);
 
   const loadFeedPosts = useCallback(
     async (page = 1, append = false) => {
@@ -638,35 +623,6 @@ export default function Home() {
     setCreatePostOpen(true);
   }, []);
 
-  // Role-to-dashboard component mapping
-  const getDashboardComponent = () => {
-    const commonProps = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      dashboardData: dashboardData as any,
-      loading: dashboardLoading,
-      onRefresh: refreshDashboard,
-    };
-
-    if (rolePermissions.isSuperAdmin || rolePermissions.isAdmin)
-      return <AdminDashboard {...commonProps} />;
-    if (rolePermissions.isJobSeeker)
-      return <JobSeekerDashboard {...commonProps} />;
-    if (rolePermissions.isRecruiter)
-      return <RecruiterDashboard {...commonProps} />;
-    if (rolePermissions.isEmployer)
-      return <EmployerDashboard {...commonProps} />;
-    if (rolePermissions.isAffiliate) return <AffiliateDashboardContent />;
-
-    return (
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-4">Welcome to hired.video</h1>
-        <p className="text-muted-foreground">
-          Your role ({user?.role}) doesn&apos;t have a specific dashboard yet.
-        </p>
-      </div>
-    );
-  };
-
   // Auth loading
   if (isLoading) {
     return (
@@ -722,72 +678,6 @@ export default function Home() {
         />
 
         <div className="pt-16 pb-20">
-          {/* ── Dashboard section (hidden for job seekers) ── */}
-          {!rolePermissions.isJobSeeker && (
-            <>
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <div className="mb-6 sm:mb-8">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div className="flex-1">
-                      <h1 className="text-2xl sm:text-3xl font-bold">
-                        {dashboardData?.title ?? "Your Home"}
-                      </h1>
-                      <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                        {dashboardData?.description ??
-                          "Your dashboard and community feed in one place."}
-                      </p>
-                      {lastRefresh && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Last updated: {lastRefresh.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-center mb-4">
-                  <AdSlot slot="dashboard-banner" size="banner" />
-                </div>
-
-                {dashboardLoading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      Loading dashboard...
-                    </p>
-                  </div>
-                ) : dashboardError ? (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                      <span className="flex-1">{dashboardError}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={refreshDashboard}
-                        className="min-h-[44px] w-full sm:w-auto"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Retry
-                      </Button>
-                    </AlertDescription>
-                  </Alert>
-                ) : dashboardData ? (
-                  getDashboardComponent()
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground py-8">
-                    No dashboard data available
-                  </div>
-                )}
-              </div>
-
-              {/* ── Divider between Dashboard and Feed ── */}
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <Separator className="my-4" />
-              </div>
-            </>
-          )}
-
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
             <div className="mb-6">

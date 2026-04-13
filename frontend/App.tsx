@@ -421,7 +421,7 @@ const App = () => (
                         element={<CompanyCreatePage />}
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
-                      <Route path="/affiliate/dashboard" element={<Navigate to="/services?expand=affiliate" replace />} />
+                      <Route path="/affiliate/dashboard" element={<Navigate to="/services" replace />} />
 
                       <Route
                         path="/companies/create/:id"

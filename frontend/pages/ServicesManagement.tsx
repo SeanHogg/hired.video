@@ -25,8 +25,6 @@ import {
   Settings as SettingsIcon,
   Link2,
   Video,
-  ChevronDown,
-  ChevronUp,
   Star,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -155,20 +153,17 @@ export default function ServicesManagement() {
   // Effective role: impersonation > persona preview > actual role
   const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
-  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
+  const tabParam = searchParams.get("tab");
+  const initialTab = tabParam === "services" ? "services" : tabParam === "inquiries" ? "inquiries" : "dashboard";
+  const [activeTab, setActiveTab] = useState<"dashboard" | "services" | "inquiries">(initialTab);
 
   // ── Standard services state ────────────────────────────────────────────────
-  // Each standard service tracks: enrolled?, loading?, expanded?, enrolling?
-  const expandParam = searchParams.get("expand"); // e.g. ?expand=affiliate
-
   const [affiliateActive, setAffiliateActive] = useState(false);
   const [affiliateLoading, setAffiliateLoading] = useState(true);
   const [affiliateEnrolling, setAffiliateEnrolling] = useState(false);
-  const [affiliateExpanded, setAffiliateExpanded] = useState(expandParam === "affiliate");
 
   const [creatorActive, setCreatorActive] = useState(false);
   const [creatorLoading, setCreatorLoading] = useState(true);
-  const [creatorExpanded, setCreatorExpanded] = useState(expandParam === "creator");
   const [creatorProfile, setCreatorProfile] = useState<{
     completedProjectsCount: number;
     totalEarnedCents: number;
@@ -189,12 +184,11 @@ export default function ServicesManagement() {
     // Affiliate check
     if (effectiveRole === USER_ROLES.AFFILIATE) {
       setAffiliateActive(true);
-      setAffiliateExpanded(true);
       setAffiliateLoading(false);
     } else {
       affiliateService.getProfile()
         .then(() => setAffiliateActive(true))
-        .catch(() => { setAffiliateActive(false); setAffiliateExpanded(false); })
+        .catch(() => setAffiliateActive(false))
         .finally(() => setAffiliateLoading(false));
     }
 
@@ -226,7 +220,6 @@ export default function ServicesManagement() {
     try {
       await affiliateService.getProfile(); // auto-creates profile
       setAffiliateActive(true);
-      setAffiliateExpanded(true);
       toast.success("You're now an affiliate! Share your referral link to start earning.");
     } catch {
       toast.error("Failed to join affiliate program. Please try again.");
@@ -256,13 +249,8 @@ export default function ServicesManagement() {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
     loadServices();
+    loadInquiries(); // load eagerly so dashboard metrics are populated
   }, [isAuthenticated, user]);
-
-  useEffect(() => {
-    if (activeTab === "inquiries" && incoming.length === 0 && myRequests.length === 0 && !inquiriesLoading) {
-      loadInquiries();
-    }
-  }, [activeTab]);
 
   async function loadServices() {
     setLoading(true);
@@ -587,10 +575,10 @@ export default function ServicesManagement() {
             <div>
               <h1 className="text-2xl font-bold">Services</h1>
               <p className="text-muted-foreground mt-1">
-                Manage your offerings and respond to incoming leads
+                Dashboard, offerings, and incoming leads
               </p>
             </div>
-            {activeTab === "offerings" && (
+            {activeTab === "services" && (
               <div className="flex items-center gap-2">
                 <Link to="/settings?tab=lead-generation">
                   <Button variant="outline">
@@ -612,7 +600,8 @@ export default function ServicesManagement() {
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
             <TabsList className="mb-6">
-              <TabsTrigger value="offerings">My Services</TabsTrigger>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
               <TabsTrigger value="inquiries" className="flex items-center gap-2">
                 Inquiries
                 {pendingCount > 0 && (
@@ -623,176 +612,205 @@ export default function ServicesManagement() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ── My Services ─────────────────────────────────────────────── */}
-            <TabsContent value="offerings" className="space-y-6">
+            {/* ── Dashboard ───────────────────────────────────────────────── */}
+            <TabsContent value="dashboard" className="space-y-6">
 
-              {/* ── Standard Services ─────────────────────────────────────── */}
-              <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  Standard Services
-                </h2>
-
-                {/* Affiliate */}
-                <Card className={`transition-colors ${affiliateActive ? "border-green-300/50" : "border-dashed"}`}>
+              {/* Metrics row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center shrink-0">
-                          <Link2 className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">Affiliate</h3>
-                            {affiliateLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            ) : affiliateActive ? (
-                              <Badge variant="default" className="text-xs bg-green-600">Active</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">Available</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Earn 25% commission on every referral's first-month subscription
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!affiliateLoading && !affiliateActive && (
-                          <Button
-                            size="sm"
-                            onClick={handleAffiliateOptIn}
-                            disabled={affiliateEnrolling}
-                            className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                          >
-                            {affiliateEnrolling ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                            ) : null}
-                            Join
-                          </Button>
-                        )}
-                        {affiliateActive && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setAffiliateExpanded(!affiliateExpanded)}
-                          >
-                            {affiliateExpanded ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <ShoppingBag className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase">Active Services</span>
                     </div>
+                    <p className="text-2xl font-bold">{services.filter((s) => s.isActive).length}</p>
                   </CardContent>
-                  {affiliateActive && affiliateExpanded && (
-                    <div className="border-t px-4 pb-4 pt-4">
-                      <AffiliateDashboardContent />
-                    </div>
-                  )}
                 </Card>
-
-                {/* Content Creator */}
-                <Card className={`transition-colors ${creatorActive ? "border-green-300/50" : "border-dashed"}`}>
+                <Card>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-pink-500 to-orange-400 flex items-center justify-center shrink-0">
-                          <Video className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">Content Creator</h3>
-                            {creatorLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            ) : creatorActive ? (
-                              <Badge variant="default" className="text-xs bg-green-600">Active</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">Available</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Sell promo videos, portfolio pieces, and creative services
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!creatorLoading && !creatorActive && (
-                          <Link to="/creator/onboarding">
-                            <Button
-                              size="sm"
-                              className="bg-gradient-to-r from-pink-500 to-orange-400 hover:opacity-90"
-                            >
-                              Join
-                            </Button>
-                          </Link>
-                        )}
-                        {creatorActive && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setCreatorExpanded(!creatorExpanded)}
-                          >
-                            {creatorExpanded ? (
-                              <ChevronUp className="h-4 w-4" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Inbox className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase">New Leads</span>
                     </div>
+                    <p className="text-2xl font-bold">{pendingCount}</p>
                   </CardContent>
-                  {creatorActive && creatorExpanded && creatorProfile && (
-                    <div className="border-t px-4 pb-4 pt-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <p className="text-2xl font-bold">{creatorProfile.completedProjectsCount}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Projects Completed</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <p className="text-2xl font-bold">
-                              ${(creatorProfile.totalEarnedCents / 100).toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">Total Earned</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                              <p className="text-2xl font-bold">
-                                {creatorProfile.averageRating?.toFixed(1) ?? "—"}
-                              </p>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Avg Rating ({creatorProfile.ratingCount} reviews)
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-4 text-center">
-                            <p className="text-2xl font-bold">{creatorProfile.displayName ?? "—"}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Display Name</p>
-                          </CardContent>
-                        </Card>
-                      </div>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <MessageSquare className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase">Total Inquiries</span>
                     </div>
-                  )}
+                    <p className="text-2xl font-bold">{incoming.length}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase">Completed</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {incoming.filter((i) => i.inquiry.status === "completed").length}
+                    </p>
+                  </CardContent>
                 </Card>
               </div>
 
-              {/* ── Custom Offerings ──────────────────────────────────────── */}
-              <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  Custom Offerings
-                </h2>
+              {/* Main content: widgets left, CTA cards right */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* Service list */}
+                {/* Left column — active service widgets */}
+                <div className="lg:col-span-2 space-y-6">
+
+                  {/* Affiliate widget — only when active */}
+                  {affiliateActive && (
+                    <AffiliateDashboardContent />
+                  )}
+
+                  {/* Creator widget — only when active */}
+                  {creatorActive && creatorProfile && (
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <Video className="h-5 w-5 text-pink-500" />
+                        Content Creator
+                      </h2>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <Card>
+                          <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold">{creatorProfile.completedProjectsCount}</p>
+                            <p className="text-xs text-muted-foreground">Projects</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold">
+                              ${(creatorProfile.totalEarnedCents / 100).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Earned</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                              <p className="text-xl font-bold">
+                                {creatorProfile.averageRating?.toFixed(1) ?? "—"}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Rating ({creatorProfile.ratingCount})
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold truncate">{creatorProfile.displayName ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground">Display Name</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty state when no standard services active */}
+                  {!affiliateLoading && !creatorLoading && !affiliateActive && !creatorActive && (
+                    <Card className="border-dashed">
+                      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                        <TrendingUp className="h-10 w-10 text-muted-foreground mb-3" />
+                        <h3 className="text-lg font-medium mb-1">No active programs</h3>
+                        <p className="text-sm text-muted-foreground max-w-sm">
+                          Join a standard service to see metrics here. Start with
+                          the Affiliate or Content Creator program.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Right column — CTA cards for standard services */}
+                <div className="space-y-4">
+
+                  {/* Affiliate CTA */}
+                  <Card className={affiliateActive ? "border-green-300/50" : "border-brand-purple/20"}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center shrink-0">
+                          <Link2 className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-sm">Affiliate</h3>
+                            {affiliateLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            ) : affiliateActive ? (
+                              <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Earn 25% commission on every referral's first-month subscription. Unlimited referrals, tiered rewards from Bronze to Platinum.
+                      </p>
+                      {!affiliateLoading && !affiliateActive && (
+                        <Button
+                          size="sm"
+                          onClick={handleAffiliateOptIn}
+                          disabled={affiliateEnrolling}
+                          className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                        >
+                          {affiliateEnrolling ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Link2 className="h-4 w-4 mr-1" />
+                          )}
+                          Join Affiliate Program
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Content Creator CTA */}
+                  <Card className={creatorActive ? "border-green-300/50" : "border-pink-300/20"}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-pink-500 to-orange-400 flex items-center justify-center shrink-0">
+                          <Video className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-sm">Content Creator</h3>
+                            {creatorLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            ) : creatorActive ? (
+                              <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sell promo videos, portfolio pieces, and creative services. Set your own pricing, track projects, and get reviewed by clients.
+                      </p>
+                      {!creatorLoading && !creatorActive && (
+                        <Link to="/creator/onboarding">
+                          <Button
+                            size="sm"
+                            className="w-full bg-gradient-to-r from-pink-500 to-orange-400 hover:opacity-90"
+                          >
+                            <Video className="h-4 w-4 mr-1" />
+                            Join Creator Program
+                          </Button>
+                        </Link>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* ── Services ────────────────────────────────────────────────── */}
+            <TabsContent value="services" className="space-y-4">
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -891,7 +909,6 @@ export default function ServicesManagement() {
                   ))}
                 </div>
               )}
-              </div>
             </TabsContent>
 
             {/* ── Inquiries ────────────────────────────────────────────────── */}
