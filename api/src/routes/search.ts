@@ -6,7 +6,7 @@ import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getPublicJobs, JobEntity } from "../services/job.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, videos } = schema;
 
 export const searchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -100,6 +100,26 @@ function toVoiceItem(clone: typeof studioVoiceClones.$inferSelect) {
   };
 }
 
+function toMediaItem(video: typeof videos.$inferSelect, ownerName: string | null) {
+  const title = video.title || `${ownerName ?? "Unknown"}'s Video Resume`;
+  return {
+    id: video.id,
+    type: "media" as const,
+    title,
+    name: title,
+    description: video.description ?? "",
+    summary: video.description ?? "Video Resume",
+    // Frontend media mapper reads these overloaded fields:
+    skills: "video",           // metaType
+    location: video.userId,    // ownerId
+    company: video.resumeId,   // resumeId reference
+    experienceLevel: video.youtubeUrl ?? (video.r2Key ? `/cdn/${video.r2Key}` : null), // mediaUrl
+    avatar: video.thumbnailUrl, // thumbnail
+    createdAt: video.createdAt.toISOString(),
+    isFeatured: false,
+  };
+}
+
 // Unified search endpoint used by frontend.
 // Supports category filtering (jobs/people/companies/resumes) and a default "all".
 searchRoutes.get("/public", async (c) => {
@@ -120,6 +140,7 @@ searchRoutes.get("/public", async (c) => {
   const includePeople = category === "all" || category === "people";
   const includeResumes = category === "all" || category === "resumes";
   const includeVoices = category === "all" || category === "voices";
+  const includeMedia = category === "all" || category === "media";
 
   const jobsPromise = includeJobs
     ? getPublicJobs({
@@ -205,12 +226,30 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof studioVoiceClones.$inferSelect[]);
 
-  const [jobs, companies, people, resumes, voices] = await Promise.all([
+  // Media (public video resumes)
+  const mediaWhere = search
+    ? and(
+        eq(videos.privacyStatus, "public"),
+        or(ilike(videos.title, `%${search}%`), ilike(videos.description, `%${search}%`)),
+      )
+    : eq(videos.privacyStatus, "public");
+  const mediaPromise = includeMedia
+    ? db
+        .select({ video: videos, ownerName: users.name })
+        .from(videos)
+        .innerJoin(users, eq(videos.userId, users.id))
+        .where(mediaWhere)
+        .orderBy(desc(videos.createdAt))
+        .limit(100)
+    : Promise.resolve([] as Array<{ video: typeof videos.$inferSelect; ownerName: string | null }>);
+
+  const [jobs, companies, people, resumes, voices, media] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
     resumesPromise,
     voicesPromise,
+    mediaPromise,
   ]);
 
   // When searching "all", we merge and paginate by createdAt.
@@ -220,6 +259,7 @@ searchRoutes.get("/public", async (c) => {
     ...people.map(({ user, profile }) => toPeopleItem(user, profile ?? null)),
     ...resumes.map(toResumeItem),
     ...voices.map(toVoiceItem),
+    ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));
 

@@ -84,10 +84,6 @@ const SendConnectionRequestSchema = z.object({
 
 export const userRoutes = new Hono<{ Variables: Variables }>();
 
-function nowIso() {
-  return new Date().toISOString();
-}
-
 function makeConnectionDto(row: {
   id: string; fromUserId: string; toUserId: string; status: string;
   requestMessage: string | null; responseMessage: string | null;
@@ -192,6 +188,10 @@ function toUserProfileDto(
   };
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
 function makeConnection(id: string, fromUserId: string, toUserId: string, status: "Pending" | "Accepted" | "Rejected") {
   const now = nowIso();
   return {
@@ -269,7 +269,6 @@ userRoutes.get("/me", async (c) => {
   meDto.isPremium = meSub.isPremium;
   return c.json(success(meDto), 200);
 });
-
 
 // ── Shared profile update logic (DRY) ─────────────────────────────────────────
 type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
