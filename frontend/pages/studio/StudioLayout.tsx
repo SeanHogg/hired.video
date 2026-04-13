@@ -1123,7 +1123,7 @@ export default function StudioLayout() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+      <div className="studio-page min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -1142,7 +1142,7 @@ export default function StudioLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="studio-page min-h-screen bg-background">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
