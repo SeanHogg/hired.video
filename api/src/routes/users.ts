@@ -117,6 +117,7 @@ function toUserProfileDto(
     yearsOfExperience?: number | null;
     skills?: string[] | null; industries?: string[] | null; preferredRoles?: string[] | null;
     providesServices?: boolean | null;
+    profileVisibility?: string | null;
     updatedAt?: Date | string | null;
   } | null,
   privacyOptions?: {
