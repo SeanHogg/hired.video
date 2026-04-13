@@ -32,6 +32,7 @@ export function OnboardingProgress({
   showAllTasksLink = true,
   maxVisibleTasks = 2,
 }: OnboardingProgressProps) {
+  const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return Boolean(localStorage.getItem(DISMISS_KEY));
@@ -39,6 +40,8 @@ export function OnboardingProgress({
       return false;
     }
   });
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set());
 
   const completedTasksCount = tasks.filter((task) => task.completed).length;
   const progressPercentage = completionPercentage ?? (
@@ -88,10 +91,6 @@ export function OnboardingProgress({
       </Card>
     );
   }
-
-  const navigate = useNavigate();
-  const [completingId, setCompletingId] = useState<string | null>(null);
-  const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set());
 
   const handleComplete = async (task: OnboardingTask) => {
     setCompletingId(task.id);
