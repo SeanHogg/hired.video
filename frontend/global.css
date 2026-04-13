@@ -168,6 +168,10 @@
   margin-left: 0 !important;
 }
 
+.pricing-page .max-w-4xl {
+  max-width: none !important;
+}
+
 /* ─── Footer padding ────────────────────────────────────────────────── */
 @media (min-width: 768px) {
   .md\:col-span-2 {

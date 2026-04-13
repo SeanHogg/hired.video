@@ -259,7 +259,7 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+    <div className="pricing-page min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={closeSidebar}
