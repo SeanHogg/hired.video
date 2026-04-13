@@ -136,6 +136,16 @@
   }
 }
 
+/* ─── Narrower sidebar, wider content ────────────────────────────────── */
+@media (min-width: 1024px) {
+  .lg\:w-80 {
+    width: 12rem;
+  }
+  .lg\:ml-80 {
+    margin-left: 12rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
