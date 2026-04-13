@@ -139,10 +139,10 @@
 /* ─── Narrower sidebar, wider content ────────────────────────────────── */
 @media (min-width: 1024px) {
   .lg\:w-80 {
-    width: 12rem;
+    width: 12rem !important;
   }
   .lg\:ml-80 {
-    margin-left: 12rem;
+    margin-left: 12rem !important;
   }
 }
 

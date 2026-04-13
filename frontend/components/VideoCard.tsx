@@ -1,4 +1,4 @@
-import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
+import { Play, Eye, Clock, User, Briefcase, Brain, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { CardActions } from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
+import { toast } from "sonner";
 
 interface VideoCardProps {
   id: string;
@@ -22,10 +23,10 @@ interface VideoCardProps {
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
   onView?: () => void;
-  onActions?: () => void;
 }
 
 export default function VideoCard({
+  id,
   title,
   description,
   thumbnail,
@@ -39,7 +40,6 @@ export default function VideoCard({
   userContext: _userContext,
   itemOwnership,
   onView,
-  onActions,
 }: VideoCardProps) {
   const isOwner = itemOwnership?.ownership === "owned";
   const formatViews = (count: number) => {
@@ -76,21 +76,21 @@ export default function VideoCard({
               if (onView) {
                 onView();
               } else {
-                console.log("View video:", title);
+                window.location.href = `/v/${id}`;
               }
             },
           },
           {
-            id: "actions",
-            label: "Actions",
-            variant: "default" as const,
-            icon: Play,
+            id: "share",
+            label: "Share",
+            variant: "outline" as const,
+            icon: Share2,
             onClick: () => {
-              if (onActions) {
-                onActions();
-              } else {
-                console.log("Actions clicked for video:", title);
-              }
+              const url = `${window.location.origin}/v/${id}`;
+              navigator.clipboard
+                .writeText(url)
+                .then(() => toast.success("Video link copied to clipboard"))
+                .catch(() => prompt("Copy this link:", url));
             },
           },
         ];

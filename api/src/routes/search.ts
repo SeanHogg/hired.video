@@ -50,6 +50,7 @@ function toPeopleItem(user: typeof users.$inferSelect, profile?: typeof userProf
     type: "people" as const,
     name: user.name,
     role: user.role,
+    avatar: profile?.avatarUrl ?? undefined,
     headline: profile?.headline ?? undefined,
     location: profile?.location ?? undefined,
     createdAt: user.createdAt?.toISOString(),
