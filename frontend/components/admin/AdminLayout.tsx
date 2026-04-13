@@ -43,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const visibleTabs = TABS.filter(({ resource }) => canAccess(resource));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="admin-page min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />

@@ -152,6 +152,10 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
+  .admin-page .lg\:px-8 {
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+  }
 }
 
 .mx-auto {
@@ -168,7 +172,8 @@
   margin-left: 0 !important;
 }
 
-.pricing-page .max-w-4xl {
+.pricing-page .max-w-4xl,
+.services-page .max-w-4xl {
   max-width: none !important;
 }
 

@@ -1323,63 +1323,62 @@ export default function Resumes() {
                   </div>
                 </div>
 
-                {/* Search and Filters */}
-                <div className="space-y-4">
-                  <SearchBar
-                    context="resumes"
-                    value={searchFilters.search}
-                    filters={searchFilters}
-                    onSearch={handleSearch}
-                    onFilterChange={handleFilterChange}
-                    onClearFilters={handleClearFilters}
-                  />
-
-                  {/* View Mode Toggle */}
-                  <div className="flex justify-end space-x-2">
-                    {/* Master Groups Toggle - Only for Job Seekers */}
-                    {isJobSeeker && (
-                      <div className="flex items-center border rounded-md">
-                        <Button
-                          variant={showMasterGroups ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setShowMasterGroups(true)}
-                          className="rounded-r-none text-xs px-3"
-                        >
-                          Collections
-                        </Button>
-                        <Button
-                          variant={!showMasterGroups ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setShowMasterGroups(false)}
-                          className="rounded-l-none text-xs px-3"
-                        >
-                          All Resumes
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Grid/List Toggle - Show for all roles when not in master groups view, or always for non-Job Seekers */}
-                    {(!isJobSeeker || !showMasterGroups) && (
-                      <div className="flex items-center border rounded-md">
-                        <Button
-                          variant={viewMode === "grid" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("grid")}
-                          className="rounded-r-none"
-                        >
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={viewMode === "list" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("list")}
-                          className="rounded-l-none"
-                        >
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                {/* Search, Filters, and View Toggle */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <SearchBar
+                      context="resumes"
+                      value={searchFilters.search}
+                      filters={searchFilters}
+                      onSearch={handleSearch}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={handleClearFilters}
+                    />
                   </div>
+
+                  {/* Master Groups Toggle - Only for Job Seekers */}
+                  {isJobSeeker && (
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={showMasterGroups ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setShowMasterGroups(true)}
+                        className="rounded-r-none text-xs px-3"
+                      >
+                        Collections
+                      </Button>
+                      <Button
+                        variant={!showMasterGroups ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setShowMasterGroups(false)}
+                        className="rounded-l-none text-xs px-3"
+                      >
+                        All Resumes
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Grid/List Toggle */}
+                  {(!isJobSeeker || !showMasterGroups) && (
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Master Resume Groups - Only for Job Seekers */}
