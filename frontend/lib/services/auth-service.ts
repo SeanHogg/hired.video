@@ -36,10 +36,10 @@ export const RegisterRequestSchema = z.object({
     USER_ROLES.JOB_SEEKER,
     USER_ROLES.RECRUITER,
     USER_ROLES.EMPLOYER,
-    USER_ROLES.AFFILIATE,
     USER_ROLES.ADMIN,
   ]).optional(),
   referralCode: z.string().trim().min(1).max(64).optional(),
+  enableAffiliate: z.boolean().optional(),
 });
 
 // Use the shared login response schema from @shared/api
@@ -120,7 +120,7 @@ function mapServerRole(role: string | number | undefined | null): string {
   if (r === "employer") return USER_ROLES.EMPLOYER;
   if (r === "admin") return USER_ROLES.ADMIN;
   if (r === "superadmin" || r === "super_admin") return USER_ROLES.SUPER_ADMIN;
-  if (r === "affiliate") return USER_ROLES.AFFILIATE;
+  if (r === "affiliate") return USER_ROLES.EMPLOYER; // Affiliate is a service, not a role
   // If it's numeric-like string, coerce to number mapping
   const num = Number(r);
   if (!Number.isNaN(num)) return mapServerRole(num);

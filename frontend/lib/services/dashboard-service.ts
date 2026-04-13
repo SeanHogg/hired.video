@@ -480,8 +480,6 @@ export class DashboardService {
           return await this.getEmployerDashboard();
         case DASHBOARD_TYPES.ADMIN:
           return await this.getAdminDashboard();
-        case DASHBOARD_TYPES.AFFILIATE:
-          return await this.getAffiliateDashboard();
         case DASHBOARD_TYPES.DEFAULT:
         default:
           return await this.getDashboard();

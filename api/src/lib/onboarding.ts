@@ -64,15 +64,7 @@ function getOnboardingTasksForRole(role: string): OnboardingTaskDef[] {
         position: 3,
       },
     ],
-    affiliate: [
-      {
-        title: "Start referring users",
-        description: "Share your affiliate link and start earning commissions",
-        taskType: 19,
-        url: "/affiliate",
-        position: 3,
-      },
-    ],
+    // Affiliate is a service, not a role — onboarding is handled via the affiliate profile flow
   };
 
   return [...common, ...(roleSpecific[role] ?? [])];

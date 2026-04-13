@@ -67,6 +67,7 @@ interface AuthContextType {
     lastName: string,
     role?: UserRole,
     referralCode?: string,
+    enableAffiliate?: boolean,
   ) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
@@ -289,6 +290,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     lastName: string,
     role: UserRole = USER_ROLES.JOB_SEEKER,
     referralCode?: string,
+    enableAffiliate?: boolean,
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -304,6 +306,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         lastName,
         role: registrationRole,
         referralCode,
+        enableAffiliate,
       });
 
       return true;

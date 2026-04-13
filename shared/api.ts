@@ -138,10 +138,10 @@ export const SignupRequestSchema = z.object({
       USER_ROLES.JOB_SEEKER,
       USER_ROLES.RECRUITER,
       USER_ROLES.EMPLOYER,
-      USER_ROLES.AFFILIATE,
       USER_ROLES.ADMIN,
     ])
     .optional(),
+  enableAffiliate: z.boolean().optional(),
 });
 
 // Exported types for shared schemas
@@ -166,7 +166,6 @@ export const UserProfileResponseSchema = z.object({
     USER_ROLES.JOB_SEEKER,
     USER_ROLES.RECRUITER,
     USER_ROLES.EMPLOYER,
-    USER_ROLES.AFFILIATE,
     USER_ROLES.ADMIN,
   ]),
   isVerified: z.boolean(),

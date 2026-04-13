@@ -36,10 +36,10 @@ export default function AffiliateProgram() {
       return;
     }
 
-    // Register explicitly as Affiliate and pass referral code from ?ref=
+    // Register as Employer with affiliate service auto-enabled
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref") || undefined;
-    const ok = await signup(email, password, firstName, lastName, USER_ROLES.AFFILIATE, ref);
+    const ok = await signup(email, password, firstName, lastName, USER_ROLES.EMPLOYER, ref, true);
     if (ok) {
       setSuccess("Registration successful! Please confirm your email to continue.");
       setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);

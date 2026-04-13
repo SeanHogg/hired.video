@@ -37,23 +37,6 @@ export function useDashboard(): UseDashboardReturn {
       return;
     }
 
-    // Check if user is affiliate - they handle their own dashboard data
-    const rolePermissions = createRolePermissions(user.role);
-    if (rolePermissions.dashboardType === DASHBOARD_TYPES.AFFILIATE) {
-      setLoading(false);
-      setDashboardData({
-        title: "Affiliate Dashboard",
-        description: "Manage your referrals and track your earnings",
-        metrics: [],
-        recentActivity: [],
-        onboardingTasks: [],
-        onboardingCompletionPercentage: 0,
-        lastUpdated: new Date()
-      });
-      setLastRefresh(new Date());
-      return;
-    }
-
     setLoading(true);
     setError(null);
 

@@ -15,7 +15,7 @@ import {
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
 
-const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens } = schema;
+const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens, affiliateProfiles } = schema;
 
 function getJwtSecret(): string {
   return process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET || "";
@@ -146,13 +146,15 @@ const RegisterSchema = z.object({
         jobseeker: "job_seeker",
         recruiter: "recruiter",
         employer: "employer",
-        affiliate: "affiliate",
+        affiliate: "employer", // Affiliate is a service, not a role — map to employer
         admin: "admin",
       };
       return map[r.toLowerCase().replace(/[^a-z]/g, "")] ?? r;
     })
-    .pipe(z.enum(["job_seeker", "recruiter", "employer", "affiliate", "admin"]))
+    .pipe(z.enum(["job_seeker", "recruiter", "employer", "admin"]))
     .default("job_seeker"),
+  // When true, auto-creates an affiliate profile for the new user
+  enableAffiliate: z.boolean().optional(),
 }).refine(
   (d) => d.name || (d.firstName || d.lastName),
   { message: "name or firstName/lastName is required", path: ["name"] },
@@ -195,7 +197,7 @@ authRoutes.post("/register", async (c) => {
   }
 
   const db = getDb();
-  const { email, password, role } = parsed.data;
+  const { email, password, role, enableAffiliate } = parsed.data;
   const name = parsed.data.name || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ") || email;
 
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
@@ -235,6 +237,20 @@ authRoutes.post("/register", async (c) => {
       triggerOnboardingDrip(user.id, user.email, user.name, user.role ?? "job_seeker").catch((err) =>
         console.error("[register] Failed to trigger onboarding drip:", err),
       ),
+      // Auto-create affiliate profile when signing up via the affiliate program
+      ...(enableAffiliate ? [
+        (async () => {
+          const base = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).padEnd(4, "X");
+          const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+          const referralCode = `${base}${rand}`;
+          await db.insert(affiliateProfiles).values({
+            userId: user.id,
+            referralCode,
+            commissionRate: "0.10",
+            status: "active",
+          } as any);
+        })().catch((err) => console.error("[register] Failed to create affiliate profile:", err)),
+      ] : []),
     ]),
   );
 

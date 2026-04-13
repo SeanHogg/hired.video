@@ -14,7 +14,6 @@ export const BACKEND_ROLE_VALUES = {
   JOB_SEEKER: 30,
   RECRUITER: 40,
   EMPLOYER: 20,
-  AFFILIATE: 50,
   ADMIN: 0,
   SUPER_ADMIN: -1,
 } as const;
@@ -24,7 +23,6 @@ export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
   [USER_ROLES.RECRUITER]: "Recruiter",
   [USER_ROLES.EMPLOYER]: "Employer",
-  [USER_ROLES.AFFILIATE]: "Affiliate",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
   "Unassigned": "Unassigned", // Users without a role or profile
@@ -35,7 +33,6 @@ export const ROLE_DESCRIPTIONS = {
   [USER_ROLES.JOB_SEEKER]: "Looking for job opportunities",
   [USER_ROLES.RECRUITER]: "Recruiting talent for companies",
   [USER_ROLES.EMPLOYER]: "Managing company and hiring",
-  [USER_ROLES.AFFILIATE]: "Partner or affiliate marketer",
   [USER_ROLES.ADMIN]: "System administration",
   [USER_ROLES.SUPER_ADMIN]: "Full system control and product management",
   "Unassigned": "Users without a role or profile assigned",
@@ -46,7 +43,6 @@ export const DASHBOARD_TYPES = {
   JOB_SEEKER: "jobseeker",
   RECRUITER: "recruiter",
   EMPLOYER: "employer",
-  AFFILIATE: "affiliate",
   ADMIN: "admin",
   SUPER_ADMIN: "admin", // SuperAdmin uses admin dashboard
   DEFAULT: "default",
@@ -74,8 +70,8 @@ export function normalizeRole(
         return USER_ROLES.RECRUITER;
       case BACKEND_ROLE_VALUES.EMPLOYER: // 20
         return USER_ROLES.EMPLOYER;
-      case BACKEND_ROLE_VALUES.AFFILIATE: // 50
-        return USER_ROLES.AFFILIATE;
+      case 50: // Legacy affiliate enum value — affiliate is now a service, not a role
+        return USER_ROLES.EMPLOYER;
       case BACKEND_ROLE_VALUES.ADMIN: // 0
         return USER_ROLES.ADMIN;
       case BACKEND_ROLE_VALUES.SUPER_ADMIN: // -1
@@ -97,8 +93,8 @@ export function normalizeRole(
     case "employer":
     case "business": // Legacy role, maps to Employer
       return USER_ROLES.EMPLOYER;
-    case "affiliate":
-      return USER_ROLES.AFFILIATE;
+    case "affiliate": // Legacy — affiliate is now a service, not a role
+      return USER_ROLES.EMPLOYER;
     case "admin":
     case "administrator":
       return USER_ROLES.ADMIN;
@@ -195,10 +191,6 @@ export class RolePermissions {
     return this.role === USER_ROLES.EMPLOYER;
   }
 
-  get isAffiliate(): boolean {
-    return this.role === USER_ROLES.AFFILIATE;
-  }
-
   get isAdmin(): boolean {
     return this.role === USER_ROLES.ADMIN;
   }
@@ -249,7 +241,6 @@ export class RolePermissions {
     if (this.isSuperAdmin || this.isAdmin) return DASHBOARD_TYPES.ADMIN;
     if (this.isEmployer) return DASHBOARD_TYPES.EMPLOYER;
     if (this.isRecruiter) return DASHBOARD_TYPES.RECRUITER;
-    if (this.isAffiliate) return DASHBOARD_TYPES.AFFILIATE;
     if (this.isJobSeeker) return DASHBOARD_TYPES.JOB_SEEKER;
     return DASHBOARD_TYPES.DEFAULT;
   }
@@ -278,9 +269,6 @@ export const roleUtils = {
     const normalized = normalizeRole(role);
     return normalized === USER_ROLES.EMPLOYER;
   },
-
-  isAffiliate: (role: string | number | undefined | null): boolean =>
-    normalizeRole(role) === USER_ROLES.AFFILIATE,
 
   isAdmin: (role: string | number | undefined | null): boolean =>
     normalizeRole(role) === USER_ROLES.ADMIN,

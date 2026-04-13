@@ -227,7 +227,6 @@ export default function AIChatPanel() {
       [USER_ROLES.JOB_SEEKER]: "👋 Hi! I'm your AI CHRO. I can help you craft a standout resume, ace your interviews, negotiate your salary, and land the role you deserve. What are we working on today?",
       [USER_ROLES.RECRUITER]: "👋 Hi! I'm your AI CHRO. I can help you source top candidates, write compelling job descriptions, run structured interviews, and close faster. What's on your hiring agenda?",
       [USER_ROLES.EMPLOYER]: "👋 Hi! I'm your AI CHRO. I can help you build high-performing teams, optimize your hiring process, benchmark compensation, and manage your workforce strategy. Where do you want to start?",
-      [USER_ROLES.AFFILIATE]: "👋 Hi! I'm your AI CHRO. I can help you grow your affiliate business, optimize your referral strategy, and maximize your earnings on hired.video. What would you like to tackle?",
       [USER_ROLES.ADMIN]: "👋 Hi! I'm your AI CHRO. I can help you manage the platform, analyze user metrics, and drive better outcomes across the board. What do you need?",
       [USER_ROLES.SUPER_ADMIN]: "👋 Hi! I'm your AI CHRO. Full platform visibility is at your fingertips — analytics, user management, system insights. What are we looking at?",
     };

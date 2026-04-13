@@ -38,7 +38,6 @@ export function usePermissions() {
     isEmployer: permissions.isEmployer,
     isRecruiter: permissions.isRecruiter,
     isJobSeeker: permissions.isJobSeeker,
-    isAffiliate: permissions.isAffiliate,
     isSuperAdmin: isSuperAdmin,
 
     // Impersonation state

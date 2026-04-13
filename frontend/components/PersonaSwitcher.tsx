@@ -74,7 +74,6 @@ export function PersonaSwitcher({
           <SelectItem value={USER_ROLES.JOB_SEEKER}>Job Seeker</SelectItem>
           <SelectItem value={USER_ROLES.RECRUITER}>Recruiter</SelectItem>
           <SelectItem value={USER_ROLES.EMPLOYER}>Employer</SelectItem>
-          <SelectItem value={USER_ROLES.AFFILIATE}>Affiliate</SelectItem>
           <SelectItem value={USER_ROLES.ADMIN}>Administrator</SelectItem>
           <SelectItem value={USER_ROLES.SUPER_ADMIN}>Super Administrator</SelectItem>
         </SelectContent>

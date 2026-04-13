@@ -59,6 +59,7 @@ const UpdateProfileSchema = z.object({
   twitter: z.string().optional(),
   currentRole: z.string().optional(),
   currentCompany: z.string().optional(),
+  avatar: z.string().optional(),
   avatarUrl: z.string().optional(),
   openToWork: z.boolean().optional(),
   openToRemote: z.boolean().optional(),
@@ -305,84 +306,58 @@ userRoutes.get("/profile", async (c) => {
   return c.json(success(profileDto), 200);
 });
 
-/** PUT /api/users/profile — update the authenticated user's profile */
-userRoutes.put("/profile", async (c) => {
-  const user = c.var.user;
-  const body = await c.req.json().catch(() => null);
-  const parsed = UpdateProfileSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
+// ── Shared profile update logic (DRY) ─────────────────────────────────────────
+type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 
+/** Build a partial profile updates object from only the fields that were provided */
+function buildProfileUpdates(d: UpdateProfileInput): Record<string, unknown> {
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (d.headline !== undefined) updates.headline = d.headline;
+  if (d.summary !== undefined) updates.summary = d.summary;
+  if (d.location !== undefined) updates.location = d.location;
+  if (d.website !== undefined) updates.website = d.website;
+  if (d.phone !== undefined) updates.phone = d.phone;
+  if (d.linkedIn !== undefined) updates.linkedIn = d.linkedIn;
+  if (d.github !== undefined || d.gitHub !== undefined) updates.github = d.github ?? d.gitHub;
+  if (d.twitter !== undefined) updates.twitter = d.twitter;
+  if (d.currentRole !== undefined) updates.currentRole = d.currentRole;
+  if (d.currentCompany !== undefined) updates.currentCompany = d.currentCompany;
+  if (d.avatar !== undefined || d.avatarUrl !== undefined) updates.avatarUrl = d.avatar ?? d.avatarUrl;
+  if (d.openToWork !== undefined) updates.openToWork = d.openToWork;
+  if (d.openToRemote !== undefined) updates.openToRemote = d.openToRemote;
+  if (d.salaryCurrency !== undefined) updates.salaryCurrency = d.salaryCurrency;
+  if (d.salaryExpectation !== undefined) updates.salaryExpectation = d.salaryExpectation;
+  if (d.yearsOfExperience !== undefined) updates.yearsOfExperience = d.yearsOfExperience;
+  if (d.skills !== undefined) updates.skills = d.skills;
+  if (d.industries !== undefined) updates.industries = d.industries;
+  if (d.preferredRoles !== undefined) updates.preferredRoles = d.preferredRoles;
+  if (d.profileVisibility !== undefined) updates.profileVisibility = d.profileVisibility;
+  return updates;
+}
+
+const PROFILE_INSERT_DEFAULTS = {
+  openToWork: false,
+  openToRemote: false,
+  skills: [] as string[],
+  industries: [] as string[],
+  preferredRoles: [] as string[],
+};
+
+async function upsertProfile(userId: string, profileUpdates: Record<string, unknown>) {
   const db = getDb();
-  const d = parsed.data;
-
-  const firstName = d.firstName ?? "";
-  const lastName = d.lastName ?? "";
-  const fullName = d.name ?? (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined);
-
-  const userUpdates: Partial<{ name: string; email: string; updatedAt: Date }> = { updatedAt: new Date() };
-  if (fullName) userUpdates.name = fullName;
-  if (d.email) userUpdates.email = d.email;
-
-  const [updated] = await db
-    .update(users)
-    .set(userUpdates)
-    .where(eq(users.id, user.sub))
-    .returning({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-
-    });
-
-  if (!updated) {
-    return c.json(error("NOT_FOUND", "User not found"), 404);
-  }
-
-  const profileData = {
-    userId: user.sub,
-    headline: d.headline ?? null,
-    summary: d.summary ?? null,
-    location: d.location ?? null,
-    website: d.website ?? null,
-    phone: d.phone ?? null,
-    linkedIn: d.linkedIn ?? null,
-    github: d.github ?? d.gitHub ?? null,
-    twitter: d.twitter ?? null,
-    currentRole: d.currentRole ?? null,
-    currentCompany: d.currentCompany ?? null,
-    avatarUrl: d.avatarUrl ?? null,
-    openToWork: d.openToWork ?? false,
-    openToRemote: d.openToRemote ?? false,
-    salaryCurrency: d.salaryCurrency ?? null,
-    salaryExpectation: d.salaryExpectation ?? null,
-    yearsOfExperience: d.yearsOfExperience ?? null,
-    skills: d.skills ?? [],
-    industries: d.industries ?? [],
-    preferredRoles: d.preferredRoles ?? [],
-    ...(d.profileVisibility ? { profileVisibility: d.profileVisibility } : {}),
-    updatedAt: new Date(),
-  } as any;
-
   const [profile] = await db
     .insert(userProfiles)
-    .values({ ...profileData, createdAt: new Date() })
+    .values({ userId, ...PROFILE_INSERT_DEFAULTS, ...profileUpdates, createdAt: new Date() } as any)
     .onConflictDoUpdate({
       target: userProfiles.userId,
-      set: profileData,
+      set: profileUpdates as any,
     })
     .returning();
+  return profile;
+}
 
-  return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
-});
-
-/** PUT /api/users/me — frontend compatibility endpoint */
-userRoutes.put("/me", async (c) => {
+/** PUT /api/users/me (and /profile alias) — update authenticated user's profile */
+const handleUpdateProfile = async (c: any) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = UpdateProfileSchema.safeParse(body);
@@ -393,17 +368,14 @@ userRoutes.put("/me", async (c) => {
   const db = getDb();
   const d = parsed.data;
 
-  // Derive name from firstName/lastName if provided
   const firstName = d.firstName ?? "";
   const lastName = d.lastName ?? "";
   const fullName = d.name ?? (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined);
 
-  // Update users table (name/email/role)
   const userUpdates: Partial<{ name: string; email: string; role: string; updatedAt: Date }> = { updatedAt: new Date() };
   if (fullName) userUpdates.name = fullName;
   if (d.email) userUpdates.email = d.email;
 
-  // Persist role change if provided
   const newRole = d.role ? normalizeRole(d.role) : null;
   if (newRole) userUpdates.role = newRole;
 
@@ -412,60 +384,21 @@ userRoutes.put("/me", async (c) => {
     .set(userUpdates as any)
     .where(eq(users.id, user.sub))
     .returning({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
+      id: users.id, email: users.email, name: users.name, role: users.role,
+      emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt,
     });
 
   if (!updated) {
     return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
-  // Upsert user_profiles
-  const profileData = {
-    userId: user.sub,
-    headline: d.headline ?? null,
-    summary: d.summary ?? null,
-    location: d.location ?? null,
-    website: d.website ?? null,
-    phone: d.phone ?? null,
-    linkedIn: d.linkedIn ?? null,
-    github: d.github ?? d.gitHub ?? null,
-    twitter: d.twitter ?? null,
-    currentRole: d.currentRole ?? null,
-    currentCompany: d.currentCompany ?? null,
-    avatarUrl: d.avatarUrl ?? null,
-    openToWork: d.openToWork ?? false,
-    openToRemote: d.openToRemote ?? false,
-    salaryCurrency: d.salaryCurrency ?? null,
-    salaryExpectation: d.salaryExpectation ?? null,
-    yearsOfExperience: d.yearsOfExperience ?? null,
-    skills: d.skills ?? [],
-    industries: d.industries ?? [],
-    preferredRoles: d.preferredRoles ?? [],
-    ...(d.profileVisibility ? { profileVisibility: d.profileVisibility } : {}),
-    updatedAt: new Date(),
-  } as any;
-
-  const [profile] = await db
-    .insert(userProfiles)
-    .values({ ...profileData, createdAt: new Date() })
-    .onConflictDoUpdate({
-      target: userProfiles.userId,
-      set: profileData,
-    })
-    .returning();
+  const profile = await upsertProfile(user.sub, buildProfileUpdates(d));
 
   // When the role changes, replace onboarding tasks for the new role (fire-and-forget)
   if (newRole) {
     c.executionCtx.waitUntil(
       (async () => {
         try {
-          // Delete existing onboarding tasks (taskType 10–19)
           const existingTasks = await db.select({ id: tasks.id, metadata: tasks.metadata }).from(tasks).where(eq(tasks.userId, user.sub));
           const onboardingIds = existingTasks
             .filter((t) => {
@@ -477,7 +410,6 @@ userRoutes.put("/me", async (c) => {
           for (const id of onboardingIds) {
             await db.delete(tasks).where(eq(tasks.id, id));
           }
-          // Re-seed for new role
           await seedOnboardingTasks(user.sub, newRole);
         } catch (err) {
           console.error("[users/me] Failed to re-seed onboarding tasks:", err);
@@ -487,7 +419,9 @@ userRoutes.put("/me", async (c) => {
   }
 
   return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
-});
+};
+userRoutes.put("/me", handleUpdateProfile);
+userRoutes.put("/profile", handleUpdateProfile);
 
 /** POST /api/users/connections — send connection request */
 userRoutes.post("/connections", async (c) => {
