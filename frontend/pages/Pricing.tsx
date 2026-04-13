@@ -195,28 +195,6 @@ export default function Pricing() {
     },
 
 
-    [USER_ROLES.AFFILIATE]: {
-      label: "Affiliate",
-      freeDescription: "Earn 25% commission on first-month subscriptions you refer.",
-      premiumDescription: "Affiliates earn commissions; no paid plan required.",
-      freeFeatures: [
-        "Unique referral link with click tracking",
-        "25% first-month commission",
-        "Real-time referrals & payouts dashboard",
-        "$25 minimum payout threshold",
-        "PayPal & bank transfer payouts",
-        "Referral attribution for job seekers, recruiters & employers",
-      ],
-      premiumFeatures: [
-        "Priority affiliate support",
-        "Advanced tracking & cohort analytics (coming soon)",
-        "Payout history export (CSV)",
-        "Co-marketing assets & brand kit",
-      ],
-      unitLabel: "",
-      userCountLabel: "",
-    },
-
     [USER_ROLES.ADMIN]: {
       label: "Admin",
       freeDescription: "Administrative access to manage the platform.",

@@ -33,7 +33,7 @@ function normalizeRole(role: string): string | null {
     job_seeker: "job_seeker",
     recruiter: "recruiter",
     employer: "employer",
-    affiliate: "affiliate",
+    affiliate: "employer", // Affiliate is a service, not a role — map to employer
     admin: "admin",
   };
   return map[role.toLowerCase()] ?? null;
@@ -270,41 +270,6 @@ userRoutes.get("/me", async (c) => {
   return c.json(success(meDto), 200);
 });
 
-/** GET /api/users/profile — get the authenticated user's profile */
-userRoutes.get("/profile", async (c) => {
-  const user = c.var.user;
-  const db = getDb();
-
-  const [me] = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      name: users.name,
-      role: users.role,
-      emailVerified: users.emailVerified,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-
-    })
-    .from(users)
-    .where(eq(users.id, user.sub))
-    .limit(1);
-
-  if (!me) {
-    return c.json(error("NOT_FOUND", "User not found"), 404);
-  }
-
-  const [profile] = await db
-    .select(profileCols)
-    .from(userProfiles)
-    .where(eq(userProfiles.userId, user.sub))
-    .limit(1);
-
-  const profileDto = toUserProfileDto(me, profile ?? null);
-  const profileSub = await getSubscription(user.sub);
-  profileDto.isPremium = profileSub.isPremium;
-  return c.json(success(profileDto), 200);
-});
 
 // ── Shared profile update logic (DRY) ─────────────────────────────────────────
 type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
@@ -421,7 +386,6 @@ const handleUpdateProfile = async (c: any) => {
   return c.json(success(toUserProfileDto(updated, profile ?? null)), 200);
 };
 userRoutes.put("/me", handleUpdateProfile);
-userRoutes.put("/profile", handleUpdateProfile);
 
 /** POST /api/users/connections — send connection request */
 userRoutes.post("/connections", async (c) => {

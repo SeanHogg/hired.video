@@ -7,7 +7,6 @@ import {
   type DashboardResponse,
 } from "@/lib/services/dashboard-service";
 import { useAuth } from "@/lib/auth";
-import { createRolePermissions, DASHBOARD_TYPES } from "@/lib/role-utils";
 
 export type DashboardData =
   | BaseDashboard

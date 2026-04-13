@@ -181,16 +181,11 @@ export default function ServicesManagement() {
     setAffiliateLoading(true);
     setCreatorLoading(true);
 
-    // Affiliate check
-    if (effectiveRole === USER_ROLES.AFFILIATE) {
-      setAffiliateActive(true);
-      setAffiliateLoading(false);
-    } else {
-      affiliateService.getProfile()
-        .then(() => setAffiliateActive(true))
-        .catch(() => setAffiliateActive(false))
-        .finally(() => setAffiliateLoading(false));
-    }
+    // Affiliate check — always service-based (affiliate is a service, not a role)
+    affiliateService.getProfile()
+      .then(() => setAffiliateActive(true))
+      .catch(() => setAffiliateActive(false))
+      .finally(() => setAffiliateLoading(false));
 
     // Creator check
     import("@/lib/api-client").then(({ apiClient }) => {
