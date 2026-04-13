@@ -83,7 +83,7 @@ const Help = lazy(() => import("./pages/Help"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
-const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+
 const AICoach = lazy(() => import("./pages/AICoach"));
 const ChromeExtension = lazy(() => import("./pages/ChromeExtension"));
 const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
@@ -421,7 +421,7 @@ const App = () => (
                         element={<CompanyCreatePage />}
                       />
                       <Route path="/affiliate-program" element={<AffiliateProgram />} />
-                      <Route path="/affiliate/dashboard" element={<RequireVerified><AffiliateDashboard /></RequireVerified>} />
+                      <Route path="/affiliate/dashboard" element={<Navigate to="/services?tab=affiliate" replace />} />
 
                       <Route
                         path="/companies/create/:id"

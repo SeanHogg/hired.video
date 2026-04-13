@@ -32,7 +32,7 @@ function AffiliateDashboardContent() {
     // Protect route: affiliate role only
     // Backend roles include Affiliate = 50; frontend may have string roles; be permissive here and rely on backend auth too
     if (!isAuthenticated) {
-      navigate("/login?next=/affiliate/dashboard");
+      navigate("/login?next=/services?tab=affiliate");
     }
   }, [isAuthenticated, navigate]);
 
@@ -80,8 +80,11 @@ function AffiliateDashboardContent() {
         title: "Payment method added!",
         description: "Your payment method has been successfully configured. You can now request payouts.",
       });
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
+      // Clean up URL — preserve tab param if present
+      const cleanParams = new URLSearchParams(window.location.search);
+      cleanParams.delete('pm_success');
+      const cleanSearch = cleanParams.toString();
+      window.history.replaceState({}, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
       // Reload payment methods
       const reloadPaymentMethods = async () => {
         try {
@@ -114,8 +117,8 @@ function AffiliateDashboardContent() {
   const handleAddPaymentMethod = async () => {
     try {
       setPaymentMethodsLoading(true);
-      const successUrl = `${window.location.origin}/affiliate/dashboard?pm_success=true`;
-      const cancelUrl = `${window.location.origin}/affiliate/dashboard`;
+      const successUrl = `${window.location.origin}/services?tab=affiliate&pm_success=true`;
+      const cancelUrl = `${window.location.origin}/services?tab=affiliate`;
       const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
       window.location.href = setupUrl;
     } catch (e) {

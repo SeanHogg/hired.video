@@ -144,8 +144,60 @@ function timeAgo(dateStr: string) {
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
+  // Support ?tab=affiliate deep-link (e.g. redirect from /affiliate/dashboard)
+  const tabFromUrl = searchParams.get("tab");
+  const initialTab = tabFromUrl === "affiliate" ? "affiliate" : "offerings";
+  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries" | "affiliate">(initialTab);
+
+  // Affiliate state — any user can opt in
+  const [isAffiliate, setIsAffiliate] = useState(false);
+  const [affiliateLoading, setAffiliateLoading] = useState(true);
+  const [affiliateEnrolling, setAffiliateEnrolling] = useState(false);
+
+  // Check affiliate status on mount
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    // User already has the Affiliate role
+    if (user.role === USER_ROLES.AFFILIATE) {
+      setIsAffiliate(true);
+      setAffiliateLoading(false);
+      return;
+    }
+    // Otherwise probe for an existing affiliate profile
+    affiliateService.getProfile()
+      .then(() => setIsAffiliate(true))
+      .catch(() => setIsAffiliate(false))
+      .finally(() => setAffiliateLoading(false));
+  }, [isAuthenticated, user]);
+
+  // Sync tab to URL
+  function changeTab(tab: typeof activeTab) {
+    setActiveTab(tab);
+    if (tab === "affiliate") {
+      setSearchParams({ tab: "affiliate" }, { replace: true });
+    } else {
+      // Remove tab param for default tabs
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+  }
+
+  async function handleAffiliateOptIn() {
+    setAffiliateEnrolling(true);
+    try {
+      await affiliateService.getProfile(); // auto-creates profile
+      setIsAffiliate(true);
+      changeTab("affiliate");
+      toast.success("You're now an affiliate! Share your referral link to start earning.");
+    } catch {
+      toast.error("Failed to join affiliate program. Please try again.");
+    } finally {
+      setAffiliateEnrolling(false);
+    }
+  }
 
   // ── Services state ──────────────────────────────────────────────────────────
   const [providesServices, setProviderServices] = useState(false);
@@ -522,7 +574,7 @@ export default function ServicesManagement() {
             )}
           </div>
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+          <Tabs value={activeTab} onValueChange={(v) => changeTab(v as typeof activeTab)}>
             <TabsList className="mb-6">
               <TabsTrigger value="offerings">My Offerings</TabsTrigger>
               <TabsTrigger value="inquiries" className="flex items-center gap-2">
@@ -532,6 +584,10 @@ export default function ServicesManagement() {
                     {pendingCount}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="affiliate" className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                Affiliate
               </TabsTrigger>
             </TabsList>
 
@@ -818,6 +874,72 @@ export default function ServicesManagement() {
                     )}
                   </TabsContent>
                 </Tabs>
+              )}
+            </TabsContent>
+
+            {/* ── Affiliate ──────────────────────────────────────────────── */}
+            <TabsContent value="affiliate">
+              {affiliateLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : isAffiliate ? (
+                <AffiliateDashboardContent />
+              ) : (
+                <Card className="border-brand-purple/20">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center">
+                        <Link2 className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle>Affiliate Program</CardTitle>
+                        <CardDescription>Earn 25% commission on every referral's first month</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Share your unique referral link and earn a one-time 25% commission when your
+                      referrals subscribe. No cap on earnings — the more you refer, the more you earn.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="flex items-start gap-3">
+                        <DollarSign className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">25% Commission</p>
+                          <p className="text-xs text-muted-foreground">On first-month subscription</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Users className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">Unlimited Referrals</p>
+                          <p className="text-xs text-muted-foreground">No cap on earnings</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <TrendingUp className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">Tiered Rewards</p>
+                          <p className="text-xs text-muted-foreground">Bronze to Platinum tiers</p>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleAffiliateOptIn}
+                      disabled={affiliateEnrolling}
+                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                    >
+                      {affiliateEnrolling ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Link2 className="h-4 w-4 mr-2" />
+                      )}
+                      Join Affiliate Program
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
           </Tabs>

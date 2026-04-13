@@ -60,7 +60,7 @@ function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] 
         { label: "Home", href: "/", icon: Home },
         { label: "Jobs", href: "/jobs", icon: Briefcase },
         { label: "Resumes", href: "/resumes", icon: FileText },
-        { label: "Affiliate", href: "/affiliate/dashboard", icon: Share2 },
+        { label: "Services", href: "/services?tab=affiliate", icon: Share2 },
         { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
       ];
 
