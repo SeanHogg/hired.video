@@ -24,6 +24,10 @@ import {
   TrendingUp,
   Settings as SettingsIcon,
   Link2,
+  Video,
+  ChevronDown,
+  ChevronUp,
+  Star,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -144,53 +148,72 @@ function timeAgo(dateStr: string) {
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  // Support ?tab=affiliate deep-link (e.g. redirect from /affiliate/dashboard)
-  const tabFromUrl = searchParams.get("tab");
-  const initialTab = tabFromUrl === "affiliate" ? "affiliate" : "offerings";
-  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries" | "affiliate">(initialTab);
+  const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
 
-  // Affiliate state — any user can opt in
-  const [isAffiliate, setIsAffiliate] = useState(false);
+  // ── Standard services state ────────────────────────────────────────────────
+  // Each standard service tracks: enrolled?, loading?, expanded?, enrolling?
+  const expandParam = searchParams.get("expand"); // e.g. ?expand=affiliate
+
+  const [affiliateActive, setAffiliateActive] = useState(false);
   const [affiliateLoading, setAffiliateLoading] = useState(true);
   const [affiliateEnrolling, setAffiliateEnrolling] = useState(false);
+  const [affiliateExpanded, setAffiliateExpanded] = useState(expandParam === "affiliate");
 
-  // Check affiliate status on mount
+  const [creatorActive, setCreatorActive] = useState(false);
+  const [creatorLoading, setCreatorLoading] = useState(true);
+  const [creatorExpanded, setCreatorExpanded] = useState(expandParam === "creator");
+  const [creatorProfile, setCreatorProfile] = useState<{
+    completedProjectsCount: number;
+    totalEarnedCents: number;
+    averageRating: number | null;
+    ratingCount: number;
+    displayName: string | null;
+  } | null>(null);
+
+  // Check standard service enrollment on mount
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    // User already has the Affiliate role
-    if (user.role === USER_ROLES.AFFILIATE) {
-      setIsAffiliate(true);
-      setAffiliateLoading(false);
-      return;
-    }
-    // Otherwise probe for an existing affiliate profile
-    affiliateService.getProfile()
-      .then(() => setIsAffiliate(true))
-      .catch(() => setIsAffiliate(false))
-      .finally(() => setAffiliateLoading(false));
-  }, [isAuthenticated, user]);
 
-  // Sync tab to URL
-  function changeTab(tab: typeof activeTab) {
-    setActiveTab(tab);
-    if (tab === "affiliate") {
-      setSearchParams({ tab: "affiliate" }, { replace: true });
+    // Affiliate check
+    if (user.role === USER_ROLES.AFFILIATE) {
+      setAffiliateActive(true);
+      setAffiliateLoading(false);
     } else {
-      // Remove tab param for default tabs
-      const next = new URLSearchParams(searchParams);
-      next.delete("tab");
-      setSearchParams(next, { replace: true });
+      affiliateService.getProfile()
+        .then(() => setAffiliateActive(true))
+        .catch(() => setAffiliateActive(false))
+        .finally(() => setAffiliateLoading(false));
     }
-  }
+
+    // Creator check
+    import("@/lib/api-client").then(({ apiClient }) => {
+      apiClient.get<any>("/api/creators/me")
+        .then((res: any) => {
+          const profile = res?.data;
+          if (profile) {
+            setCreatorActive(true);
+            setCreatorProfile({
+              completedProjectsCount: profile.completedProjectsCount ?? 0,
+              totalEarnedCents: profile.totalEarnedCents ?? 0,
+              averageRating: profile.averageRating ?? null,
+              ratingCount: profile.ratingCount ?? 0,
+              displayName: profile.displayName ?? null,
+            });
+          }
+        })
+        .catch(() => setCreatorActive(false))
+        .finally(() => setCreatorLoading(false));
+    });
+  }, [isAuthenticated, user]);
 
   async function handleAffiliateOptIn() {
     setAffiliateEnrolling(true);
     try {
       await affiliateService.getProfile(); // auto-creates profile
-      setIsAffiliate(true);
-      changeTab("affiliate");
+      setAffiliateActive(true);
+      setAffiliateExpanded(true);
       toast.success("You're now an affiliate! Share your referral link to start earning.");
     } catch {
       toast.error("Failed to join affiliate program. Please try again.");
@@ -574,9 +597,9 @@ export default function ServicesManagement() {
             )}
           </div>
 
-          <Tabs value={activeTab} onValueChange={(v) => changeTab(v as typeof activeTab)}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
             <TabsList className="mb-6">
-              <TabsTrigger value="offerings">My Offerings</TabsTrigger>
+              <TabsTrigger value="offerings">My Services</TabsTrigger>
               <TabsTrigger value="inquiries" className="flex items-center gap-2">
                 Inquiries
                 {pendingCount > 0 && (
@@ -585,14 +608,176 @@ export default function ServicesManagement() {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="affiliate" className="flex items-center gap-2">
-                <Link2 className="h-4 w-4" />
-                Affiliate
-              </TabsTrigger>
             </TabsList>
 
-            {/* ── My Offerings ─────────────────────────────────────────────── */}
+            {/* ── My Services ─────────────────────────────────────────────── */}
             <TabsContent value="offerings" className="space-y-6">
+
+              {/* ── Standard Services ─────────────────────────────────────── */}
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Standard Services
+                </h2>
+
+                {/* Affiliate */}
+                <Card className={`transition-colors ${affiliateActive ? "border-green-300/50" : "border-dashed"}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center shrink-0">
+                          <Link2 className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">Affiliate</h3>
+                            {affiliateLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            ) : affiliateActive ? (
+                              <Badge variant="default" className="text-xs bg-green-600">Active</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">Available</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Earn 25% commission on every referral's first-month subscription
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!affiliateLoading && !affiliateActive && (
+                          <Button
+                            size="sm"
+                            onClick={handleAffiliateOptIn}
+                            disabled={affiliateEnrolling}
+                            className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
+                          >
+                            {affiliateEnrolling ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : null}
+                            Join
+                          </Button>
+                        )}
+                        {affiliateActive && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAffiliateExpanded(!affiliateExpanded)}
+                          >
+                            {affiliateExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                  {affiliateActive && affiliateExpanded && (
+                    <div className="border-t px-4 pb-4 pt-4">
+                      <AffiliateDashboardContent />
+                    </div>
+                  )}
+                </Card>
+
+                {/* Content Creator */}
+                <Card className={`transition-colors ${creatorActive ? "border-green-300/50" : "border-dashed"}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-pink-500 to-orange-400 flex items-center justify-center shrink-0">
+                          <Video className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">Content Creator</h3>
+                            {creatorLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            ) : creatorActive ? (
+                              <Badge variant="default" className="text-xs bg-green-600">Active</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">Available</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Sell promo videos, portfolio pieces, and creative services
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!creatorLoading && !creatorActive && (
+                          <Link to="/creator/onboarding">
+                            <Button
+                              size="sm"
+                              className="bg-gradient-to-r from-pink-500 to-orange-400 hover:opacity-90"
+                            >
+                              Join
+                            </Button>
+                          </Link>
+                        )}
+                        {creatorActive && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setCreatorExpanded(!creatorExpanded)}
+                          >
+                            {creatorExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                  {creatorActive && creatorExpanded && creatorProfile && (
+                    <div className="border-t px-4 pb-4 pt-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-2xl font-bold">{creatorProfile.completedProjectsCount}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Projects Completed</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-2xl font-bold">
+                              ${(creatorProfile.totalEarnedCents / 100).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Total Earned</p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                              <p className="text-2xl font-bold">
+                                {creatorProfile.averageRating?.toFixed(1) ?? "—"}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Avg Rating ({creatorProfile.ratingCount} reviews)
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="p-4 text-center">
+                            <p className="text-2xl font-bold">{creatorProfile.displayName ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Display Name</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* ── Custom Offerings ──────────────────────────────────────── */}
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  Custom Offerings
+                </h2>
 
               {/* Service list */}
               {loading ? (
@@ -693,6 +878,7 @@ export default function ServicesManagement() {
                   ))}
                 </div>
               )}
+              </div>
             </TabsContent>
 
             {/* ── Inquiries ────────────────────────────────────────────────── */}
@@ -877,71 +1063,6 @@ export default function ServicesManagement() {
               )}
             </TabsContent>
 
-            {/* ── Affiliate ──────────────────────────────────────────────── */}
-            <TabsContent value="affiliate">
-              {affiliateLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : isAffiliate ? (
-                <AffiliateDashboardContent />
-              ) : (
-                <Card className="border-brand-purple/20">
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center">
-                        <Link2 className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle>Affiliate Program</CardTitle>
-                        <CardDescription>Earn 25% commission on every referral's first month</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Share your unique referral link and earn a one-time 25% commission when your
-                      referrals subscribe. No cap on earnings — the more you refer, the more you earn.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="flex items-start gap-3">
-                        <DollarSign className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">25% Commission</p>
-                          <p className="text-xs text-muted-foreground">On first-month subscription</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Users className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">Unlimited Referrals</p>
-                          <p className="text-xs text-muted-foreground">No cap on earnings</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <TrendingUp className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">Tiered Rewards</p>
-                          <p className="text-xs text-muted-foreground">Bronze to Platinum tiers</p>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleAffiliateOptIn}
-                      disabled={affiliateEnrolling}
-                      className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                    >
-                      {affiliateEnrolling ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Link2 className="h-4 w-4 mr-2" />
-                      )}
-                      Join Affiliate Program
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
           </Tabs>
         </main>
         </div>
