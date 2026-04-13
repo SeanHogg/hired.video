@@ -24,7 +24,7 @@ function getOnboardingTasksForRole(role: string): OnboardingTaskDef[] {
       title: "Complete your profile",
       description: "Add your photo, bio, and contact information",
       taskType: 11,
-      url: "/settings/profile",
+      url: "/profile",
       position: 1,
     },
     {
@@ -120,20 +120,25 @@ export async function seedOnboardingTasks(userId: string, role: string): Promise
   const boardId = await getOrCreateDefaultBoard(userId, db);
 
   await db.insert(tasks).values(
-    taskDefs.map((def) => ({
-      boardId,
-      userId,
-      title: def.title,
-      description: def.description,
-      status: "todo",
-      priority: "medium",
-      position: def.position,
-      metadata: {
-        taskType: def.taskType,
-        legacyStatus: 1, // ToDo
-        url: def.url,
-      },
-    })) as any,
+    taskDefs.map((def) => {
+      // Persona is already selected by the time we seed (chosen during signup or role change)
+      const alreadyDone = def.taskType === 10;
+      return {
+        boardId,
+        userId,
+        title: def.title,
+        description: def.description,
+        status: alreadyDone ? "done" : "todo",
+        priority: "medium",
+        position: def.position,
+        completedAt: alreadyDone ? new Date() : null,
+        metadata: {
+          taskType: def.taskType,
+          legacyStatus: alreadyDone ? 6 : 1,
+          url: def.url,
+        },
+      };
+    }) as any,
   );
 }
 
@@ -142,15 +147,20 @@ export async function seedOnboardingTasks(userId: string, role: string): Promise
  */
 export function toOnboardingTaskDto(row: typeof tasks.$inferSelect) {
   const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  const taskType = typeof meta.taskType === "number" ? meta.taskType : -1;
   const legacyStatus = typeof meta.legacyStatus === "number" ? meta.legacyStatus : 1;
-  const completed = legacyStatus === 6 || row.completedAt != null;
+  // Persona (taskType 10) is always complete — selected during signup or role change
+  const completed = taskType === 10 || legacyStatus === 6 || row.completedAt != null;
+  // Fix stale /settings/profile URLs from earlier seeds
+  let url = typeof meta.url === "string" ? meta.url : undefined;
+  if (url === "/settings/profile") url = "/profile";
   return {
     id: row.id,
     title: row.title,
     description: row.description ?? undefined,
     completed,
     completedDate: row.completedAt ? new Date(row.completedAt).toISOString() : undefined,
-    url: typeof meta.url === "string" ? meta.url : undefined,
+    url,
     priority: typeof row.position === "number" ? row.position + 1 : 1,
   };
 }
