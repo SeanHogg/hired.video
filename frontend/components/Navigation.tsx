@@ -23,7 +23,7 @@ import { EmulationHeaderControls, useEmulationStyle } from "@/components/Emulati
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { roleChecks } from "@/lib/role-utils";
+import { roleUtils } from "@/lib/role-utils";
 
 interface NavigationProps {
   onMenuClick?: () => void;
@@ -291,7 +291,7 @@ export default function Navigation({
               ) : (
                 <>
                   {/* Show upgrade button for free accounts — admins never see it */}
-                  {(!user?.subscription || user?.subscription === "free") && !roleChecks.isAdmin(user?.role) && !roleChecks.isSuperAdmin(user?.role) ? (
+                  {(!user?.subscription || user?.subscription === "free") && !roleUtils.isAdmin(user?.role) && !roleUtils.isSuperAdmin(user?.role) ? (
                     <Link to="/pricing">
                       <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
                         Upgrade Account
