@@ -148,13 +148,14 @@
   .lg\:ml-80 {
     margin-left: 12rem !important;
   }
-  .lg\:px-8 {
+}
+
+/* Nav bar & footer: remove horizontal padding */
+@media (min-width: 1024px) {
+  #nav-bar-wrapper,
+  #footer-wrapper {
     padding-left: 0 !important;
     padding-right: 0 !important;
-  }
-  .admin-page .lg\:px-8 {
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
   }
 }
 

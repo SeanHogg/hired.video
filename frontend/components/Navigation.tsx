@@ -147,7 +147,7 @@ export default function Navigation({
 
   return (
     <nav className={navCls}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div id="nav-bar-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div id="nav-bar" className="flex justify-between items-center h-16 pl-2.5">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
           <div className="flex items-center space-x-3">
