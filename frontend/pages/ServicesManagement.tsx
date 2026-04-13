@@ -80,6 +80,7 @@ import {
 } from "@/lib/push-notifications";
 import { toast } from "sonner";
 import { USER_ROLES } from "@shared/user-roles";
+import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import affiliateService from "@/lib/services/affiliate-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 
@@ -147,8 +148,12 @@ function timeAgo(dateStr: string) {
 
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, impersonationSession } = useAuth();
+  const { personaPreview } = usePersonaPreview();
   const [searchParams] = useSearchParams();
+
+  // Effective role: impersonation > persona preview > actual role
+  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
   const [activeTab, setActiveTab] = useState<"offerings" | "inquiries">("offerings");
 
@@ -172,18 +177,24 @@ export default function ServicesManagement() {
     displayName: string | null;
   } | null>(null);
 
-  // Check standard service enrollment on mount
+  // Check standard service enrollment — re-runs when effective role changes
+  // (e.g. impersonation role switch, persona preview toggle)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
+    // Reset loading states on role change
+    setAffiliateLoading(true);
+    setCreatorLoading(true);
+
     // Affiliate check
-    if (user.role === USER_ROLES.AFFILIATE) {
+    if (effectiveRole === USER_ROLES.AFFILIATE) {
       setAffiliateActive(true);
+      setAffiliateExpanded(true);
       setAffiliateLoading(false);
     } else {
       affiliateService.getProfile()
         .then(() => setAffiliateActive(true))
-        .catch(() => setAffiliateActive(false))
+        .catch(() => { setAffiliateActive(false); setAffiliateExpanded(false); })
         .finally(() => setAffiliateLoading(false));
     }
 
@@ -201,12 +212,14 @@ export default function ServicesManagement() {
               ratingCount: profile.ratingCount ?? 0,
               displayName: profile.displayName ?? null,
             });
+          } else {
+            setCreatorActive(false);
           }
         })
         .catch(() => setCreatorActive(false))
         .finally(() => setCreatorLoading(false));
     });
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, effectiveRole]);
 
   async function handleAffiliateOptIn() {
     setAffiliateEnrolling(true);
