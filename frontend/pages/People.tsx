@@ -28,6 +28,8 @@ import {
   Calendar,
   Plus,
   FileText,
+  Grid,
+  List,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -137,6 +139,7 @@ export default function People() {
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -761,16 +764,36 @@ export default function People() {
 
                   {/* Browse Tab */}
                   <TabsContent value="browse" className="space-y-6">
-                    {/* Search and Filters */}
-                    <div>
-                      <SearchBar
-                        context="people"
-                        value={searchFilters.search}
-                        filters={searchFilters}
-                        onSearch={handleSearch}
-                        onFilterChange={handleFilterChange}
-                        onClearFilters={handleClearFilters}
-                      />
+                    {/* Search, Filters, and View Toggle */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <SearchBar
+                          context="people"
+                          value={searchFilters.search}
+                          filters={searchFilters}
+                          onSearch={handleSearch}
+                          onFilterChange={handleFilterChange}
+                          onClearFilters={handleClearFilters}
+                        />
+                      </div>
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant={viewMode === "grid" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("grid")}
+                          className="rounded-r-none"
+                        >
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={viewMode === "list" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("list")}
+                          className="rounded-l-none"
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                 {/* Tracked People */}
                 {("tracked" in peopleData
@@ -837,7 +860,7 @@ export default function People() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
                       {people.map((person) => {
                         const personMetadata = {
                           id: person.id,
@@ -860,7 +883,7 @@ export default function People() {
                           headline: person.headline || "",
                           bio: (person as any).bio || person.headline || "",
                           location: person.location || "Location not specified",
-                          role: person.role, // Keep original role value for proper processing
+                          role: person.role,
                           skills: person.skills,
                           openToWork: person.openToWork,
                           visibility: "public" as const,
@@ -885,7 +908,8 @@ export default function People() {
                           <PeopleCard
                             key={person.id}
                             person={personMetadata}
-                            connectionStatus="none" // TODO: Implement connection status checking
+                            connectionStatus="none"
+                            layout={viewMode === "list" ? "horizontal" : "vertical"}
                             onConnect={handleConnect}
                             onMessage={handleMessage}
                             onAcceptConnection={handleAcceptConnection}
@@ -1159,16 +1183,36 @@ export default function People() {
               ) : (
                 /* Non-recruiter view - original layout */
                 <div className="space-y-6">
-                  {/* Search and Filters */}
-                  <div className="mb-6">
-                    <SearchBar
-                      context="people"
-                      value={searchFilters.search}
-                      filters={searchFilters}
-                      onSearch={handleSearch}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={handleClearFilters}
-                    />
+                  {/* Search, Filters, and View Toggle */}
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="flex-1">
+                      <SearchBar
+                        context="people"
+                        value={searchFilters.search}
+                        filters={searchFilters}
+                        onSearch={handleSearch}
+                        onFilterChange={handleFilterChange}
+                        onClearFilters={handleClearFilters}
+                      />
+                    </div>
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Tracked People */}
@@ -1236,7 +1280,7 @@ export default function People() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
                         {people.map((person) => {
                           const personMetadata = {
                             id: person.id,
@@ -1285,6 +1329,7 @@ export default function People() {
                               key={person.id}
                               person={personMetadata}
                               connectionStatus="none"
+                              layout={viewMode === "list" ? "horizontal" : "vertical"}
                               onConnect={handleConnect}
                               onMessage={handleMessage}
                               onAcceptConnection={handleAcceptConnection}

@@ -27,9 +27,10 @@ interface CompanyCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
-   
+  layout?: "vertical" | "horizontal";
+
   onTrack?: (_companyId: string) => void;
-   
+
   onUntrack?: (_companyId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -41,6 +42,7 @@ export default function CompanyCard({
   actions,
   userContext: _userContext,
   itemOwnership: _itemOwnership,
+  layout = "vertical",
   onTrack,
   onUntrack,
   onView,
@@ -189,6 +191,36 @@ export default function CompanyCard({
     },
   ];
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+
+  if (layout === "horizontal") {
+    return (
+      <BaseCard className="flex flex-row items-center">
+        <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+          <div className="flex-1 min-w-0">
+            <a href={`/companies/${company.id}`} className="font-semibold hover:underline truncate block">
+              {company.name}
+            </a>
+            <p className="text-sm text-muted-foreground truncate">{company.tagline}</p>
+          </div>
+          <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground flex-shrink-0">
+            {company.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{company.location}</span>}
+            {company.industry && <span className="text-xs">{company.industry}</span>}
+            {company.size && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{company.size}</span>}
+          </div>
+          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            {company.activeJobCount > 0 && (
+              <Badge variant="outline" className="text-xs">
+                <Briefcase className="h-3 w-3 mr-1" />{company.activeJobCount} Job{company.activeJobCount !== 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex-shrink-0 p-2">
+          <CardActions actions={cardActions} className="border-t-0 p-0 bg-transparent" />
+        </div>
+      </BaseCard>
+    );
+  }
 
   return (
     <BaseCard>

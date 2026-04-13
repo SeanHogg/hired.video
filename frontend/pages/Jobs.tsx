@@ -26,6 +26,8 @@ import {
   ExternalLink,
   Calendar,
   Edit,
+  Grid,
+  List,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -153,6 +155,7 @@ export default function Jobs() {
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [jobsData, setJobsData] = useState<{
@@ -593,16 +596,36 @@ export default function Jobs() {
 
                 {/* Browse Tab */}
                 <TabsContent value="browse" className="space-y-6">
-                  {/* Search and Filters */}
-                  <div>
-                    <SearchBar
-                      context="jobs"
-                      value={searchFilters.search}
-                      filters={searchFilters}
-                      onSearch={handleSearch}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={handleClearFilters}
-                    />
+                  {/* Search, Filters, and View Toggle */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <SearchBar
+                        context="jobs"
+                        value={searchFilters.search}
+                        filters={searchFilters}
+                        onSearch={handleSearch}
+                        onFilterChange={handleFilterChange}
+                        onClearFilters={handleClearFilters}
+                      />
+                    </div>
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Owned Jobs (for recruiters/employers) */}
@@ -682,7 +705,7 @@ export default function Jobs() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
                       {jobs.map((job) => {
                         const jobMetadata = {
                           id: job.id,
@@ -717,6 +740,7 @@ export default function Jobs() {
                             job={jobMetadata}
                             onTrack={handleTrackJob}
                             onUntrack={handleUntrackJob}
+                            layout={viewMode === "list" ? "horizontal" : "vertical"}
                           />
                         );
                       })}

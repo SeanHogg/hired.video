@@ -8,6 +8,8 @@ import {
   Plus,
   Search,
   Eye,
+  Grid,
+  List,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -50,6 +52,7 @@ export default function Companies() {
   useSEO(location.pathname);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -215,16 +218,36 @@ export default function Companies() {
                 </div>
               </div>
 
-              {/* Search and Filters */}
-              <div className="mb-6">
-                <SearchBar
-                  context="companies"
-                  value={searchFilters.search}
-                  filters={searchFilters}
-                  onSearch={handleSearch}
-                  onFilterChange={handleFilterChange}
-                  onClearFilters={handleClearFilters}
-                />
+              {/* Search, Filters, and View Toggle */}
+              <div className="flex items-center gap-2 mb-6">
+                <div className="flex-1">
+                  <SearchBar
+                    context="companies"
+                    value={searchFilters.search}
+                    filters={searchFilters}
+                    onSearch={handleSearch}
+                    onFilterChange={handleFilterChange}
+                    onClearFilters={handleClearFilters}
+                  />
+                </div>
+                <div className="flex items-center border rounded-md">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    className="rounded-r-none"
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className="rounded-l-none"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {/* Company Listings */}
@@ -311,7 +334,7 @@ export default function Companies() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
                           {companies
                             .filter((company) => isValidCompanyName(company.name))
                             .map((company) => {
@@ -350,6 +373,7 @@ export default function Companies() {
                                 <CompanyCard
                                   key={company.id}
                                   company={companyMetadata}
+                                  layout={viewMode === "list" ? "horizontal" : "vertical"}
                                   onTrack={handleFollowCompany}
                                   onUntrack={handleUnfollowCompany}
                                 />

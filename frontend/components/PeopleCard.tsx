@@ -57,6 +57,7 @@ interface PeopleCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
+  layout?: "vertical" | "horizontal";
   onTrack?: (personId: string) => void;
   onUntrack?: (personId: string) => void;
   onConnect?: (personId: string, message?: string) => void;
@@ -76,6 +77,7 @@ export default function PeopleCard({
   actions,
   userContext: _userContext,
   itemOwnership: _itemOwnership,
+  layout = "vertical",
   onTrack,
   onUntrack,
   onConnect,
@@ -253,6 +255,66 @@ export default function PeopleCard({
   }
 
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+
+  if (layout === "horizontal") {
+    return (
+      <>
+        <Card className="hover:shadow-lg transition-shadow flex flex-row items-center">
+          <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+            <Avatar className="w-10 h-10 flex-shrink-0">
+              <AvatarImage src={person.avatar} alt={displayFullName} />
+              <AvatarFallback className="text-xs">{firstInitial}{lastInitial}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <a href={`/people/${person.slug || person.id}`} className="font-semibold hover:underline truncate block">
+                {displayFullName}
+              </a>
+              <p className="text-sm text-muted-foreground truncate">{person.headline}</p>
+            </div>
+            <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground flex-shrink-0">
+              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{person.location}</span>
+              {person.currentCompany && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{person.currentCompany}</span>}
+            </div>
+            <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+              {person.openToWork && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">Open to Work</Badge>
+              )}
+              <Badge variant="secondary" className={getStatusColor(person.status)}>{person.status}</Badge>
+            </div>
+          </div>
+          <div className="flex-shrink-0 p-2">
+            <CardActions actions={cardActions} className="border-t-0 p-0 bg-transparent" />
+          </div>
+        </Card>
+
+        {/* Connect Dialog */}
+        <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Send Connection Request</DialogTitle>
+              <DialogDescription>
+                Add a personal message to your connection request to {displayFullName}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Textarea
+                placeholder="I'd love to connect and expand my professional network..."
+                value={connectMessage}
+                onChange={(e) => setConnectMessage(e.target.value)}
+                rows={3}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowConnectDialog(false)}>Cancel</Button>
+                <Button onClick={handleSendConnect}>
+                  <Send className="h-4 w-4 mr-2" />Send Request
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <Card className="hover:shadow-lg transition-shadow relative overflow-hidden">

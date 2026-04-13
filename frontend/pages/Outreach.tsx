@@ -34,11 +34,15 @@ import {
   ChevronDown,
   ChevronRight,
   Link2,
+  Grid,
+  List,
+  Search,
 } from "lucide-react";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
+import Pagination, { usePagination } from "@/components/Pagination";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,7 +130,13 @@ export default function Outreach() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-
+  // Search, view mode, and pagination for content tabs
+  const [templatesSearch, setTemplatesSearch] = useState("");
+  const [templatesViewMode, setTemplatesViewMode] = useState<"grid" | "list">("grid");
+  const [campaignsSearch, setCampaignsSearch] = useState("");
+  const [campaignsViewMode, setCampaignsViewMode] = useState<"grid" | "list">("grid");
+  const [contactsSearch, setContactsSearch] = useState("");
+  const [contactsViewMode, setContactsViewMode] = useState<"grid" | "list">("grid");
 
   // Data state
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplateDTO[]>([]);
@@ -219,6 +229,41 @@ export default function Outreach() {
     location: "",
     notes: "",
   });
+
+  // Filtered data for search
+  const filteredTemplates = emailTemplates.filter((t) =>
+    !templatesSearch || t.name.toLowerCase().includes(templatesSearch.toLowerCase()) ||
+    (t.description && t.description.toLowerCase().includes(templatesSearch.toLowerCase())) ||
+    t.subject.toLowerCase().includes(templatesSearch.toLowerCase())
+  );
+
+  const filteredCampaigns = {
+    video: videoCampaigns.filter((vc) =>
+      !campaignsSearch || vc.name.toLowerCase().includes(campaignsSearch.toLowerCase()) ||
+      (vc.description && vc.description.toLowerCase().includes(campaignsSearch.toLowerCase()))
+    ),
+    email: emailCampaigns.filter((ec) =>
+      !campaignsSearch || ec.name.toLowerCase().includes(campaignsSearch.toLowerCase()) ||
+      (ec.description && ec.description.toLowerCase().includes(campaignsSearch.toLowerCase()))
+    ),
+  };
+  const totalCampaigns = filteredCampaigns.video.length + filteredCampaigns.email.length;
+
+  const filteredContacts = externalContacts.filter((c) =>
+    !contactsSearch ||
+    `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactsSearch.toLowerCase()) ||
+    c.email.toLowerCase().includes(contactsSearch.toLowerCase()) ||
+    (c.companyName && c.companyName.toLowerCase().includes(contactsSearch.toLowerCase())) ||
+    (c.jobTitle && c.jobTitle.toLowerCase().includes(contactsSearch.toLowerCase()))
+  );
+
+  // Pagination hooks
+  const templatesPagination = usePagination(filteredTemplates.length, 12);
+  const campaignsPagination = usePagination(totalCampaigns, 12);
+  const contactsPagination = usePagination(filteredContacts.length, 12);
+
+  const paginatedTemplates = filteredTemplates.slice(templatesPagination.startIndex, templatesPagination.endIndex);
+  const paginatedContacts = filteredContacts.slice(contactsPagination.startIndex, contactsPagination.endIndex);
 
   // Load data on component mount
   useEffect(() => {
@@ -1144,68 +1189,96 @@ export default function Outreach() {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {emailTemplates.map((template) => (
-                        <Card key={template.id}>
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle className="text-lg">
-                                  {template.name}
-                                </CardTitle>
-                                <CardDescription>
-                                  {template.description}
-                                </CardDescription>
+                    {/* Search and View Toggle */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Search templates..."
+                          value={templatesSearch}
+                          onChange={(e) => { setTemplatesSearch(e.target.value); templatesPagination.setCurrentPage(1); }}
+                          className="pl-10 min-h-[44px]"
+                        />
+                      </div>
+                      <div className="flex items-center border rounded-md">
+                        <Button variant={templatesViewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setTemplatesViewMode("grid")} className="rounded-r-none">
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button variant={templatesViewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setTemplatesViewMode("list")} className="rounded-l-none">
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className={templatesViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
+                      {paginatedTemplates.map((template) => (
+                        <Card key={template.id} className={templatesViewMode === "list" ? "flex flex-row items-center" : ""}>
+                          {templatesViewMode === "list" ? (
+                            <>
+                              <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold truncate">{template.name}</p>
+                                  <p className="text-sm text-muted-foreground truncate">{template.description}</p>
+                                </div>
+                                <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+                                  <Badge variant="secondary">{EmailTemplateCategory[template.category]}</Badge>
+                                  <Badge variant="outline">{EmailTemplateTargetRole[template.targetRole]}</Badge>
+                                </div>
+                                <span className="text-sm text-muted-foreground flex-shrink-0">Used {template.usageCount}x</span>
                               </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingTemplate(template);
-                                    setTemplateForm({
-                                      name: template.name,
-                                      description: template.description || "",
-                                      subject: template.subject,
-                                      body: template.body,
-                                      category: template.category,
-                                      targetRole: template.targetRole,
-                                    });
-                                    setShowTemplateDialog(true);
-                                  }}
-                                >
+                              <div className="flex gap-2 p-2 flex-shrink-0">
+                                <Button size="sm" variant="outline" onClick={() => { setEditingTemplate(template); setTemplateForm({ name: template.name, description: template.description || "", subject: template.subject, body: template.body, category: template.category, targetRole: template.targetRole }); setShowTemplateDialog(true); }}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 {!template.isSystemTemplate && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      handleDeleteTemplate(template.id)
-                                    }
-                                  >
+                                  <Button size="sm" variant="outline" onClick={() => handleDeleteTemplate(template.id)}>
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-2">
-                              <Badge variant="secondary">
-                                {EmailTemplateCategory[template.category]}
-                              </Badge>
-                              <Badge variant="outline">
-                                {EmailTemplateTargetRole[template.targetRole]}
-                              </Badge>
-                              <p className="text-sm text-muted-foreground">
-                                Used {template.usageCount} times
-                              </p>
-                            </div>
-                          </CardContent>
+                            </>
+                          ) : (
+                            <>
+                              <CardHeader>
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                                    <CardDescription>{template.description}</CardDescription>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => { setEditingTemplate(template); setTemplateForm({ name: template.name, description: template.description || "", subject: template.subject, body: template.body, category: template.category, targetRole: template.targetRole }); setShowTemplateDialog(true); }}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    {!template.isSystemTemplate && (
+                                      <Button size="sm" variant="outline" onClick={() => handleDeleteTemplate(template.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="space-y-2">
+                                  <Badge variant="secondary">{EmailTemplateCategory[template.category]}</Badge>
+                                  <Badge variant="outline">{EmailTemplateTargetRole[template.targetRole]}</Badge>
+                                  <p className="text-sm text-muted-foreground">Used {template.usageCount} times</p>
+                                </div>
+                              </CardContent>
+                            </>
+                          )}
                         </Card>
                       ))}
                     </div>
+
+                    {filteredTemplates.length > 0 && (
+                      <Pagination
+                        currentPage={templatesPagination.currentPage}
+                        totalItems={filteredTemplates.length}
+                        itemsPerPage={templatesPagination.itemsPerPage}
+                        onPageChange={templatesPagination.setCurrentPage}
+                        onItemsPerPageChange={templatesPagination.handleItemsPerPageChange}
+                      />
+                    )}
 
                     {emailTemplates.length === 0 && (
                       <div className="text-center py-12">
@@ -1234,47 +1307,91 @@ export default function Outreach() {
                       </Button>
                     </div>
 
+                    {/* Search and View Toggle */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Search campaigns..."
+                          value={campaignsSearch}
+                          onChange={(e) => { setCampaignsSearch(e.target.value); campaignsPagination.setCurrentPage(1); }}
+                          className="pl-10 min-h-[44px]"
+                        />
+                      </div>
+                      <div className="flex items-center border rounded-md">
+                        <Button variant={campaignsViewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setCampaignsViewMode("grid")} className="rounded-r-none">
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button variant={campaignsViewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setCampaignsViewMode("list")} className="rounded-l-none">
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
                     {/* Video Campaigns */}
-                    {videoCampaigns.length > 0 && (
+                    {filteredCampaigns.video.length > 0 && (
                       <>
                         <h3 className="text-lg font-semibold flex items-center gap-2"><Video className="h-4 w-4" /> Video Campaigns</h3>
-                        <div className="space-y-4">
-                          {videoCampaigns.map((vc) => (
-                            <Card key={vc.id}>
-                              <CardHeader>
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <CardTitle>{vc.name}</CardTitle>
-                                    <CardDescription>{vc.description || "No description"}</CardDescription>
+                        <div className={campaignsViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
+                          {filteredCampaigns.video.map((vc) => (
+                            <Card key={vc.id} className={campaignsViewMode === "list" ? "flex flex-row items-center" : ""}>
+                              {campaignsViewMode === "list" ? (
+                                <>
+                                  <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold truncate">{vc.name}</p>
+                                      <p className="text-sm text-muted-foreground truncate">{vc.description || "No description"}</p>
+                                    </div>
+                                    <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
+                                      <span>{vc.videoIds.length} videos</span>
+                                      <span>{new Date(vc.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                    <Badge variant={vc.status === "active" ? "default" : "secondary"} className="flex-shrink-0">{vc.status}</Badge>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant={vc.status === "active" ? "default" : "secondary"}>{vc.status}</Badge>
+                                  <div className="flex-shrink-0 p-2">
                                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => { await studioService.deleteCampaign(vc.id); setVideoCampaigns((prev) => prev.filter((c) => c.id !== vc.id)); }}>
                                       <Trash2 className="h-3 w-3" />
                                     </Button>
                                   </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-muted-foreground">Videos</p>
-                                    <p className="font-medium">{vc.videoIds.length}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">UTM Source</p>
-                                    <p className="font-medium">{vc.utmSource || "—"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">UTM Medium</p>
-                                    <p className="font-medium">{vc.utmMedium || "—"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-muted-foreground">Created</p>
-                                    <p className="font-medium">{new Date(vc.createdAt).toLocaleDateString()}</p>
-                                  </div>
-                                </div>
-                              </CardContent>
+                                </>
+                              ) : (
+                                <>
+                                  <CardHeader>
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <CardTitle>{vc.name}</CardTitle>
+                                        <CardDescription>{vc.description || "No description"}</CardDescription>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant={vc.status === "active" ? "default" : "secondary"}>{vc.status}</Badge>
+                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => { await studioService.deleteCampaign(vc.id); setVideoCampaigns((prev) => prev.filter((c) => c.id !== vc.id)); }}>
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                      <div>
+                                        <p className="text-muted-foreground">Videos</p>
+                                        <p className="font-medium">{vc.videoIds.length}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">UTM Source</p>
+                                        <p className="font-medium">{vc.utmSource || "—"}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">UTM Medium</p>
+                                        <p className="font-medium">{vc.utmMedium || "—"}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-muted-foreground">Created</p>
+                                        <p className="font-medium">{new Date(vc.createdAt).toLocaleDateString()}</p>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </>
+                              )}
                             </Card>
                           ))}
                         </div>
@@ -1282,35 +1399,64 @@ export default function Outreach() {
                     )}
 
                     {/* Email Campaigns */}
-                    {emailCampaigns.length > 0 && (
+                    {filteredCampaigns.email.length > 0 && (
                       <>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Mail className="h-4 w-4" /> Email Campaigns</h3>
-                        <div className="space-y-4">
-                          {emailCampaigns.map((campaign) => (
-                            <Card key={campaign.id}>
-                              <CardHeader>
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <CardTitle>{campaign.name}</CardTitle>
-                                    <CardDescription>{campaign.description}</CardDescription>
+                        <div className={campaignsViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
+                          {filteredCampaigns.email.map((campaign) => (
+                            <Card key={campaign.id} className={campaignsViewMode === "list" ? "flex flex-row items-center" : ""}>
+                              {campaignsViewMode === "list" ? (
+                                <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold truncate">{campaign.name}</p>
+                                    <p className="text-sm text-muted-foreground truncate">{campaign.description}</p>
                                   </div>
-                                  <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"}>
+                                  <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
+                                    <span>{campaign.totalRecipients} recipients</span>
+                                    <span>{campaign.emailsSent} sent</span>
+                                    <span>{campaign.emailsOpened} opened</span>
+                                  </div>
+                                  <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"} className="flex-shrink-0">
                                     {EmailCampaignStatus[campaign.status]}
                                   </Badge>
                                 </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div><p className="text-muted-foreground">Recipients</p><p className="font-medium">{campaign.totalRecipients}</p></div>
-                                  <div><p className="text-muted-foreground">Sent</p><p className="font-medium">{campaign.emailsSent}</p></div>
-                                  <div><p className="text-muted-foreground">Opened</p><p className="font-medium">{campaign.emailsOpened}</p></div>
-                                  <div><p className="text-muted-foreground">Replies</p><p className="font-medium">{campaign.repliesReceived}</p></div>
-                                </div>
-                              </CardContent>
+                              ) : (
+                                <>
+                                  <CardHeader>
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <CardTitle>{campaign.name}</CardTitle>
+                                        <CardDescription>{campaign.description}</CardDescription>
+                                      </div>
+                                      <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"}>
+                                        {EmailCampaignStatus[campaign.status]}
+                                      </Badge>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                      <div><p className="text-muted-foreground">Recipients</p><p className="font-medium">{campaign.totalRecipients}</p></div>
+                                      <div><p className="text-muted-foreground">Sent</p><p className="font-medium">{campaign.emailsSent}</p></div>
+                                      <div><p className="text-muted-foreground">Opened</p><p className="font-medium">{campaign.emailsOpened}</p></div>
+                                      <div><p className="text-muted-foreground">Replies</p><p className="font-medium">{campaign.repliesReceived}</p></div>
+                                    </div>
+                                  </CardContent>
+                                </>
+                              )}
                             </Card>
                           ))}
                         </div>
                       </>
+                    )}
+
+                    {totalCampaigns > 0 && (
+                      <Pagination
+                        currentPage={campaignsPagination.currentPage}
+                        totalItems={totalCampaigns}
+                        itemsPerPage={campaignsPagination.itemsPerPage}
+                        onPageChange={campaignsPagination.setCurrentPage}
+                        onItemsPerPageChange={campaignsPagination.handleItemsPerPageChange}
+                      />
                     )}
 
                     {emailCampaigns.length === 0 && videoCampaigns.length === 0 && (

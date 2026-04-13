@@ -29,9 +29,10 @@ interface JobCardProps {
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
-   
+  layout?: "vertical" | "horizontal";
+
   onTrack?: (_jobId: string) => void;
-   
+
   onUntrack?: (_jobId: string) => void;
   onView?: () => void;
   onActions?: () => void;
@@ -43,6 +44,7 @@ export default function JobCard({
   actions,
   userContext: _userContext,
   itemOwnership: _itemOwnership,
+  layout = "vertical",
   onTrack,
   onUntrack,
   onView,
@@ -174,6 +176,34 @@ export default function JobCard({
     },
   ];
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+
+  if (layout === "horizontal") {
+    return (
+      <BaseCard className="flex flex-row items-center">
+        <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
+          <div className="flex-1 min-w-0">
+            <a href={`/jobs/${job.id}`} className="font-semibold hover:underline truncate block">
+              {job.title}
+            </a>
+            <p className="text-sm text-muted-foreground truncate">{job.company}</p>
+          </div>
+          <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground flex-shrink-0">
+            <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
+            {job.salary && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" />{job.salary}</span>}
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{job.employmentType}</span>
+          </div>
+          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            {badges.map((b, i) => (
+              <Badge key={i} variant={b.variant} className={b.className}>{b.text}</Badge>
+            ))}
+          </div>
+        </div>
+        <div className="flex-shrink-0 p-2">
+          <CardActions actions={cardActions} className="border-t-0 p-0 bg-transparent" />
+        </div>
+      </BaseCard>
+    );
+  }
 
   return (
     <BaseCard>
