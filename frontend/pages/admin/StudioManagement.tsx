@@ -8,6 +8,10 @@ import {
   Trash2,
   Loader2,
   Video,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +53,19 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { apiClient } from "@/lib/api-client";
 
+interface VideoRecord {
+  id: string;
+  title: string | null;
+  status: string;
+  videoUrl: string | null;
+  youtubeVideoId: string | null;
+  thumbnailUrl: string | null;
+  privacyStatus: string | null;
+  isPublic: boolean;
+  isOrphan: boolean;
+  createdAt: string;
+}
+
 interface StudioProjectRow {
   id: string;
   userId: string;
@@ -58,6 +75,10 @@ interface StudioProjectRow {
   status: string;
   purpose: string | null;
   videoId: string | null;
+  linkedVideoUrl: string | null;
+  linkedVideoStatus: string | null;
+  linkedVideoPrivacy: string | null;
+  userVideos: VideoRecord[];
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +93,8 @@ interface StudioResponse {
     draft: number;
     published: number;
     failed: number;
+    totalVideos: number;
+    orphanedVideos: number;
   };
 }
 
@@ -81,7 +104,10 @@ const STATUS_COLORS: Record<string, string> = {
   processing: "bg-blue-100 text-blue-800",
   exported:   "bg-indigo-100 text-indigo-800",
   published:  "bg-green-100 text-green-800",
+  Completed:  "bg-green-100 text-green-800",
+  Queued:     "bg-gray-200 text-gray-800",
   failed:     "bg-red-100 text-red-800",
+  Failed:     "bg-red-100 text-red-800",
 };
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -96,14 +122,16 @@ const PURPOSE_LABELS: Record<string, string> = {
 export default function StudioManagement() {
   const [projects, setProjects] = useState<StudioProjectRow[]>([]);
   const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, failed: 0 });
+  const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<StudioProjectRow | null>(null);
+  const [confirmDeleteVideo, setConfirmDeleteVideo] = useState<VideoRecord | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<string>("");
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
@@ -130,7 +158,7 @@ export default function StudioManagement() {
       );
       setProjects(res.data.projects ?? []);
       setTotal(res.data.total ?? 0);
-      setSummary(res.data.summary ?? { total: 0, draft: 0, published: 0, failed: 0 });
+      setSummary(res.data.summary ?? { total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load studio projects");
     } finally {
@@ -151,6 +179,15 @@ export default function StudioManagement() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleDelete = async (project: StudioProjectRow) => {
     try {
       await apiClient.delete(`/api/admin/studio/projects/${project.id}`);
@@ -159,6 +196,17 @@ export default function StudioManagement() {
       loadProjects();
     } catch {
       toast({ title: "Failed to delete project", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteVideo = async (video: VideoRecord) => {
+    try {
+      await apiClient.delete(`/api/admin/studio/videos/${video.id}`);
+      toast({ title: `Deleted video "${video.title || video.id.slice(0, 8)}"` });
+      setConfirmDeleteVideo(null);
+      loadProjects();
+    } catch {
+      toast({ title: "Failed to delete video", variant: "destructive" });
     }
   };
 
@@ -237,7 +285,7 @@ export default function StudioManagement() {
         <div>
           <h1 className="text-2xl font-bold">Studio Management</h1>
           <p className="text-muted-foreground text-sm">
-            View and manage all studio projects across the platform.
+            View and manage all studio projects and video records across the platform.
           </p>
         </div>
         <span className="text-sm text-muted-foreground">
@@ -246,12 +294,14 @@ export default function StudioManagement() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: "Total",     count: summary.total,     color: "text-foreground" },
-          { label: "Published", count: summary.published, color: "text-green-600" },
-          { label: "Draft",     count: summary.draft,     color: "text-yellow-600" },
-          { label: "Failed",    count: summary.failed,    color: "text-red-600" },
+          { label: "Projects",  count: summary.total,           color: "text-foreground" },
+          { label: "Published", count: summary.published,       color: "text-green-600" },
+          { label: "Draft",     count: summary.draft,           color: "text-yellow-600" },
+          { label: "Failed",    count: summary.failed,          color: "text-red-600" },
+          { label: "Videos",    count: summary.totalVideos,     color: "text-blue-600" },
+          { label: "Orphaned",  count: summary.orphanedVideos,  color: summary.orphanedVideos > 0 ? "text-orange-600" : "text-muted-foreground" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
@@ -261,6 +311,17 @@ export default function StudioManagement() {
           </Card>
         ))}
       </div>
+
+      {/* Orphan warning banner */}
+      {summary.orphanedVideos > 0 && (
+        <div className="flex items-center gap-2 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>{summary.orphanedVideos} orphaned video{summary.orphanedVideos === 1 ? "" : "s"}</strong> found
+            {" "}&mdash; video records not linked to any studio project. Expand project rows to see user videos and delete orphans.
+          </span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -359,12 +420,13 @@ export default function StudioManagement() {
                   aria-label="Select all projects on this page"
                 />
               </TableHead>
+              <TableHead className="w-8" />
               <TableHead>Project</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead>Purpose</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Video</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>Video URL</TableHead>
+              <TableHead>Videos</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -372,93 +434,221 @@ export default function StudioManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading projects...
                 </TableCell>
               </TableRow>
             ) : projects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   No studio projects match your filters.
                 </TableCell>
               </TableRow>
             ) : (
-              projects.map((project) => (
-                <TableRow key={project.id} data-state={selectedIds.has(project.id) ? "selected" : undefined}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(project.id)}
-                      onCheckedChange={(v) => toggleOne(project.id, v === true)}
-                      aria-label={`Select ${project.title}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Video className="h-4 w-4 text-muted-foreground" />
-                      <p className="font-medium text-sm truncate max-w-[200px]">{project.title}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <p className="font-medium">{project.userName ?? "—"}</p>
-                      <p className="text-muted-foreground text-xs">{project.userEmail ?? ""}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {project.purpose ? (PURPOSE_LABELS[project.purpose] ?? project.purpose) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[project.status] ?? "bg-gray-100 text-gray-800"}`}
-                    >
-                      {project.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {project.videoId ? (
-                      <span className="text-green-600 text-xs font-medium">Linked</span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">None</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <MoreHorizontal className="h-4 w-4" />
+              projects.map((project) => {
+                const isExpanded = expandedIds.has(project.id);
+                const orphanCount = project.userVideos.filter((v) => v.isOrphan).length;
+                return (
+                  <React.Fragment key={project.id}>
+                    <TableRow data-state={selectedIds.has(project.id) ? "selected" : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(project.id)}
+                          onCheckedChange={(v) => toggleOne(project.id, v === true)}
+                          aria-label={`Select ${project.title}`}
+                        />
+                      </TableCell>
+                      <TableCell className="px-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => toggleExpanded(project.id)}
+                          aria-label={isExpanded ? "Collapse" : "Expand"}
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4" />
+                            : <ChevronRight className="h-4 w-4" />}
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link to={`/admin/users`}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Owner
-                          </Link>
-                        </DropdownMenuItem>
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onSelect={() => setConfirmDelete(project)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Video className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <p className="font-medium text-sm truncate max-w-[200px]">{project.title}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <p className="font-medium">{project.userName ?? "—"}</p>
+                          <p className="text-muted-foreground text-xs">{project.userEmail ?? ""}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {project.purpose ? (PURPOSE_LABELS[project.purpose] ?? project.purpose) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[project.status] ?? "bg-gray-100 text-gray-800"}`}
+                        >
+                          {project.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {project.linkedVideoUrl ? (
+                          <a
+                            href={project.linkedVideoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-blue-600 hover:underline truncate max-w-[180px]"
+                          >
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{project.linkedVideoUrl.replace(/^https?:\/\//, "").slice(0, 40)}</span>
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">None</span>
                         )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <span className="font-medium">{project.userVideos.length}</span>
+                        {orphanCount > 0 && (
+                          <span className="ml-1 text-orange-600 text-xs font-medium">
+                            ({orphanCount} orphan{orphanCount === 1 ? "" : "s"})
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to="/admin/users">
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Owner
+                              </Link>
+                            </DropdownMenuItem>
+                            {canDelete && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onSelect={() => setConfirmDelete(project)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Project
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Expanded video detail rows */}
+                    {isExpanded && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/40">
+                        <TableCell colSpan={10} className="p-0">
+                          <div className="px-6 py-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                              All videos for {project.userName} ({project.userVideos.length})
+                            </p>
+                            {project.userVideos.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No video records found for this user.</p>
+                            ) : (
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-xs text-muted-foreground border-b">
+                                    <th className="text-left py-1 pr-3 font-medium">Status</th>
+                                    <th className="text-left py-1 pr-3 font-medium">Title</th>
+                                    <th className="text-left py-1 pr-3 font-medium">Video URL</th>
+                                    <th className="text-left py-1 pr-3 font-medium">Privacy</th>
+                                    <th className="text-left py-1 pr-3 font-medium">Link</th>
+                                    <th className="text-left py-1 pr-3 font-medium">Created</th>
+                                    <th className="text-left py-1 font-medium w-8" />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {project.userVideos.map((v) => (
+                                    <tr
+                                      key={v.id}
+                                      className={`border-b last:border-0 ${v.isOrphan ? "bg-orange-50" : ""}`}
+                                    >
+                                      <td className="py-1.5 pr-3">
+                                        <span
+                                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-gray-100 text-gray-800"}`}
+                                        >
+                                          {v.status}
+                                        </span>
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-muted-foreground truncate max-w-[120px]">
+                                        {v.title || "—"}
+                                      </td>
+                                      <td className="py-1.5 pr-3">
+                                        {v.videoUrl ? (
+                                          <a
+                                            href={v.videoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                                          >
+                                            <ExternalLink className="h-3 w-3 shrink-0" />
+                                            <span className="truncate max-w-[200px] inline-block align-bottom">
+                                              {v.videoUrl.replace(/^https?:\/\//, "").slice(0, 50)}
+                                            </span>
+                                          </a>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-muted-foreground text-xs">
+                                        {v.privacyStatus ?? "—"}
+                                      </td>
+                                      <td className="py-1.5 pr-3">
+                                        {v.isOrphan ? (
+                                          <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-medium">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Orphan
+                                          </span>
+                                        ) : v.id === project.videoId ? (
+                                          <span className="text-green-600 text-xs font-medium">Linked</span>
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">Other project</span>
+                                        )}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-muted-foreground text-xs">
+                                        {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
+                                      </td>
+                                      <td className="py-1.5">
+                                        {canDelete && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-destructive hover:text-destructive"
+                                            onClick={() => setConfirmDeleteVideo(v)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -491,7 +681,7 @@ export default function StudioManagement() {
         </div>
       )}
 
-      {/* Delete confirmation */}
+      {/* Delete project confirmation */}
       <AlertDialog
         open={!!confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
@@ -502,7 +692,7 @@ export default function StudioManagement() {
             <AlertDialogDescription>
               This will permanently delete{" "}
               <span className="font-semibold">"{confirmDelete?.title}"</span>.
-              This action cannot be undone.
+              This action cannot be undone. The linked video record will NOT be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -512,6 +702,40 @@ export default function StudioManagement() {
               onClick={() => confirmDelete && handleDelete(confirmDelete)}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete video confirmation */}
+      <AlertDialog
+        open={!!confirmDeleteVideo}
+        onOpenChange={(open) => !open && setConfirmDeleteVideo(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this video record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the video{" "}
+              <span className="font-semibold">
+                "{confirmDeleteVideo?.title || confirmDeleteVideo?.id.slice(0, 8)}"
+              </span>
+              {confirmDeleteVideo?.videoUrl && (
+                <> and its URL will stop working</>
+              )}.
+              {!confirmDeleteVideo?.isOrphan && (
+                <> Any linked studio project will be unlinked.</>
+              )}
+              {" "}This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteVideo && handleDeleteVideo(confirmDeleteVideo)}
+            >
+              Delete Video
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

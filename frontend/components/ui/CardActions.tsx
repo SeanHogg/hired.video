@@ -1,5 +1,12 @@
 import * as React from "react";
+import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface CardAction {
@@ -13,7 +20,7 @@ interface CardAction {
     | "link";
   size?: "default" | "sm" | "lg" | "icon";
   icon?: React.ComponentType<{ className?: string }>;
-   
+
   onClick: (event: React.MouseEvent) => void;
   disabled?: boolean;
   loading?: boolean;
@@ -27,82 +34,75 @@ interface CardActionsProps {
 }
 
 /**
- * CardActions - Standardized card footer component for action buttons
+ * CardActions - Standardized card footer component
  *
- * Provides:
- * - Consistent button layouts and spacing
- * - Multiple layout options (horizontal, vertical, space-between, center)
- * - Icon support for buttons
- * - Loading and disabled states
- * - Event propagation handling (stops card click events)
+ * Renders the primary action as a visible button on the left and collapses
+ * all remaining actions into an ellipsis (⋯) dropdown on the right.
+ * This mirrors the proven ResumeCard pattern across all card types.
  */
 export function CardActions({
   actions,
   className = "",
-  layout = "space-between",
-  gap = "md",
 }: CardActionsProps) {
-  // Always show action buttons - if no actions provided, show default actions
-  const defaultActions = [
-    {
-      label: "View",
-      variant: "outline" as const,
-      onClick: () => console.log("View clicked"),
-    },
-    {
-      label: "Actions",
-      variant: "default" as const,
-      onClick: () => console.log("Actions clicked"),
-    },
-  ];
+  if (actions.length === 0) return null;
 
-  const finalActions = actions.length > 0 ? actions : defaultActions;
-
-  const layoutStyles = {
-    horizontal: "flex items-center",
-    vertical: "flex flex-col",
-    "space-between": "flex items-center justify-between",
-    center: "flex items-center justify-center",
-  };
-
-  const gapStyles = {
-    sm: "gap-1",
-    md: "gap-2",
-    lg: "gap-4",
-  };
+  // Primary action is the first one — rendered as a visible button.
+  const primary = actions[0];
+  // Everything else goes into the ellipsis dropdown.
+  const overflow = actions.slice(1);
 
   return (
     <div
       className={cn(
-        "p-4 bg-background border-t border-border",
-        layoutStyles[layout],
-        gapStyles[gap],
+        "p-4 bg-background border-t border-border flex items-center justify-between gap-2",
         className,
       )}
     >
-      {finalActions.map((action, index) => (
-        <Button
-          key={index}
-          variant={action.variant || "outline"}
-          size={action.size || "sm"}
-          disabled={action.disabled || action.loading}
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent card click events
-            action.onClick(e);
-          }}
-          className={cn(
-            action.icon && "gap-2",
-            layout === "vertical" && "w-full",
-          )}
-        >
-          {action.loading ? (
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-            action.icon && <action.icon className="w-4 h-4" />
-          )}
-          {action.label}
-        </Button>
-      ))}
+      {/* Primary action button */}
+      <Button
+        variant={primary.variant || "outline"}
+        size={primary.size || "sm"}
+        disabled={primary.disabled || primary.loading}
+        onClick={(e) => {
+          e.stopPropagation();
+          primary.onClick(e);
+        }}
+        className={cn(primary.icon && "gap-2")}
+      >
+        {primary.loading ? (
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          primary.icon && <primary.icon className="w-4 h-4" />
+        )}
+        {primary.label}
+      </Button>
+
+      {/* Overflow actions → ellipsis dropdown */}
+      {overflow.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">More actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {overflow.map((action, index) => (
+              <DropdownMenuItem
+                key={index}
+                disabled={action.disabled || action.loading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  action.onClick(e as unknown as React.MouseEvent);
+                }}
+              >
+                {action.icon && <action.icon className="w-4 h-4 mr-2" />}
+                {action.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 }

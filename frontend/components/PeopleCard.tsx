@@ -218,12 +218,12 @@ export default function PeopleCard({
     });
   }
 
-  // View action
+  // View — always available (goes into dropdown)
   fallbackActions.push({
     id: "view",
-    label: "View",
+    label: "View Profile",
     variant: "outline",
-    icon: UserCheck,
+    icon: Eye,
     onClick: () => {
       if (onView) {
         onView();
@@ -233,14 +233,24 @@ export default function PeopleCard({
     },
   });
 
-  // Actions menu
-  fallbackActions.push({
-    id: "actions",
-    label: "Actions",
-    variant: "outline",
-    icon: MessageCircle,
-    onClick: () => onActions?.(),
-  });
+  // Follow / Unfollow toggle (dropdown)
+  if (!isOwnProfile) {
+    fallbackActions.push(
+      buildTrackAction({
+        isTracked,
+        trackLabel: "Follow",
+        trackedLabel: "Following",
+        onToggle: (e) => {
+          e.stopPropagation();
+          if (isTracked) {
+            onUntrack?.(person.id);
+          } else {
+            onTrack?.(person.id);
+          }
+        },
+      }),
+    );
+  }
 
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 

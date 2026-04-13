@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { and, count, eq, gte, inArray, sql, sum, desc } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, sql, sum, desc } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
+import { cdnUrl } from "../utils/cdn.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 
@@ -410,6 +411,10 @@ const StudioSearchSchema = z.object({
 	purpose: z.string().optional(),
 });
 
+function videoUrl(v: { youtubeUrl: string | null; r2Key: string | null }): string | null {
+	return v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null);
+}
+
 adminRoutes.get("/studio/projects", async (c) => {
 	const query = StudioSearchSchema.safeParse(c.req.query());
 	if (!query.success) return c.json({ error: { code: "BAD_REQUEST", message: query.error.issues[0].message } }, 400);
@@ -457,9 +462,71 @@ adminRoutes.get("/studio/projects", async (c) => {
 			.where(where),
 	]);
 
+	// Fetch linked videos for projects that have a videoId
+	const videoIds = rows.map((r) => r.videoId).filter((id): id is string => Boolean(id));
+	const linkedVideos = videoIds.length
+		? await db.select().from(schema.videos).where(inArray(schema.videos.id, videoIds))
+		: [];
+	const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
+
+	// For each project owner, also fetch ALL their videos to expose orphans
+	const userIds = [...new Set(rows.map((r) => r.userId))];
+	const allUserVideos = userIds.length
+		? await db
+				.select({
+					id: schema.videos.id,
+					userId: schema.videos.userId,
+					title: schema.videos.title,
+					status: schema.videos.status,
+					r2Key: schema.videos.r2Key,
+					youtubeUrl: schema.videos.youtubeUrl,
+					youtubeVideoId: schema.videos.youtubeVideoId,
+					thumbnailUrl: schema.videos.thumbnailUrl,
+					privacyStatus: schema.videos.privacyStatus,
+					isPublic: schema.videos.isPublic,
+					createdAt: schema.videos.createdAt,
+				})
+				.from(schema.videos)
+				.where(inArray(schema.videos.userId, userIds))
+				.orderBy(desc(schema.videos.createdAt))
+		: [];
+
+	// Group all videos by userId
+	const videosByUser = new Map<string, typeof allUserVideos>();
+	for (const v of allUserVideos) {
+		const list = videosByUser.get(v.userId) ?? [];
+		list.push(v);
+		videosByUser.set(v.userId, list);
+	}
+
+	// Build the set of videoIds that ARE linked to a studioProject
+	const allLinkedVideoIds = new Set<string>();
+	// Query ALL studioProject videoIds (not just this page) to correctly identify orphans
+	const allProjectLinks = await db
+		.select({ videoId: schema.studioProjects.videoId })
+		.from(schema.studioProjects)
+		.where(sql`${schema.studioProjects.videoId} IS NOT NULL`);
+	for (const row of allProjectLinks) {
+		if (row.videoId) allLinkedVideoIds.add(row.videoId);
+	}
+
 	// Extract display title and purpose from storyboard JSONB
 	const projects = rows.map((r) => {
 		const meta = r.storyboard as Record<string, unknown> | null;
+		const linked = r.videoId ? videoById.get(r.videoId) ?? null : null;
+		// All videos for this user, with orphan flag
+		const userVids = (videosByUser.get(r.userId) ?? []).map((v) => ({
+			id: v.id,
+			title: v.title,
+			status: v.status,
+			videoUrl: videoUrl(v),
+			youtubeVideoId: v.youtubeVideoId,
+			thumbnailUrl: v.thumbnailUrl,
+			privacyStatus: v.privacyStatus,
+			isPublic: v.isPublic,
+			isOrphan: !allLinkedVideoIds.has(v.id),
+			createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
+		}));
 		return {
 			id: r.id,
 			userId: r.userId,
@@ -469,6 +536,10 @@ adminRoutes.get("/studio/projects", async (c) => {
 			status: r.status,
 			purpose: (meta?._purpose as string) || null,
 			videoId: r.videoId,
+			linkedVideoUrl: linked ? videoUrl(linked) : null,
+			linkedVideoStatus: linked?.status ?? null,
+			linkedVideoPrivacy: linked?.privacyStatus ?? null,
+			userVideos: userVids,
 			createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
 			updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
 		};
@@ -480,11 +551,19 @@ adminRoutes.get("/studio/projects", async (c) => {
 		: projects;
 
 	// Summary counts (unfiltered)
-	const [totalRow, draftRow, publishedRow, failedRow] = await Promise.all([
+	const [totalRow, draftRow, publishedRow, failedRow, totalVideosRow, orphanCount] = await Promise.all([
 		db.select({ n: count() }).from(schema.studioProjects),
 		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "draft")),
 		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "published")),
 		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "failed")),
+		db.select({ n: count() }).from(schema.videos),
+		// Orphan count: videos not linked to any studioProject
+		db.select({ n: count() })
+			.from(schema.videos)
+			.where(allLinkedVideoIds.size > 0
+				? sql`${schema.videos.id} NOT IN (${sql.join([...allLinkedVideoIds].map((id) => sql`${id}`), sql`, `)})`
+				: sql`1=1`
+			),
 	]);
 
 	return c.json(ok({
@@ -497,6 +576,8 @@ adminRoutes.get("/studio/projects", async (c) => {
 			draft: draftRow[0]?.n ?? 0,
 			published: publishedRow[0]?.n ?? 0,
 			failed: failedRow[0]?.n ?? 0,
+			totalVideos: totalVideosRow[0]?.n ?? 0,
+			orphanedVideos: orphanCount[0]?.n ?? 0,
 		},
 	}), 200);
 });
@@ -515,6 +596,28 @@ adminRoutes.delete("/studio/projects/:projectId", async (c) => {
 
 	if (!deleted) return c.json({ error: { code: "NOT_FOUND", message: "Project not found" } }, 404);
 	return c.json(ok({ id: projectId }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/admin/studio/videos/:videoId — admin delete any video record
+// ---------------------------------------------------------------------------
+adminRoutes.delete("/studio/videos/:videoId", async (c) => {
+	const videoId = c.req.param("videoId");
+	const db = getDb();
+
+	// Unlink any studioProjects that reference this video
+	await db
+		.update(schema.studioProjects)
+		.set({ videoId: null } as any)
+		.where(eq(schema.studioProjects.videoId, videoId));
+
+	const [deleted] = await db
+		.delete(schema.videos)
+		.where(eq(schema.videos.id, videoId))
+		.returning();
+
+	if (!deleted) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
+	return c.json(ok({ id: videoId }), 200);
 });
 
 adminRoutes.all("*", (c) =>
