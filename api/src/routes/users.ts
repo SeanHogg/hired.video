@@ -96,7 +96,7 @@ function makeConnectionDto(row: {
     id: row.id,
     fromUserId: row.fromUserId,
     toUserId: row.toUserId,
-    status: row.status,
+    status: row.status.toLowerCase(),
     requestMessage: row.requestMessage ?? "",
     responseMessage: row.responseMessage ?? "",
     createdAt: new Date(row.createdAt).toISOString(),
