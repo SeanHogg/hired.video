@@ -290,19 +290,13 @@ export default function Navigation({
                 </>
               ) : (
                 <>
-                  {/* Show upgrade button for free accounts — admins never see it */}
-                  {(!user?.subscription || user?.subscription === "free") && !roleUtils.isAdmin(user?.role) && !roleUtils.isSuperAdmin(user?.role) ? (
+                  {/* Show upgrade button only for free-tier users */}
+                  {(!user?.subscription || user?.subscription === "free") && !roleUtils.isAdmin(user?.role) && !roleUtils.isSuperAdmin(user?.role) && (
                     <Link to="/pricing">
                       <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
                         Upgrade Account
                       </Button>
                     </Link>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="capitalize">
-                        {user?.subscription ?? "free"} Plan
-                      </Badge>
-                    </div>
                   )}
                 </>
               )}
