@@ -263,7 +263,7 @@ export default function Index() {
               company: "Independent", // TODO: Get from user profile
               createdAt: item.createdAt || new Date().toISOString(),
               location: item.location,
-              role: "job_seeker" as const, // TODO: Get actual role
+              role: (item as any).role || "job_seeker",
               isVerified: false, // TODO: Get from user profile
               isPremium: false, // TODO: Get from user profile
             };
@@ -844,7 +844,7 @@ export default function Index() {
             {filteredItems.length > 0 ? (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {paginatedItems.map((item, index) => {
                       // Voice marketplace listings get a dedicated card with
                       // inline preview playback and an add-to-cart button.
@@ -1009,7 +1009,7 @@ export default function Index() {
                 <Play className="w-5 h-5 text-primary" />
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground">Video Resumes</h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {publicVideos.map((v) => (
                   <VideoCard
                     key={v.id}

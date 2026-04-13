@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { count, eq, gte, sql, sum, desc } from "drizzle-orm";
+import { and, count, eq, gte, inArray, sql, sum, desc } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -397,6 +397,124 @@ adminRoutes.put("/settings", async (c) => {
 	}
 
 	return c.json(ok({ updated: entries.length }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/studio/projects — list all studio projects across all users
+// ---------------------------------------------------------------------------
+const StudioSearchSchema = z.object({
+	page: z.coerce.number().int().min(1).default(1),
+	limit: z.coerce.number().int().min(1).max(100).default(50),
+	search: z.string().optional(),
+	status: z.string().optional(),
+	purpose: z.string().optional(),
+});
+
+adminRoutes.get("/studio/projects", async (c) => {
+	const query = StudioSearchSchema.safeParse(c.req.query());
+	if (!query.success) return c.json({ error: { code: "BAD_REQUEST", message: query.error.issues[0].message } }, 400);
+
+	const db = getDb();
+	const { page, limit, search, status, purpose } = query.data;
+	const offset = (page - 1) * limit;
+
+	// Build WHERE clause
+	let where = sql`1=1`;
+	if (status && status !== "all") {
+		where = sql`${where} AND ${schema.studioProjects.status} = ${status}`;
+	}
+	if (search) {
+		where = sql`${where} AND (
+			${schema.users.name} ILIKE ${"%" + search + "%"}
+			OR ${schema.users.email} ILIKE ${"%" + search + "%"}
+			OR CAST(${schema.studioProjects.storyboard}->>'_name' AS TEXT) ILIKE ${"%" + search + "%"}
+		)`;
+	}
+
+	const [rows, [{ total }]] = await Promise.all([
+		db
+			.select({
+				id: schema.studioProjects.id,
+				userId: schema.studioProjects.userId,
+				userName: schema.users.name,
+				userEmail: schema.users.email,
+				status: schema.studioProjects.status,
+				storyboard: schema.studioProjects.storyboard,
+				videoId: schema.studioProjects.videoId,
+				createdAt: schema.studioProjects.createdAt,
+				updatedAt: schema.studioProjects.updatedAt,
+			})
+			.from(schema.studioProjects)
+			.innerJoin(schema.users, eq(schema.studioProjects.userId, schema.users.id))
+			.where(where)
+			.orderBy(desc(schema.studioProjects.updatedAt))
+			.limit(limit)
+			.offset(offset),
+		db
+			.select({ total: count() })
+			.from(schema.studioProjects)
+			.innerJoin(schema.users, eq(schema.studioProjects.userId, schema.users.id))
+			.where(where),
+	]);
+
+	// Extract display title and purpose from storyboard JSONB
+	const projects = rows.map((r) => {
+		const meta = r.storyboard as Record<string, unknown> | null;
+		return {
+			id: r.id,
+			userId: r.userId,
+			userName: r.userName,
+			userEmail: r.userEmail,
+			title: (meta?._name as string) || "Untitled Project",
+			status: r.status,
+			purpose: (meta?._purpose as string) || null,
+			videoId: r.videoId,
+			createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+			updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
+		};
+	});
+
+	// Filter by purpose in-memory (stored in JSONB, not a column)
+	const filtered = purpose && purpose !== "all"
+		? projects.filter((p) => p.purpose === purpose)
+		: projects;
+
+	// Summary counts (unfiltered)
+	const [totalRow, draftRow, publishedRow, failedRow] = await Promise.all([
+		db.select({ n: count() }).from(schema.studioProjects),
+		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "draft")),
+		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "published")),
+		db.select({ n: count() }).from(schema.studioProjects).where(eq(schema.studioProjects.status, "failed")),
+	]);
+
+	return c.json(ok({
+		projects: filtered,
+		total,
+		page,
+		limit,
+		summary: {
+			total: totalRow[0]?.n ?? 0,
+			draft: draftRow[0]?.n ?? 0,
+			published: publishedRow[0]?.n ?? 0,
+			failed: failedRow[0]?.n ?? 0,
+		},
+	}), 200);
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/admin/studio/projects/:projectId — admin delete any studio project
+// ---------------------------------------------------------------------------
+adminRoutes.delete("/studio/projects/:projectId", async (c) => {
+	const projectId = c.req.param("projectId");
+	const db = getDb();
+
+	const [deleted] = await db
+		.delete(schema.studioProjects)
+		.where(eq(schema.studioProjects.id, projectId))
+		.returning();
+
+	if (!deleted) return c.json({ error: { code: "NOT_FOUND", message: "Project not found" } }, 404);
+	return c.json(ok({ id: projectId }), 200);
 });
 
 adminRoutes.all("*", (c) =>

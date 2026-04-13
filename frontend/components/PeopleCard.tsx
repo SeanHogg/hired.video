@@ -29,7 +29,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -165,48 +164,84 @@ export default function PeopleCard({
     .toString()
     .toUpperCase();
 
-  // Use passed actions or fallback to default actions.
-  // The Follow/Unfollow toggle lives here (not in the header or connection row) so every
-  // content type exposes tracking from the same spot.
-  const fallbackActions: DynamicCardAction[] = [
-    {
-      id: "view",
-      label: "View",
+  // Build the card footer actions — connection state drives the primary action.
+  const fallbackActions: DynamicCardAction[] = [];
+
+  // Connection / own-profile action comes first
+  if (isOwnProfile) {
+    fallbackActions.push({
+      id: "edit-profile",
+      label: "Edit Profile",
+      variant: "default",
+      icon: ExternalLink,
+      onClick: () => { window.location.href = "/profile"; },
+    });
+  } else if (isPendingReceived) {
+    fallbackActions.push({
+      id: "accept",
+      label: "Accept",
+      variant: "default",
+      icon: CheckCircle,
+      onClick: () => onAcceptConnection?.(person.id),
+    });
+    fallbackActions.push({
+      id: "reject",
+      label: "Reject",
       variant: "outline",
-      icon: UserCheck,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/people/${person.slug || person.id}`;
-        }
-      },
-    },
-  ];
-  if (!isOwnProfile) {
-    fallbackActions.push(
-      buildTrackAction({
-        isTracked,
-        trackLabel: "Follow",
-        trackedLabel: "Following",
-        onToggle: (e) => {
-          e.stopPropagation();
-          if (isTracked) {
-            onUntrack?.(person.id);
-          } else {
-            onTrack?.(person.id);
-          }
-        },
-      }),
-    );
+      icon: X,
+      onClick: () => onRejectConnection?.(person.id),
+    });
+  } else if (isPendingSent) {
+    fallbackActions.push({
+      id: "pending",
+      label: "Pending",
+      variant: "outline",
+      icon: Clock,
+      disabled: true,
+      onClick: () => {},
+    });
+  } else if (isConnected) {
+    fallbackActions.push({
+      id: "message",
+      label: "Message",
+      variant: "outline",
+      icon: MessageCircle,
+      onClick: () => onMessage?.(person.id),
+    });
+  } else if (user) {
+    fallbackActions.push({
+      id: "connect",
+      label: "Connect",
+      variant: "default",
+      icon: UserPlus,
+      onClick: () => setShowConnectDialog(true),
+    });
   }
+
+  // View action
+  fallbackActions.push({
+    id: "view",
+    label: "View",
+    variant: "outline",
+    icon: UserCheck,
+    onClick: () => {
+      if (onView) {
+        onView();
+      } else {
+        window.location.href = `/people/${person.slug || person.id}`;
+      }
+    },
+  });
+
+  // Actions menu
   fallbackActions.push({
     id: "actions",
     label: "Actions",
-    variant: "default",
+    variant: "outline",
     icon: MessageCircle,
     onClick: () => onActions?.(),
   });
+
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
   return (
@@ -345,103 +380,18 @@ export default function PeopleCard({
             </div>
           </div>
 
-          {/* Connection Actions (Secondary Row) */}
-          {user && person.id !== user.id && (
+          {/* Add to Talent Pool (Recruiters only) */}
+          {user && !isOwnProfile && createRolePermissions(user.role).isRecruiter && onAddToTalentPool && (
             <div className="flex items-center gap-2 pt-2">
-              {isPendingReceived ? (
-                <div className="flex gap-1 flex-1">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onAcceptConnection?.(person.id)}
-                  >
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Accept
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onRejectConnection?.(person.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : isPendingSent ? (
-                <Button variant="outline" size="sm" className="flex-1" disabled>
-                  <Clock className="h-3 w-3 mr-1" />
-                  Pending
-                </Button>
-              ) : isConnected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => onMessage?.(person.id)}
-                >
-                  <MessageCircle className="h-3 w-3 mr-1" />
-                  Message
-                </Button>
-              ) : (
-                <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="flex-1">
-                      <UserPlus className="h-3 w-3 mr-1" />
-                      Connect
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Send Connection Request</DialogTitle>
-                      <DialogDescription>
-                        Add a personal message to your connection request to {displayFullName}.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Textarea
-                        placeholder="I'd love to connect and expand my professional network..."
-                        value={connectMessage}
-                        onChange={(e) => setConnectMessage(e.target.value)}
-                        rows={3}
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSendConnect}>
-                          <Send className="h-3 w-3 mr-2" />
-                          Send Request
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-
-              {/* Track / Follow moved to the bottom action row — see cardActions below. */}
-
-              {/* Add to Talent Pool (Recruiters only) */}
-              {user && createRolePermissions(user.role).isRecruiter && onAddToTalentPool && (
-                <Button
-                  variant={isInTalentPool ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() => onAddToTalentPool(person.id)}
-                  disabled={isInTalentPool}
-                  title={isInTalentPool ? "Already in talent pool" : "Add to talent pool"}
-                >
-                  <UserCog className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Own Profile */}
-          {user && person.id === user.id && (
-            <div className="flex items-center gap-2 pt-2">
-              <Button asChild className="flex-1">
-                <Link to="/profile">
-                  Edit Profile
-                  <ExternalLink className="h-3 w-3 ml-1" />
-                </Link>
+              <Button
+                variant={isInTalentPool ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => onAddToTalentPool(person.id)}
+                disabled={isInTalentPool}
+                title={isInTalentPool ? "Already in talent pool" : "Add to talent pool"}
+              >
+                <UserCog className="h-3 w-3 mr-1" />
+                {isInTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
               </Button>
             </div>
           )}
@@ -449,6 +399,35 @@ export default function PeopleCard({
       </CardContent>
 
       <CardActions actions={cardActions} />
+
+      {/* Connect Dialog — triggered from the Connect action in CardActions */}
+      <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Connection Request</DialogTitle>
+            <DialogDescription>
+              Add a personal message to your connection request to {displayFullName}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="I'd love to connect and expand my professional network..."
+              value={connectMessage}
+              onChange={(e) => setConnectMessage(e.target.value)}
+              rows={3}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowConnectDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSendConnect}>
+                <Send className="h-3 w-3 mr-2" />
+                Send Request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
