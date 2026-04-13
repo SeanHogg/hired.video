@@ -6,7 +6,6 @@
  */
 
 import * as React from "react";
-import { Eye } from "lucide-react";
 import JobCard from "@/components/JobCard";
 import CompanyCard from "@/components/CompanyCard";
 import PeopleCard from "@/components/PeopleCard";
@@ -144,33 +143,14 @@ export function useCardRenderer({
             normalizedData,
             effectiveUserContext,
           );
-          const peopleActions = [
-            {
-              id: "view",
-              label: "View",
-              variant: "outline" as const,
-              icon: Eye,
-              onClick: () => interactions.onView?.(normalizedData),
-              priority: 1,
-            },
-            {
-              id: "actions",
-              label: "Actions",
-              variant: "default" as const,
-              onClick: () => interactions.onActions?.(normalizedData),
-              priority: 2,
-            },
-          ];
 
           return (
             <PeopleCard
               key={normalizedData.id}
               person={normalizedData}
-              actions={peopleActions}
               userContext={effectiveUserContext}
               itemOwnership={peopleOwnership}
               onView={() => interactions.onView?.(normalizedData)}
-              onActions={() => interactions.onActions?.(normalizedData)}
               onTrack={interactions.onTrack}
               onUntrack={interactions.onUntrack}
             />
@@ -210,27 +190,6 @@ export function useCardRenderer({
 
         case "video": {
           normalizedData = normalizeVideoData(item, context);
-          const videoOwnership = determineItemOwnership(
-            normalizedData,
-            effectiveUserContext,
-          );
-          const videoActions = [
-            {
-              id: "view",
-              label: "View",
-              variant: "outline" as const,
-              icon: Eye,
-              onClick: () => interactions.onView?.(normalizedData),
-              priority: 1,
-            },
-            {
-              id: "actions",
-              label: "Actions",
-              variant: "default" as const,
-              onClick: () => interactions.onActions?.(normalizedData),
-              priority: 2,
-            },
-          ];
 
           return (
             <VideoCard
@@ -245,11 +204,7 @@ export function useCardRenderer({
               profession={normalizedData.profession}
               company={normalizedData.company}
               createdAt={normalizedData.createdAt}
-              actions={videoActions}
-              userContext={effectiveUserContext}
-              itemOwnership={videoOwnership}
               onView={() => interactions.onView?.(normalizedData)}
-              onActions={() => interactions.onActions?.(normalizedData)}
             />
           );
         }
@@ -323,7 +278,6 @@ export function renderCardItem(
           key={normalizedData.id}
           job={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
-          onActions={() => interactions.onActions?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
         />
@@ -337,7 +291,6 @@ export function renderCardItem(
           key={normalizedData.id}
           company={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
-          onActions={() => interactions.onActions?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
         />
@@ -351,7 +304,6 @@ export function renderCardItem(
           key={normalizedData.id}
           person={normalizedData}
           onView={() => interactions.onView?.(normalizedData)}
-          onActions={() => interactions.onActions?.(normalizedData)}
           onTrack={interactions.onTrack}
           onUntrack={interactions.onUntrack}
         />
@@ -370,7 +322,6 @@ export function renderCardItem(
           views={normalizedData.views || 0}
           privacy={normalizedData.privacy}
           onView={() => interactions.onView?.(normalizedData)}
-          onActions={() => interactions.onActions?.(normalizedData)}
         />
       );
     }
@@ -391,7 +342,6 @@ export function renderCardItem(
           company={normalizedData.company}
           createdAt={normalizedData.createdAt}
           onView={() => interactions.onView?.(normalizedData)}
-          onActions={() => interactions.onActions?.(normalizedData)}
         />
       );
     }
