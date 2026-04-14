@@ -107,6 +107,7 @@ export default function PeopleCard({
   const ownership = "ownership" in person ? person.ownership : undefined;
   const isTracked = ownership === "tracked";
   const isOwnProfile = !!user && person.id === user.id;
+  const isAuthenticated = !!user;
   const isConnected =
     ownership === "connected" || connectionStatus === "connected";
   const isPendingSent = connectionStatus === "pending_sent";
@@ -272,7 +273,9 @@ export default function PeopleCard({
               <p className="text-sm text-muted-foreground truncate">{person.headline}</p>
             </div>
             <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground flex-shrink-0">
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{person.location}</span>
+              {isAuthenticated && (
+                <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{person.location}</span>
+              )}
               {person.currentCompany && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{person.currentCompany}</span>}
             </div>
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
@@ -359,15 +362,22 @@ export default function PeopleCard({
                 {person.headline}
               </CardDescription>
 
+              {/* Role, location, active/joined are authenticated-only. Anonymous
+                  viewers still see name, headline, current position, and company
+                  — enough to identify the person and click through. */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  {getRoleIcon(person.role)}
-                  <span>{formatRoleForDisplay(person.role)}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  <span>{person.location}</span>
-                </div>
+                {isAuthenticated && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      {getRoleIcon(person.role)}
+                      <span>{formatRoleForDisplay(person.role)}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{person.location}</span>
+                    </div>
+                  </>
+                )}
                 {person.currentCompany && (
                   <div className="flex items-center gap-1">
                     <Building2 className="h-3 w-3" />
@@ -416,41 +426,47 @@ export default function PeopleCard({
             </div>
           )}
 
-          {/* Public stats: connections + followers are social proof and stay public.
-              Profile views are engagement data → owner-only, shown in its own row below. */}
-          <div className="grid grid-cols-2 gap-2 text-xs text-center">
-            <div>
-              <div className="font-medium">{person.connectionCount}</div>
-              <div className="text-muted-foreground">Connections</div>
-            </div>
-            <div>
-              <div className="font-medium">{person.followerCount}</div>
-              <div className="text-muted-foreground">Followers</div>
-            </div>
-          </div>
+          {/* Engagement metrics (connections, followers, profile views) are
+              owner-only — they're personal analytics, not social proof for the
+              public. */}
+          {isOwnProfile && (
+            <>
+              <div className="grid grid-cols-2 gap-2 text-xs text-center">
+                <div>
+                  <div className="font-medium">{person.connectionCount}</div>
+                  <div className="text-muted-foreground">Connections</div>
+                </div>
+                <div>
+                  <div className="font-medium">{person.followerCount}</div>
+                  <div className="text-muted-foreground">Followers</div>
+                </div>
+              </div>
+              <OwnerMetricsRow isOwner={isOwnProfile} className="justify-center pt-1">
+                <Metric icon={Eye} value={person.profileViews ?? 0} label="profile views" />
+              </OwnerMetricsRow>
+            </>
+          )}
 
-          <OwnerMetricsRow isOwner={isOwnProfile} className="justify-center pt-1">
-            <Metric icon={Eye} value={person.profileViews ?? 0} label="profile views" />
-          </OwnerMetricsRow>
-
-          {/* Last Active */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Active{" "}
-              {person.lastActiveAt &&
-              !isNaN(new Date(person.lastActiveAt).getTime())
-                ? new Date(person.lastActiveAt).toLocaleDateString()
-                : "Unknown"}
+          {/* Active / Joined timestamps are authenticated-only. */}
+          {isAuthenticated && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Active{" "}
+                {person.lastActiveAt &&
+                !isNaN(new Date(person.lastActiveAt).getTime())
+                  ? new Date(person.lastActiveAt).toLocaleDateString()
+                  : "Unknown"}
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Joined{" "}
+                {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
+                  ? new Date(person.createdAt).toLocaleDateString()
+                  : "Unknown"}
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              Joined{" "}
-              {person.createdAt && !isNaN(new Date(person.createdAt).getTime())
-                ? new Date(person.createdAt).toLocaleDateString()
-                : "Unknown"}
-            </div>
-          </div>
+          )}
 
           {/* Add to Talent Pool (Recruiters only) */}
           {user && !isOwnProfile && createRolePermissions(user.role).isRecruiter && onAddToTalentPool && (
