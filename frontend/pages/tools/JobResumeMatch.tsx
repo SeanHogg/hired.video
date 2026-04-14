@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,7 +17,9 @@ import Sidebar from "@/components/Sidebar";
 import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
+import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
   matchService,
@@ -63,6 +65,22 @@ export default function JobResumeMatch() {
   // Loading and error states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Preserve the wizard so anonymous users who bounce through login
+  // return to the same step with job + resume still populated.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    jobData: JobData | null;
+    resumeData: ResumeData | null;
+    currentStep: WizardStep;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.jobData) setJobData(restored.jobData);
+    if (restored.resumeData) setResumeData(restored.resumeData);
+    if (restored.currentStep) setCurrentStep(restored.currentStep);
+  }, [restored, isAuthenticated]);
 
   // Step navigation
   const steps = [
@@ -95,6 +113,19 @@ export default function JobResumeMatch() {
   const handleResumeSelected = async (data: ResumeData) => {
     setResumeData(data);
     setError(null);
+
+    // Soft-gate before the paid API call. Snapshot the whole wizard so
+    // the user returns to this exact step with job + resume populated.
+    if (!isAuthenticated) {
+      snapshot({
+        jobData,
+        resumeData: data,
+        currentStep: "resume",
+      });
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsAnalyzing(true);
 
     try {
@@ -108,6 +139,7 @@ export default function JobResumeMatch() {
 
       setMatchResult(result);
       setCurrentStep("results");
+      clear();
     } catch (err) {
       console.error("Match analysis failed:", err);
       setError("Failed to analyze job-resume match. Please try again.");
@@ -151,7 +183,14 @@ export default function JobResumeMatch() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-6">
+        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="tool"
+              title="Job-Resume Match"
+              message="Sign in to score your match — we'll keep the job and resume you've selected and run the analysis as soon as you're back."
+            />
+          )}
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">

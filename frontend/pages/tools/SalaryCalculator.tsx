@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Calculator,
@@ -28,6 +28,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
 import { INDUSTRIES, EDUCATION_LEVELS } from "@/lib/constants/industries";
@@ -143,6 +144,23 @@ export default function SalaryCalculator() {
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
+  // Persist form inputs across the anonymous → authenticated bounce so the
+  // user doesn't have to re-enter their job details after signing in.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    jobTitle?: string;
+    location?: string;
+    experience?: number[];
+    industry?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.jobTitle) setJobTitle(restored.jobTitle);
+    if (restored.location) setLocation(restored.location);
+    if (restored.experience) setExperience(restored.experience);
+    if (restored.industry) setIndustry(restored.industry);
+  }, [restored, isAuthenticated]);
+
   const calculateSalary = async () => {
     if (!jobTitle.trim() || !location_.trim()) {
       setError("Please enter both job title and location.");
@@ -156,6 +174,12 @@ export default function SalaryCalculator() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({
+        jobTitle,
+        location: location_,
+        experience,
+        industry,
+      });
       setShowAuthOverlay(true);
       return;
     }
@@ -280,6 +304,7 @@ export default function SalaryCalculator() {
       };
 
       setSalaryData(salaryDataResult);
+      clear();
     } catch (err: unknown) {
       console.error("Salary calculation failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to calculate salary. Please try again.";
@@ -326,9 +351,9 @@ export default function SalaryCalculator() {
         <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
-              contentType="resume"
-              title="Salary Calculator Tool"
-              message="Sign in to access our salary calculator and discover your market value with personalized compensation insights."
+              contentType="tool"
+              title="Salary Calculator"
+              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
             />
           )}
 

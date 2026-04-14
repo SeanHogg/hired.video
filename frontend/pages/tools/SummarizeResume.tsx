@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Loader2, Upload, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
@@ -19,6 +19,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
@@ -46,6 +47,19 @@ export default function SummarizeResume() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Persist the pasted resume text across the anonymous → authenticated bounce
+  // so the user doesn't have to re-paste after signing in.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    resumeText?: string;
+    selectedResumeId?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.resumeText) setResumeText(restored.resumeText);
+    if (restored.selectedResumeId) setSelectedResumeId(restored.selectedResumeId);
+  }, [restored, isAuthenticated]);
 
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
@@ -92,6 +106,7 @@ export default function SummarizeResume() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ resumeText });
       setShowAuthOverlay(true);
       return;
     }
@@ -108,6 +123,7 @@ export default function SummarizeResume() {
 
       const data: any = response.data;
       setSummary(data.result || data);
+      clear();
     } catch (err) {
       console.error("Summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");
@@ -121,6 +137,9 @@ export default function SummarizeResume() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      // File objects can't be snapshotted; the file input will re-render
+      // empty after login but the user has the original file locally.
+      snapshot({});
       setShowAuthOverlay(true);
       return;
     }
@@ -156,6 +175,7 @@ export default function SummarizeResume() {
 
       const data: any = summaryResponse.data;
       setSummary(data.result || data);
+      clear();
     } catch (err) {
       console.error("File summarization failed:", err);
       setError("Failed to summarize resume file. Please try again.");
@@ -169,6 +189,7 @@ export default function SummarizeResume() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ selectedResumeId });
       setShowAuthOverlay(true);
       return;
     }
@@ -185,6 +206,7 @@ export default function SummarizeResume() {
 
       const data: any = response.data;
       setSummary(data.result || data);
+      clear();
     } catch (err) {
       console.error("Resume summarization failed:", err);
       setError("Failed to summarize resume. Please try again.");
@@ -231,9 +253,9 @@ export default function SummarizeResume() {
         <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
-              contentType="resume"
-              title="Resume Summarization Tool"
-              message="Sign in to access our AI-powered resume summarization tool and get instant professional summaries."
+              contentType="tool"
+              title="Resume Summarization"
+              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
             />
           )}
 

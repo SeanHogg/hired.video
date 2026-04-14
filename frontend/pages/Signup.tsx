@@ -161,10 +161,16 @@ export default function Signup() {
       const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
       if (success) {
         trackSignUp("email");
-        // Redirect to success page with email confirmation instructions
-        navigate(
-          `/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`,
-        );
+        // Carry any ?redirect=<tool-path> forward so the user returns to the
+        // tool they were using when prompted to sign up.
+        const search = new URLSearchParams(location.search);
+        const redirect = search.get("redirect");
+        const successParams = new URLSearchParams({
+          email,
+          firstName,
+          ...(redirect ? { redirect } : {}),
+        });
+        navigate(`/signup-success?${successParams.toString()}`);
       } else {
         setError(
           "Account with this email already exists. Please sign in instead.",

@@ -7,21 +7,32 @@ import {
   LogIn,
   UserPlus,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface AuthOverlayProps {
-  contentType?: "company" | "job" | "resume" | "person" | "ai-coach";
+  contentType?: "company" | "job" | "resume" | "person" | "ai-coach" | "tool";
   title?: string;
   message?: string;
+  /**
+   * Path to return to after login. Defaults to the current pathname so tool
+   * pages resume in place. The Login screen reads ?redirect= and navigates
+   * there on success; pair this with usePendingToolInput to rehydrate form
+   * state and avoid making users re-enter their data.
+   */
+  returnTo?: string;
 }
 
 export default function AuthOverlay({
   contentType = "company",
   title,
   message,
+  returnTo,
 }: AuthOverlayProps) {
+  const location = useLocation();
+  const redirectTarget = returnTo ?? `${location.pathname}${location.search}`;
+  const redirectQuery = `?redirect=${encodeURIComponent(redirectTarget)}`;
   const getContentIcon = () => {
     switch (contentType) {
       case "company":
@@ -33,6 +44,8 @@ export default function AuthOverlay({
       case "person":
         return <User className="h-5 w-5" />;
       case "ai-coach":
+        return <Lock className="h-5 w-5" />;
+      case "tool":
         return <Lock className="h-5 w-5" />;
       default:
         return <Lock className="h-5 w-5" />;
@@ -51,6 +64,8 @@ export default function AuthOverlay({
         return "Sign in to view full professional profiles and connect with industry professionals.";
       case "ai-coach":
         return "Sign in to access AI-powered career coaching and personalized guidance.";
+      case "tool":
+        return "Sign in to run this tool — we'll keep the inputs you've already entered and pick up right where you left off.";
       default:
         return "Sign in to access complete details and unlock all features.";
     }
@@ -87,13 +102,13 @@ export default function AuthOverlay({
               {/* Action buttons */}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button asChild className="flex-1" size="sm">
-                  <Link to="/login">
+                  <Link to={`/login${redirectQuery}`}>
                     <LogIn className="h-4 w-4 mr-2" />
                     Sign In
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="flex-1" size="sm">
-                  <Link to="/signup">
+                  <Link to={`/signup${redirectQuery}`}>
                     <UserPlus className="h-4 w-4 mr-2" />
                     Create Account
                   </Link>

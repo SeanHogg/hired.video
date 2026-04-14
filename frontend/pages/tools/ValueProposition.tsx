@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,7 +19,9 @@ import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import ValuePropositionResultsStep from "@/components/tools/ValuePropositionResultsStep";
 import CompanyInfoStep from "@/components/tools/CompanyInfoStep";
+import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
   valuePropositionService,
@@ -71,6 +73,25 @@ export default function ValueProposition() {
   // Loading and error states
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Preserve the whole wizard (job + resume + company + step cursor) so
+  // an anonymous user who bounces through login lands back on the same
+  // step with every field still filled in.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    jobData: JobData | null;
+    resumeData: ResumeData | null;
+    companyData: CompanyData | null;
+    currentStep: WizardStep;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.jobData) setJobData(restored.jobData);
+    if (restored.resumeData) setResumeData(restored.resumeData);
+    if (restored.companyData) setCompanyData(restored.companyData);
+    if (restored.currentStep) setCurrentStep(restored.currentStep);
+  }, [restored, isAuthenticated]);
 
   // Step navigation
   const steps = [
@@ -97,6 +118,21 @@ export default function ValueProposition() {
   const handleCompanyInfoSubmitted = async (data: CompanyData) => {
     setCompanyData(data);
     setError(null);
+
+    // Soft-gate: anonymous users are bounced through login with the whole
+    // wizard state preserved so they return to this same step without
+    // re-entering job, resume, or company details.
+    if (!isAuthenticated) {
+      snapshot({
+        jobData,
+        resumeData,
+        companyData: data,
+        currentStep: "company",
+      });
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -113,6 +149,7 @@ export default function ValueProposition() {
 
       setValuePropositionResult(result);
       setCurrentStep("results");
+      clear();
     } catch (err) {
       console.error("Value proposition generation failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to generate value proposition. Please try again.";
@@ -154,7 +191,14 @@ export default function ValueProposition() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-6">
+        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="tool"
+              title="Value Proposition Builder"
+              message="Sign in to generate your value proposition — we'll keep the job, resume, and company details you've entered."
+            />
+          )}
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="mb-8">

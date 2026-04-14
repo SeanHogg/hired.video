@@ -278,60 +278,224 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords: "help, support, FAQ, user guide, customer service",
   },
   "/tools": {
-    title: "Career Tools - hired.video",
+    title: "Free AI Career Tools — Resume Scorer, Optimizer, Value Prop | hired.video",
     description:
-      "Access powerful AI-driven career tools including sentiment analysis, job-resume matching, and career insights.",
+      "Free AI career tools from hired.video: resume scorer, ATS optimizer, salary calculator, job-resume match, sentiment analysis, and value proposition builder. No signup to try.",
     keywords:
-      "career tools, AI tools, job matching, sentiment analysis, career insights",
-  },
-  "/tools/sentiment-analysis": {
-    title: "Sentiment Analysis Tool - hired.video",
-    description:
-      "Analyze the sentiment and tone of your resume content with our AI-powered sentiment analysis tool.",
-    keywords:
-      "sentiment analysis, resume analysis, AI tools, content optimization",
-  },
-  "/tools/job-resume-match": {
-    title: "Job Resume Matching Tool - hired.video",
-    description:
-      "Find the perfect match between jobs and resumes using our advanced AI matching algorithm.",
-    keywords: "job matching, resume matching, AI matching, career fit analysis",
+      "AI career tools, AI resume scorer, resume optimizer, ATS resume checker, salary calculator, job match, value proposition, free career tools, AI job search",
+    ogTitle: "Free AI Career Tools — hired.video",
+    ogDescription:
+      "Score, optimize, and tailor your resume with AI. Free to try — no signup needed to start.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "hired.video AI Career Tools",
+      url: "https://hired.video/tools",
+      description:
+        "A collection of free AI-powered career tools including resume scoring, ATS optimization, salary analysis, job-resume matching, and value proposition generation.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
   },
   "/tools/ai-resume-scorer": {
-    title: "AI Resume Scorer - hired.video",
+    title: "AI Resume Scorer — Free ATS Resume Grader | hired.video",
     description:
-      "Score your resume with AI to identify strengths and areas to improve for better job matches.",
-    keywords: "AI resume score, resume grading, resume quality, career tools",
+      "Grade your resume in seconds with our free AI resume scorer. Get an ATS-compatibility score, keyword match, content-quality rating, and targeted recommendations to land more interviews.",
+    keywords:
+      "AI resume scorer, resume grader, ATS score, resume checker, resume grade, resume quality score, free resume review, AI resume review",
+    ogTitle: "AI Resume Scorer — free ATS-ready resume grading",
+    ogDescription:
+      "Paste your resume. Get a score, a grade, and specific fixes — powered by AI, free to try.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video AI Resume Scorer",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/ai-resume-scorer",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/tools/resume-optimizer": {
-    title: "Resume Optimizer - hired.video",
+    title: "Resume Optimizer — AI ATS Keyword Matcher | hired.video",
     description:
-      "Optimize your resume for ATS and recruiters with AI suggestions tailored to your target roles.",
-    keywords: "resume optimizer, ATS optimization, resume improvement, AI tools",
+      "Optimize your resume for ATS and any target job in seconds. Our AI resume optimizer mirrors job-description keywords, suggests rewrites, and boosts your match rate.",
+    keywords:
+      "resume optimizer, ATS optimizer, resume keyword match, AI resume rewrite, tailor resume to job, ATS-friendly resume, resume keywords",
+    ogTitle: "AI Resume Optimizer — tailor your resume to any job",
+    ogDescription:
+      "Paste a resume and a job description. Get an ATS-optimized draft with the right keywords.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Optimizer",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/resume-optimizer",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/tools/salary-calculator": {
-    title: "Salary Calculator - hired.video",
+    title: "Salary Calculator — AI Compensation Benchmarks | hired.video",
     description:
-      "Estimate fair salary ranges by title, experience, and location to negotiate your next offer confidently.",
-    keywords: "salary calculator, compensation, pay range, negotiate salary",
+      "Know your market rate. Our AI salary calculator estimates fair compensation by title, years of experience, location, and industry — with percentile ranges and negotiation tips.",
+    keywords:
+      "salary calculator, compensation calculator, market salary, pay range, salary benchmark, salary negotiation, what am I worth, salary by experience, salary by location",
+    ogTitle: "Salary Calculator — know your market rate",
+    ogDescription:
+      "Estimate fair compensation by role, experience, and location. Includes p10–p90 percentile bands.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Salary Calculator",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/salary-calculator",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/job-resume-match": {
+    title: "Job-Resume Match — AI Fit Score for Any Role | hired.video",
+    description:
+      "See how well your resume fits any job in seconds. Our AI match tool scores alignment, highlights missing skills, and tells you what to add before you apply.",
+    keywords:
+      "job resume match, job fit score, resume match score, AI job matching, resume vs job description, skill gap analysis, resume job compatibility",
+    ogTitle: "Job-Resume Match — AI fit score for any job",
+    ogDescription:
+      "Upload a job. Pick a resume. Get a match score plus the specific gaps you need to close.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Job-Resume Match",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/job-resume-match",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/tools/summarize-resume": {
-    title: "Resume Summarizer - hired.video",
+    title: "AI Resume Summarizer — Professional Summaries in Seconds | hired.video",
     description:
-      "Generate concise professional summaries from your resume to use on profiles and applications.",
-    keywords: "resume summary, professional summary, AI resume tools",
+      "Turn your resume into a sharp, hireable professional summary with AI. Perfect for LinkedIn, cover letters, and profile bios — generated in seconds, tailored to your target role.",
+    keywords:
+      "resume summarizer, professional summary generator, AI resume summary, LinkedIn summary, about me generator, career summary, resume intro generator",
+    ogTitle: "AI Resume Summarizer — professional summaries in seconds",
+    ogDescription:
+      "Paste your resume. Get a concise, role-ready summary for LinkedIn, cover letters, and profiles.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Summarizer",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/summarize-resume",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
-  "/tools/pdf-to-json": {
-    title: "PDF to JSON - hired.video",
+  "/tools/sentiment-analysis": {
+    title: "Resume Sentiment Analysis — AI Tone Checker | hired.video",
     description:
-      "Convert resume PDFs into structured JSON data for analysis and quick editing.",
-    keywords: "pdf to json, resume parsing, data extraction, AI tools",
+      "Check the tone and confidence of your resume with AI. Our sentiment analysis tool flags passive language, weak phrasing, and opportunities to sound more assertive.",
+    keywords:
+      "resume sentiment analysis, resume tone checker, AI resume tone, confident resume language, resume wording analysis, action verb checker",
+    ogTitle: "Resume Sentiment Analysis — AI tone checker",
+    ogDescription:
+      "Upload your resume and see how confident, assertive, and impact-driven its language reads.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Sentiment Analysis",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/sentiment-analysis",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/tools/value-proposition": {
-    title: "Value Proposition Builder - hired.video",
+    title: "AI Value Proposition Builder — Elevator Pitch Generator | hired.video",
     description:
-      "Craft a compelling value proposition tailored to your target role using your resume and job description.",
-    keywords: "value proposition, career branding, elevator pitch, AI tools",
+      "Build a compelling value proposition tailored to your target role. AI combines your resume, the job description, and the company's mission into a personal pitch that wins interviews.",
+    keywords:
+      "value proposition generator, elevator pitch builder, personal brand statement, AI cover letter, career pitch, unique value proposition, job application pitch",
+    ogTitle: "AI Value Proposition Builder — personal pitch in seconds",
+    ogDescription:
+      "Combine your resume, the job, and the company's mission into a value prop that gets noticed.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Value Proposition Builder",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/value-proposition",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/pdf-to-json": {
+    title: "Resume PDF to JSON Converter — AI Resume Parser | hired.video",
+    description:
+      "Convert any resume PDF to structured JSON. Our AI parser extracts basics, work history, skills, and education in seconds — ideal for builders, ATSes, and data pipelines.",
+    keywords:
+      "pdf to json, resume parser, AI resume extraction, json resume, resume data extraction, pdf resume converter, structured resume",
+    ogTitle: "Resume PDF to JSON — AI parser",
+    ogDescription:
+      "Drop a PDF. Get clean, structured JSON — schema-compatible and ready to index.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video PDF-to-JSON Resume Parser",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/pdf-to-json",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/resume-consolidator": {
+    title: "Resume Consolidator — Merge Multiple Resumes | hired.video",
+    description:
+      "Have three resumes? Merge them into one master resume with AI. Dedupes work history, consolidates skills, and preserves every highlight you've ever written.",
+    keywords:
+      "resume consolidator, merge resumes, combine resumes, master resume, AI resume merge, dedupe resume, resume deduplication",
+    ogTitle: "Resume Consolidator — merge multiple resumes into one",
+    ogDescription:
+      "AI merges your resumes into a single master resume without losing a single highlight.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Consolidator",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/resume-consolidator",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/resume-tailor": {
+    title: "Resume Tailor — AI Custom Resume for Every Job | hired.video",
+    description:
+      "Tailor your resume to any job in seconds. AI rewrites your bullets, rearranges sections, and injects the right keywords — all while keeping your voice and facts intact.",
+    keywords:
+      "resume tailor, customize resume for job, tailor resume to job description, AI resume customization, per-job resume, resume variants",
+    ogTitle: "Resume Tailor — AI custom resume for every job",
+    ogDescription:
+      "Upload your resume and a job. Get a tailored version that matches the role without making things up.",
+    ogImage: "https://hired.video/og-image.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Tailor",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/resume-tailor",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/contact": {
     title: "Contact Us - hired.video",
@@ -366,14 +530,25 @@ export const PAGE_SEO: Record<string, SEOData> = {
 // Canonical origin (prefer apex domain over www)
 const CANONICAL_ORIGIN = "https://hired.video";
 
-// Map legacy/duplicate routes to canonical equivalents
+// Map legacy/duplicate routes to canonical equivalents. The tools are
+// registered at both PascalCase (/Tools/AIResumeScorer) and kebab-case
+// (/tools/ai-resume-scorer) paths — kebab-case is canonical for SEO so
+// every PascalCase variant is aliased here. Keep this in sync with
+// App.tsx's route table when new tools are added.
 export function canonicalizePath(pathname: string): string {
   const p = pathname || "/";
   const aliasMap: Record<string, string> = {
+    "/Tools/AIResumeScorer": "/tools/ai-resume-scorer",
+    "/Tools/ResumeOptimizer": "/tools/resume-optimizer",
+    "/Tools/SalaryCalculator": "/tools/salary-calculator",
     "/Tools/SentimentAnalysis": "/tools/sentiment-analysis",
     "/Tools/JobResumeMatch": "/tools/job-resume-match",
     "/Tools/SummarizeResume": "/tools/summarize-resume",
+    "/Tools/ValueProposition": "/tools/value-proposition",
     "/Tools/pdftojson": "/tools/pdf-to-json",
+    "/Tools/PdfToJson": "/tools/pdf-to-json",
+    "/Tools/ResumeConsolidator": "/tools/resume-consolidator",
+    "/Tools/ResumeTailor": "/tools/resume-tailor",
     "/privacy": "/privacy-policy",
     "/terms": "/terms-of-service",
   };

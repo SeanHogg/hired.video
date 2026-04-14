@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   FileText,
@@ -18,6 +18,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { extractTextFromFile } from "@/lib/extract-text";
@@ -41,6 +42,22 @@ export default function PdfToJson() {
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // File objects can't be serialized, but we flag that the user was mid-
+  // conversion so the UI can prompt them to re-upload after login instead
+  // of silently dropping them on the empty state.
+  const { restored, snapshot, clear } = usePendingToolInput<{ pending?: boolean; fileName?: string }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.pending && !file) {
+      setError(
+        restored.fileName
+          ? `You were converting "${restored.fileName}" before signing in — please re-upload it to continue.`
+          : "Please re-upload your PDF to finish the conversion.",
+      );
+    }
+  }, [restored, isAuthenticated, file]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -74,6 +91,7 @@ export default function PdfToJson() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ pending: true, fileName: file.name });
       setShowAuthOverlay(true);
       return;
     }
@@ -113,6 +131,7 @@ export default function PdfToJson() {
       }
 
       setJsonResult(formattedJson);
+      clear();
     } catch (err) {
       console.error("Conversion failed:", err);
       setError("Failed to convert document. Please try again.");
@@ -176,9 +195,9 @@ export default function PdfToJson() {
         <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
-              contentType="resume"
-              title="Document Converter Tool"
-              message="Sign in to access our document conversion tool and convert your PDF/Word resumes to structured JSON format."
+              contentType="tool"
+              title="PDF to JSON Converter"
+              message="Sign in to run this tool — we'll keep your place and pick up right where you left off."
             />
           )}
 

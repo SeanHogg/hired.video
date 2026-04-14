@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Loader2,
@@ -29,6 +29,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
@@ -76,6 +77,20 @@ export default function ResumeOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Persist text inputs across the anonymous → authenticated bounce so the
+  // user doesn't have to retype after signing in. File objects can't survive
+  // JSON serialization, so only text fields are snapshotted.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    resumeText?: string;
+    jobDescription?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.resumeText) setResumeText(restored.resumeText);
+    if (restored.jobDescription) setJobDescription(restored.jobDescription);
+  }, [restored, isAuthenticated]);
 
   // Fetch user's resumes if authenticated
   const { data: resumes } = useQuery({
@@ -147,6 +162,7 @@ export default function ResumeOptimizer() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ resumeText, jobDescription });
       setShowAuthOverlay(true);
       return;
     }
@@ -158,6 +174,7 @@ export default function ResumeOptimizer() {
     try {
       const result = await optimizeResume(resumeText);
       setOptimizationResult(result);
+      clear();
     } catch (err: any) {
       console.error("Optimization failed:", err);
       const errorMessage = err?.message || "Failed to optimize resume. Please try again.";
@@ -172,6 +189,9 @@ export default function ResumeOptimizer() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      // File objects can't be snapshotted; the file input will re-render
+      // empty after login but the user has the original file locally.
+      snapshot({ jobDescription });
       setShowAuthOverlay(true);
       return;
     }
@@ -203,6 +223,7 @@ export default function ResumeOptimizer() {
       // Now optimize the parsed content
       const result = await optimizeResume(resumeContent);
       setOptimizationResult(result);
+      clear();
     } catch (err: any) {
       console.error("File optimization failed:", err);
       const errorMessage = err?.message || "Failed to optimize resume file. Please try again.";
@@ -217,6 +238,7 @@ export default function ResumeOptimizer() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ jobDescription });
       setShowAuthOverlay(true);
       return;
     }
@@ -234,6 +256,7 @@ export default function ResumeOptimizer() {
       }
       const result = await optimizeResume(resumeContent);
       setOptimizationResult(result);
+      clear();
     } catch (err: any) {
       console.error("Resume optimization failed:", err);
       const errorMessage = err?.message || "Failed to optimize resume. Please try again.";
@@ -316,9 +339,9 @@ export default function ResumeOptimizer() {
         <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
-              contentType="resume"
-              title="Resume Optimizer Tool"
-              message="Sign in to access our AI-powered resume optimization tool and get detailed ATS compatibility analysis."
+              contentType="tool"
+              title="Resume Optimizer"
+              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
             />
           )}
 

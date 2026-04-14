@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Upload,
   Loader2,
@@ -31,6 +31,7 @@ import AuthOverlay from "@/components/AuthOverlay";
 import SentimentScoreDisplay from "@/components/tools/SentimentScoreDisplay";
 import SentimentRecommendations from "@/components/tools/SentimentRecommendations";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
@@ -60,6 +61,18 @@ export default function SentimentAnalysis() {
 
   // State for existing resume selection
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+
+  // Persist the selected resume across the anonymous → authenticated bounce so
+  // the user doesn't have to re-pick after signing in. File objects can't be
+  // serialized, so only the resume selection is snapshotted.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    selectedResumeId?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.selectedResumeId) setSelectedResumeId(restored.selectedResumeId);
+  }, [restored, isAuthenticated]);
 
   // Fetch user's resumes if authenticated
   const { data: resumes = [] } = useQuery({
@@ -122,6 +135,9 @@ export default function SentimentAnalysis() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      // File objects can't be snapshotted; the file input will re-render
+      // empty after login but the user has the original file locally.
+      snapshot({});
       setShowAuthOverlay(true);
       return;
     }
@@ -133,6 +149,7 @@ export default function SentimentAnalysis() {
     try {
       const score = await sentimentService.analyzeFileSentiment(file);
       setSentimentScore(score);
+      clear();
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
       setError("Failed to analyze sentiment. Please try again.");
@@ -146,6 +163,7 @@ export default function SentimentAnalysis() {
 
     // Check authentication before proceeding
     if (!isAuthenticated) {
+      snapshot({ selectedResumeId });
       setShowAuthOverlay(true);
       return;
     }
@@ -158,6 +176,7 @@ export default function SentimentAnalysis() {
       const score =
         await sentimentService.analyzeResumeSentiment(selectedResumeId);
       setSentimentScore(score);
+      clear();
     } catch (err) {
       console.error("Resume sentiment analysis failed:", err);
       setError("Failed to analyze resume sentiment. Please try again.");
@@ -203,9 +222,9 @@ export default function SentimentAnalysis() {
         <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
-              contentType="resume"
-              title="Sentiment Analysis Tool"
-              message="Sign in to access our AI-powered sentiment analysis tool and discover how positive your resume sounds to employers."
+              contentType="tool"
+              title="Sentiment Analysis"
+              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
             />
           )}
           <div className="max-w-6xl mx-auto space-y-8">

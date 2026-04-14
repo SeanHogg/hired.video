@@ -56,6 +56,8 @@ export const JobSummarySchema = z
     salaryMax: z.number().optional(),
     postedDate: z.string().optional(),
     isRemote: z.boolean().optional(),
+    requirements: z.array(z.string()).optional(),
+    skills: z.array(z.string()).optional(),
     views: z.number().optional(),
     applications: z.number().optional(),
     createdAt: z.string().optional(),
@@ -222,34 +224,44 @@ export class JobService {
   }
 
   /**
-   * Create job from file upload
+   * Create job from file upload.
+   *
+   * Validates the response with the permissive JobSummarySchema rather
+   * than the strict JobSchema. Reason: the CreateFromFile backend path
+   * only extracts title + description + location from the upload — the
+   * enum fields (employmentType, experienceLevel) and metadata (company,
+   * postedDate, createdAt, …) aren't populated synchronously, so strict
+   * validation produces 400 VALIDATION_ERROR responses to a call that
+   * actually succeeded on the server. Support ticket 2026-04-14 was
+   * this exact failure mode from the ValueProposition wizard.
    */
-  async createJobFromFile(file: File): Promise<Job> {
+  async createJobFromFile(file: File): Promise<JobSummary> {
     const formData = new FormData();
     formData.append("file", file);
 
-    // Note: This will need special handling for FormData
-    const response = await apiClient.request<Job>(
+    const response = await apiClient.request<JobSummary>(
       "/api/Job/CreateFromFile",
       {
         method: "POST",
         body: formData,
-        headers: {}, // Remove Content-Type to let browser set it for FormData
+        headers: {}, // Let the browser set the multipart boundary.
       },
-      JobSchema,
+      JobSummarySchema,
     );
 
     return response.data;
   }
 
   /**
-   * Extract job from URL
+   * Extract job from URL. Uses the permissive JobSummarySchema for the
+   * same reason as createJobFromFile — enum fields may be absent when
+   * the extractor can't infer them from the page.
    */
-  async extractJobFromUrl(url: string): Promise<Job> {
-    const response = await apiClient.post<Job>(
+  async extractJobFromUrl(url: string): Promise<JobSummary> {
+    const response = await apiClient.post<JobSummary>(
       "/api/Job/Extract",
       { url },
-      JobSchema,
+      JobSummarySchema,
     );
 
     return response.data;
