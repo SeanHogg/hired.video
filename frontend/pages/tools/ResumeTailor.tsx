@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Sparkles,
@@ -27,6 +27,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import {
@@ -58,6 +59,20 @@ export default function ResumeTailor() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JobTailorResponse | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Preserve the job description + resume selection so anonymous users
+  // who bounce through login don't have to retype or re-pick.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    jobDescription?: string;
+    selectedResumeId?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.jobDescription) setJobDescription(restored.jobDescription);
+    if (restored.selectedResumeId) setSelectedResumeId(restored.selectedResumeId);
+  }, [restored, isAuthenticated]);
 
   // Fetch user's resumes
   const { data: resumes, isLoading: resumesLoading } = useQuery({
@@ -73,6 +88,15 @@ export default function ResumeTailor() {
       return;
     }
 
+    // Soft-gate: the tailor endpoint needs an authenticated user (to pull
+    // the master resume). Snapshot the job description and any resume
+    // selection so the user lands back on this exact form after login.
+    if (!isAuthenticated) {
+      snapshot({ jobDescription, selectedResumeId });
+      setShowAuthOverlay(true);
+      return;
+    }
+
     setError(null);
     setIsGenerating(true);
     setResult(null);
@@ -83,6 +107,7 @@ export default function ResumeTailor() {
         resumeId: selectedResumeId || undefined,
       });
       setResult(response);
+      clear();
     } catch (_err) {
       console.error("Failed to generate tailored resume:", _err);
       setError("Failed to generate tailored resume. Please try again.");
@@ -137,7 +162,14 @@ export default function ResumeTailor() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <div className="pt-16 p-6">
+        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="tool"
+              title="AI Resume Tailor"
+              message="Sign in to tailor your resume — we'll keep the job description you've pasted and generate the tailored version as soon as you're back."
+            />
+          )}
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -160,15 +192,7 @@ export default function ResumeTailor() {
               </Link>
             </div>
 
-            {/* Auth Overlay for non-authenticated users */}
-            {!isAuthenticated && (
-              <AuthOverlay
-                title="Sign in to use AI Resume Tailor"
-                message="Create a free account to generate tailored resumes for any job posting"
-              />
-            )}
-
-            {isAuthenticated && (
+            {(
               <div className="grid lg:grid-cols-2 gap-8">
                 {/* Input Section */}
                 <div className="space-y-6">
@@ -182,22 +206,29 @@ export default function ResumeTailor() {
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="resume-select">Select Your Resume</Label>
-                        <Select
-                          value={selectedResumeId}
-                          onValueChange={setSelectedResumeId}
-                          disabled={resumesLoading}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a resume..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
-                              <SelectItem key={(resume.Id || resume.id)!} value={(resume.Id || resume.id)!}>
-                                {resume.Name || resume.name || resume.Slug || resume.slug || "Untitled Resume"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isAuthenticated ? (
+                          <Select
+                            value={selectedResumeId}
+                            onValueChange={setSelectedResumeId}
+                            disabled={resumesLoading}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a resume..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
+                                <SelectItem key={(resume.Id || resume.id)!} value={(resume.Id || resume.id)!}>
+                                  {resume.Name || resume.name || resume.Slug || resume.slug || "Untitled Resume"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <p className="text-sm text-muted-foreground border border-dashed rounded-md p-3">
+                            Paste a job below, then sign in to pick one of your saved
+                            resumes — we'll keep the job description you've entered.
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-2">

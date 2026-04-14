@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowLeft,
   GitMerge,
@@ -25,6 +25,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -64,11 +65,32 @@ export default function ResumeConsolidator() {
   const [step, setStep] = useState<Step>("select");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   // Selection
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
+
+  // Preserve the user's source/target picks and any uploaded filename so
+  // they return to the same pre-analysis state after login. File objects
+  // themselves can't be serialized; we surface a prompt to re-upload.
+  const { restored, snapshot, clear } = usePendingToolInput<{
+    sourceId?: string | null;
+    targetId?: string | null;
+    sourceFileName?: string;
+  }>();
+
+  useEffect(() => {
+    if (!restored || !isAuthenticated) return;
+    if (restored.sourceId) setSourceId(restored.sourceId);
+    if (restored.targetId) setTargetId(restored.targetId);
+    if (restored.sourceFileName && !sourceFile) {
+      setError(
+        `You were merging "${restored.sourceFileName}" before signing in — please re-upload it to continue.`,
+      );
+    }
+  }, [restored, isAuthenticated, sourceFile]);
 
   // Analysis
   const [analysis, setAnalysis] = useState<MergeAnalysis | null>(null);
@@ -98,7 +120,21 @@ export default function ResumeConsolidator() {
   );
 
   const handleAnalyze = useCallback(async () => {
+    // Soft-gate *first*: an anonymous user can have a source file but no
+    // targetId (the saved-resume list is empty until they sign in), so
+    // don't require targetId until after we've bounced them through login.
+    if (!isAuthenticated) {
+      snapshot({
+        sourceId,
+        targetId,
+        sourceFileName: sourceFile?.name,
+      });
+      setShowAuthOverlay(true);
+      return;
+    }
+
     if (!targetId) return;
+
     setLoading(true);
     setError(null);
 
@@ -129,7 +165,7 @@ export default function ResumeConsolidator() {
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel]);
+  }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel, isAuthenticated, snapshot]);
 
   const handleExecute = useCallback(async () => {
     if (!targetId || !analysis || !sourceId) return;
@@ -170,15 +206,21 @@ export default function ResumeConsolidator() {
       setTargetId(null);
       setSourceFile(null);
       setDecisions([]);
+      clear();
       refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Merge failed. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch]);
+  }, [targetId, sourceId, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch, clear]);
 
-  const canAnalyze = targetId && (sourceId || sourceFile) && sourceId !== targetId;
+  // Anonymous users can't pick a target (empty saved-resume list) so
+  // let them click Analyze with just a source — the soft-gate will
+  // bounce them through login before the API call.
+  const canAnalyze = isAuthenticated
+    ? !!(targetId && (sourceId || sourceFile) && sourceId !== targetId)
+    : !!(sourceId || sourceFile);
 
   return (
     <div className="min-h-screen bg-background">
@@ -186,7 +228,14 @@ export default function ResumeConsolidator() {
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
-        <div className="pt-16 p-6">
+        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+          {showAuthOverlay && (
+            <AuthOverlay
+              contentType="tool"
+              title="Resume Consolidator"
+              message="Sign in to merge your resumes — we'll keep the source and target you've picked and pick up where you left off."
+            />
+          )}
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -209,14 +258,7 @@ export default function ResumeConsolidator() {
               </Link>
             </div>
 
-            {!isAuthenticated && (
-              <AuthOverlay
-                title="Sign in to use Resume Consolidator"
-                message="Create a free account to merge and consolidate your resumes"
-              />
-            )}
-
-            {isAuthenticated && step === "select" && (
+            {step === "select" && (
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Target (merge into) */}
                 <Card>
@@ -253,7 +295,11 @@ export default function ResumeConsolidator() {
                         );
                       })}
                       {filteredResumes.length === 0 && (
-                        <p className="text-sm text-muted-foreground p-3">No resumes found. Create a resume first.</p>
+                        <p className="text-sm text-muted-foreground p-3 border border-dashed rounded-md">
+                          {isAuthenticated
+                            ? "No resumes found. Create a resume first."
+                            : "Upload a source resume below, then click Analyze — we'll prompt you to sign in and pick a target from your account."}
+                        </p>
                       )}
                     </div>
                   </CardContent>
@@ -299,6 +345,12 @@ export default function ResumeConsolidator() {
                                 </button>
                               );
                             })}
+                          {!isAuthenticated && (
+                            <p className="text-sm text-muted-foreground p-3 border border-dashed rounded-md">
+                              Sign in to pick from your saved resumes — or switch to the
+                              Upload File tab to merge from a local file.
+                            </p>
+                          )}
                         </div>
                       </TabsContent>
 
@@ -368,7 +420,7 @@ export default function ResumeConsolidator() {
               </div>
             )}
 
-            {isAuthenticated && step === "review" && analysis && (
+            {step === "review" && analysis && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Review Merge</h2>
