@@ -87,18 +87,31 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
   };
 }
 
-function rowToSummary(row: typeof resumes.$inferSelect) {
+function rowToSummary(
+  row: typeof resumes.$inferSelect,
+  currentUserId?: string | null,
+) {
+  const content = (row.content ?? {}) as Record<string, unknown>;
+  const basics = (content.basics ?? content.Basics ?? {}) as Record<string, unknown>;
+  const summary = (basics.summary ?? basics.Summary ?? "") as string;
+  const isOwner = Boolean(currentUserId && row.userId === currentUserId);
+
   return {
     Id: row.id,
     TemplateName: "Default",
-    IsPublic: true,
-    IsOwner: true,
+    IsPublic: row.privacyLevel === 0,
+    IsOwner: isOwner,
     CreationDateTimeFormatted: new Date(row.createdAt).toISOString(),
+    UpdatedAt: new Date(row.updatedAt).toISOString(),
     SentimentScore: 0,
     UserId: row.userId,
     Name: row.title,
-    Slug: row.id,
-    Description: "",
+    Slug: row.slug ?? row.id,
+    Description: summary,
+    Privacy: LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private",
+    IsMaster: row.isMaster,
+    IsActive: row.isActive,
+    ParentId: row.parentId ?? null,
     IsPrimaryDefault: false,
     IsWatched: false,
     Latitude: null,
@@ -407,6 +420,7 @@ resumeRoutes.get("/public", async (c) => {
   const page = Number(c.req.query("page") ?? 1) || 1;
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const db = getDb();
+  const currentUserId = c.var.user?.sub ?? null;
   // Only return resumes with privacyLevel = 0 (public)
   const rows = await db
     .select()
@@ -418,7 +432,7 @@ resumeRoutes.get("/public", async (c) => {
 
   return c.json(
     ok({
-      items: rows.map(rowToSummary),
+      items: rows.map((row) => rowToSummary(row, currentUserId)),
       total: rows.length,
       page,
       limit,
@@ -446,7 +460,7 @@ resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  return c.json(ok(rows.map(rowToSummary)), 200);
+  return c.json(ok(rows.map((row) => rowToSummary(row, user.sub))), 200);
 });
 
 resumeRoutes.get("/withownership", async (c) => {

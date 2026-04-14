@@ -150,10 +150,8 @@ export function createApp() {
     "/api/analytics/beacon",
     "/api/analytics/ads/impression",
     "/api/search/public",
-    "/api/users/public",
     "/api/jobs/public",
     "/api/companies/public",
-    "/api/resumes/public",
     "/api/resume/public",
     "/api/studio/videos/public",
     "/api/studio/videos/resume",
@@ -198,6 +196,13 @@ export function createApp() {
   // POST/PATCH/DELETE to these paths still require auth via the route handlers.
   const PUBLIC_LISTING_ROUTE = /^\/api\/(?:job|jobs|companies|compan(?:y|ies))(?:$|\/(?!me$|me\/))/i;
 
+  // Public listing endpoints that benefit from knowing the caller when authenticated
+  // (e.g. to compute IsOwner on public resumes, or to show connection state on public
+  // people). Route through optionalAuthMiddleware instead of the public bypass so
+  // c.var.user?.sub is populated when a valid JWT is present but no error is thrown
+  // when absent.
+  const OPTIONAL_AUTH_PUBLIC_ROUTE = /^\/api\/(?:resumes\/public|users\/public)(?:$|\/|\?)/;
+
   // Ad config is public (anonymous users see ads) but Premium check requires
   // optional auth so logged-in Premium users get adsEnabled: false.
   const ADS_CONFIG_ROUTE = /^\/api\/ads\/config$/;
@@ -214,6 +219,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
+    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) {
       return optionalAuthMiddleware(c as any, next);
     }
@@ -229,6 +235,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
+    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
@@ -241,6 +248,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
+    if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
     return passwordChangeMiddleware(c as any, next);
   });

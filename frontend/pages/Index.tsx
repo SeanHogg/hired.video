@@ -37,11 +37,12 @@ import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { companyService } from "@/lib/services/company-service";
+import { type SearchFilters } from "@/lib/services/search-service";
 import {
-  searchService,
-  type SearchResponse,
-  type SearchFilters,
-} from "@/lib/services/search-service";
+  fetchCardFeed,
+  type CardFeedResponse,
+  type CardFeedType,
+} from "@/lib/card-feed";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 import type { CompanyWithOwnership } from "@/types/company";
@@ -87,7 +88,7 @@ export default function Index() {
   });
 
   // New state for real API data - now with individual loading states
-  const [searchResults, setSearchResults] = useState<SearchResponse | null>(
+  const [searchResults, setSearchResults] = useState<CardFeedResponse | null>(
     null,
   );
 
@@ -98,13 +99,37 @@ export default function Index() {
   // Deduplicate rapid successive loads (e.g., double effects or quick state churn)
   const lastRequestRef = React.useRef<string>("");
 
-  // Load dashboard data function
+  // Map the legacy category filter to card-feed types. Categories that aren't
+  // backed by a dedicated domain endpoint (media, voices) fall through to an
+  // empty types list, which returns [] — those sections are now surfaced by
+  // their own dedicated fetches (publicVideos, voice marketplace) elsewhere.
+  const categoryToTypes = (category: string): CardFeedType[] => {
+    switch (category) {
+      case "resumes":
+        return ["resume"];
+      case "jobs":
+        return ["job"];
+      case "companies":
+        return ["company"];
+      case "people":
+        return ["people"];
+      case "all":
+        return ["resume", "job", "company", "people"];
+      default:
+        return [];
+    }
+  };
+
+  // Load content via the card-feed aggregator, which fans out to the per-domain
+  // public endpoints (/api/resumes/public, /api/jobs/public, /api/companies/public,
+  // /api/users/public) and returns a single sorted stream. Cards rendered from
+  // this feed receive the full domain payload — summary, owner id, privacy, etc. —
+  // so they match the parity of the dedicated pages (/resumes, /jobs, ...).
   const loadContent = async (category?: string, pageArg?: number, limitArg?: number) => {
     try {
       setIsLoadingContent(true);
       setContentError(null);
 
-      // Call unified search to get content for the selected category
       const searchCategory = category || selectedCategory;
       const pageToUse = typeof pageArg === "number" ? pageArg : 1;
       const limitToUse = typeof limitArg === "number" ? limitArg : 12;
@@ -116,10 +141,18 @@ export default function Index() {
       }
       lastRequestRef.current = requestKey;
 
-      const content = await searchService.searchPublicContent({
+      const types = categoryToTypes(searchCategory);
+      // For a single-type category we want the full limit against that type;
+      // for "all" we split across the four types so the mixed grid is balanced.
+      const limitPerType = types.length === 1
+        ? limitToUse
+        : Math.max(1, Math.ceil(limitToUse / Math.max(1, types.length)));
+
+      const content = await fetchCardFeed({
+        types,
         page: pageToUse,
-        limit: limitToUse,
-        category: searchCategory === "all" ? undefined : (searchCategory as any),
+        limitPerType,
+        sort: (searchFilters.sortBy as any) || "recent",
       });
 
       setSearchResults(content);
@@ -236,176 +269,26 @@ export default function Index() {
     return { owned: [], tracked: [] };
   };
 
-  // Convert unified search results to content items
+  // Items from the card-feed aggregator are already shaped for card-factory
+  // (they carry real summary, userId, privacy, etc. from the per-domain
+  // endpoints). We only strip out invalid companies and draft resumes here —
+  // no placeholder strings or TODO owner-id hacks anymore.
   const contentItems = searchResults
-    ? searchResults.items
-      .map((item) => {
-        switch (item.type) {
-          case "people":
-            // Filter out demo users from public results
-            if ((item as any).isDemo) {
-              return null;
-            }
-
-            return {
-              id: item.id,
-              name: item.name ?? item.title ?? "",
-              title: item.headline || item.summary || "Professional",
-              summary: item.headline || item.summary || "Professional",
-              avatar: item.avatar,
-              views: item.views || 0,
-              type: "people" as const,
-              contentType: "profile" as const,
-              profession:
-                item.headline?.split(" | ")[0] ||
-                item.summary ||
-                "Professional",
-              company: "Independent", // TODO: Get from user profile
-              createdAt: item.createdAt || new Date().toISOString(),
-              location: item.location,
-              role: (item as any).role || "job_seeker",
-              isVerified: false, // TODO: Get from user profile
-              isPremium: false, // TODO: Get from user profile
-            };
-          case "company":
-            // Filter out companies with invalid names and demo companies
-            const companyName = item.name ?? item.title ?? "";
-
-            if (!isValidCompanyName(companyName) || (item as any).isDemo) {
-              return null; // Filter out invalid or demo companies
-            }
-
-            return {
-              id: item.id,
-              name: companyName,
-              title: item.description || item.summary || "Company",
-              summary: item.description || item.summary || "Company",
-              logo: item.logo,
-              views: item.views || 0,
-              type: "company" as const,
-              contentType: "profile" as const,
-              profession: item.industry || "Technology",
-              company: companyName,
-              createdAt: item.createdAt || new Date().toISOString(),
-              location: item.location,
-              industry: item.industry, // Use actual industry from API
-              size: item.size, // Use actual size from API
-              founded: item.founded, // Use actual founded year from API
-              activeJobCount: item.activeJobCount || 0,
-              followers: item.followers || 0,
-            };
-          case "resume":
-            // Filter out DRAFT resumes - they should not be visible
-            if ((item as any).privacy === "draft") {
-              return null;
-            }
-            return {
-              id: item.id,
-              name: item.title || item.name || "Untitled Resume",
-              title: item.title || item.name || "Untitled Resume",
-              summary:
-                item.summary || item.description || "No summary available",
-              views: item.views || 0,
-              type: "resume" as const,
-              contentType: "text" as const,
-              profession: item.skills?.[0] || "Professional",
-              company: "Independent", // TODO: Get from resume data
-              createdAt: item.createdAt || new Date().toISOString(),
-              ownerId: item.id, // TODO: Get actual owner ID
-              privacy: (item as any).privacy || "public",
-            };
-          case "job":
-            return {
-              id: item.id,
-              title: item.title,
-              name: item.title,
-              summary: item.summary || `${item.title}${item.company ? ` at ${item.company}` : ""}`,
-              views: item.views || 0,
-              applications: item.applications || 0,
-              type: "job" as const,
-              contentType: "job" as const,
-              profession: item.title,
-              company: item.company,
-              createdAt:
-                item.postedDate || item.createdAt || new Date().toISOString(),
-              location: item.location,
-              employmentType: item.employmentType,
-              salary: item.salary,
-              experienceLevel: item.experienceLevel,
-              salaryMin: 0, // Parsed from salary string if needed
-              salaryMax: 0, // Parsed from salary string if needed
-              jobData: {
-                id: item.id,
-                title: item.title,
-                company: item.company,
-                location: item.location,
-                employmentType: item.employmentType,
-                postedDate:
-                  item.postedDate ||
-                  item.createdAt ||
-                  new Date().toISOString(),
-                views: item.views || 0,
-              },
-            };
-          case "media":
-            // Handle media content (videos, images from resumes)
-            const metaType = Array.isArray(item.skills) ? item.skills[0] : item.skills; // MetaType stored in skills field
-            const userId = item.location; // UserId stored in location field
-            const resumeId = item.company; // ReferenceId stored in company field
-            const mediaUrl = item.experienceLevel; // URL stored in experience level field
-
-            return {
-              id: item.id,
-              name: item.name || "Media Content",
-              title: item.name || "Media Content",
-              summary: item.summary || item.description || "Media from resume",
-              views: item.views || 0,
-              type: "media" as const,
-              contentType: metaType?.toLowerCase?.().includes("video") ? "video" : "image" as const,
-              profession: "Content Creator", // Generic profession for media
-              company: "hired.video", // Platform name
-              createdAt: item.createdAt || new Date().toISOString(),
-              // Media-specific properties
-              mediaType: metaType,
-              mediaUrl: mediaUrl,
-              thumbnail: item.avatar, // Thumbnail stored in avatar field
-              ownerId: userId,
-              resumeId: resumeId,
-              isFeatured: item.isFeatured || false,
-            };
-          case "voice": {
-            // Voice clone marketplace listing — sellable, plays a preview.
-            const v = (item as any).voice;
-            if (!v) return null;
-            return {
-              id: item.id,
-              name: item.name || item.title || "Voice",
-              title: item.name || item.title || "Voice",
-              summary: item.summary || item.description || `${v.gender ?? ""} ${v.accent ?? ""} voice`.trim(),
-              views: v.playCount || 0,
-              type: "voice" as const,
-              contentType: "voice" as const,
-              profession: "Voice Creator",
-              company: "Voice Marketplace",
-              createdAt: item.createdAt || new Date().toISOString(),
-              // Voice-specific properties consumed by the voice card / cart add
-              voiceCloneId: v.id,
-              previewAudioUrl: v.previewAudioUrl,
-              priceCents: v.priceCents,
-              currency: v.currency,
-              language: v.language,
-              gender: v.gender,
-              accent: v.accent,
-              listingSlug: v.listingSlug,
-              creatorId: v.creatorId,
-              purchaseCount: v.purchaseCount,
-            };
+    ? searchResults.items.filter((item) => {
+        if (item.type === "company") {
+          const companyName = (item.name ?? item.title ?? "") as string;
+          if (!isValidCompanyName(companyName) || (item as any).isDemo) {
+            return false;
           }
-          default:
-            return null;
         }
+        if (item.type === "resume" && (item as any).privacy === "draft") {
+          return false;
+        }
+        if (item.type === "people" && (item as any).isDemo) {
+          return false;
+        }
+        return true;
       })
-      .filter(Boolean)
     : [];
 
   // Create user context for dynamic actions

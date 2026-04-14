@@ -13,8 +13,8 @@ import {
 import {
   searchService,
   type SearchResponse,
-  type SearchFilters,
 } from "./search-service";
+import { fetchCardFeed, type CardFeedType } from "../card-feed";
 
 // ============================================================================
 // SCHEMAS
@@ -338,7 +338,15 @@ export interface HomepageFilters {
 
 export class DashboardService {
   /**
-   * Get homepage content with filtering using unified search
+   * Get homepage content by fanning out to per-domain public endpoints.
+   *
+   * Previously this used the unified /api/search/public endpoint which
+   * returned a trimmed cross-type DTO, so resumes arrived without a
+   * professional summary and without a real owner id. We now fetch from
+   * /api/resumes/public, /api/jobs/public, /api/companies/public, and
+   * /api/users/public — the same endpoints that power the dedicated pages
+   * — so dashboard widgets render with the same data fidelity as /resumes,
+   * /jobs, /companies and /people.
    */
   async getHomepageContent(
     filters: HomepageFilters = {},
@@ -346,79 +354,76 @@ export class DashboardService {
     const limit = filters.limit || 4;
 
     try {
-      // Use unified search service
-      const searchResponse = await searchService.searchPublicContent({
-        search: filters.search,
-        category: filters.category === "all" ? undefined : filters.category,
-        location: filters.location,
+      const types: CardFeedType[] = filters.category && filters.category !== "all"
+        ? [this.categoryToType(filters.category)]
+        : ["resume", "job", "company", "people"];
+
+      const feed = await fetchCardFeed({
+        types,
         page: 1,
-        limit: limit * 4, // Get more items to distribute across categories
+        limitPerType: limit,
       });
 
-      // Group items by type
-      const jobs = searchResponse.items.filter((item) => item.type === "job");
-      const companies = searchResponse.items.filter(
-        (item) => item.type === "company",
-      );
-      const users = searchResponse.items.filter(
-        (item) => item.type === "people",
-      );
-      const resumes = searchResponse.items.filter(
-        (item) => item.type === "resume",
-      );
+      const jobs = feed.items.filter((i) => i.type === "job");
+      const companies = feed.items.filter((i) => i.type === "company");
+      const users = feed.items.filter((i) => i.type === "people");
+      const resumes = feed.items.filter((i) => i.type === "resume");
 
       return {
-        jobs: jobs.slice(0, limit).map((job) => ({
+        jobs: jobs.slice(0, limit).map((job: any) => ({
           id: job.id,
           title: job.title,
           company: job.company || "Unknown Company",
           location: job.location || "Unknown Location",
           employmentType: job.employmentType || "Full-time",
-          postedDate:
-            job.postedDate || job.createdAt || new Date().toISOString(),
+          postedDate: job.createdAt || new Date().toISOString(),
           views: job.views || 0,
         })),
-        companies: companies.slice(0, limit).map((company) => ({
+        companies: companies.slice(0, limit).map((company: any) => ({
           id: company.id,
-          name: company.name || company.title,
-          description:
-            company.description ||
-            company.summary ||
-            "No description available",
-          industry: company.industry || "Technology",
-          location: company.location || "Unknown location",
+          name: company.name,
+          description: company.summary || company.tagline || "",
+          industry: company.industry || "",
+          location: company.location || "",
           logo: company.logo,
           views: company.views || 0,
         })),
-        users: users.slice(0, limit).map((user) => ({
+        users: users.slice(0, limit).map((user: any) => ({
           id: user.id,
-          firstName: user.name?.split(" ")[0] || "Unknown",
-          lastName: user.name?.split(" ").slice(1).join(" ") || "",
-          headline: user.headline || user.summary || "Professional",
-          location: user.location || "Unknown location",
+          firstName: user.fullName?.split(" ")[0] || user.name?.split(" ")[0] || "",
+          lastName: user.fullName?.split(" ").slice(1).join(" ") || user.name?.split(" ").slice(1).join(" ") || "",
+          headline: user.headline || "",
+          location: user.location || "",
           avatar: user.avatar,
           views: user.views || 0,
         })),
-        resumes: resumes.slice(0, limit).map((resume) => ({
+        resumes: resumes.slice(0, limit).map((resume: any) => ({
           id: resume.id,
           title: resume.title || resume.name || "Untitled Resume",
           name: resume.name || resume.title || "Untitled Resume",
-          summary:
-            resume.summary || resume.description || "No summary available",
-          description:
-            resume.description || resume.summary || "No description available",
+          summary: resume.summary || "",
+          description: resume.summary || "",
           skills: resume.skills || [],
-          location: resume.location || "Unknown location",
+          location: resume.location || "",
           views: resume.views || 0,
-          userId: resume.id, // TODO: Get actual owner ID
+          userId: resume.userId,
           templateName: resume.templateName,
-          isPublic: resume.isPublic,
+          isPublic: resume.privacy === "public",
           createdAt: resume.createdAt,
         })),
       };
     } catch (error) {
       console.error("Failed to get homepage content:", error);
       throw error;
+    }
+  }
+
+  private categoryToType(category: "jobs" | "companies" | "people" | "resumes"): CardFeedType {
+    switch (category) {
+      case "jobs": return "job";
+      case "companies": return "company";
+      case "people": return "people";
+      case "resumes": return "resume";
     }
   }
 

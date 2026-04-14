@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte } from "drizzle-orm";
+import { eq, or, and, lte, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -209,30 +209,76 @@ function makeConnection(id: string, fromUserId: string, toUserId: string, status
 
 const inMemoryConnections = new Map<string, ReturnType<typeof makeConnection>>();
 
-/** GET /api/users/public — list public users (no auth required) */
+/** GET /api/users/public — list public users (optional auth).
+ *
+ * Joins users + userProfiles so the response carries every field the
+ * PeopleCard needs (headline, avatar, location, current role/company,
+ * openToWork, slug). Only profiles with profileVisibility === "public"
+ * (or NULL — the default public) are returned. */
 userRoutes.get("/public", async (c) => {
   const db = getDb();
   const page = Number(c.req.query("page") ?? 1) || 1;
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const offset = (page - 1) * limit;
 
-  const items = await db
+  const rows = await db
     .select({
       id: users.id,
-      email: users.email,
       name: users.name,
       role: users.role,
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      headline: userProfiles.headline,
+      summary: userProfiles.summary,
+      location: userProfiles.location,
+      avatarUrl: userProfiles.avatarUrl,
+      currentRole: userProfiles.currentRole,
+      currentCompany: userProfiles.currentCompany,
+      openToWork: userProfiles.openToWork,
+      skills: userProfiles.skills,
+      yearsOfExperience: userProfiles.yearsOfExperience,
+      profileVisibility: userProfiles.profileVisibility,
+      customUrlSlug: userProfiles.customUrlSlug,
     })
     .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.isActive, true),
+        or(
+          eq(userProfiles.profileVisibility, "public"),
+          // Users without a userProfiles row fall through the left join with
+          // NULL — still include them since the default visibility is public.
+          isNull(userProfiles.userId),
+        ),
+      ),
+    )
     .limit(limit)
     .offset(offset);
 
-  const total = items.length;
+  const items = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    fullName: r.name,
+    role: r.role,
+    headline: r.headline ?? r.currentRole ?? "",
+    summary: r.summary ?? "",
+    location: r.location ?? "",
+    avatar: r.avatarUrl ? cdnUrl(r.avatarUrl) : null,
+    currentRole: r.currentRole ?? "",
+    currentCompany: r.currentCompany ?? "",
+    company: r.currentCompany ?? "",
+    openToWork: r.openToWork ?? false,
+    skills: r.skills ?? [],
+    yearsOfExperience: r.yearsOfExperience ?? null,
+    emailConfirmed: r.emailVerified,
+    slug: r.customUrlSlug ?? r.id,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }));
 
-  return c.json(success({ items, total, page, limit }));
+  return c.json(success({ items, total: items.length, page, limit }));
 });
 
 /** GET /api/users/me — frontend compatibility endpoint */

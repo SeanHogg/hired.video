@@ -164,18 +164,33 @@ export function normalizePersonData(
 }
 
 /**
- * Normalize resume data from various API formats
+ * Normalize resume data from various API formats.
+ *
+ * Accepts the canonicalized `RawApiItem` produced by card-feed (from
+ * `/api/resumes/public`), which carries `summary` (Basics.Summary),
+ * `privacy`, `isMaster`, `isActive`, `parentId`, and the real `userId` —
+ * everything the ResumeCard and downstream ownership detection need.
  */
 export function normalizeResumeData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedResumeData {
+  // Honour an explicit isOwner from the backend (derived from auth context)
+  // when determineOwnership can't resolve it locally.
+  const localOwnership = determineOwnership(item, context);
+  const ownership: "owned" | "tracked" =
+    localOwnership === "owned"
+      ? "owned"
+      : item.isOwner
+        ? "owned"
+        : "tracked";
+
   return {
     id: item.id,
     type: "resume" as const,
     name: item.name || item.title || "Untitled Resume",
     title: item.title,
-    summary: item.summary || "",
+    summary: item.summary || item.description || "",
     privacy: normalizeResumePrivacy(item, context),
     status: (item.status as "active" | "draft" | "archived") || "active",
     createdAt: item.createdAt || new Date().toISOString(),
@@ -184,10 +199,8 @@ export function normalizeResumeData(
     isMaster: item.isMaster,
     isActive: item.isActive,
     parentId: item.parentId,
-    ownership:
-      determineOwnership(item, context) === "none"
-        ? "tracked"
-        : (determineOwnership(item, context) as "owned" | "tracked"),
+    userId: item.userId,
+    ownership,
     showOwnership: context.showOwnership || false,
     slug: item.slug || `resume-${item.id}`,
   };
@@ -274,25 +287,26 @@ function determineOwnership(
 }
 
 /**
- * Normalize resume privacy with context-aware logic
+ * Normalize resume privacy. The backend now returns an explicit `privacy`
+ * string ("public" | "recruiter_only" | "connections" | "private" | "draft"),
+ * so trust it when present. Only fall back when missing.
  */
 function normalizeResumePrivacy(
   item: RawApiItem,
-  context: CardContext,
+  _context: CardContext,
 ): "public" | "recruiter_only" | "connections" | "private" | "draft" {
-  // Handle the inconsistency between "Latest Resumes" and "All" sections
-  if (context.section === "latest") {
-    return (
-      (item.privacy as "public" | "private" | "draft" | "recruiter_only" | "connections") ||
-      "public"
-    );
-  }
+  const explicit = item.privacy as
+    | "public"
+    | "private"
+    | "draft"
+    | "recruiter_only"
+    | "connections"
+    | undefined;
+  if (explicit) return explicit;
 
-  // For "All" section, don't override with hardcoded "public"
-  return (
-    (item.privacy as "public" | "private" | "draft" | "recruiter_only" | "connections") ||
-    "draft"
-  );
+  // No privacy signal at all — fall back to public since the item came from
+  // a public listing endpoint.
+  return item.isPublic === false ? "private" : "public";
 }
 
 /**

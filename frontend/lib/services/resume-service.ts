@@ -271,11 +271,16 @@ export const ResumeSummarySchema = z.object({
   IsPublic: nullableBoolean(),
   IsOwner: nullableBoolean(),
   CreationDateTimeFormatted: nullableString(),
+  UpdatedAt: nullableString(),
   SentimentScore: nullableNumber(),
   UserId: nullableString(),
   Name: nullableString(),
   Slug: nullableString(),
   Description: nullableString(),
+  Privacy: nullableString(),
+  IsMaster: nullableBoolean(),
+  IsActive: nullableBoolean(),
+  ParentId: nullableString(),
   IsPrimaryDefault: nullableBoolean(),
   IsWatched: nullableBoolean(),
   Latitude: nullableNumber(),
@@ -293,6 +298,10 @@ export const ResumeSummarySchema = z.object({
   name: nullableString(),
   slug: nullableString(),
   description: nullableString(),
+  privacy: z.string().optional().nullable(),
+  isMaster: nullableBoolean(),
+  isActive: nullableBoolean(),
+  parentId: nullableString(),
   isPrimaryDefault: nullableBoolean(),
   isWatched: nullableBoolean(),
   latitude: nullableNumber(),
@@ -477,6 +486,10 @@ export class ResumeService {
       latitude: item.Latitude ?? item.latitude,
       longitude: item.Longitude ?? item.longitude,
       location: item.Location || item.location,
+      privacy: item.Privacy ?? item.privacy,
+      isMaster: item.IsMaster ?? item.isMaster,
+      isActive: item.IsActive ?? item.isActive,
+      parentId: item.ParentId ?? item.parentId ?? null,
 
       // Computed properties for backward compatibility
       title: item.Name || item.name || item.title,
@@ -486,9 +499,10 @@ export class ResumeService {
         item.creationDateTimeFormatted ||
         item.createdAt,
       updatedAt:
+        item.UpdatedAt ||
+        item.updatedAt ||
         item.CreationDateTimeFormatted ||
-        item.creationDateTimeFormatted ||
-        item.updatedAt,
+        item.creationDateTimeFormatted,
     })) as ResumeSummary[];
 
     return {
