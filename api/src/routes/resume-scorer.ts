@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { checkTokenBudget } from "../middleware/tierEnforcement.js";
-import { getSubscription } from "../services/billing.js";
+import { billingFacade } from "../domains/billing/facade.js";
+import { standardTierPolicy } from "../domains/billing/tier-policy.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
 
-function buildScoreResult() {
+export function buildScoreResult() {
   return {
     overallScore: 74,
     atsCompatibility: 78,
@@ -28,49 +29,64 @@ function buildScoreResult() {
   };
 }
 
+type FullScore = ReturnType<typeof buildScoreResult>;
+
+/**
+ * Shape the score response according to the caller's tier + the tier
+ * policy's payload decision. Pure — takes the full score + payload
+ * shape + upsell, returns the payload the route serializes. Pulled out
+ * of the handler so it can be unit-tested without spinning up Hono,
+ * auth, or the billing service (roadmap #150).
+ */
+export function shapeScorePayload(
+  full: FullScore,
+  payloadShape: "full" | "teaser" | "locked",
+  upsell: { isPremiumPreview: true; upgradeUrl: string; lockedDetails: string[] },
+) {
+  if (payloadShape === "full") {
+    return full;
+  }
+  if (payloadShape === "teaser") {
+    const teaser = full.recommendations[0]
+      ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
+      : null;
+    return {
+      overallScore: full.overallScore,
+      grade: full.grade,
+      isPremiumPreview: upsell.isPremiumPreview,
+      teaserRecommendation: teaser,
+      lockedDetails: upsell.lockedDetails,
+      upgradeUrl: upsell.upgradeUrl,
+    };
+  }
+  // locked — anonymous callers get score + grade only, no teaser hint
+  return {
+    overallScore: full.overallScore,
+    grade: full.grade,
+    isPremiumPreview: upsell.isPremiumPreview,
+    upgradeUrl: upsell.upgradeUrl,
+  };
+}
+
 // ---------------------------------------------------------------------------
-// POST /api/resume-scorer/score
-// Free users: see overallScore + grade only (the upsell hook, #60).
-// Premium users: see full breakdown — gated by AI usage check.
+// POST /api/resumescorer/score
+// Tier-aware payload: anonymous/free see previews, pro sees the full score.
+// The branching lives in `standardTierPolicy` so tier experiments don't
+// touch the route (roadmap #150).
 // ---------------------------------------------------------------------------
 resumeScorerRoutes.post("/score", async (c) => {
-  const userId = c.var.user?.sub;
+  const tier = await billingFacade.getTier(c.var.user);
+  const payloadShape = standardTierPolicy.getPayloadShape(tier, "resume_scorer");
+  const upsell = standardTierPolicy.getUpsellPayload("resume_scorer");
   const full = buildScoreResult();
 
-  if (!userId) {
-    // Unauthenticated: show score only, prompt sign-up.
-    return c.json(success({
-      overallScore: full.overallScore,
-      grade: full.grade,
-      isPremiumPreview: true,
-      upgradeUrl: "/settings/billing",
-    }), 200);
+  // Pro/admin tiers consume a token credit before the full response.
+  if (payloadShape === "full") {
+    const blocked = await checkTokenBudget(c);
+    if (blocked) return blocked;
   }
 
-  // Check if user is premium
-  const sub = await getSubscription(userId);
-
-  if (!sub.isPremium) {
-    // Free tier: show score + top 1 recommendation teaser, gate the rest.
-    return c.json(success({
-      overallScore: full.overallScore,
-      grade: full.grade,
-      isPremiumPreview: true,
-      teaserRecommendation: full.recommendations[0]
-        ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
-        : null,
-      lockedDetails: ["atsCompatibility", "contentQuality", "keywordScore", "formatScore", "impactScore", "strengths", "weaknesses"],
-      upgradeUrl: "/settings/billing",
-    }), 200);
-  }
-
-  // Premium: full result, consume an AI credit. The scorer can't use the
-  // `requireTokenBudget()` middleware factory because the budget check
-  // only applies to the premium branch — free-tier callers get a preview
-  // regardless of token balance. Call `checkTokenBudget()` inline here.
-  const blocked = await checkTokenBudget(c);
-  if (blocked) return blocked;
-  return c.json(success(full), 200);
+  return c.json(success(shapeScorePayload(full, payloadShape, upsell)), 200);
 });
 
 resumeScorerRoutes.post("/category-breakdown", async (c) =>

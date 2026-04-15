@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { Variables } from "../types/index.js";
+import type { Variables, AppContext } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import * as jobService from "../services/job.js";
@@ -205,11 +205,21 @@ jobRoutes.delete("/alerts/:id", async (c) => {
   return c.json(success({ success: true }));
 });
 
-/** POST /api/Job/CreateFromFile — create job from uploaded file */
-jobRoutes.post("/CreateFromFile", async (c) => {
-  const userId = c.var.user?.sub;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
+/**
+ * Shared payload extractor for the createFromFile handlers. Accepts either
+ * a multipart upload (`file` + optional `location`) or a JSON body
+ * (`{ title?, description?, location? }`) and returns the fields the job
+ * aggregate's create operation needs. Pure — does not touch the DB.
+ *
+ * Extracted so `/CreateFromFile` (multipart-aware, Chrome extension) and
+ * `/createfromfile` (JSON-only, legacy route) share exactly one code path
+ * — previously they were two drifting near-duplicates (roadmap #149).
+ */
+export async function extractCreateFromFilePayload(c: AppContext): Promise<{
+  title: string;
+  description: string;
+  location: string | undefined;
+}> {
   const contentType = c.req.header("Content-Type") ?? "";
   let title = "Imported Job";
   let description = "";
@@ -219,7 +229,7 @@ jobRoutes.post("/CreateFromFile", async (c) => {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
     if (file) {
-      title = file.name;
+      title = file.name || title;
       description = await file.text().catch(() => "");
     }
     if (form?.has("location")) {
@@ -228,27 +238,32 @@ jobRoutes.post("/CreateFromFile", async (c) => {
   } else {
     const body = await c.req.json().catch(() => null);
     if (body) {
-      if (typeof body.title === "string") title = body.title;
+      if (typeof body.title === "string" && body.title.length > 0) title = body.title;
       if (typeof body.description === "string") description = body.description;
       if (typeof body.location === "string") location = body.location;
     }
   }
 
-  const created = await jobService.createJob({ title, description, location }, userId);
-  return c.json(success(created), 201);
-});
-jobRoutes.post("/createfromfile", async (c) => {
+  return { title, description, location };
+}
+
+/**
+ * POST /api/Job/CreateFromFile (multipart or JSON)
+ * POST /api/job/createfromfile (JSON alias for legacy callers)
+ *
+ * Both routes point at the same handler so the branching logic lives in a
+ * single place. See `extractCreateFromFilePayload` for the dispatch.
+ */
+const createFromFileHandler = async (c: AppContext) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const body = await c.req.json().catch(() => null);
-  const title = body?.title ? String(body.title) : "Imported Job";
-  const description = body?.description ? String(body.description) : "";
-  const location = typeof body?.location === "string" ? body.location : undefined;
-
-  const created = await jobService.createJob({ title, description, location }, userId);
+  const payload = await extractCreateFromFilePayload(c);
+  const created = await jobService.createJob(payload, userId);
   return c.json(success(created), 201);
-});
+};
+jobRoutes.post("/CreateFromFile", createFromFileHandler);
+jobRoutes.post("/createfromfile", createFromFileHandler);
 
 /**
  * POST /api/jobs/extract — track a job from a webpage

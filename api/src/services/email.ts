@@ -574,3 +574,96 @@ export async function sendMagicLinkEmail(
   const html = render(MAGIC_LINK_BODY, { RecipientName: recipientName, MagicUrl: magicUrl });
   await provider.send({ to, subject: "Your sign-in link for hired.video", html });
 }
+
+const CONNECTION_REQUEST_BODY = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <span style="color: #111827; font-size: 24px; font-weight: bold;">New connection request</span>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td style="color: #111827; padding-bottom: 8px;">Hi {{RecipientName}},</td>
+                </tr>
+                <tr>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 16px;">
+                    <strong>{{SenderName}}</strong> sent you a connection request on hired.video.
+                  </td>
+                </tr>
+                <tr>
+                  <td style="color: #374151; line-height: 1.6; padding-bottom: 16px; border-left: 3px solid #e5e7eb; padding-left: 12px; font-style: italic;">
+                    {{RequestMessage}}
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 24px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{ProfileUrl}}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;">
+                      Review request
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:12px;">
+                    <span style="color:#9ca3af;font-size:13px;">You can accept or decline from their profile.</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #9ca3af; font-size: 13px;">If you don't know this person, you can ignore this email or decline the request.</p>
+`;
+
+export interface ConnectionRequestEmailInput {
+  to: string;
+  recipientName: string;
+  senderName: string;
+  senderProfileId: string;
+  requestMessage?: string | null;
+}
+
+/** Pure builder: render the connection-request email without sending. Exported for unit tests. */
+export function buildConnectionRequestEmail(
+  input: ConnectionRequestEmailInput,
+): { to: string; subject: string; html: string; profileUrl: string } {
+  const profileUrl = `${getBaseUrl()}/people/${encodeURIComponent(input.senderProfileId)}`;
+  const html = render(CONNECTION_REQUEST_BODY, {
+    RecipientName: input.recipientName,
+    SenderName: input.senderName,
+    ProfileUrl: profileUrl,
+    RequestMessage:
+      input.requestMessage?.trim() || `${input.senderName} would like to connect with you.`,
+  });
+  return {
+    to: input.to,
+    subject: `${input.senderName} wants to connect on hired.video`,
+    html,
+    profileUrl,
+  };
+}
+
+export async function sendConnectionRequestEmail(
+  to: string,
+  recipientName: string,
+  senderName: string,
+  senderProfileId: string,
+  requestMessage?: string | null,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping connection request email");
+    return;
+  }
+  const { subject, html } = buildConnectionRequestEmail({
+    to,
+    recipientName,
+    senderName,
+    senderProfileId,
+    requestMessage,
+  });
+  await provider.send({ to, subject, html });
+}

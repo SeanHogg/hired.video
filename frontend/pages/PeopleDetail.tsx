@@ -212,12 +212,51 @@ export default function PeopleDetail() {
       }
     : null;
 
-  // For now, use mock data for tracking and connections until API is available
+  // For now, use mock data for tracking until API is available
   const isTracked = false; // TODO: Implement with real API
-  const [connectionStatus] = useState<
+  const [connectionStatus, setConnectionStatus] = useState<
     "none" | "pending_received" | "pending_sent" | "connected"
-  >("none"); // TODO: Implement with real API
+  >("none");
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [connectionBusy, setConnectionBusy] = useState(false);
   const isOwnProfile = user && userProfile && userProfile.id === user.id;
+
+  // Load the current connection state between the viewer and this profile.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !userProfile?.id || isOwnProfile) {
+      setConnectionStatus("none");
+      setConnectionId(null);
+      return;
+    }
+    let cancelled = false;
+    userService
+      .getConnectionStatus(user.id, userProfile.id)
+      .then((conn) => {
+        if (cancelled) return;
+        if (!conn) {
+          setConnectionStatus("none");
+          setConnectionId(null);
+          return;
+        }
+        setConnectionId(conn.id);
+        if (conn.status === "accepted") {
+          setConnectionStatus("connected");
+        } else if (conn.status === "pending") {
+          setConnectionStatus(conn.fromUserId === user.id ? "pending_sent" : "pending_received");
+        } else {
+          setConnectionStatus("none");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConnectionStatus("none");
+          setConnectionId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user?.id, userProfile?.id, isOwnProfile]);
 
   // Check if person has a public Master resume and fetch it
   const [hasPublicMasterResume, setHasPublicMasterResume] = useState(false);
@@ -369,37 +408,88 @@ export default function PeopleDetail() {
   };
 
   const handleSendConnectionRequest = async () => {
-    if (!isAuthenticated || !userProfile) {
-      return;
-    }
-
+    if (!isAuthenticated || !userProfile || connectionBusy) return;
+    setConnectionBusy(true);
     try {
-      await userService.sendConnectionRequest({
+      const conn = await userService.sendConnectionRequest({
         toUserId: userProfile.id,
         message: connectionMessage,
       });
+      setConnectionId(conn.id);
+      setConnectionStatus(conn.status === "accepted" ? "connected" : "pending_sent");
       setShowConnectionDialog(false);
       setConnectionMessage("");
-      // TODO: Update connection status in state
-    } catch (error) {
-      console.error("Failed to send connection request:", error);
+      toast.success("Connection request sent");
+    } catch (err) {
+      console.error("Failed to send connection request:", err);
+      toast.error("Failed to send connection request");
+    } finally {
+      setConnectionBusy(false);
     }
   };
 
   const handleAcceptConnection = async () => {
-    if (!isAuthenticated || !userProfile) {
-      return;
+    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    setConnectionBusy(true);
+    try {
+      await userService.acceptConnectionRequest(connectionId);
+      setConnectionStatus("connected");
+      toast.success("Connection accepted");
+    } catch (err) {
+      console.error("Failed to accept connection:", err);
+      toast.error("Failed to accept connection");
+    } finally {
+      setConnectionBusy(false);
     }
-    // TODO: Implement with real API
-    console.log("Accept connection from:", userProfile.id);
   };
 
   const handleRejectConnection = async () => {
-    if (!isAuthenticated || !userProfile) {
-      return;
+    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    setConnectionBusy(true);
+    try {
+      await userService.rejectConnectionRequest(connectionId);
+      setConnectionStatus("none");
+      setConnectionId(null);
+      toast.success("Connection request declined");
+    } catch (err) {
+      console.error("Failed to reject connection:", err);
+      toast.error("Failed to decline connection");
+    } finally {
+      setConnectionBusy(false);
     }
-    // TODO: Implement with real API
-    console.log("Reject connection from:", userProfile.id);
+  };
+
+  const handleCancelConnectionRequest = async () => {
+    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    setConnectionBusy(true);
+    try {
+      await userService.rejectConnectionRequest(connectionId);
+      setConnectionStatus("none");
+      setConnectionId(null);
+      toast.success("Connection request revoked");
+    } catch (err) {
+      console.error("Failed to revoke connection request:", err);
+      toast.error("Failed to revoke request");
+    } finally {
+      setConnectionBusy(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    if (!window.confirm(`Remove connection with ${userProfile.firstName ?? "this user"}?`)) return;
+    setConnectionBusy(true);
+    try {
+      await userService.rejectConnectionRequest(connectionId);
+      setConnectionStatus("none");
+      setConnectionId(null);
+      toast.success("Connection removed");
+    } catch (err) {
+      console.error("Failed to remove connection:", err);
+      toast.error("Failed to remove connection");
+    } finally {
+      setConnectionBusy(false);
+    }
   };
 
   const handleMessage = () => {
@@ -647,28 +737,58 @@ export default function PeopleDetail() {
                         <div className="flex items-center gap-3 mb-4">
                           {connectionStatus === "pending_received" ? (
                             <div className="flex gap-2">
-                              <Button onClick={handleAcceptConnection}>
+                              <Button onClick={handleAcceptConnection} disabled={connectionBusy}>
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Accept Connection
                               </Button>
                               <Button
                                 variant="outline"
                                 onClick={handleRejectConnection}
+                                disabled={connectionBusy}
                               >
                                 <X className="h-4 w-4 mr-2" />
                                 Decline
                               </Button>
                             </div>
                           ) : connectionStatus === "pending_sent" ? (
-                            <Button variant="outline" disabled>
-                              <Clock className="h-4 w-4 mr-2" />
-                              Connection Pending
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button variant="outline" disabled>
+                                <Clock className="h-4 w-4 mr-2" />
+                                Request Sent
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                onClick={handleCancelConnectionRequest}
+                                disabled={connectionBusy}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Revoke
+                              </Button>
+                            </div>
                           ) : connectionStatus === "connected" ? (
-                            <Button onClick={handleMessage}>
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              Message
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button onClick={handleMessage}>
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Message
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="icon" aria-label="Connection options">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={handleDisconnect}
+                                    disabled={connectionBusy}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Remove connection
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           ) : (
                             <Dialog
                               open={showConnectionDialog}
@@ -710,6 +830,7 @@ export default function PeopleDetail() {
                                     </Button>
                                     <Button
                                       onClick={handleSendConnectionRequest}
+                                      disabled={connectionBusy}
                                     >
                                       <Send className="h-4 w-4 mr-2" />
                                       Send Request

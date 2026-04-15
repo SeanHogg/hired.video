@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
+import { invalidateModuleStatusCache } from "./moduleStatus.js";
 
 type Module = InferSelectModel<typeof schema.modules>;
 
@@ -84,6 +85,8 @@ export async function updateModule(
     targetId: moduleId,
     metadata: updates as Record<string, unknown>,
   });
+
+  if (input.isActive !== undefined) invalidateModuleStatusCache();
 
   return { ok: true, mod: updated };
 }

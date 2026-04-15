@@ -7,8 +7,9 @@ import { getSubscription } from "../services/billing.js";
 import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { sendConnectionRequestEmail } from "../services/email.js";
 
-const { users, userProfiles, userConnections, tasks, privacyPreferences } = schema;
+const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications } = schema;
 
 // Explicit column list for userProfiles — avoids SELECT * and protects against
 // schema columns that haven't been migrated to the DB yet.
@@ -447,6 +448,22 @@ userRoutes.post("/connections", async (c) => {
   }
 
   const db = getDb();
+
+  // Prevent duplicates: if a connection already exists in either direction, return it.
+  const [existing] = await db
+    .select()
+    .from(userConnections)
+    .where(
+      or(
+        and(eq(userConnections.fromUserId, from), eq(userConnections.toUserId, parsed.data.toUserId)),
+        and(eq(userConnections.fromUserId, parsed.data.toUserId), eq(userConnections.toUserId, from)),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    return c.json(success(makeConnectionDto(existing)), 200);
+  }
+
   const [conn] = await db
     .insert(userConnections)
     .values({
@@ -456,6 +473,36 @@ userRoutes.post("/connections", async (c) => {
       requestMessage: parsed.data.message ?? null,
     } as any)
     .returning();
+
+  // Fire-and-forget side effects: inbox notification + email. Don't block the response.
+  (async () => {
+    try {
+      const [[sender], [recipient]] = await Promise.all([
+        db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, from)).limit(1),
+        db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, parsed.data.toUserId)).limit(1),
+      ]);
+      const senderName = sender?.name ?? "Someone";
+      await db.insert(notifications).values({
+        userId: parsed.data.toUserId,
+        type: "connection_request",
+        title: `${senderName} wants to connect`,
+        message: (parsed.data.message?.trim() || `${senderName} sent you a connection request.`),
+        data: { connectionId: conn.id, fromUserId: from, fromUserName: senderName } as any,
+      } as any).catch((err) => console.error("[connections] notification insert failed:", err));
+
+      if (recipient?.email) {
+        await sendConnectionRequestEmail(
+          recipient.email,
+          recipient.name ?? "there",
+          senderName,
+          from,
+          parsed.data.message ?? null,
+        ).catch((err) => console.error("[connections] email send failed:", err));
+      }
+    } catch (err) {
+      console.error("[connections] post-send side effects failed:", err);
+    }
+  })();
 
   return c.json(success(makeConnectionDto(conn)), 201);
 });
@@ -502,6 +549,24 @@ userRoutes.put("/connections/:id/accept", async (c) => {
   if (!updated) {
     return c.json(error("NOT_FOUND", "Connection request not found"), 404);
   }
+
+  // Notify the original sender that their request was accepted.
+  (async () => {
+    try {
+      const [accepter] = await db.select({ name: users.name }).from(users).where(eq(users.id, me)).limit(1);
+      const accepterName = accepter?.name ?? "Someone";
+      await db.insert(notifications).values({
+        userId: updated.fromUserId,
+        type: "connection_accepted",
+        title: `${accepterName} accepted your connection request`,
+        message: `You and ${accepterName} are now connected on hired.video.`,
+        data: { connectionId: updated.id, userId: me, userName: accepterName } as any,
+      } as any).catch((err) => console.error("[connections] accept notification failed:", err));
+    } catch (err) {
+      console.error("[connections] accept side effects failed:", err);
+    }
+  })();
+
   return c.json(success(makeConnectionDto(updated)), 200);
 });
 

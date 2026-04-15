@@ -76,6 +76,9 @@ import { phoneRoutes } from "./routes/phone.js";
 import { pushRoutes } from "./routes/push.js";
 import { openapiRoutes } from "./routes/openapi.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
+import { moduleRoutes as publicModuleRoutes } from "./routes/modules.js";
+import { moduleGateByPath } from "./middleware/moduleGate.js";
+import { MODULE_ROUTE_REGISTRY } from "./lib/moduleRouteRegistry.js";
 import { callLLM, getApiKey } from "./services/ai.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
@@ -253,6 +256,11 @@ export function createApp() {
     return passwordChangeMiddleware(c as any, next);
   });
 
+  // Module enforcement gate — checks the modules table for each /api/<prefix>
+  // that maps to a slug in MODULE_ROUTE_REGISTRY, and 403s when the slug is
+  // disabled. Must run after auth so the admin/SA bypass can see c.var.user.
+  app.use("/api/*", moduleGateByPath(MODULE_ROUTE_REGISTRY));
+
   // Simple health check (includes DB connectivity)
   const healthHandler = async (c: any) => {
     try {
@@ -370,6 +378,7 @@ export function createApp() {
   app.route("/api/career", careerRoutes);
   app.route("/api/phone", phoneRoutes);
   app.route("/api/push", pushRoutes);
+  app.route("/api/modules", publicModuleRoutes);
   app.route("/api", openapiRoutes);
   app.route("/", sitemapRoutes);
 
