@@ -29,7 +29,11 @@ export function MetaBadge({ meta }: { meta: ResumeSectionMeta }) {
 
   return (
     <>
-      <Button size="sm" variant="outline" className="gap-1" onClick={() => setOpen(true)}>
+      {/* Explicit text-foreground so the label stays readable when this
+          badge is rendered inside a hero/gradient that has set a white
+          inherited text color (otherwise the outline button's bg-background
+          + inherited white text = invisible pill). */}
+      <Button size="sm" variant="outline" className="gap-1 text-foreground" onClick={() => setOpen(true)}>
         {icon}
         {label}
       </Button>

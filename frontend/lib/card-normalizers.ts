@@ -175,15 +175,25 @@ export function normalizeResumeData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedResumeData {
-  // Honour an explicit isOwner from the backend (derived from auth context)
-  // when determineOwnership can't resolve it locally.
-  const localOwnership = determineOwnership(item, context);
+  // Ownership resolution order:
+  //   1. backend isOwner flag (already derived from auth context server-side)
+  //   2. item.userId matches the current viewer's userId
+  //   3. fall back to determineOwnership for legacy payloads carrying an
+  //      explicit ownership field
+  //   4. default to tracked
+  // Note: the legacy `determineOwnership` returns "owned" whenever item.userId
+  // exists regardless of who owns it, so we must NOT rely on it when a viewer
+  // id is available — otherwise every non-anonymous viewer sees "owned".
+  const viewerUserId = context.userContext?.userId;
+  const legacyOwnership = determineOwnership(item, context);
   const ownership: "owned" | "tracked" =
-    localOwnership === "owned"
+    item.isOwner === true
       ? "owned"
-      : item.isOwner
+      : viewerUserId && item.userId && item.userId === viewerUserId
         ? "owned"
-        : "tracked";
+        : legacyOwnership === "owned" && !viewerUserId
+          ? "owned"
+          : "tracked";
 
   return {
     id: item.id,

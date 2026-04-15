@@ -87,7 +87,27 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
   };
 }
 
-function rowToSummary(
+/**
+ * Merge an incoming resume `content` blob with the metaData (media attachments)
+ * from the existing row. Media is managed by the dedicated PUT /:id/metadata
+ * endpoint and the ResumeBuilder never includes it in its payload, so blindly
+ * writing `content` from a resume edit would wipe out the user's associated
+ * media. Callers that deliberately pass a `metaData` field are respected.
+ *
+ * Exported so it can be unit-tested without spinning up the DB.
+ */
+export function preserveMetaData(
+  nextContent: unknown,
+  existingMetaData: unknown,
+): unknown {
+  if (!nextContent || typeof nextContent !== "object") return nextContent;
+  const next = nextContent as Record<string, unknown>;
+  if (next.metaData !== undefined) return next;
+  if (existingMetaData === undefined) return next;
+  return { ...next, metaData: existingMetaData };
+}
+
+export function rowToSummary(
   row: typeof resumes.$inferSelect,
   currentUserId?: string | null,
 ) {
@@ -717,10 +737,28 @@ resumeRoutes.put("/:id", async (c) => {
     slugUpdate = { slug };
   }
 
+  // Metadata (media attachments) lives inside content.metaData and is managed
+  // by a separate PUT /:id/metadata endpoint. The ResumeBuilder doesn't carry
+  // metaData in its edit payload, so we must preserve it from the existing
+  // row — otherwise every resume edit wipes out the user's associated media.
+  const [existing] = await db
+    .select({ content: resumes.content })
+    .from(resumes)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .limit(1);
+  const existingMetaData = (existing?.content as Record<string, unknown> | null)
+    ?.metaData;
+
+  const mergeNextMetaData = (nextContent: unknown) =>
+    preserveMetaData(nextContent, existingMetaData);
+
   if (parsed.success) {
     // Map schema fields to actual DB columns
     const { privacy, rawText, ...dbFields } = parsed.data;
     const setData: Record<string, unknown> = { ...dbFields, ...(slugUpdate ?? {}), updatedAt: new Date() };
+    if (setData.content !== undefined) {
+      setData.content = mergeNextMetaData(setData.content);
+    }
     if (privacy !== undefined) {
       setData.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
     }
@@ -734,7 +772,7 @@ resumeRoutes.put("/:id", async (c) => {
   }
 
   // Legacy update path where body is serialized resume content string literal
-  const content = await parseBodyToContent(c);
+  const content = mergeNextMetaData(await parseBodyToContent(c));
   const [updated] = await db
     .update(resumes)
     .set({ content, ...(slugUpdate ?? {}), updatedAt: new Date() } as any)
