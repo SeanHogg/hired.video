@@ -856,13 +856,15 @@ export default function ResumeViewer({
               <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
               <p>{new Date(resume.updatedAt).toLocaleString()}</p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Views</p>
-              <p className="flex items-center gap-1">
-                <Eye className="h-4 w-4" />
-                {resume.views}
-              </p>
-            </div>
+            {canEdit && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Views</p>
+                <p className="flex items-center gap-1">
+                  <Eye className="h-4 w-4" />
+                  {resume.views}
+                </p>
+              </div>
+            )}
           </div>
 
           {resume.parentId && (

@@ -1,13 +1,10 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { success } from "../types/index.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
 import { getSubscription } from "../services/billing.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
 function buildScoreResult() {
   return {
@@ -41,14 +38,12 @@ resumeScorerRoutes.post("/score", async (c) => {
   const full = buildScoreResult();
 
   if (!userId) {
-    // Unauthenticated: show score only, prompt sign-up
-    return c.json(ok({
-      result: JSON.stringify({
-        overallScore: full.overallScore,
-        grade: full.grade,
-        isPremiumPreview: true,
-        upgradeUrl: "/settings/billing",
-      }),
+    // Unauthenticated: show score only, prompt sign-up.
+    return c.json(success({
+      overallScore: full.overallScore,
+      grade: full.grade,
+      isPremiumPreview: true,
+      upgradeUrl: "/settings/billing",
     }), 200);
   }
 
@@ -56,29 +51,27 @@ resumeScorerRoutes.post("/score", async (c) => {
   const sub = await getSubscription(userId);
 
   if (!sub.isPremium) {
-    // Free tier: show score + top 1 recommendation teaser, gate rest
-    return c.json(ok({
-      result: JSON.stringify({
-        overallScore: full.overallScore,
-        grade: full.grade,
-        isPremiumPreview: true,
-        teaserRecommendation: full.recommendations[0]
-          ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
-          : null,
-        lockedDetails: ["atsCompatibility", "contentQuality", "keywordScore", "formatScore", "impactScore", "strengths", "weaknesses"],
-        upgradeUrl: "/settings/billing",
-      }),
+    // Free tier: show score + top 1 recommendation teaser, gate the rest.
+    return c.json(success({
+      overallScore: full.overallScore,
+      grade: full.grade,
+      isPremiumPreview: true,
+      teaserRecommendation: full.recommendations[0]
+        ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
+        : null,
+      lockedDetails: ["atsCompatibility", "contentQuality", "keywordScore", "formatScore", "impactScore", "strengths", "weaknesses"],
+      upgradeUrl: "/settings/billing",
     }), 200);
   }
 
-  // Premium: full result, consume an AI credit
+  // Premium: full result, consume an AI credit.
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
-  return c.json(ok({ result: JSON.stringify(full) }), 200);
+  return c.json(success(full), 200);
 });
 
 resumeScorerRoutes.post("/category-breakdown", async (c) =>
-  c.json(ok({
+  c.json(success({
     atsCompatibility: 78,
     contentQuality: 72,
     keywordScore: 70,
@@ -88,12 +81,12 @@ resumeScorerRoutes.post("/category-breakdown", async (c) =>
 );
 
 resumeScorerRoutes.post("/recommendations", async (c) =>
-  c.json(ok(buildScoreResult().recommendations), 200),
+  c.json(success(buildScoreResult().recommendations), 200),
 );
 
 resumeScorerRoutes.all("*", (c) =>
   c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Resume scorer route not implemented" }, timestamp: new Date().toISOString() },
+    { success: false as const, error: { code: "NOT_IMPLEMENTED", message: "Resume scorer route not implemented" }, timestamp: new Date().toISOString() },
     501,
   ),
 );

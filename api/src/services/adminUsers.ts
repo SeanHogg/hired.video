@@ -1,6 +1,7 @@
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, lt, or, sum, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
+import { FREE_AI_MONTHLY_TOKENS, PRO_AI_MONTHLY_TOKENS } from "../../../shared/pricing.js";
 
 // ── User search / detail ──────────────────────────────────────────────────────
 
@@ -47,7 +48,93 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
     db.select({ total: count() }).from(schema.users).where(where),
   ]);
 
-  return { users, total, page, limit: safeLimit };
+  const userIds = users.map((u) => u.id);
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const [subRows, usageRows, balanceRows] = await Promise.all([
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{ userId: string; planSlug: string; planName: string; status: string }>)
+      : db
+          .select({
+            userId: schema.subscriptions.userId,
+            planSlug: schema.subscriptionPlans.slug,
+            planName: schema.subscriptionPlans.name,
+            status: schema.subscriptions.status,
+          })
+          .from(schema.subscriptions)
+          .innerJoin(
+            schema.subscriptionPlans,
+            eq(schema.subscriptions.planId, schema.subscriptionPlans.id),
+          )
+          .where(
+            and(
+              inArray(schema.subscriptions.userId, userIds),
+              inArray(schema.subscriptions.status, ["active", "trialing"]),
+            ),
+          ),
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{ userId: string; used: string | null }>)
+      : db
+          .select({
+            userId: schema.aiUsageRecords.userId,
+            used: sum(schema.aiUsageRecords.totalTokens),
+          })
+          .from(schema.aiUsageRecords)
+          .where(
+            and(
+              inArray(schema.aiUsageRecords.userId, userIds),
+              eq(schema.aiUsageRecords.source, "monthly"),
+              gte(schema.aiUsageRecords.createdAt, periodStart),
+              lt(schema.aiUsageRecords.createdAt, periodEnd),
+            ),
+          )
+          .groupBy(schema.aiUsageRecords.userId),
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{ userId: string; balance: number }>)
+      : db
+          .select({
+            userId: schema.userTokenBalance.userId,
+            balance: schema.userTokenBalance.balance,
+          })
+          .from(schema.userTokenBalance)
+          .where(inArray(schema.userTokenBalance.userId, userIds)),
+  ]);
+
+  const subByUser = new Map(subRows.map((r) => [r.userId, r]));
+  const usedByUser = new Map(usageRows.map((r) => [r.userId, Number(r.used ?? 0)]));
+  const packByUser = new Map(balanceRows.map((r) => [r.userId, r.balance]));
+
+  const enriched = users.map((u) => {
+    const sub = subByUser.get(u.id);
+    const isInternal = u.isSuperAdmin || u.role === "SuperAdmin" || u.role === "Admin";
+    const planSlug = isInternal ? "admin" : (sub?.planSlug ?? "free");
+    const planName = isInternal ? "Admin" : (sub?.planName ?? "Free");
+    const isPaid = !isInternal && !!sub && sub.planSlug !== "free";
+    const monthlyUsed = usedByUser.get(u.id) ?? 0;
+    const packBalance = packByUser.get(u.id) ?? 0;
+    const monthlyLimit = isInternal
+      ? null
+      : isPaid
+      ? PRO_AI_MONTHLY_TOKENS
+      : FREE_AI_MONTHLY_TOKENS;
+    const monthlyRemaining = monthlyLimit === null ? null : Math.max(0, monthlyLimit - monthlyUsed);
+    const tokensAvailable = monthlyLimit === null ? null : (monthlyRemaining ?? 0) + packBalance;
+    return {
+      ...u,
+      planId: planSlug,
+      planName,
+      isPaid,
+      isUnlimited: isInternal,
+      monthlyLimit,
+      monthlyUsed,
+      packBalance,
+      tokensAvailable,
+    };
+  });
+
+  return { users: enriched, total, page, limit: safeLimit };
 }
 
 export async function getUserDetail(userId: string) {

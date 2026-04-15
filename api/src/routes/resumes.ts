@@ -648,7 +648,8 @@ resumeRoutes.post("/sentimentprediction", async (c) => {
   const body = await c.req.json().catch(() => null);
   const value = typeof body === "string" ? body : JSON.stringify(body ?? "");
   const score = value.length > 300 ? 78 : value.length > 80 ? 64 : 52;
-  return c.json(ok(score), 200);
+  // Object-wrapped for envelope consistency (roadmap #147).
+  return c.json(ok({ score }), 200);
 });
 
 resumeRoutes.post("/watch/:id", async (c) => {

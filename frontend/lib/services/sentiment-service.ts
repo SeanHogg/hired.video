@@ -22,20 +22,20 @@ export interface SentimentInterpretation {
 
 export class SentimentService {
   /**
-   * Analyze sentiment of raw text using the Sentiment API controller
+   * Analyze sentiment of raw text using the Sentiment API controller.
    * Route: /sentiment/sentimentprediction
-   * Note: The endpoint expects a JSON-encoded string body (e.g., "text" with quotes)
+   *
+   * Response shape: `{ success: true, data: { score: number } }`. The
+   * server used to return a raw number as `data`, but the envelope
+   * contract now guarantees `data` is always an object (roadmap #147).
    */
   async analyzeSentiment(text: string): Promise<number> {
-    // The backend expects [FromBody] string, which requires a JSON-encoded string
-    // Since apiClient passes strings as-is, we need to JSON.stringify the string
-    // The API returns { success: true, data: float } and apiClient unwraps it
-    const response = await apiClient.post<number>(
+    const response = await apiClient.post<SentimentAnalysisResponse>(
       "/sentiment/sentimentprediction",
-      JSON.stringify(text), // This produces "text" with quotes for proper JSON
-      z.number(),
+      JSON.stringify(text),
+      SentimentAnalysisResponseSchema,
     );
-    return response.data;
+    return response.data.score;
   }
 
   /**
@@ -49,20 +49,18 @@ export class SentimentService {
   }
 
   /**
-   * Analyze an existing resume using the dedicated resume sentiment endpoint
+   * Analyze an existing resume using the dedicated resume sentiment endpoint.
    * Route: /api/Resume/SentimentPrediction
-   * Note: The endpoint expects a JSON-encoded string body (e.g., "resumeId" with quotes)
+   *
+   * Response shape: `{ success: true, data: { score: number } }`.
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
-    // The backend expects [FromBody] string id, which requires a JSON-encoded string
-    // Since apiClient passes strings as-is, we need to JSON.stringify the string
-    // The API returns { success: true, data: float } and apiClient unwraps it
-    const response = await apiClient.post<number>(
+    const response = await apiClient.post<SentimentAnalysisResponse>(
       "/api/Resume/SentimentPrediction",
-      JSON.stringify(resumeId), // This produces "resumeId" with quotes
-      z.number(),
+      JSON.stringify(resumeId),
+      SentimentAnalysisResponseSchema,
     );
-    return response.data;
+    return response.data.score;
   }
 
   /**

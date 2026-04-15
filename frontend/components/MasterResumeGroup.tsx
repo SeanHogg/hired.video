@@ -126,10 +126,12 @@ export default function MasterResumeGroupComponent({
             <Badge className={getPrivacyBadgeColor(masterPrivacy)}>
               {getPrivacyLabel(masterPrivacy)}
             </Badge>
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Eye className="h-4 w-4 mr-1" />
-              {group.masterResume.views}
-            </div>
+            {isOwned && (
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Eye className="h-4 w-4 mr-1" />
+                {group.masterResume.views}
+              </div>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -246,10 +248,12 @@ export default function MasterResumeGroupComponent({
                     </div>
                     <div className="flex items-center space-x-4 mt-1 text-xs text-muted-foreground">
                       <span>Created {formatDate(variation.createdAt)}</span>
-                      <div className="flex items-center">
-                        <Eye className="h-3 w-3 mr-1" />
-                        {variation.views}
-                      </div>
+                      {isOwned && (
+                        <div className="flex items-center">
+                          <Eye className="h-3 w-3 mr-1" />
+                          {variation.views}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

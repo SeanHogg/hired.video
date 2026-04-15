@@ -81,21 +81,31 @@ export interface PaginationMeta {
 }
 
 // ── API response helpers ─────────────────────────────────────────────────────
-export function success<T>(data: T): { success: true; data: T };
-export function success<T>(data: T, message: string): { success: true; data: T; message: string };
-export function success<T>(data: T, meta: PaginationMeta): { success: true; data: T; meta: PaginationMeta };
+// Canonical envelope for every /api route. Includes an ISO `timestamp` so
+// callers can drop their local `ok()` helpers and import `success` instead.
+// The frontend's `ApiResponseSchema` in shared/api.ts already treats
+// `timestamp` as optional, so adding it here is backward-compatible for
+// every call site that previously used the no-timestamp shape.
+export function success<T>(data: T): { success: true; data: T; timestamp: string };
+export function success<T>(data: T, message: string): { success: true; data: T; message: string; timestamp: string };
+export function success<T>(data: T, meta: PaginationMeta): { success: true; data: T; meta: PaginationMeta; timestamp: string };
 export function success<T>(data: T, messageOrMeta?: string | PaginationMeta) {
+  const timestamp = new Date().toISOString();
   if (typeof messageOrMeta === "string") {
-    return { success: true as const, data, message: messageOrMeta };
+    return { success: true as const, data, message: messageOrMeta, timestamp };
   }
   if (messageOrMeta) {
-    return { success: true as const, data, meta: messageOrMeta };
+    return { success: true as const, data, meta: messageOrMeta, timestamp };
   }
-  return { success: true as const, data };
+  return { success: true as const, data, timestamp };
 }
 
 export function apiError(code: string, message: string, details?: unknown) {
-  return { success: false as const, error: { code, message, ...(details !== undefined ? { details } : {}) } };
+  return {
+    success: false as const,
+    error: { code, message, ...(details !== undefined ? { details } : {}) },
+    timestamp: new Date().toISOString(),
+  };
 }
 
 // Legacy export for common error response shape

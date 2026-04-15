@@ -140,18 +140,9 @@ export default function ResumeOptimizer() {
       jobDescription: jobDescription || undefined
     });
 
-    const data: any = response.data;
-
-    // Check for API error response
-    if (data.success === false && data.error) {
-      throw new Error(data.error.message || "Optimization failed");
-    }
-
-    // Parse the result
-    const parsedResult = typeof data.result === 'string'
-      ? JSON.parse(data.result)
-      : data.result || data;
-    return parsedResult;
+    // `response.data` is the optimization object directly (roadmap #147
+    // removed the `{ result: JSON.stringify(...) }` stringly-typed wrapper).
+    return response.data as OptimizationResult;
   };
 
   const handleTextOptimization = async () => {

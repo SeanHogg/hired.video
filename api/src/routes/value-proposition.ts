@@ -1,12 +1,9 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { success } from "../types/index.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const valuePropositionRoutes = new Hono<{ Variables: Variables }>();
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
 function buildResponse() {
   return {
@@ -34,31 +31,31 @@ valuePropositionRoutes.post("/generate/content", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
   await c.req.json().catch(() => ({}));
-  return c.json(ok(buildResponse()), 200);
+  return c.json(success(buildResponse()), 200);
 });
 valuePropositionRoutes.post("/generate/job-content-resume-id", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
   await c.req.json().catch(() => ({}));
-  return c.json(ok(buildResponse()), 200);
+  return c.json(success(buildResponse()), 200);
 });
 valuePropositionRoutes.post("/generate/job-id-resume-id", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
   await c.req.json().catch(() => ({}));
-  return c.json(ok(buildResponse()), 200);
+  return c.json(success(buildResponse()), 200);
 });
 valuePropositionRoutes.post("/generate/job-id-resume-content", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
   await c.req.json().catch(() => ({}));
-  return c.json(ok(buildResponse()), 200);
+  return c.json(success(buildResponse()), 200);
 });
 
 valuePropositionRoutes.all("*", (c) =>
   c.json(
     {
-      success: false,
+      success: false as const,
       error: { code: "NOT_IMPLEMENTED", message: "Value proposition routes coming soon" },
       timestamp: new Date().toISOString(),
     },

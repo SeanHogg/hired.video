@@ -1,12 +1,9 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { success } from "../types/index.js";
 import { checkAIUsage } from "../middleware/tierEnforcement.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Variables: Variables }>();
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
 function buildOptimizationResult() {
   return {
@@ -31,24 +28,25 @@ function buildOptimizationResult() {
 resumeOptimizerRoutes.post("/optimize", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
-  const result = buildOptimizationResult();
-  return c.json(ok({ result: JSON.stringify(result) }), 200);
+  return c.json(success(buildOptimizationResult()), 200);
 });
 
 resumeOptimizerRoutes.post("/ats-analysis", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
-  return c.json(ok({ score: 82, issues: [] }), 200);
+  return c.json(success({ score: 82, issues: [] }), 200);
 });
 resumeOptimizerRoutes.post("/keyword-suggestions", async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
-  return c.json(ok(["leadership", "automation", "cross-functional"]), 200);
+  // Wrap the raw keyword array in an object so every route's `data` field
+  // is consistently an object (fixes LSP violation flagged in roadmap #147).
+  return c.json(success({ keywords: ["leadership", "automation", "cross-functional"] }), 200);
 });
 
 resumeOptimizerRoutes.all("*", (c) =>
   c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Resume optimizer route not implemented" }, timestamp: new Date().toISOString() },
+    { success: false as const, error: { code: "NOT_IMPLEMENTED", message: "Resume optimizer route not implemented" }, timestamp: new Date().toISOString() },
     501,
   ),
 );

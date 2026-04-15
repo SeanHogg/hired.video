@@ -53,6 +53,20 @@ interface ApiUser {
   mfaEnabled: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  planId: string;
+  planName: string;
+  isPaid: boolean;
+  isUnlimited: boolean;
+  monthlyLimit: number | null;
+  monthlyUsed: number;
+  packBalance: number;
+  tokensAvailable: number | null;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1)}K`;
+  return String(n);
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -241,6 +255,8 @@ export default function UserManagement() {
             <TableRow>
               <TableHead>User</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Plan</TableHead>
+              <TableHead>Tokens</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Login</TableHead>
@@ -250,14 +266,14 @@ export default function UserManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   No users match your filters.
                 </TableCell>
               </TableRow>
@@ -276,6 +292,38 @@ export default function UserManagement() {
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[user.role] ?? ""}`}>
                         {user.isSuperAdmin ? "Super Admin" : getRoleDisplayLabel(user.role)}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
+                          user.isUnlimited
+                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                            : user.isPaid
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                            : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                      >
+                        {user.isUnlimited ? "Unlimited" : user.isPaid ? user.planName : "Free"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {user.isUnlimited ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="leading-tight">
+                          <div className="font-medium">
+                            {formatTokens(user.monthlyUsed)}
+                            <span className="text-muted-foreground">
+                              {" / "}
+                              {user.monthlyLimit !== null ? formatTokens(user.monthlyLimit) : "∞"}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatTokens(user.tokensAvailable ?? 0)} available
+                            {user.packBalance > 0 && ` (+${formatTokens(user.packBalance)} pack)`}
+                          </div>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[status]}`}>

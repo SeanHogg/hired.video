@@ -1,12 +1,9 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
+import { success } from "../types/index.js";
 import { requirePremium } from "../middleware/tierEnforcement.js";
 
 export const salaryRoutes = new Hono<{ Variables: Variables }>();
-
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
 
 function buildSalaryPayload(body: Record<string, unknown>) {
   const experience =
@@ -60,12 +57,12 @@ const INDUSTRIES = [
 
 // GET /api/salarycalculator/industries — industry list with subcategories
 salaryRoutes.get("/industries", (c) => {
-  return c.json(ok({ industries: INDUSTRIES }), 200);
+  return c.json(success({ industries: INDUSTRIES }), 200);
 });
 
 salaryRoutes.post("/analyze", requirePremium("Salary Calculator"), async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  return c.json(ok(buildSalaryPayload(body)), 200);
+  return c.json(success(buildSalaryPayload(body)), 200);
 });
 
 salaryRoutes.post("/negotiation-tips", requirePremium("Salary Negotiation Tips"), async (c) => {
@@ -74,7 +71,7 @@ salaryRoutes.post("/negotiation-tips", requirePremium("Salary Negotiation Tips")
   const marketRate = typeof body.marketRate === "number" ? body.marketRate : undefined;
 
   return c.json(
-    ok({
+    success({
       strategies: [
         "Lead with market data and role impact.",
         "Anchor your range slightly above your target.",
@@ -98,7 +95,7 @@ salaryRoutes.post("/negotiation-tips", requirePremium("Salary Negotiation Tips")
 salaryRoutes.all("*", (c) =>
   c.json(
     {
-      success: false,
+      success: false as const,
       error: { code: "NOT_IMPLEMENTED", message: "Salary routes coming soon" },
       timestamp: new Date().toISOString(),
     },

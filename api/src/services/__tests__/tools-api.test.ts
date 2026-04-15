@@ -200,6 +200,9 @@ describe("/api/resumescorer/score — buildScoreResult", () => {
 
 describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
   // Mirrors the first branch of resume-scorer.ts::/score (no userId).
+  // The payload is the plain score-preview object — roadmap #147 removed
+  // the `{ result: JSON.stringify(...) }` wrapper so `response.data` is
+  // the structured object directly.
   function anonymousPayload() {
     const full = buildScoreResult();
     return {
@@ -227,6 +230,13 @@ describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
     ]) {
       assert.equal(p[blocked], undefined, `${blocked} must be gated`);
     }
+  });
+
+  it("is a plain object, not a JSON-stringified blob (roadmap #147)", () => {
+    const p = anonymousPayload() as any;
+    // Guard against regressing back to `{ result: JSON.stringify(full) }`.
+    assert.equal(typeof p.result, "undefined", "`result` stringification removed");
+    assert.equal(typeof p, "object");
   });
 });
 
@@ -426,6 +436,13 @@ describe("/sentiment/sentimentprediction — length-bucket scoring", () => {
   it("returns the minimum score for null/undefined", () => {
     assert.equal(sentimentScore(null), 55);
     assert.equal(sentimentScore(undefined), 55);
+  });
+
+  it("wraps the number in an object (roadmap #147 envelope consistency)", () => {
+    // The route returns `data: { score }`, not `data: <number>`.
+    const payload = { score: sentimentScore("y".repeat(500)) };
+    assert.equal(typeof payload, "object");
+    assert.equal(typeof payload.score, "number");
   });
 });
 

@@ -1,29 +1,31 @@
 import { Hono } from "hono";
+import { success } from "../types/index.js";
 
 export const sentimentRoutes = new Hono();
 
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
+// Pure scoring so both handlers stay in sync and the unit test can
+// exercise the same function as production.
+function scoreSentiment(body: unknown): number {
+  const text = typeof body === "string" ? body : JSON.stringify(body ?? "");
+  return text.length > 300 ? 85 : text.length > 120 ? 70 : 55;
 }
 
 sentimentRoutes.post("/sentimentprediction", async (c) => {
   const body = await c.req.json().catch(() => "");
-  const text = typeof body === "string" ? body : JSON.stringify(body ?? "");
-  const score = text.length > 300 ? 85 : text.length > 120 ? 70 : 55;
-  return c.json(ok(score), 200);
+  // `data` is always an object (not a raw number) — consistent envelope
+  // across all tool endpoints; see roadmap #147.
+  return c.json(success({ score: scoreSentiment(body) }), 200);
 });
 
 // Legacy alias for requests that become /sentiment/resume/sentimentprediction
 sentimentRoutes.post("/resume/sentimentprediction", async (c) => {
   const body = await c.req.json().catch(() => "");
-  const text = typeof body === "string" ? body : JSON.stringify(body ?? "");
-  const score = text.length > 300 ? 85 : text.length > 120 ? 70 : 55;
-  return c.json(ok(score), 200);
+  return c.json(success({ score: scoreSentiment(body) }), 200);
 });
 
 sentimentRoutes.all("*", (c) =>
   c.json(
-    { success: false, error: { code: "NOT_IMPLEMENTED", message: "Sentiment route not implemented" }, timestamp: new Date().toISOString() },
+    { success: false as const, error: { code: "NOT_IMPLEMENTED", message: "Sentiment route not implemented" }, timestamp: new Date().toISOString() },
     501,
   ),
 );
