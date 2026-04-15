@@ -1,16 +1,14 @@
-import { z } from "zod";
 import { apiClient } from "../api-client";
 import { resumeService } from "./resume-service";
 import type { Resume } from "@/types/resume";
+import {
+  SentimentResponseSchema as SentimentAnalysisResponseSchema,
+  type SentimentResponse as SentimentAnalysisResponse,
+} from "@shared/tool-schemas";
 
-// Schema for sentiment analysis response
-export const SentimentAnalysisResponseSchema = z.object({
-  score: z.number().min(0).max(100),
-});
-
-export type SentimentAnalysisResponse = z.infer<
-  typeof SentimentAnalysisResponseSchema
->;
+// Re-exports preserved for existing imports across the app.
+export { SentimentAnalysisResponseSchema };
+export type { SentimentAnalysisResponse };
 
 // Schema for sentiment interpretation
 export interface SentimentInterpretation {

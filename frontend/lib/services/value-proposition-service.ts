@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import {
+  ValuePropositionResponseSchema,
+  type ValuePropositionResponse,
+} from "@shared/tool-schemas";
 
 // ============================================================================
 // TYPES & SCHEMAS
@@ -15,21 +19,14 @@ export const ValuePropositionRequestSchema = z.object({
   companyValues: z.string().optional(),
 });
 
-export const ValuePropositionResponseSchema = z.object({
-  valueProposition: z.string(),
-  executiveSummary: z.string(),
-  keyStrengths: z.array(z.string()),
-  alignmentPoints: z.array(z.string()),
-  callToAction: z.string(),
-  confidenceScore: z.number(),
-});
-
 export type ValuePropositionRequest = z.infer<
   typeof ValuePropositionRequestSchema
 >;
-export type ValuePropositionResponse = z.infer<
-  typeof ValuePropositionResponseSchema
->;
+
+// Response schema + type now live in shared/tool-schemas.ts so the
+// backend and frontend share the same source of truth (roadmap #147).
+export { ValuePropositionResponseSchema };
+export type { ValuePropositionResponse };
 
 // ============================================================================
 // SERVICE CLASS

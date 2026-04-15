@@ -21,6 +21,15 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import {
+  FullResumeScoreSchema,
+  ResumeScorePreviewSchema,
+  OptimizerResponseSchema,
+  SalaryAnalysisResponseSchema,
+  ValuePropositionResponseSchema,
+  SentimentResponseSchema,
+  SummarizeResponseSchema,
+} from "../../../../shared/tool-schemas.js";
 
 // ---------------------------------------------------------------------------
 // Helpers replicated from the route modules (verbatim — if either drifts,
@@ -558,6 +567,71 @@ describe("/api/Job/CreateFromFile — ValueProposition regression", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 // Tier gating — response envelope contract
 // ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Shared schema validation — every tool handler's output must parse clean
+// against the shared Zod schemas in shared/tool-schemas.ts. These guard
+// against drift between server output and the contract the frontend
+// validates at runtime (roadmap #147).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("shared schemas: server output matches shared contract", () => {
+  it("FullResumeScoreSchema accepts buildScoreResult() output", () => {
+    const parsed = FullResumeScoreSchema.safeParse(buildScoreResult());
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("ResumeScorePreviewSchema accepts the anonymous preview shape", () => {
+    const full = buildScoreResult();
+    const preview = {
+      overallScore: full.overallScore,
+      grade: full.grade,
+      isPremiumPreview: true as const,
+      upgradeUrl: "/settings/billing",
+    };
+    const parsed = ResumeScorePreviewSchema.safeParse(preview);
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("OptimizerResponseSchema accepts buildOptimizationResult() output", () => {
+    const parsed = OptimizerResponseSchema.safeParse(buildOptimizationResult());
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("SalaryAnalysisResponseSchema accepts buildSalaryPayload() output", () => {
+    const parsed = SalaryAnalysisResponseSchema.safeParse(buildSalaryPayload({ experienceYears: 5, industry: "tech" }));
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("ValuePropositionResponseSchema accepts buildResponse() output", () => {
+    const parsed = ValuePropositionResponseSchema.safeParse(buildValuePropositionResponse());
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("SentimentResponseSchema accepts the wrapped score shape", () => {
+    const parsed = SentimentResponseSchema.safeParse({ score: sentimentScore("hello world") });
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("SummarizeResponseSchema accepts the summarize handler output", () => {
+    const parsed = SummarizeResponseSchema.safeParse({ result: summarizeHandler({ resumeText: "sample" }) });
+    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
+  });
+
+  it("rejects regressions — score must be 0–100", () => {
+    const parsed = FullResumeScoreSchema.safeParse({
+      ...buildScoreResult(),
+      overallScore: 150, // out of range
+    });
+    assert.equal(parsed.success, false);
+  });
+
+  it("rejects regressions — SentimentResponseSchema rejects raw numbers", () => {
+    // Guards against reverting to `data: <number>` instead of `data: { score }`.
+    const parsed = SentimentResponseSchema.safeParse(73);
+    assert.equal(parsed.success, false);
+  });
+});
 
 describe("tier enforcement: response envelopes", () => {
   // Mirrors api/src/middleware/tierEnforcement.ts::requirePremium
