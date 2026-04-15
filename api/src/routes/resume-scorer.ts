@@ -3,7 +3,7 @@ import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { billingFacade } from "../domains/billing/facade.js";
-import { standardTierPolicy } from "../domains/billing/tier-policy.js";
+import { standardAccessPolicy } from "../domains/billing/access-policy.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
 
@@ -70,17 +70,17 @@ export function shapeScorePayload(
 
 // ---------------------------------------------------------------------------
 // POST /api/resumescorer/score
-// Tier-aware payload: anonymous/free see previews, pro sees the full score.
-// The branching lives in `standardTierPolicy` so tier experiments don't
-// touch the route (roadmap #150).
+// Audience-aware payload: anonymous → locked, free → teaser, pro/admin
+// → full. The branching lives in `standardAccessPolicy` so pricing
+// experiments don't touch the route (roadmap #150).
 // ---------------------------------------------------------------------------
 resumeScorerRoutes.post("/score", async (c) => {
-  const tier = await billingFacade.getTier(c.var.user);
-  const payloadShape = standardTierPolicy.getPayloadShape(tier, "resume_scorer");
-  const upsell = standardTierPolicy.getUpsellPayload("resume_scorer");
+  const audience = await billingFacade.getAudience(c.var.user);
+  const payloadShape = standardAccessPolicy.getPayloadShape(audience, "resume_scorer");
+  const upsell = standardAccessPolicy.getUpsellPayload("resume_scorer");
   const full = buildScoreResult();
 
-  // Pro/admin tiers consume a token credit before the full response.
+  // Full responses consume a token credit (admins bypass inside the middleware).
   if (payloadShape === "full") {
     const blocked = await checkTokenBudget(c);
     if (blocked) return blocked;

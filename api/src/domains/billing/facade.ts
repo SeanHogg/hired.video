@@ -1,61 +1,77 @@
 /**
  * Billing Facade — the ONE entry point tool routes use to reason about
- * a caller's tier. Wraps the raw `getSubscription()` service so the
+ * a caller's audience. Wraps the raw `getSubscription()` service so the
  * tool layer never touches the billing domain directly (roadmap #150,
  * DDD-boundary finding).
  *
- * Before this file existed, `resume-scorer.ts` called
- * `getSubscription(userId)` and inspected `sub.isPremium` — a bounded
- * context leak that made "add a Team tier" a codebase-wide sweep.
+ * The facade exposes two methods:
+ *   • `getAudience(user)` — what the AccessPolicy dispatches on.
+ *     Returns one of "anonymous" | "free" | "pro" | "admin".
+ *   • `getTier(user)` — the actual billing tier ("free" | "pro"),
+ *     for routes that need to reason about the plan (e.g., billing
+ *     pages) rather than gating behavior.
  *
- * The facade is intentionally tiny. It exists so:
- *   1. Tool routes have a stable, mockable dependency.
- *   2. The `isPremium → tier` translation lives in one place
- *      (`deriveTier`), so pricing changes don't ripple through routes.
+ * Tool routes should prefer `getAudience`. The separation exists so
+ * "there are four tiers" confusion doesn't creep back — tiers are
+ * Free / Pro, period; audiences are the wider set the policy needs.
  */
 
 import type { JwtPayload } from "../../types/index.js";
 import { getSubscription } from "../../services/billing.js";
-import { deriveTier, type Tier } from "./tier.js";
+import { deriveAudience, deriveTier, type Audience, type Tier } from "./audience.js";
 
 export interface BillingFacade {
   /**
-   * Resolve the caller's tier from the current auth context.
-   *
-   * Implementation looks up the subscription via `getSubscription()`
-   * for authenticated users; anonymous callers short-circuit to
-   * `"anonymous"` without hitting the billing service.
+   * Resolve the caller's policy audience from the current auth context.
+   * Anonymous callers short-circuit without hitting the billing service.
+   */
+  getAudience(user: JwtPayload | null | undefined): Promise<Audience>;
+
+  /**
+   * Resolve the caller's billing tier. Anonymous users default to
+   * "free" since there's no subscription to look up.
    */
   getTier(user: JwtPayload | null | undefined): Promise<Tier>;
 }
 
-/**
- * Production facade. Uses the cached `getSubscription()` service.
- */
 export const billingFacade: BillingFacade = {
-  async getTier(user) {
+  async getAudience(user) {
     if (!user?.sub) return "anonymous";
     const sub = await getSubscription(user.sub);
-    return deriveTier(user, sub);
+    return deriveAudience(user, sub);
+  },
+
+  async getTier(user) {
+    if (!user?.sub) return "free";
+    const sub = await getSubscription(user.sub);
+    return deriveTier(sub);
   },
 };
 
 /**
- * Build a deterministic test double for the facade. Useful for unit
- * tests that want to exercise the tier-policy branches without setting
- * up a fake database.
+ * Build a deterministic test double. Useful for unit tests that want
+ * to exercise the access-policy branches without setting up a fake DB.
  *
  * Example:
  *   const fake = makeBillingFacadeForTests({ "user-1": "pro" });
- *   await fake.getTier({ sub: "user-1" }); // → "pro"
+ *   await fake.getAudience({ sub: "user-1" }); // → "pro"
  */
 export function makeBillingFacadeForTests(
-  tierByUserId: Record<string, Tier>,
+  audienceByUserId: Record<string, Audience>,
 ): BillingFacade {
   return {
-    async getTier(user) {
+    async getAudience(user) {
       if (!user?.sub) return "anonymous";
-      return tierByUserId[user.sub] ?? "free";
+      return audienceByUserId[user.sub] ?? "free";
+    },
+    async getTier(user) {
+      if (!user?.sub) return "free";
+      const a = audienceByUserId[user.sub] ?? "free";
+      // Admin is a policy concept, not a billing tier — map to the
+      // underlying plan (default "free"; tests wanting an admin-on-pro
+      // scenario should use the production facade with a mocked sub).
+      if (a === "pro") return "pro";
+      return "free";
     },
   };
 }

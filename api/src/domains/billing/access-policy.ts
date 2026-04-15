@@ -1,25 +1,30 @@
 /**
- * Tier Policy — decides what each tier is allowed to see for a given
- * tool feature. Replaces the hardcoded `if (!sub.isPremium)` branches
- * scattered across tool routes (roadmap #150).
+ * Access Policy — decides what each audience sees for a given tool
+ * feature. Replaces the hardcoded `if (!sub.isPremium)` branches that
+ * used to live inside tool routes (roadmap #150).
+ *
+ * NOTE on naming: the billing tiers are just Free and Pro (see
+ * `audience.ts`). This policy dispatches on a wider `Audience` set —
+ * anonymous visitors and admins get handled separately from billing
+ * tiers. Treat "audience" as "policy input", not "billing plan".
  *
  * The policy answers two questions:
- *   1. `getPayloadShape(tier, feature)` — should the caller see the
- *      full response, a teaser, or an upsell-only payload?
+ *   1. `getPayloadShape(audience, feature)` — should the caller see
+ *      the full response, a teaser, or an upsell-only payload?
  *   2. `getUpsellPayload(feature)` — the shape of the upsell CTA
  *      (locked fields, upgrade URL) to splice into the response.
  *
- * Adding a new tier (e.g., `team` or `trial`) or a new feature is a
- * matrix-table edit here, NOT a sweep across tool routes.
+ * Adding a new audience is unlikely (Anonymous/Free/Pro/Admin covers
+ * the full space today), but adding a new gated tool feature is a
+ * matrix-table edit here — NOT a sweep across tool routes.
  */
 
-import type { Tier } from "./tier.js";
+import type { Audience } from "./audience.js";
 
 /**
- * Enum of features the tier policy knows how to gate. Keep this list
- * stable — adding a tool is a two-step change: register the feature,
- * then thread `policy.getPayloadShape("resume_scorer", tier)` through
- * the route.
+ * Tools the policy knows how to gate. Adding a tool is a two-step
+ * change: register the feature here, then thread
+ * `policy.getPayloadShape(audience, "my_tool")` through the route.
  */
 export type ToolFeature =
   | "resume_scorer"
@@ -42,20 +47,20 @@ export interface UpsellPayload {
   lockedDetails: string[];
 }
 
-export interface TierPolicy {
+export interface AccessPolicy {
   /**
-   * Return how much of the response this tier gets for this feature.
+   * Return how much of the response this audience gets for this feature.
    *
-   *  - `full`   → the handler returns the complete response
-   *  - `teaser` → the handler returns score + grade + one hint
-   *  - `locked` → the handler returns the upsell CTA only
+   *  - `full`   → handler returns the complete response
+   *  - `teaser` → handler returns score + grade + one hint
+   *  - `locked` → handler returns the upsell CTA only
    */
-  getPayloadShape(tier: Tier, feature: ToolFeature): PayloadShape;
+  getPayloadShape(audience: Audience, feature: ToolFeature): PayloadShape;
 
   /**
    * Return the upsell CTA for this feature, to splice into preview
-   * responses. Feature-specific so the locked-fields list can be
-   * accurate (the scorer hides different fields than the optimizer).
+   * responses. Feature-specific so the locked-fields list matches the
+   * tool being gated.
    */
   getUpsellPayload(feature: ToolFeature): UpsellPayload;
 }
@@ -68,7 +73,6 @@ export interface TierPolicy {
 
 const UPGRADE_URL = "/settings/billing" as const;
 
-/** Fields a free-tier scorer response hides behind the upsell. */
 const SCORER_LOCKED_DETAILS: readonly string[] = [
   "atsCompatibility",
   "contentQuality",
@@ -79,21 +83,18 @@ const SCORER_LOCKED_DETAILS: readonly string[] = [
   "weaknesses",
 ];
 
-/** Fields a free-tier optimizer response hides (placeholder for future use). */
 const OPTIMIZER_LOCKED_DETAILS: readonly string[] = [
   "suggestions",
   "optimizedContent",
 ];
 
 /**
- * Matrix of (tier × feature) → payload shape. Defaults to `full` if a
- * feature doesn't appear, so adding a feature to `ToolFeature` doesn't
- * accidentally lock it on day 1.
+ * Matrix of (audience × feature) → payload shape. Defaults to `"full"`
+ * if a feature doesn't appear, so adding a feature to `ToolFeature`
+ * doesn't accidentally lock it on day 1.
  */
-const PAYLOAD_MATRIX: Record<Tier, Partial<Record<ToolFeature, PayloadShape>>> = {
+const PAYLOAD_MATRIX: Record<Audience, Partial<Record<ToolFeature, PayloadShape>>> = {
   anonymous: {
-    // Anonymous sees a locked upsell for every tool — the score + grade
-    // only, no breakdown. Matches the pre-refactor scorer behavior.
     resume_scorer: "locked",
     resume_optimizer: "locked",
     salary_calculator: "locked",
@@ -101,8 +102,6 @@ const PAYLOAD_MATRIX: Record<Tier, Partial<Record<ToolFeature, PayloadShape>>> =
     job_resume_match: "locked",
   },
   free: {
-    // Free authenticated users see a teaser (score + grade + one hint)
-    // for the scorer, locked for everything else.
     resume_scorer: "teaser",
     resume_optimizer: "locked",
     salary_calculator: "locked",
@@ -110,7 +109,6 @@ const PAYLOAD_MATRIX: Record<Tier, Partial<Record<ToolFeature, PayloadShape>>> =
     job_resume_match: "teaser",
   },
   pro: {
-    // Pro gets everything (subject to token-budget middleware).
     resume_scorer: "full",
     resume_optimizer: "full",
     salary_calculator: "full",
@@ -118,7 +116,6 @@ const PAYLOAD_MATRIX: Record<Tier, Partial<Record<ToolFeature, PayloadShape>>> =
     job_resume_match: "full",
   },
   admin: {
-    // Admin bypasses all gating.
     resume_scorer: "full",
     resume_optimizer: "full",
     salary_calculator: "full",
@@ -155,9 +152,9 @@ const UPSELL_BY_FEATURE: Record<ToolFeature, UpsellPayload> = {
   },
 };
 
-export const standardTierPolicy: TierPolicy = {
-  getPayloadShape(tier, feature) {
-    return PAYLOAD_MATRIX[tier]?.[feature] ?? "full";
+export const standardAccessPolicy: AccessPolicy = {
+  getPayloadShape(audience, feature) {
+    return PAYLOAD_MATRIX[audience]?.[feature] ?? "full";
   },
   getUpsellPayload(feature) {
     return UPSELL_BY_FEATURE[feature];
