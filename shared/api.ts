@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import { USER_ROLES } from "./user-roles";
+import { USER_ROLES } from "./user-roles.js";
 
 // ============================================================================
 // VALIDATION SCHEMAS

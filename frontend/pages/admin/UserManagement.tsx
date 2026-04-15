@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,8 +23,20 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
@@ -93,11 +105,18 @@ export default function UserManagement() {
   const { startImpersonation } = useAuth();
   const { toast } = useToast();
   const { can } = useAdminPermissions();
+  const navigate = useNavigate();
+
+  const [grantTarget, setGrantTarget] = useState<ApiUser | null>(null);
+  const [grantTokens, setGrantTokens] = useState("");
+  const [grantReason, setGrantReason] = useState("");
+  const [granting, setGranting] = useState(false);
 
   const canCreate    = can("users", "create");
   const canUpdate    = can("users", "update");
   const canDelete    = can("users", "delete");
   const canImpersonate = can("users", "delete");
+  const canManageTokens = canUpdate;
 
   const limit = 50;
 
@@ -149,6 +168,49 @@ export default function UserManagement() {
       loadUsers();
     } catch {
       toast({ title: "Failed to change role", variant: "destructive" });
+    }
+  };
+
+  const handleResetTokens = async (user: ApiUser) => {
+    if (!window.confirm(`Reset ${user.name}'s monthly token usage to 0? This deletes their usage records for the current month.`)) return;
+    try {
+      const res = await apiClient.post<{ tokensReset: number }>(
+        `/api/admin/impersonate/users/${user.id}/tokens/reset`,
+        {},
+      );
+      toast({ title: `Reset ${res.data.tokensReset.toLocaleString()} tokens for ${user.name}` });
+      loadUsers();
+    } catch {
+      toast({ title: "Failed to reset tokens", variant: "destructive" });
+    }
+  };
+
+  const handleOpenGrant = (user: ApiUser) => {
+    setGrantTarget(user);
+    setGrantTokens("");
+    setGrantReason("");
+  };
+
+  const handleSubmitGrant = async () => {
+    if (!grantTarget) return;
+    const tokens = Number(grantTokens);
+    if (!Number.isInteger(tokens) || tokens <= 0) {
+      toast({ title: "Enter a positive integer", variant: "destructive" });
+      return;
+    }
+    try {
+      setGranting(true);
+      await apiClient.post(
+        `/api/admin/impersonate/users/${grantTarget.id}/tokens/grant`,
+        { tokens, reason: grantReason || undefined },
+      );
+      toast({ title: `Granted ${tokens.toLocaleString()} tokens to ${grantTarget.name}` });
+      setGrantTarget(null);
+      loadUsers();
+    } catch {
+      toast({ title: "Failed to grant tokens", variant: "destructive" });
+    } finally {
+      setGranting(false);
     }
   };
 
@@ -344,29 +406,40 @@ export default function UserManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => navigate(`/people/${user.id}`)}>
                             <Eye className="h-4 w-4 mr-2" />View Profile
                           </DropdownMenuItem>
                           {canUpdate && (
-                            <DropdownMenu>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
                                 <ShieldCheck className="h-4 w-4 mr-2" />Change Role
-                              </DropdownMenuItem>
-                            </DropdownMenu>
-                          )}
-                          {canUpdate && (
-                            <>
-                              {["JobSeeker", "Employer", "Recruiter", "Admin", "Affiliate"].filter(r => r !== user.role).map(r => (
-                                <DropdownMenuItem key={r} className="pl-8 text-xs" onSelect={() => handleChangeRole(user, r)}>
-                                  Set {getRoleDisplayLabel(r)}
-                                </DropdownMenuItem>
-                              ))}
-                            </>
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {["JobSeeker", "Employer", "Recruiter", "Admin", "Affiliate"]
+                                  .filter((r) => r !== user.role)
+                                  .map((r) => (
+                                    <DropdownMenuItem key={r} onSelect={() => handleChangeRole(user, r)}>
+                                      Set {getRoleDisplayLabel(r)}
+                                    </DropdownMenuItem>
+                                  ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
                           )}
                           {canImpersonate && (
                             <DropdownMenuItem onSelect={() => handleImpersonate(user)}>
                               <UserCheck className="h-4 w-4 mr-2" />Impersonate
                             </DropdownMenuItem>
+                          )}
+                          {canManageTokens && !user.isUnlimited && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => handleOpenGrant(user)}>
+                                <Coins className="h-4 w-4 mr-2" />Grant Tokens
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleResetTokens(user)}>
+                                <RotateCcw className="h-4 w-4 mr-2" />Reset Monthly Usage
+                              </DropdownMenuItem>
+                            </>
                           )}
                           {canDelete && (
                             <>
@@ -387,6 +460,53 @@ export default function UserManagement() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Grant Tokens dialog */}
+      <Dialog open={grantTarget !== null} onOpenChange={(open) => !open && setGrantTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Grant tokens</DialogTitle>
+            <DialogDescription>
+              Add tokens to {grantTarget?.name}'s purchased pack balance. These never expire and are spent after the monthly allowance is used up.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="grant-tokens">Tokens</Label>
+              <Input
+                id="grant-tokens"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="e.g. 500000"
+                value={grantTokens}
+                onChange={(e) => setGrantTokens(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Common amounts: 500K = 500000, 2M = 2000000, 10M = 10000000
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="grant-reason">Reason (optional)</Label>
+              <Input
+                id="grant-reason"
+                placeholder="e.g. Support ticket #123 — comp for outage"
+                value={grantReason}
+                onChange={(e) => setGrantReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGrantTarget(null)} disabled={granting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitGrant} disabled={granting || !grantTokens}>
+              {granting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Grant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Pagination */}
       {totalPages > 1 && (

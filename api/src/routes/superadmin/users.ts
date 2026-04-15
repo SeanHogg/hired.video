@@ -2,7 +2,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
-import { searchUsers, getUserDetail, assignUserRole, setUserStatus } from "../../services/adminUsers.js";
+import {
+  searchUsers,
+  getUserDetail,
+  assignUserRole,
+  setUserStatus,
+  resetUserMonthlyTokens,
+  grantUserTokens,
+} from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/adminModules.js";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -25,6 +32,11 @@ const SetStatusSchema = z.object({
 
 const AssignModuleSchema = z.object({
   moduleId: z.string().uuid("moduleId must be a valid UUID"),
+});
+
+const GrantTokensSchema = z.object({
+  tokens: z.coerce.number().int().min(1, "tokens must be ≥ 1").max(1_000_000_000),
+  reason: z.string().max(500).optional(),
 });
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -72,4 +84,19 @@ userMgmtRoutes.post("/:id/modules", async (c) => {
 userMgmtRoutes.delete("/:id/modules/:moduleId", async (c) => {
   await removeModuleFromUser(c.var.user.sub, c.req.param("id"), c.req.param("moduleId"));
   return c.json(ok({ userId: c.req.param("id"), moduleId: c.req.param("moduleId") }), 200);
+});
+
+userMgmtRoutes.post("/:id/tokens/reset", async (c) => {
+  const result = await resetUserMonthlyTokens(c.var.user.sub, c.req.param("id"));
+  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  return c.json(ok({ userId: c.req.param("id"), tokensReset: result.tokensReset }), 200);
+});
+
+userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
+  const body = GrantTokensSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+
+  const result = await grantUserTokens(c.var.user.sub, c.req.param("id"), body.data.tokens, body.data.reason);
+  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  return c.json(ok({ userId: c.req.param("id"), tokensGranted: body.data.tokens }), 200);
 });

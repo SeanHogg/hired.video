@@ -107,6 +107,27 @@ export async function checkTokenBudget(c: AppCtx): Promise<Response | null> {
 export const checkAIUsage = checkTokenBudget;
 
 // ---------------------------------------------------------------------------
+// requireTokenBudget — route middleware factory equivalent of
+// checkTokenBudget. Use this at the route registration site so handlers
+// stop repeating the `const limitError = await checkAIUsage(c as any); if
+// (limitError) return limitError;` guard pattern (roadmap #148).
+//
+// Usage:
+//   resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), handler);
+//
+// The check short-circuits anonymous requests (the `sub` is absent, so
+// there's nothing to meter); pair with the auth middleware upstream if
+// a route requires authentication.
+// ---------------------------------------------------------------------------
+export function requireTokenBudget(): MiddlewareHandler<{ Variables: Variables }> {
+  return async (c: AppCtx, next) => {
+    const blocked = await checkTokenBudget(c);
+    if (blocked) return blocked;
+    return next();
+  };
+}
+
+// ---------------------------------------------------------------------------
 // checkTeamSize — call before creating a new team invite.
 // Counts accepted + pending invitations sent by this user. If the total already
 // meets or exceeds FREE_TEAM_MEMBER_LIMIT - 1 (the inviter counts as seat 1),

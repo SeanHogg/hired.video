@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, lt, or, sum, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 import { FREE_AI_MONTHLY_TOKENS, PRO_AI_MONTHLY_TOKENS } from "../../../shared/pricing.js";
@@ -223,3 +223,117 @@ export async function setUserStatus(
   });
 }
 
+// ── Token administration ─────────────────────────────────────────────────────
+
+/**
+ * Zero out a user's current-month monthly-bucket usage by deleting their
+ * `aiUsageRecords` rows with `source = "monthly"` in the current calendar
+ * month. Pack balance is untouched. Returns the number of tokens that were
+ * reset so the caller can surface it in the audit log / UI.
+ */
+export async function resetUserMonthlyTokens(
+  adminId: string,
+  userId: string,
+): Promise<{ ok: true; tokensReset: number } | { ok: false; code: "NOT_FOUND" }> {
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const periodFilter = and(
+    eq(schema.aiUsageRecords.userId, userId),
+    eq(schema.aiUsageRecords.source, "monthly"),
+    gte(schema.aiUsageRecords.createdAt, periodStart),
+    lt(schema.aiUsageRecords.createdAt, periodEnd),
+  );
+
+  const [usedRow] = await db
+    .select({ used: sum(schema.aiUsageRecords.totalTokens) })
+    .from(schema.aiUsageRecords)
+    .where(periodFilter);
+  const tokensReset = Number(usedRow?.used ?? 0);
+
+  await db.delete(schema.aiUsageRecords).where(periodFilter);
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.TOKENS_RESET,
+    targetType: "user",
+    targetId: userId,
+    metadata: {
+      tokensReset,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+    },
+  });
+
+  return { ok: true, tokensReset };
+}
+
+/**
+ * Grant additional tokens to a user's purchased-pack balance. Recorded as a
+ * `tokenPackPurchases` row with `packId = "admin_grant"` and `pricePaid = 0`
+ * so the ledger stays consistent with paid top-ups.
+ */
+export async function grantUserTokens(
+  adminId: string,
+  userId: string,
+  tokens: number,
+  reason?: string,
+): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" }> {
+  if (!Number.isInteger(tokens) || tokens <= 0) {
+    throw new Error("tokens must be a positive integer");
+  }
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!existing) return { ok: false, code: "NOT_FOUND" };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db.insert(schema.tokenPackPurchases) as any).values({
+    userId,
+    packId: "admin_grant",
+    tokensGranted: tokens,
+    pricePaid: "0",
+    currency: "USD",
+    stripePaymentIntentId: null,
+    status: "paid",
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (db.insert(schema.userTokenBalance) as any)
+    .values({
+      userId,
+      balance: tokens,
+      lifetimeGranted: tokens,
+      lifetimeConsumed: 0,
+    })
+    .onConflictDoUpdate({
+      target: schema.userTokenBalance.userId,
+      set: {
+        balance: sql`${schema.userTokenBalance.balance} + ${tokens}`,
+        lifetimeGranted: sql`${schema.userTokenBalance.lifetimeGranted} + ${tokens}`,
+        updatedAt: new Date(),
+      },
+    });
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.TOKENS_GRANTED,
+    targetType: "user",
+    targetId: userId,
+    metadata: { tokens, reason: reason ?? null },
+  });
+
+  return { ok: true };
+}

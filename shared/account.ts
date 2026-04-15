@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { USER_ROLES } from "./user-roles";
-import { EmailSchema, NonEmptyStringSchema } from "./validation";
+import { USER_ROLES } from "./user-roles.js";
+import { EmailSchema, NonEmptyStringSchema } from "./validation.js";
 
 // AccountUser DTO (shared between frontend and backend)
 export const AccountUserSchema = z.object({

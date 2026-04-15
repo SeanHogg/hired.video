@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { checkAIUsage } from "../middleware/tierEnforcement.js";
+import { requireTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const valuePropositionRoutes = new Hono<{ Variables: Variables }>();
 
@@ -27,30 +27,18 @@ function buildResponse() {
   };
 }
 
-valuePropositionRoutes.post("/generate/content", async (c) => {
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
+// One generator for all four variants — they only differ by how the
+// caller identifies the job+resume pair. The budget gate is applied via
+// middleware at the route registration (roadmap #148).
+async function generate(c: any) {
   await c.req.json().catch(() => ({}));
   return c.json(success(buildResponse()), 200);
-});
-valuePropositionRoutes.post("/generate/job-content-resume-id", async (c) => {
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
-  await c.req.json().catch(() => ({}));
-  return c.json(success(buildResponse()), 200);
-});
-valuePropositionRoutes.post("/generate/job-id-resume-id", async (c) => {
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
-  await c.req.json().catch(() => ({}));
-  return c.json(success(buildResponse()), 200);
-});
-valuePropositionRoutes.post("/generate/job-id-resume-content", async (c) => {
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
-  await c.req.json().catch(() => ({}));
-  return c.json(success(buildResponse()), 200);
-});
+}
+
+valuePropositionRoutes.post("/generate/content", requireTokenBudget(), generate);
+valuePropositionRoutes.post("/generate/job-content-resume-id", requireTokenBudget(), generate);
+valuePropositionRoutes.post("/generate/job-id-resume-id", requireTokenBudget(), generate);
+valuePropositionRoutes.post("/generate/job-id-resume-content", requireTokenBudget(), generate);
 
 valuePropositionRoutes.all("*", (c) =>
   c.json(

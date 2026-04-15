@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { checkAIUsage } from "../middleware/tierEnforcement.js";
+import { checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { getSubscription } from "../services/billing.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
@@ -64,9 +64,12 @@ resumeScorerRoutes.post("/score", async (c) => {
     }), 200);
   }
 
-  // Premium: full result, consume an AI credit.
-  const limitError = await checkAIUsage(c as any);
-  if (limitError) return limitError;
+  // Premium: full result, consume an AI credit. The scorer can't use the
+  // `requireTokenBudget()` middleware factory because the budget check
+  // only applies to the premium branch — free-tier callers get a preview
+  // regardless of token balance. Call `checkTokenBudget()` inline here.
+  const blocked = await checkTokenBudget(c);
+  if (blocked) return blocked;
   return c.json(success(full), 200);
 });
 
