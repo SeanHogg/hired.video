@@ -530,7 +530,30 @@ export const PAGE_SEO: Record<string, SEOData> = {
         },
       },
     },
-  }
+  },
+  "/blog": {
+    title: "Career Guides & AI Tool Tutorials — hired.video Blog",
+    description:
+      "Actionable guides to help you score, optimize, and tailor your resume, land more interviews, and negotiate the salary you deserve. Powered by hired.video's free AI career tools.",
+    keywords:
+      "resume tips, career advice, AI resume tools, interview preparation, salary negotiation, video resume guide, ATS tips, job search strategy",
+    ogTitle: "Career Guides & AI Tool Tutorials — hired.video",
+    ogDescription:
+      "Free guides on resume scoring, ATS optimization, salary negotiation, interview prep, and video resumes.",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      name: "hired.video Blog",
+      url: "https://hired.video/blog",
+      description:
+        "Career guides and AI tool tutorials from hired.video — the AI-powered video resume and career tools platform.",
+      publisher: {
+        "@type": "Organization",
+        name: "hired.video",
+        url: "https://hired.video",
+      },
+    },
+  },
 
 };
 

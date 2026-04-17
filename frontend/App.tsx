@@ -44,6 +44,8 @@ import SignupSuccess from "./pages/SignupSuccess";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
 // Lazy load non-critical pages
+const BlogIndex = lazy(() => import("./pages/blog/BlogIndex"));
+const BlogPost = lazy(() => import("./pages/blog/BlogPost"));
 const PostAJob = lazy(() => import("./pages/PostAJob"));
 const SalaryPage = lazy(() => import("./pages/seo/SalaryPage"));
 const ResumeGuidePage = lazy(() => import("./pages/seo/ResumeGuidePage"));
@@ -390,6 +392,8 @@ const App = () => (
                       <Route path="/resume-roast" element={<ResumeRoast />} />
                       <Route path="/tools/resume-roast" element={<ResumeRoast />} />
                       <Route path="/post-a-job" element={<PostAJob />} />
+                      <Route path="/blog" element={<BlogIndex />} />
+                      <Route path="/blog/:slug" element={<BlogPost />} />
                       <Route path="/salary/:jobSlug" element={<SalaryPage />} />
                       <Route path="/resume-guide/:jobSlug" element={<ResumeGuidePage />} />
                       <Route
