@@ -275,9 +275,18 @@ export default function Sidebar({
                       <p className="text-sm font-medium truncate">
                         {user.name}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate capitalize">
-                        {user.role?.replace("_", " ")}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs text-muted-foreground truncate capitalize">
+                          {user.role?.replace("_", " ")}
+                        </p>
+                        {user.subscription && user.subscription !== "free" ? (
+                          <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
+                            Free
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </Link>
