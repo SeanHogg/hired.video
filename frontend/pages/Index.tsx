@@ -551,7 +551,7 @@ export default function Index() {
         <h1 className="sr-only">hired.video — Your AI Chief Human Resources Officer</h1>
 
         {/* AI CHRO Hero */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-10 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
+        <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-20 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
           {/* Subtle background glow */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-[400px] w-[800px] rounded-full bg-primary/5 blur-3xl" />
