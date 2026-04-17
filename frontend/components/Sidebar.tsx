@@ -3,6 +3,7 @@ import {
   Briefcase,
   TrendingUp,
   Settings,
+  Crown,
   HelpCircle,
   FileText,
   Building2,
