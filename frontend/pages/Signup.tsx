@@ -9,9 +9,9 @@ import {
   Building2,
   Check,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -129,6 +129,28 @@ export default function Signup() {
 
   // SEO for signup page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Sign Up", url: "/signup" }]);
+
+  // FAQPage JSON-LD for signup page
+  const signupFaq = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "Is hired.video free to sign up?", acceptedAnswer: { "@type": "Answer", text: "Yes. hired.video is completely free to start. You get AI resume scoring, one published video resume, job matching (5/month), 50K AI tokens/month, and access to all 10+ career tools. No credit card required." } },
+      { "@type": "Question", name: "How long does it take to set up?", acceptedAnswer: { "@type": "Answer", text: "Under 2 minutes. Sign up with Google, LinkedIn, GitHub, or email, choose your role (Job Seeker, Recruiter, or Employer), and you're in. You can create your first AI video resume in 60 seconds." } },
+      { "@type": "Question", name: "What sign-up methods are available?", acceptedAnswer: { "@type": "Answer", text: "hired.video supports sign-up via Google, LinkedIn, GitHub, Microsoft, or email/password. All methods are free and give you immediate access to the platform." } },
+      { "@type": "Question", name: "What's included in the free plan?", acceptedAnswer: { "@type": "Answer", text: "The free plan includes: 1 published AI video resume, ATS-friendly resume builder, Chrome extension for job tracking, AI tools (resume scorer, optimizer, salary calculator, and more), career dashboard, job matching, and unlimited networking. Pro ($9.95/mo) adds unlimited videos, voice cloning, 1080p export, and 1M AI tokens/month." } },
+    ],
+  }), []);
+
+  useEffect(() => {
+    const id = "signup-faq-jsonld";
+    let s = document.getElementById(id) as HTMLScriptElement | null;
+    if (!s) { s = document.createElement("script"); s.type = "application/ld+json"; s.id = id; document.head.appendChild(s); }
+    s.textContent = JSON.stringify(signupFaq);
+    return () => { document.getElementById(id)?.remove(); };
+  }, [signupFaq]);
+
   const {
     sidebarOpen,
     sidebarCollapsed,

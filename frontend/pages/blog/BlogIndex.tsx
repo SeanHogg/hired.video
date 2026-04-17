@@ -39,7 +39,7 @@ export default function BlogIndex() {
       />
       <div className="flex-1 flex flex-col min-h-screen">
         <Navigation onMenuClick={openSidebar} />
-        <div className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
+        <div className="flex-1 container mx-auto px-4 pt-20 pb-8 max-w-5xl">
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">

@@ -126,7 +126,7 @@ export default function ServiceInquiries() {
       <Navigation onSidebarToggle={toggleSidebar} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 max-w-4xl mx-auto w-full">
+        <main className="flex-1 overflow-y-auto pt-20 px-4 pb-4 md:pt-20 md:px-8 md:pb-8 max-w-4xl mx-auto w-full">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
             <Link to="/services">

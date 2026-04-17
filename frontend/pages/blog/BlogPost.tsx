@@ -103,7 +103,7 @@ export default function BlogPost() {
       />
       <div className="flex-1 flex flex-col min-h-screen">
         <Navigation onMenuClick={openSidebar} />
-        <article className="flex-1 container mx-auto px-4 py-8 max-w-3xl">
+        <article className="flex-1 container mx-auto px-4 pt-20 pb-8 max-w-3xl">
           {/* Back link */}
           <Link
             to="/blog"

@@ -506,16 +506,20 @@ export default function JobDetail() {
                         </div>
                       </div>
 
-                      {/* Stats */}
+                      {/* Stats — views + applications are owner-only */}
                       <div className="flex items-center gap-6 mt-4 pt-4 border-t">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Eye className="h-4 w-4" />
-                          {job.views} views
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          {job.applications} applications
-                        </div>
+                        {isOwner && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Eye className="h-4 w-4" />
+                              {job.views} views
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              {job.applications} applications
+                            </div>
+                          </>
+                        )}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
                           Posted{" "}
@@ -850,7 +854,8 @@ export default function JobDetail() {
                   </Card>
                 )}
 
-                {/* Job Stats */}
+                {/* Job Stats — owner-only engagement metrics */}
+                {isOwner && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Job Statistics</CardTitle>
@@ -887,6 +892,7 @@ export default function JobDetail() {
                     )}
                   </CardContent>
                 </Card>
+                )}
               </div>
             </div>
           </div>

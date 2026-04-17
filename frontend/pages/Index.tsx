@@ -854,10 +854,13 @@ export default function Index() {
                               {"location" in item && item.location && (
                                 <span>{item.location}</span>
                               )}
-                              <span className="flex items-center gap-1">
-                                <Eye className="w-3 h-3" />
-                                {item.views} views
-                              </span>
+                              {/* Views are owner-only — same policy as the grid card components. */}
+                              {user && (item.userId === user.id || (item as any).isOwner === true) && (
+                                <span className="flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  {item.views} views
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

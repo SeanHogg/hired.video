@@ -1586,10 +1586,6 @@ export default function Resumes() {
                                     <p className="text-sm text-muted-foreground mt-1">{resume.summary}</p>
                                     <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                                       <span>Created {formatDate(resume.createdAt)}</span>
-                                      <div className="flex items-center">
-                                        <Eye className="h-3 w-3 mr-1" />
-                                        {resume.views}
-                                      </div>
                                     </div>
                                   </div>
                                   <ResumeActionsMenu

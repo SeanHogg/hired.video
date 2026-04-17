@@ -232,17 +232,25 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "post a job, free job posting, hire talent, post job, google for jobs",
   },
   "/login": {
-    title: "Login - Hired.video",
+    title: "Sign In — hired.video",
     description:
-      "Sign in to your Hired.video account to access your video resumes, job applications, and professional network.",
+      "Sign in to hired.video to access your AI video resumes, resume scoring history, job matches, and career dashboard. Sign in with Google, LinkedIn, GitHub, Microsoft, or email.",
     robots: "noindex, nofollow",
   },
   "/signup": {
-    title: "Sign Up - Hired.video",
+    title: "Sign Up Free — hired.video | AI Video Resumes & Career Tools",
     description:
-      "Join Hired.video today and create your professional video resume. Connect with top employers and advance your career.",
+      "Create your free hired.video account in under 2 minutes. Get AI resume scoring, a video resume in 60 seconds, job matching, and 10+ career tools — no credit card required.",
     keywords:
-      "sign up, create account, video resume registration, join Hired.video",
+      "sign up, create account, video resume registration, free career tools, AI resume, join hired.video",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: "Sign Up — hired.video",
+      url: "https://hired.video/signup",
+      dateModified: "2026-04-17",
+      description: "Create a free hired.video account. AI video resumes, resume scoring, job matching, and 10+ career tools — no credit card required.",
+    },
   },
   "/pricing": {
     title: "Pricing — hired.video Plans for Job Seekers, Recruiters & Teams",

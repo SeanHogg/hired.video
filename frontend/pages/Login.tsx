@@ -1,8 +1,8 @@
-import { Eye, EyeOff, Mail } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff, Mail, Check } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -88,7 +88,27 @@ export default function Login() {
   const [isVerifying, setIsVerifying] = useState(false);
 
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Login", url: "/login" }]);
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
+
+  // FAQPage JSON-LD for login page
+  const loginFaq = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "What sign-in methods does hired.video support?", acceptedAnswer: { "@type": "Answer", text: "hired.video supports sign-in via Google, LinkedIn, GitHub, Microsoft, email/password, and passwordless magic links. All methods are free." } },
+      { "@type": "Question", name: "Is hired.video free to use?", acceptedAnswer: { "@type": "Answer", text: "Yes. hired.video is free to start with AI resume scoring, one published video resume, job matching, and 50K AI tokens per month. The Pro plan ($9.95/mo) unlocks unlimited features." } },
+      { "@type": "Question", name: "How do I reset my password?", acceptedAnswer: { "@type": "Answer", text: "Click 'Forgot your password?' on the login page, enter your email, and you'll receive a reset link. You can also use passwordless magic link sign-in as an alternative." } },
+    ],
+  }), []);
+
+  useEffect(() => {
+    const id = "login-faq-jsonld";
+    let s = document.getElementById(id) as HTMLScriptElement | null;
+    if (!s) { s = document.createElement("script"); s.type = "application/ld+json"; s.id = id; document.head.appendChild(s); }
+    s.textContent = JSON.stringify(loginFaq);
+    return () => { document.getElementById(id)?.remove(); };
+  }, [loginFaq]);
   const { login, verifyTwoFactor, resendTwoFactorCode } = useAuth();
   const navigate = useNavigate();
 
@@ -152,7 +172,9 @@ export default function Login() {
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <div className="pt-16 min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-center mb-6">Sign in to hired.video</h1>
             <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Welcome back</CardTitle>
@@ -264,6 +286,41 @@ export default function Login() {
                 </div>
               </CardContent>
             </Card>
+            </div>
+
+            {/* Marketing panel — desktop only */}
+            <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-6">
+              <h2 className="text-2xl font-bold tracking-tight">Your career tools are waiting</h2>
+              <p className="text-muted-foreground">
+                Sign in to access your AI video resumes, resume scoring history, job matches, and career dashboard — all in one place.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-background rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-primary">Free</div>
+                  <div className="text-xs text-muted-foreground">No credit card needed</div>
+                </div>
+                <div className="bg-background rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-primary">60s</div>
+                  <div className="text-xs text-muted-foreground">AI video resume</div>
+                </div>
+                <div className="bg-background rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-primary">10+</div>
+                  <div className="text-xs text-muted-foreground">AI career tools</div>
+                </div>
+                <div className="bg-background rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-primary">50K+</div>
+                  <div className="text-xs text-muted-foreground">Professionals</div>
+                </div>
+              </div>
+              <ul className="space-y-2">
+                {["4 sign-in options (Google, LinkedIn, GitHub, Microsoft)", "Passwordless magic link", "AI-powered career dashboard", "Resume scoring & optimization history"].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
         <Footer />

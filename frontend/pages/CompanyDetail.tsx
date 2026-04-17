@@ -416,15 +416,17 @@ export default function CompanyDetail() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">{company.views}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Profile Views
+                        {isOwner && (
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium">{company.views}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Profile Views
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <div>
@@ -859,12 +861,14 @@ export default function CompanyDetail() {
                       <span className="text-muted-foreground">Followers</span>
                       <span className="font-medium">{company.followers}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Profile Views
-                      </span>
-                      <span className="font-medium">{company.views}</span>
-                    </div>
+                    {isOwner && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Profile Views
+                        </span>
+                        <span className="font-medium">{company.views}</span>
+                      </div>
+                    )}
                     {company.data.financials?.fundingStage && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Funding</span>

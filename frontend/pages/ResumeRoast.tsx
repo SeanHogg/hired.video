@@ -211,7 +211,7 @@ export default function ResumeRoast() {
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
-        <main className="max-w-3xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+        <main className="max-w-3xl mx-auto px-4 pt-20 pb-10 sm:px-6 lg:px-8">
           {/* Header with back link */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
