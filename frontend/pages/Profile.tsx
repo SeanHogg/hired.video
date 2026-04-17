@@ -1,37 +1,18 @@
 import {
   User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Edit,
-  Save,
-  Camera,
-  Eye,
-  Star,
-  TrendingUp,
-  Clock,
-  Settings,
-  Building2,
   Briefcase,
   FileText,
-  Download,
+  Settings,
   Share,
-  ExternalLink,
-  Link as LinkIcon,
-  Check,
-  X as XIcon,
+  Eye,
   Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
-import { uploadAvatar } from "@/lib/services/upload-service";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ShareModal from "@/components/ShareModal";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,34 +21,50 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-import { Textarea } from "@/components/ui/textarea";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useAuth } from "@/lib/auth";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
+import { useProfileResumeData } from "@/hooks/useProfileResumeData";
 import ProfileInsights from "@/components/profile/ProfileInsights";
 import ProfileStatistics from "@/components/dashboard/shared/ProfileStatistics";
 import ApplicationStatistics from "@/components/dashboard/shared/ApplicationStatistics";
 import JobMatchesCard from "@/components/dashboard/shared/JobMatchesCard";
 import UpcomingInterviewsCard from "@/components/dashboard/shared/UpcomingInterviewsCard";
-import { userService } from "@/lib/services/user-service";
 import {
-  roleToSelectValue,
   formatRoleForDisplay,
-  getAvailableRoles,
   createRolePermissions,
 } from "@/lib/role-utils";
+
+// Section display components
+import ProfileHeader from "@/components/profile/sections/ProfileHeader";
+import AboutSection from "@/components/profile/sections/AboutSection";
+import ExperienceSection from "@/components/profile/sections/ExperienceSection";
+import EducationSection from "@/components/profile/sections/EducationSection";
+import SkillsSection from "@/components/profile/sections/SkillsSection";
+import ProjectsSection from "@/components/profile/sections/ProjectsSection";
+import ContactSidebar from "@/components/profile/sections/ContactSidebar";
+import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
+
+// Edit dialogs
+import EditHeaderDialog from "@/components/profile/dialogs/EditHeaderDialog";
+import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
+import EditContactDialog from "@/components/profile/dialogs/EditContactDialog";
+import EditSocialProfilesDialog from "@/components/profile/dialogs/EditSocialProfilesDialog";
+import EditSkillsDialog from "@/components/profile/dialogs/EditSkillsDialog";
+import EditProfessionalInfoDialog from "@/components/profile/dialogs/EditProfessionalInfoDialog";
+import EditCustomUrlDialog from "@/components/profile/dialogs/EditCustomUrlDialog";
+
+type DialogType =
+  | "header"
+  | "about"
+  | "contact"
+  | "social"
+  | "skills"
+  | "professional"
+  | "url"
+  | null;
 
 function ProfileContent() {
   const {
@@ -77,61 +74,27 @@ function ProfileContent() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const [searchParams] = useSearchParams();
-  const [isEditing, setIsEditing] = useState(searchParams.get("edit") === "true");
-  const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
   const [shareOpen, setShareOpen] = useState(false);
-
-  // Slug editor state
-  const [slugInput, setSlugInput] = useState("");
-  const [slugEditing, setSlugEditing] = useState(false);
-  const [slugChecking, setSlugChecking] = useState(false);
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
-  const [slugSaving, setSlugSaving] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<DialogType>(null);
 
   const { user, isAuthenticated, refreshUser, impersonationSession } = useAuth();
   const { personaPreview } = usePersonaPreview();
   const { dashboardData, loading: dashboardLoading } = useDashboard();
+  const { masterResume, loading: resumeLoading } = useProfileResumeData();
 
   // Effective role: impersonation > persona preview > actual
-  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
+  const effectiveRole =
+    impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
-  // Ensure we have fresh user data only on /profile
+  // Refresh user data on mount
   useEffect(() => {
     if (isAuthenticated) {
-      refreshUser().catch((e) => {
-        console.warn("Profile: refreshUser failed", e);
-        // API client handles 401 errors automatically with logout + redirect
-        // If we get here, the error was already processed
-      });
+      refreshUser().catch((e) =>
+        console.warn("Profile: refreshUser failed", e),
+      );
     }
-    // run once on mount
-
   }, []);
-
-  // Form state for editing
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    role: roleToSelectValue(user?.role),
-    location: user?.location || "",
-    bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-    headline: user?.headline || "",
-    company: user?.currentCompany || "",
-    title: user?.currentRole || "",
-    website: user?.website || "",
-    linkedIn: user?.linkedIn || "",
-    gitHub: user?.github || "",
-    twitter: user?.twitter || "",
-    skills: user?.skills?.join(", ") || "",
-    industries: user?.industries?.join(", ") || "",
-    openToRemote: user?.openToRemote || false,
-    preferredRoles: user?.preferredRoles?.join(", ") || "",
-    salaryExpectation: user?.salaryExpectation?.toString() || "",
-    salaryCurrency: user?.salaryCurrency || "USD",
-  });
 
   const joinedText = (() => {
     const iso = (user as any)?.createdAt as string | undefined;
@@ -141,104 +104,16 @@ function ProfileContent() {
     return `Joined ${d.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
   })();
 
-  // Keep form in sync when user context updates
-  useEffect(() => {
-    if (!user) return;
-    console.info("Profile: syncing form from user context", user);
-    setFormData({
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      email: user.email || "",
-      phone: user.phone || "",
-      role: roleToSelectValue(user.role),
-      location: user.location || "",
-      bio: user.bio || `Passionate ${formatRoleForDisplay(user.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-      headline: user.headline || "",
-      company: user.currentCompany || "",
-      title: user.currentRole || "",
-      website: user.website || "",
-      linkedIn: user.linkedIn || "",
-      gitHub: user.github || "",
-      twitter: user.twitter || "",
-      skills: user.skills?.join(", ") || "",
-      industries: user.industries?.join(", ") || "",
-      openToRemote: user.openToRemote || false,
-      preferredRoles: user.preferredRoles?.join(", ") || "",
-      salaryExpectation: user.salaryExpectation?.toString() || "",
-      salaryCurrency: user.salaryCurrency || "USD",
-    });
-  }, [user]);
-
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const { updateProfile } = useAuth();
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      await updateProfile({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        bio: formData.bio,
-        headline: formData.headline,
-        location: formData.location,
-        website: formData.website,
-        linkedIn: formData.linkedIn,
-        github: formData.gitHub,
-        twitter: formData.twitter,
-        phone: formData.phone,
-        currentCompany: formData.company,
-        currentRole: formData.title,
-        skills: formData.skills ? formData.skills.split(",").map(s => s.trim()).filter(Boolean) : [],
-        industries: formData.industries ? formData.industries.split(",").map(s => s.trim()).filter(Boolean) : [],
-        openToRemote: formData.openToRemote,
-        preferredRoles: formData.preferredRoles ? formData.preferredRoles.split(",").map(s => s.trim()).filter(Boolean) : [],
-        salaryExpectation: formData.salaryExpectation ? parseFloat(formData.salaryExpectation) : undefined,
-        salaryCurrency: formData.salaryCurrency,
-      });
-      // Immediately switch to read-only on successful update
-      setIsEditing(false);
-      // Refresh in background; don't block UI transition
-      refreshUser().catch((e) =>
-        console.warn("refreshUser failed after save", e),
-      );
-    } catch (err) {
-      console.error("Failed to save profile:", err);
-    } finally {
-      setSaving(false);
+  // Navigate to resume editor for resume-owned sections
+  const handleEditResume = () => {
+    if (masterResume?.id) {
+      navigate(`/resumes/edit/${masterResume.id}`);
+    } else {
+      navigate("/resumes");
     }
   };
 
-  const handleCancel = () => {
-    // Reset form data to original values
-    setFormData({
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-      phone: user?.phone || "",
-      role: roleToSelectValue(user?.role),
-      location: user?.location || "",
-      bio: user?.bio || `Passionate ${formatRoleForDisplay(user?.role)} focused on building meaningful connections and driving career growth through innovative technology.`,
-      headline: user?.headline || "",
-      company: user?.currentCompany || "",
-      title: user?.currentRole || "",
-      website: user?.website || "",
-      linkedIn: user?.linkedIn || "",
-      gitHub: user?.github || "",
-      twitter: user?.twitter || "",
-      skills: user?.skills?.join(", ") || "",
-      industries: user?.industries?.join(", ") || "",
-      openToRemote: user?.openToRemote || false,
-      preferredRoles: user?.preferredRoles?.join(", ") || "",
-      salaryExpectation: user?.salaryExpectation?.toString() || "",
-      salaryCurrency: user?.salaryCurrency || "USD",
-    });
-    setIsEditing(false);
-  };
-
-  // If user is not authenticated, redirect to login
+  // If user is not authenticated, show sign-in prompt
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-background">
@@ -253,11 +128,12 @@ function ProfileContent() {
             onSidebarToggle={toggleSidebar}
             sidebarCollapsed={sidebarCollapsed}
           />
-
           <div className="pt-16">
             <div className="max-w-4xl mx-auto text-center py-12 sm:py-16 p-4 sm:p-6">
               <User className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
-              <h1 className="text-xl sm:text-2xl font-bold mb-4">Sign In Required</h1>
+              <h1 className="text-xl sm:text-2xl font-bold mb-4">
+                Sign In Required
+              </h1>
               <p className="text-sm sm:text-base text-muted-foreground mb-6">
                 Please sign in to view and edit your profile.
               </p>
@@ -287,576 +163,175 @@ function ProfileContent() {
         />
 
         <div className="pt-16 p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-6xl mx-auto space-y-6">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold">Profile</h1>
-                <p className="text-muted-foreground mt-1">
-                  View and manage your professional profile
-                </p>
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold">Profile</h1>
+              <p className="text-muted-foreground mt-1">
+                View and manage your professional profile
+              </p>
             </div>
 
-            {/* Profile Card */}
-            <Card>
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
-                  <div className="relative flex-shrink-0">
-                    <Avatar className="w-20 h-20 sm:w-24 sm:h-24">
-                      <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="text-lg sm:text-2xl">
-                        {(formData.firstName[0] || "") +
-                          (formData.lastName[0] || "")}
-                      </AvatarFallback>
-                    </Avatar>
-                    {isEditing && (
-                      <>
-                        <input
-                          id="avatarInput"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            try {
-                              setSaving(true);
-                              const avatarUrl = await uploadAvatar(file);
-                              if (avatarUrl) {
-                                await updateProfile({ profilePicture: avatarUrl });
-                              }
-                              await refreshUser();
-                            } catch (err) {
-                              console.error("Avatar upload failed", err);
-                            } finally {
-                              setSaving(false);
-                              // Clear input so same file can be re-selected
-                              e.currentTarget.value = "";
-                            }
-                          }}
+            {/* Profile Header Card */}
+            <ProfileHeader
+              avatar={user.avatar}
+              firstName={user.firstName || ""}
+              lastName={user.lastName || ""}
+              headline={user.headline}
+              roleBadge={formatRoleForDisplay(effectiveRole ?? user.role)}
+              subscription={user.subscription}
+              email={user.email || ""}
+              phone={user.phone}
+              location={user.location}
+              currentRole={user.currentRole}
+              currentCompany={user.currentCompany}
+              website={user.website}
+              joinedText={joinedText}
+              slug={user.slug}
+              isOwner={true}
+              onEditProfile={() => setActiveDialog("header")}
+              onEditUrl={() => setActiveDialog("url")}
+              onShare={() => setShareOpen(true)}
+            />
+
+            {/* 2-Column Layout */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Main Content */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* About */}
+                <AboutSection
+                  bio={user.bio}
+                  isOwner={true}
+                  onEdit={() => setActiveDialog("about")}
+                />
+
+                {/* Resume Sections */}
+                {resumeLoading ? (
+                  <Card>
+                    <CardContent className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                      <span className="text-muted-foreground">
+                        Loading resume data...
+                      </span>
+                    </CardContent>
+                  </Card>
+                ) : masterResume ? (
+                  <>
+                    {/* Experience */}
+                    <ExperienceSection
+                      work={masterResume.data.Work || []}
+                      isOwner={true}
+                      onEdit={handleEditResume}
+                    />
+
+                    {/* Education */}
+                    <EducationSection
+                      education={masterResume.data.Education || []}
+                      isOwner={true}
+                      onEdit={handleEditResume}
+                    />
+
+                    {/* Resume Skills */}
+                    {masterResume.data.Skills &&
+                      masterResume.data.Skills.length > 0 && (
+                        <SkillsSection
+                          resumeSkills={masterResume.data.Skills}
+                          isOwner={true}
+                          onEdit={handleEditResume}
+                          title="Resume Skills"
                         />
-                        <Button
-                          size="icon"
-                          className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full"
-                          onClick={() =>
-                            document.getElementById("avatarInput")?.click()
-                          }
-                          disabled={saving}
-                        >
-                          <Camera className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex-1 text-center sm:text-left">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                      <h1 className="text-xl sm:text-2xl font-bold">
-                        {isEditing
-                          ? `${formData.firstName} ${formData.lastName}`
-                          : user.name}
-                      </h1>
-                      <div className="flex flex-col sm:flex-row items-center gap-2">
-                        {isEditing ? (
-                          <>
-                            <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto min-h-[44px]">
-                              Cancel
-                            </Button>
-                            <Button
-                              onClick={handleSave}
-                              disabled={saving}
-                              className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]"
-                            >
-                              <Save className="h-4 w-4" />
-                              {saving ? "Saving..." : "Save Changes"}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsEditing(true)}
-                            className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]"
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit Profile
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-3">
-                      <Badge variant="outline">
-                        {formatRoleForDisplay(effectiveRole ?? formData.role)}
-                      </Badge>
-                      {user?.subscription && user.subscription !== "free" && (
-                        <Badge variant="secondary" className="capitalize">
-                          {user.subscription} Member
-                        </Badge>
                       )}
-                    </div>
 
-                    {!isEditing ? (
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        {formData.headline && (
-                          <p className="text-sm text-foreground font-medium">
-                            {formData.headline}
-                          </p>
-                        )}
-                        {(formData.title || formData.company) && (
-                          <div className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4" />
-                            {formData.title}{formData.title && formData.company ? " at " : ""}{formData.company}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          {formData.email}
-                        </div>
-                        {formData.phone && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4" />
-                            {formData.phone}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          {formData.location}
-                        </div>
-                        {formData.website && (
-                          <div className="flex items-center gap-2">
-                            <ExternalLink className="h-4 w-4" />
-                            <a href={formData.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                              {formData.website}
-                            </a>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {joinedText}
-                        </div>
-                        {/* Custom URL / Slug */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <LinkIcon className="h-4 w-4 shrink-0" />
-                          {slugEditing ? (
-                            <div className="flex items-center gap-2 flex-1">
-                              <div className="flex items-center border rounded-md overflow-hidden text-xs">
-                                <span className="px-2 py-1 bg-muted text-muted-foreground border-r">hired.video/people/</span>
-                                <input
-                                  className="px-2 py-1 w-32 outline-none bg-background text-foreground"
-                                  value={slugInput}
-                                  onChange={async (e) => {
-                                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
-                                    setSlugInput(val);
-                                    setSlugAvailable(null);
-                                    if (val.length >= 2) {
-                                      setSlugChecking(true);
-                                      const res = await userService.checkSlug(val).catch(() => ({ available: false }));
-                                      setSlugAvailable(res.available);
-                                      setSlugChecking(false);
-                                    }
-                                  }}
-                                  placeholder="your-name"
-                                  autoFocus
-                                />
-                                {slugChecking && <Loader2 className="h-3 w-3 animate-spin mx-1 text-muted-foreground" />}
-                                {!slugChecking && slugAvailable === true && <Check className="h-3 w-3 mx-1 text-emerald-500" />}
-                                {!slugChecking && slugAvailable === false && <XIcon className="h-3 w-3 mx-1 text-destructive" />}
-                              </div>
-                              <button
-                                className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground disabled:opacity-50"
-                                disabled={!slugAvailable || slugSaving || slugInput.length < 2}
-                                onClick={async () => {
-                                  if (!slugAvailable || slugInput.length < 2) return;
-                                  setSlugSaving(true);
-                                  try {
-                                    await userService.updateSlug(slugInput);
-                                    await refreshUser();
-                                    setSlugEditing(false);
-                                  } catch {}
-                                  setSlugSaving(false);
-                                }}
-                              >
-                                {slugSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                              </button>
-                              <button
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() => setSlugEditing(false)}
-                              >Cancel</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs">
-                                {user?.slug
-                                  ? <a href={`/people/${user.slug}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">hired.video/people/{user.slug}</a>
-                                  : <span className="text-muted-foreground">No custom URL set</span>
-                                }
-                              </span>
-                              <button
-                                className="text-xs text-muted-foreground hover:text-foreground underline"
-                                onClick={() => {
-                                  setSlugInput((user as any)?.slug ?? "");
-                                  setSlugAvailable(null);
-                                  setSlugEditing(true);
-                                }}
-                              >
-                                {user?.slug ? "Edit" : "Set custom URL"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {isEditing ? (
-                  <div className="mt-6 space-y-6">
-                    {/* Personal Information */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">
-                        Personal Information
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName">First Name</Label>
-                          <Input
-                            id="firstName"
-                            value={formData.firstName}
-                            onChange={(e) =>
-                              handleInputChange("firstName", e.target.value)
-                            }
-                            className="min-h-[44px]"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName">Last Name</Label>
-                          <Input
-                            id="lastName"
-                            value={formData.lastName}
-                            onChange={(e) =>
-                              handleInputChange("lastName", e.target.value)
-                            }
-                            className="min-h-[44px]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact Information */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">
-                        Contact Information
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email Address</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) =>
-                              handleInputChange("email", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input
-                            id="phone"
-                            type="tel"
-                            placeholder="+1 (555) 123-4567"
-                            value={formData.phone}
-                            onChange={(e) =>
-                              handleInputChange("phone", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="location">Location</Label>
-                          <Input
-                            id="location"
-                            placeholder="City, State, Country"
-                            value={formData.location}
-                            onChange={(e) =>
-                              handleInputChange("location", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Professional Information */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">
-                        Professional Information
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="role">Professional Role</Label>
-                          <Select
-                            value={formData.role}
-                            onValueChange={(value) =>
-                              handleInputChange("role", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAvailableRoles().map((roleOption) => (
-                                <SelectItem
-                                  key={roleOption.value}
-                                  value={roleOption.value}
-                                >
-                                  {roleOption.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="title">Job Title</Label>
-                          <Input
-                            id="title"
-                            placeholder="e.g. Senior Software Engineer"
-                            value={formData.title}
-                            onChange={(e) =>
-                              handleInputChange("title", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="company">Company</Label>
-                          <Input
-                            id="company"
-                            placeholder="e.g. Tech Corp"
-                            value={formData.company}
-                            onChange={(e) =>
-                              handleInputChange("company", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="website">Website</Label>
-                          <Input
-                            id="website"
-                            type="url"
-                            placeholder="https://yourwebsite.com"
-                            value={formData.website}
-                            onChange={(e) =>
-                              handleInputChange("website", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Headline */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Professional Headline</h3>
-                      <div className="space-y-2">
-                        <Label htmlFor="headline">Headline</Label>
-                        <Input
-                          id="headline"
-                          placeholder="e.g. Full-Stack Developer | React & Node.js Expert"
-                          value={formData.headline}
-                          onChange={(e) =>
-                            handleInputChange("headline", e.target.value)
-                          }
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          A brief professional tagline that appears on your profile
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Social Profiles */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Social Profiles</h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="linkedIn">LinkedIn</Label>
-                          <Input
-                            id="linkedIn"
-                            type="url"
-                            placeholder="https://linkedin.com/in/yourprofile"
-                            value={formData.linkedIn}
-                            onChange={(e) =>
-                              handleInputChange("linkedIn", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="gitHub">GitHub</Label>
-                          <Input
-                            id="gitHub"
-                            type="url"
-                            placeholder="https://github.com/yourusername"
-                            value={formData.gitHub}
-                            onChange={(e) =>
-                              handleInputChange("gitHub", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="twitter">Twitter</Label>
-                          <Input
-                            id="twitter"
-                            type="url"
-                            placeholder="https://twitter.com/yourusername"
-                            value={formData.twitter}
-                            onChange={(e) =>
-                              handleInputChange("twitter", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Skills & Industries */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Skills & Expertise</h3>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="skills">Skills</Label>
-                          <Input
-                            id="skills"
-                            placeholder="e.g. JavaScript, React, Node.js, Python"
-                            value={formData.skills}
-                            onChange={(e) =>
-                              handleInputChange("skills", e.target.value)
-                            }
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Separate skills with commas
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="industries">Industries</Label>
-                          <Input
-                            id="industries"
-                            placeholder="e.g. Technology, Finance, Healthcare"
-                            value={formData.industries}
-                            onChange={(e) =>
-                              handleInputChange("industries", e.target.value)
-                            }
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Separate industries with commas
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Job Preferences moved to Settings page for editing */}
-
-                    {/* Bio */}
-                    <div>
-                      <h3 className="text-lg font-medium mb-4">Bio</h3>
-                      <div className="space-y-2">
-                        <Label htmlFor="bio">About You</Label>
-                        <Textarea
-                          id="bio"
-                          placeholder="Tell us about yourself, your experience, and what you're looking for..."
-                          rows={4}
-                          value={formData.bio}
-                          onChange={(e) =>
-                            handleInputChange("bio", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    {/* Projects */}
+                    <ProjectsSection
+                      projects={masterResume.data.Projects || []}
+                      isOwner={true}
+                      onEdit={handleEditResume}
+                    />
+                  </>
                 ) : (
-                  <div className="mt-6 space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium mb-3">About</h3>
-                      <p className="text-muted-foreground leading-relaxed">
-                        {formData.bio}
+                  <Card>
+                    <CardContent className="text-center py-10">
+                      <div className="flex justify-center mb-4">
+                        <div className="p-3 bg-muted rounded-full">
+                          <FileText className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      </div>
+                      <h3 className="font-semibold text-lg mb-2">
+                        No Master Resume Found
+                      </h3>
+                      <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+                        Create a master resume to display your work experience,
+                        education, skills, and projects on your profile.
                       </p>
-                    </div>
-
-                    {/* Social Profiles */}
-                    {(formData.linkedIn || formData.gitHub || formData.twitter) && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-3">Social Profiles</h3>
-                        <div className="space-y-2 text-sm">
-                          {formData.linkedIn && (
-                            <div className="flex items-center gap-2">
-                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                              <a href={formData.linkedIn} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                LinkedIn
-                              </a>
-                            </div>
-                          )}
-                          {formData.gitHub && (
-                            <div className="flex items-center gap-2">
-                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                              <a href={formData.gitHub} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                GitHub
-                              </a>
-                            </div>
-                          )}
-                          {formData.twitter && (
-                            <div className="flex items-center gap-2">
-                              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                              <a href={formData.twitter} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                Twitter
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Skills */}
-                    {formData.skills && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-3">Skills</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {formData.skills.split(",").map(s => s.trim()).filter(Boolean).map((skill) => (
-                            <Badge key={skill} variant="secondary">{skill}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Industries */}
-                    {formData.industries && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-3">Industries</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {formData.industries.split(",").map(s => s.trim()).filter(Boolean).map((industry) => (
-                            <Badge key={industry} variant="outline">{industry}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      <Button asChild>
+                        <Link to="/resumes">Manage Resumes</Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
                 )}
 
-              </CardContent>
-            </Card>
+                {/* Profile Skills & Industries (profile-level, editable here) */}
+                <SkillsSection
+                  profileSkills={user.skills}
+                  industries={user.industries}
+                  isOwner={true}
+                  onEdit={() => setActiveDialog("skills")}
+                  title="Profile Skills & Industries"
+                />
+              </div>
 
-            {/* Profile Insights — visibility, persona, metrics */}
-            <ProfileInsights effectiveRole={effectiveRole} />
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Contact */}
+                <ContactSidebar
+                  email={user.email}
+                  phone={user.phone}
+                  website={user.website}
+                  isOwner={true}
+                  onEdit={() => setActiveDialog("contact")}
+                />
+
+                {/* Social Profiles */}
+                <SocialProfilesSection
+                  linkedIn={user.linkedIn}
+                  github={user.github}
+                  twitter={user.twitter}
+                  isOwner={true}
+                  onEdit={() => setActiveDialog("social")}
+                />
+
+                {/* Profile Insights — visibility, persona, metrics */}
+                <ProfileInsights effectiveRole={effectiveRole} />
+              </div>
+            </div>
 
             {/* Job Seeker Dashboard Cards */}
             {(() => {
               const rp = createRolePermissions(effectiveRole);
               if (!rp.isJobSeeker) return null;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const dd = dashboardData as any;
               return (
                 <>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    <ProfileStatistics stats={dd?.profileStats} loading={dashboardLoading} />
-                    <ApplicationStatistics stats={dd?.applicationStats} loading={dashboardLoading} />
+                    <ProfileStatistics
+                      stats={dd?.profileStats}
+                      loading={dashboardLoading}
+                    />
+                    <ApplicationStatistics
+                      stats={dd?.applicationStats}
+                      loading={dashboardLoading}
+                    />
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    <JobMatchesCard matches={dd?.jobMatches} loading={dashboardLoading} />
-                    <UpcomingInterviewsCard interviews={dd?.upcomingInterviews} loading={dashboardLoading} />
+                    <JobMatchesCard
+                      matches={dd?.jobMatches}
+                      loading={dashboardLoading}
+                    />
+                    <UpcomingInterviewsCard
+                      interviews={dd?.upcomingInterviews}
+                      loading={dashboardLoading}
+                    />
                   </div>
                 </>
               );
@@ -872,7 +347,6 @@ function ProfileContent() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  {/* Role-based quick actions */}
                   {(() => {
                     const rolePermissions = createRolePermissions(effectiveRole);
                     if (rolePermissions.isJobSeeker) {
@@ -885,13 +359,14 @@ function ProfileContent() {
                           >
                             <Link to="/resumes">
                               <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
-                              <span className="text-sm sm:text-base font-medium">Update Resume</span>
+                              <span className="text-sm sm:text-base font-medium">
+                                Update Resume
+                              </span>
                               <span className="text-xs text-muted-foreground">
                                 Upload or edit your resume
                               </span>
                             </Link>
                           </Button>
-
                           <Button
                             variant="outline"
                             className="h-auto p-4 flex flex-col gap-2"
@@ -907,14 +382,11 @@ function ProfileContent() {
                               </span>
                             </Link>
                           </Button>
-
                           <Button
                             variant="outline"
                             className="h-auto p-4 flex flex-col gap-2"
                             asChild
                           >
-
-
                             <Link to="/settings">
                               <Settings className="h-6 w-6" />
                               <span className="font-medium">
@@ -925,7 +397,6 @@ function ProfileContent() {
                               </span>
                             </Link>
                           </Button>
-
                           <Button
                             variant="outline"
                             className="h-auto p-4 flex flex-col gap-2"
@@ -957,7 +428,6 @@ function ProfileContent() {
                             </span>
                           </Link>
                         </Button>
-
                         <Button
                           variant="outline"
                           className="h-auto p-4 flex flex-col gap-2"
@@ -973,7 +443,6 @@ function ProfileContent() {
                             </span>
                           </Link>
                         </Button>
-
                         <Button
                           variant="outline"
                           className="h-auto p-4 flex flex-col gap-2"
@@ -989,10 +458,10 @@ function ProfileContent() {
                             </span>
                           </Link>
                         </Button>
-
                         <Button
                           variant="outline"
                           className="h-auto p-4 flex flex-col gap-2"
+                          onClick={() => setShareOpen(true)}
                         >
                           <Share className="h-6 w-6" />
                           <span className="font-medium">Share Company</span>
@@ -1007,6 +476,7 @@ function ProfileContent() {
               </CardContent>
             </Card>
 
+            {/* Share Modal */}
             <ShareModal
               open={shareOpen}
               onOpenChange={setShareOpen}
@@ -1018,6 +488,36 @@ function ProfileContent() {
         </div>
         <Footer />
       </div>
+
+      {/* Section Edit Dialogs */}
+      <EditHeaderDialog
+        open={activeDialog === "header"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditAboutDialog
+        open={activeDialog === "about"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditContactDialog
+        open={activeDialog === "contact"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditSocialProfilesDialog
+        open={activeDialog === "social"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditSkillsDialog
+        open={activeDialog === "skills"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditProfessionalInfoDialog
+        open={activeDialog === "professional"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
+      <EditCustomUrlDialog
+        open={activeDialog === "url"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      />
     </div>
   );
 }
