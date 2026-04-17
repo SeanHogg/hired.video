@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { DollarSign, TrendingUp, MapPin, Briefcase, ArrowRight, Loader2 } from "lucide-react";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,10 @@ export default function SalaryPage() {
   const title = data?.jobTitle ?? slugToTitle(jobSlug ?? "");
 
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Jobs", url: "/jobs" },
+    { name: `${title} Salary`, url: `/salary/${jobSlug ?? ""}` },
+  ]);
 
   useEffect(() => {
     if (!jobSlug) return;

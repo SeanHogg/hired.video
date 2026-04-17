@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { FileText, CheckCircle2, XCircle, Lightbulb, DollarSign, ArrowRight, Loader2, Brain } from "lucide-react";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,10 @@ export default function ResumeGuidePage() {
   const title = guide?.jobTitle ?? slugToTitle(jobSlug ?? "");
 
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Resumes", url: "/resumes" },
+    { name: `${title} Resume Guide`, url: `/resume-guide/${jobSlug ?? ""}` },
+  ]);
 
   useEffect(() => {
     if (!jobSlug) return;

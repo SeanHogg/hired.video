@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Loader2, Upload, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,10 @@ export default function SummarizeResume() {
 
   // SEO for summarize resume page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Resume Summarizer", url: "/tools/summarize-resume" },
+  ]);
 
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");

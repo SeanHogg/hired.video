@@ -37,12 +37,13 @@ import {
   Lock,
   Download,
 } from "lucide-react";
-import { PRO_MONTHLY_PRICE as basePrice } from "@shared/pricing";
+import { PRO_MONTHLY_PRICE as basePrice, PRO_YEARLY_PRICE } from "@shared/pricing";
 import { TRUST_SIGNALS } from "@/lib/constants";
 
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, generatePricingSchema } from "@/lib/seo";
+import MarketingFAQ from "@/components/MarketingFAQ";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -80,8 +81,22 @@ export default function Pricing() {
     toggleSidebar,
   } = useSidebar();
 
-  // SEO for pricing page
-  useSEO(location.pathname);
+  // SEO for pricing page — includes Product/Offer structured data for rich snippets
+  useSEO(location.pathname, {
+    structuredData: generatePricingSchema([
+      {
+        name: "Free",
+        description: "Free career tools — AI resume scorer, video resume, job matching, and more.",
+        monthlyPrice: 0,
+      },
+      {
+        name: "Pro",
+        description: "Full access to hired.video — 1M AI tokens/mo, 1080p video, voice cloning, brand kits, unlimited published videos.",
+        monthlyPrice: basePrice,
+        annualPrice: PRO_YEARLY_PRICE,
+      },
+    ]),
+  });
   const { isAuthenticated } = useAuth();
   const { addItem, openCart } = useCart();
 
@@ -1983,6 +1998,43 @@ export default function Pricing() {
                 </Button>
               </Card>
             </div>
+
+            {/* FAQ — generates FAQPage JSON-LD for Google/Bing/AI rich results */}
+            <MarketingFAQ
+              schemaId="pricing"
+              heading="Pricing FAQ"
+              subheading="Everything you need to know about hired.video plans"
+              items={[
+                {
+                  question: "How much does hired.video cost?",
+                  answer: `hired.video is free to start with generous limits — AI resume scoring, one published video resume, and 50K AI tokens per month. The Pro plan is $${basePrice}/month (or $${PRO_YEARLY_PRICE}/year with a 20% annual discount) and includes 1M AI tokens/month, 1080p video export, voice cloning, brand kits, and unlimited published videos. You can cancel anytime.`,
+                },
+                {
+                  question: "What's included in the free plan?",
+                  answer: "The free plan includes AI resume scoring, one published video resume, job-resume matching (5/month), 10 job applications/month, 50K AI tokens for tools like the resume optimizer and salary calculator, and access to the full tool suite. No credit card required.",
+                },
+                {
+                  question: "Can I try Pro features before committing?",
+                  answer: "Yes — all AI tools are available on the free tier with a monthly token budget. You can score resumes, generate video resumes, and use every tool to see the quality before upgrading. Pro unlocks higher limits, 1080p export, voice cloning, and brand kits.",
+                },
+                {
+                  question: "What are AI tokens and how do they work?",
+                  answer: "AI tokens are the currency that powers all AI features — resume scoring, video script generation, job matching, and more. Free users get 50K tokens/month; Pro users get 1M tokens/month. If you need more, top-up token packs start at $3.99 for 500K tokens.",
+                },
+                {
+                  question: "Do you offer team or recruiter pricing?",
+                  answer: "Yes — Pro supports multi-seat teams with per-seat pricing. Recruiters get access to AI candidate sourcing, match scoring, and a visual hiring pipeline. Contact us for volume discounts on 10+ seats.",
+                },
+                {
+                  question: "Can I cancel my subscription anytime?",
+                  answer: "Absolutely. There are no contracts or cancellation fees. Cancel from your account settings at any time and you'll keep access through the end of your billing period. Your data stays safe and you can re-subscribe whenever you want.",
+                },
+                {
+                  question: "Is there a discount for annual billing?",
+                  answer: `Yes — the annual plan saves 20%. Instead of $${basePrice}/month, you pay $${PRO_YEARLY_PRICE}/year (about $${(PRO_YEARLY_PRICE / 12).toFixed(2)}/month).`,
+                },
+              ]}
+            />
 
             {/* Trust Signals */}
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">

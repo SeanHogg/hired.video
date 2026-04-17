@@ -8,7 +8,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,6 +61,10 @@ export default function ValueProposition() {
 
   // SEO for value proposition page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Value Proposition Builder", url: "/tools/value-proposition" },
+  ]);
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState<WizardStep>("job");

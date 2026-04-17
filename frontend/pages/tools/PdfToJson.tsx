@@ -8,7 +8,7 @@ import {
   Code,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,10 @@ export default function PdfToJson() {
 
   // SEO for PDF to JSON page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "PDF to JSON", url: "/tools/pdf-to-json" },
+  ]);
 
   const [file, setFile] = useState<File | null>(null);
   const [jsonResult, setJsonResult] = useState<string | null>(null);

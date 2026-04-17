@@ -9,6 +9,8 @@ export interface SEOData {
   ogImage?: string;
   ogUrl?: string;
   twitterCard?: "summary" | "summary_large_image" | "app" | "player";
+  twitterSite?: string;
+  twitterCreator?: string;
   twitterTitle?: string;
   twitterDescription?: string;
   twitterImage?: string;
@@ -30,12 +32,15 @@ export const ORGANIZATION_SCHEMA = {
   name: "hired.video",
   alternateName: "Hired.video",
   url: "https://hired.video",
-  logo: "https://hired.video/og-image.jpg",
+  logo: "https://hired.video/og-image.svg",
   description:
     "hired.video is an AI-powered video resume platform that helps candidates create compelling video resumes and helps recruiters find top talent faster.",
   sameAs: [
     "https://www.linkedin.com/company/hired-video",
     "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol",
+    "https://x.com/hired_video",
+    "https://www.youtube.com/@hired-video",
+    "https://github.com/hired-video",
   ],
   contactPoint: {
     "@type": "ContactPoint",
@@ -58,9 +63,11 @@ export const DEFAULT_SEO: SEOData = {
   ogTitle: "hired.video — AI Video Resumes & AI Job Search",
   ogDescription:
     "Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring.",
-  ogImage: "https://hired.video/og-image.jpg",
+  ogImage: "https://hired.video/og-image.svg",
   ogUrl: "https://hired.video",
   twitterCard: "summary_large_image",
+  twitterSite: "@hired_video",
+  twitterCreator: "@hired_video",
   author: "hired.video",
   robots: "index, follow",
   structuredData: ORGANIZATION_SCHEMA,
@@ -286,7 +293,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Free AI Career Tools — hired.video",
     ogDescription:
       "Score, optimize, and tailor your resume with AI. Free to try — no signup needed to start.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
@@ -306,7 +313,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "AI Resume Scorer — free ATS-ready resume grading",
     ogDescription:
       "Paste your resume. Get a score, a grade, and specific fixes — powered by AI, free to try.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -326,7 +333,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "AI Resume Optimizer — tailor your resume to any job",
     ogDescription:
       "Paste a resume and a job description. Get an ATS-optimized draft with the right keywords.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -346,7 +353,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Salary Calculator — know your market rate",
     ogDescription:
       "Estimate fair compensation by role, experience, and location. Includes p10–p90 percentile bands.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -366,7 +373,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Job-Resume Match — AI fit score for any job",
     ogDescription:
       "Upload a job. Pick a resume. Get a match score plus the specific gaps you need to close.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -386,7 +393,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "AI Resume Summarizer — professional summaries in seconds",
     ogDescription:
       "Paste your resume. Get a concise, role-ready summary for LinkedIn, cover letters, and profiles.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -406,7 +413,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Resume Sentiment Analysis — AI tone checker",
     ogDescription:
       "Upload your resume and see how confident, assertive, and impact-driven its language reads.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -426,7 +433,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "AI Value Proposition Builder — personal pitch in seconds",
     ogDescription:
       "Combine your resume, the job, and the company's mission into a value prop that gets noticed.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -446,7 +453,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Resume PDF to JSON — AI parser",
     ogDescription:
       "Drop a PDF. Get clean, structured JSON — schema-compatible and ready to index.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -466,7 +473,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Resume Consolidator — merge multiple resumes into one",
     ogDescription:
       "AI merges your resumes into a single master resume without losing a single highlight.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -486,7 +493,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     ogTitle: "Resume Tailor — AI custom resume for every job",
     ogDescription:
       "Upload your resume and a job. Get a tailored version that matches the role without making things up.",
-    ogImage: "https://hired.video/og-image.jpg",
+    ogImage: "https://hired.video/og-image.svg",
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -599,6 +606,9 @@ export function updateMetaTags(seoData: SEOData): void {
 
   // Update Twitter Card tags
   if (seoData.twitterCard) updateMetaTag("twitter:card", seoData.twitterCard);
+  if (seoData.twitterSite) updateMetaTag("twitter:site", seoData.twitterSite);
+  if (seoData.twitterCreator)
+    updateMetaTag("twitter:creator", seoData.twitterCreator);
   if (seoData.twitterTitle)
     updateMetaTag("twitter:title", seoData.twitterTitle);
   if (seoData.twitterDescription)
@@ -674,6 +684,37 @@ export function useSEO(pathname: string, customSEO?: Partial<SEOData>): void {
       }
     };
   }, [pathname, customSEO]);
+}
+
+/**
+ * Injects a BreadcrumbList JSON-LD script alongside (not replacing) the
+ * page's primary structured data. Cleaned up on unmount.
+ *
+ * Usage in a tool page:
+ *   useBreadcrumbs([
+ *     { name: "Tools", url: "/tools" },
+ *     { name: "AI Resume Scorer", url: "/tools/ai-resume-scorer" },
+ *   ]);
+ */
+export function useBreadcrumbs(
+  items: { name: string; url: string }[],
+): void {
+  useEffect(() => {
+    const scriptId = "breadcrumb-jsonld";
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.id = scriptId;
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(generateBreadcrumbs(items));
+
+    return () => {
+      const existing = document.getElementById(scriptId);
+      if (existing) existing.remove();
+    };
+  }, [items]);
 }
 
 /**
@@ -855,3 +896,76 @@ export const generateStructuredData = {
     url: `https://hired.video/people/${person.id}`,
   }),
 };
+
+/**
+ * Build a schema.org BreadcrumbList for SERP breadcrumb trails.
+ *
+ * Usage:
+ *   generateBreadcrumbs([
+ *     { name: "Tools", url: "/tools" },
+ *     { name: "AI Resume Scorer", url: "/tools/ai-resume-scorer" },
+ *   ])
+ */
+export function generateBreadcrumbs(
+  items: { name: string; url: string }[],
+): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: `${CANONICAL_ORIGIN}${item.url}`,
+    })),
+  };
+}
+
+/**
+ * Build a schema.org Product with multiple Offer entries for SaaS pricing.
+ * Used on the Pricing page for rich snippets.
+ */
+export function generatePricingSchema(plans: {
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  annualPrice?: number;
+  currency?: string;
+  features?: string[];
+}[]): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "hired.video",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web Browser",
+    url: "https://hired.video",
+    offers: plans.map((plan) => ({
+      "@type": "Offer",
+      name: plan.name,
+      description: plan.description,
+      price: String(plan.monthlyPrice),
+      priceCurrency: plan.currency || "USD",
+      ...(plan.annualPrice != null
+        ? {
+            priceSpecification: [
+              {
+                "@type": "UnitPriceSpecification",
+                price: String(plan.monthlyPrice),
+                priceCurrency: plan.currency || "USD",
+                unitText: "MONTH",
+                referenceQuantity: { "@type": "QuantitativeValue", value: "1", unitCode: "MON" },
+              },
+              {
+                "@type": "UnitPriceSpecification",
+                price: String(plan.annualPrice),
+                priceCurrency: plan.currency || "USD",
+                unitText: "YEAR",
+                referenceQuantity: { "@type": "QuantitativeValue", value: "1", unitCode: "ANN" },
+              },
+            ],
+          }
+        : {}),
+    })),
+  };
+}

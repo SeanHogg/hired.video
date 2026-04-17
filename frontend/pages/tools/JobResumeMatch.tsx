@@ -7,7 +7,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +53,10 @@ export default function JobResumeMatch() {
 
   // SEO for job resume match page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Job-Resume Match", url: "/tools/job-resume-match" },
+  ]);
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState<WizardStep>("job");

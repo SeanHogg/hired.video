@@ -9,7 +9,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,6 +132,10 @@ export default function SalaryCalculator() {
 
   // SEO for salary calculator page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Salary Calculator", url: "/tools/salary-calculator" },
+  ]);
 
   const [jobTitle, setJobTitle] = useState("");
   const [location_, setLocation] = useState("");

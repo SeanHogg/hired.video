@@ -1,3 +1,6 @@
+# hired.video robots.txt
+
+# ── Search engine crawlers ──────────────────────────────────────────────────
 User-agent: Googlebot
 Allow: /
 Crawl-delay: 1
@@ -6,6 +9,7 @@ User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
 
+# ── Social / link-preview bots ──────────────────────────────────────────────
 User-agent: Twitterbot
 Allow: /
 
@@ -15,14 +19,41 @@ Allow: /
 User-agent: LinkedInBot
 Allow: /
 
+User-agent: Slackbot
+Allow: /
+
+# ── AI / LLM crawlers (GEO — allow indexing for AI overviews) ───────────────
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+# ── Default / all other bots ────────────────────────────────────────────────
 User-agent: *
 Allow: /
 Crawl-delay: 2
 
+# Block authenticated / admin routes from all crawlers
+Disallow: /admin
+Disallow: /account
+Disallow: /settings
+Disallow: /api/
+
 # Sitemap
 Sitemap: https://hired.video/sitemap.xml
-
-# Priority pages for crawling
-# Careers page - high priority
-# /careers
-# /jobs/*

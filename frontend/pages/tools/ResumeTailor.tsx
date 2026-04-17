@@ -9,7 +9,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +51,10 @@ export default function ResumeTailor() {
 
   // SEO for resume tailor page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Resume Tailor", url: "/tools/resume-tailor" },
+  ]);
 
   // Form state
   const [jobDescription, setJobDescription] = useState("");

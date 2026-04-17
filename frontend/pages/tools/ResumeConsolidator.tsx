@@ -11,7 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,10 @@ export default function ResumeConsolidator() {
   const { toast } = useToast();
 
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Resume Consolidator", url: "/tools/resume-consolidator" },
+  ]);
 
   // Fetch resumes
   const { data: resumes = [], refetch } = useQuery({

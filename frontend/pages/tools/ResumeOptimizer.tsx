@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +67,10 @@ export default function ResumeOptimizer() {
 
   // SEO for resume optimizer page
   useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: "Tools", url: "/tools" },
+    { name: "Resume Optimizer", url: "/tools/resume-optimizer" },
+  ]);
 
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
