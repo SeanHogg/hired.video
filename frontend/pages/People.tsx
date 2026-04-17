@@ -34,7 +34,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -137,6 +137,7 @@ export default function People() {
 
   // SEO for people page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "People", url: "/people" }]);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Footer from "@/components/Footer";
+import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -368,6 +369,7 @@ export default function ResumeTailor() {
             )}
           </div>
         </div>
+        <ToolFooterSEO />
         <Footer />
       </div>
     </div>

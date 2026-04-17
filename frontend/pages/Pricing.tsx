@@ -42,7 +42,7 @@ import { TRUST_SIGNALS } from "@/lib/constants";
 
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO, generatePricingSchema } from "@/lib/seo";
+import { useSEO, useBreadcrumbs, generatePricingSchema } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -97,6 +97,7 @@ export default function Pricing() {
       },
     ]),
   });
+  useBreadcrumbs([{ name: "Pricing", url: "/pricing" }]);
   const { isAuthenticated } = useAuth();
   const { addItem, openCart } = useCart();
 

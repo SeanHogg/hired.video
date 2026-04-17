@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Footer from "@/components/Footer";
+import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import JobInputStep from "@/components/tools/JobInputStep";
@@ -329,6 +330,7 @@ export default function ValueProposition() {
           </div>
         </div>
       </div>
+      <ToolFooterSEO />
       <Footer />
     </>
   );

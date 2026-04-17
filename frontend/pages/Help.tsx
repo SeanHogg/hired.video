@@ -14,7 +14,7 @@ import {
   ExternalLink,
   ArrowRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -36,7 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
@@ -51,6 +51,7 @@ export default function Help() {
   } = useSidebar();
   const location = useLocation();
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -156,6 +157,32 @@ export default function Help() {
       ],
     },
   ];
+
+  // Inject FAQPage JSON-LD for all visible Q&As
+  const faqSchema = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.flatMap((cat) =>
+      cat.questions.map((q) => ({
+        "@type": "Question",
+        name: q.question,
+        acceptedAnswer: { "@type": "Answer", text: q.answer },
+      })),
+    ),
+  }), []);
+
+  useEffect(() => {
+    const scriptId = "help-faq-jsonld";
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.id = scriptId;
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(faqSchema);
+    return () => { document.getElementById(scriptId)?.remove(); };
+  }, [faqSchema]);
 
   const contactOptions = [
     {

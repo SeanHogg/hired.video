@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -47,6 +47,7 @@ export default function About() {
 
   // SEO for about page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "About", url: "/about" }]);
   const { isAuthenticated } = useAuth();
 
   const values = [

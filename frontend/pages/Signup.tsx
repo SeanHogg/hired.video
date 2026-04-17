@@ -7,6 +7,7 @@ import {
   Users,
   Briefcase,
   Building2,
+  Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -198,7 +199,9 @@ export default function Signup() {
         />
 
         <div className="pt-16 min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
+            <div>
+            <h1 className="text-2xl font-bold text-center mb-6">Create your free account</h1>
             <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Create your account</CardTitle>
@@ -434,6 +437,56 @@ export default function Signup() {
                 </div>
               </CardContent>
             </Card>
+            </div>
+
+            {/* Marketing panel — hidden on mobile */}
+            <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">Start building your career with AI</h2>
+                <p className="mt-3 text-muted-foreground">
+                  Join 50,000+ professionals using hired.video to create video resumes, score and optimize their resumes with AI, and connect with recruiters who are actively hiring.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-background rounded-xl p-4 shadow-sm">
+                  <p className="text-lg font-semibold">Free to start</p>
+                  <p className="text-sm text-muted-foreground">No credit card required</p>
+                </div>
+                <div className="bg-background rounded-xl p-4 shadow-sm">
+                  <p className="text-lg font-semibold">60 seconds</p>
+                  <p className="text-sm text-muted-foreground">To create a video resume</p>
+                </div>
+                <div className="bg-background rounded-xl p-4 shadow-sm">
+                  <p className="text-lg font-semibold">10+ AI tools</p>
+                  <p className="text-sm text-muted-foreground">Resume scorer, optimizer, tailor &amp; more</p>
+                </div>
+                <div className="bg-background rounded-xl p-4 shadow-sm">
+                  <p className="text-lg font-semibold">50K+ users</p>
+                  <p className="text-sm text-muted-foreground">Professionals and recruiters</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-sm">AI video resume in 60 seconds</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-sm">Free ATS resume scoring</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-sm">AI job-resume matching</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-sm">Chrome extension for job boards</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
         <Footer />

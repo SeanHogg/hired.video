@@ -32,7 +32,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   JOB_APPLICATION_STATUS_COLORS,
   JOB_ALERT_FREQUENCY_LABELS,
@@ -153,6 +153,7 @@ export default function Jobs() {
 
   // SEO for jobs page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Jobs", url: "/jobs" }]);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import MarketingFAQ from "@/components/MarketingFAQ";
@@ -111,6 +111,7 @@ export default function Resumes() {
 
   // SEO for resumes page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Resumes", url: "/resumes" }]);
   const { isAuthenticated, user } = useAuth();
   const { effectiveRole, isJobSeeker: isEffectiveJobSeeker, isRecruiter: isEffectiveRecruiter, isEmployer: isEffectiveEmployer } = usePermissions();
   const { toast } = useToast();

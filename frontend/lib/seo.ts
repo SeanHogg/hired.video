@@ -86,23 +86,66 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, resume tailoring, career development, professional networking",
     structuredData: {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      name: "hired.video",
-      description:
-        "AI-powered video resume platform and AI job search tools — create video resumes, tailor your resume for any job, and match with recruiters.",
-      url: "https://hired.video",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Web Browser",
-      offers: {
-        "@type": "Offer",
-        price: "0",
-        priceCurrency: "USD",
-      },
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.8",
-        ratingCount: "1240",
-      },
+      "@graph": [
+        {
+          "@type": "WebSite",
+          name: "hired.video",
+          url: "https://hired.video",
+          description: "AI-powered video resume platform and career tools.",
+          potentialAction: {
+            "@type": "SearchAction",
+            target: { "@type": "EntryPoint", urlTemplate: "https://hired.video/jobs?q={search_term_string}" },
+            "query-input": "required name=search_term_string",
+          },
+        },
+        {
+          "@type": "WebApplication",
+          name: "hired.video",
+          description:
+            "AI-powered video resume platform and AI job search tools — create video resumes, tailor your resume for any job, and match with recruiters.",
+          url: "https://hired.video",
+          applicationCategory: "BusinessApplication",
+          operatingSystem: "Web Browser",
+          dateModified: new Date().toISOString().slice(0, 10),
+          offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "USD",
+          },
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: "4.8",
+            ratingCount: "1240",
+          },
+        },
+        ORGANIZATION_SCHEMA,
+        {
+          "@type": "DefinedTermSet",
+          name: "hired.video Career Concepts",
+          hasDefinedTerm: [
+            {
+              "@type": "DefinedTerm",
+              name: "Video Resume",
+              description: "A short (30–90 second) video where a candidate introduces themselves and highlights key qualifications. Created with AI on hired.video — no camera or editing required.",
+            },
+            {
+              "@type": "DefinedTerm",
+              name: "ATS Score",
+              description: "A numeric rating measuring how well a resume matches a job posting in an Applicant Tracking System. hired.video's AI Resume Scorer grades resumes across six dimensions: ATS compatibility, content quality, keyword match, formatting, and impact.",
+            },
+            {
+              "@type": "DefinedTerm",
+              name: "Job-Resume Match Score",
+              description: "A percentage score quantifying the alignment between a resume and a specific job description. Measures hard skills, experience level, soft skills, and industry relevance.",
+            },
+            {
+              "@type": "DefinedTerm",
+              name: "AI Token",
+              description: "The unit of AI usage on hired.video. Free users receive 50,000 tokens/month; Pro subscribers receive 1,000,000 tokens/month. Tokens power resume scoring, video generation, job matching, and all AI tools.",
+            },
+          ],
+        },
+      ],
     },
   },
   "/home": {
@@ -153,6 +196,16 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Upload your resume and get brutally honest, instant AI feedback on what's working, what's weak, and exactly how to fix it. 100% free.",
     keywords:
       "free resume roast, ai resume feedback, resume critique, resume review, resume feedback ai",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Resume Roast",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web Browser",
+      url: "https://hired.video/resume-roast",
+      dateModified: "2026-04-17",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/interview": {
     title: "Free AI Interview Practice — hired.video",
@@ -160,6 +213,16 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Practice live interviews with an AI interviewer tuned to your role. Get instant feedback on your answers, tone, and pacing. Completely free.",
     keywords:
       "ai interview practice, mock interview, interview prep, behavioral interview, ai interviewer",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video AI Interview Practice",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web Browser",
+      url: "https://hired.video/interview",
+      dateModified: "2026-04-17",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
   },
   "/post-a-job": {
     title: "Post a Job for Free — hired.video",
@@ -197,11 +260,37 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "recruiter tools, ai candidate sourcing, candidate screening, applicant tracking, video resume screening, talent pool, sourcing chrome extension, ai recruiting software",
   },
   "/about": {
-    title: "About Us - Hired.video",
+    title: "About hired.video — Our Mission & Team",
     description:
-      "Learn about Hired.video's mission to revolutionize recruitment through AI-powered video resumes and talent matching.",
+      "Learn about hired.video's mission to revolutionize recruitment through AI-powered video resumes and talent matching.",
     keywords:
       "about us, company mission, video resume platform, recruitment innovation",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "AboutPage",
+          name: "About hired.video",
+          url: "https://hired.video/about",
+          dateModified: "2026-04-17",
+          mainEntity: {
+            "@type": "Organization",
+            name: "hired.video",
+            url: "https://hired.video",
+            description: "AI-powered video resume platform that helps candidates create compelling video resumes and helps recruiters find top talent faster.",
+            foundingDate: "2024",
+            numberOfEmployees: { "@type": "QuantitativeValue", value: "10" },
+          },
+        },
+        {
+          "@type": "Person",
+          name: "Sean Hogg",
+          jobTitle: "Founder & CEO",
+          worksFor: { "@type": "Organization", name: "hired.video" },
+          url: "https://hired.video/people/seanhogg",
+        },
+      ],
+    },
   },
   "/careers": {
     title: "Careers at Hired.video",
@@ -219,25 +308,52 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "video resume maker, ai video resume, resume builder, ats resume, video resume template, online resume, resume with video, professional resume",
   },
   "/jobs": {
-    title: "Job Search - Hired.video",
+    title: "Job Search — AI Job Matching | hired.video",
     description:
       "Find your dream job with AI-powered matching. Browse thousands of opportunities and apply with your video resume.",
     keywords:
       "job search, career opportunities, employment, job listings, AI job matching",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Job Listings — hired.video",
+      url: "https://hired.video/jobs",
+      dateModified: "2026-04-17",
+      description: "Browse job listings with AI-powered match scoring. Apply with your video resume and get matched with recruiters who are actively hiring.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
   },
   "/companies": {
-    title: "Companies - Hired.video",
+    title: "Companies Hiring — hired.video",
     description:
       "Discover top companies hiring through video resumes. Connect with innovative employers and explore career opportunities.",
     keywords:
       "companies, employers, hiring companies, career opportunities, company profiles",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Companies — hired.video",
+      url: "https://hired.video/companies",
+      dateModified: "2026-04-17",
+      description: "Discover companies hiring through hired.video. Browse employer profiles, open roles, and company culture.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
   },
   "/people": {
-    title: "Professional Network - Hired.video",
+    title: "Professional Network — hired.video",
     description:
       "Connect with professionals, recruiters, and industry leaders. Build your network and advance your career.",
     keywords:
       "professional networking, career connections, industry professionals, networking platform",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "Professional Network — hired.video",
+      url: "https://hired.video/people",
+      dateModified: "2026-04-17",
+      description: "Connect with professionals, recruiters, and industry leaders on hired.video.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
   },
   "/tasks": {
     title: "Task Management - Hired.video",
@@ -266,17 +382,47 @@ export const PAGE_SEO: Record<string, SEOData> = {
     robots: "noindex, nofollow",
   },
   "/privacy-policy": {
-    title: "Privacy Policy - hired.video",
+    title: "Privacy Policy — hired.video",
     description:
-      "Learn how we protect your data and respect your privacy across our platform. Review our policies and your rights.",
+      "Learn how hired.video protects your data and respects your privacy. Review our policies and your rights.",
     keywords:
       "privacy policy, data protection, GDPR compliance, user privacy, data security",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: "Privacy Policy — hired.video",
+      url: "https://hired.video/privacy-policy",
+      dateModified: "2026-04-17",
+      inLanguage: "en",
+      mainEntity: {
+        "@type": "DigitalDocument",
+        name: "hired.video Privacy Policy",
+        creator: { "@type": "Organization", name: "hired.video" },
+        inLanguage: "en",
+        lastReviewed: "2026-04-17",
+      },
+    },
   },
   "/terms-of-service": {
-    title: "Terms of Service - hired.video",
+    title: "Terms of Service — hired.video",
     description:
       "Understand your rights and responsibilities when using hired.video. Review our platform terms and conditions.",
     keywords: "terms of service, user agreement, legal terms, platform rules",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      name: "Terms of Service — hired.video",
+      url: "https://hired.video/terms-of-service",
+      dateModified: "2026-04-17",
+      inLanguage: "en",
+      mainEntity: {
+        "@type": "DigitalDocument",
+        name: "hired.video Terms of Service",
+        creator: { "@type": "Organization", name: "hired.video" },
+        inLanguage: "en",
+        lastReviewed: "2026-04-17",
+      },
+    },
   },
   "/help": {
     title: "Help & Support - hired.video",

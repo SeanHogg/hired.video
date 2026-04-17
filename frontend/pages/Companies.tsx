@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -50,6 +50,7 @@ export default function Companies() {
 
   // SEO for companies page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");

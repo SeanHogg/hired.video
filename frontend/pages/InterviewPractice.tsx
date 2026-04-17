@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -955,6 +955,7 @@ export default function InterviewPractice() {
     title: "AI Interview Practice — hired.video",
     description: "Simulate real job interviews and get AI feedback on your answers.",
   });
+  useBreadcrumbs([{ name: "Interview Practice", url: "/interview" }]);
 
   const [step, setStep] = useState<Step>("setup");
   const [loading, setLoading] = useState(false);

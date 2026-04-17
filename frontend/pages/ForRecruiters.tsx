@@ -30,7 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useSidebar } from "@/hooks/use-sidebar";
 
 const STATS = [
@@ -194,6 +194,7 @@ const FAQ_ITEMS = [
 export default function ForRecruiters() {
   const location = useLocation();
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "For Recruiters", url: "/for-recruiters" }]);
   const {
     sidebarOpen,
     sidebarCollapsed,

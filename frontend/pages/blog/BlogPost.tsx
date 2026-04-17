@@ -63,9 +63,10 @@ export default function BlogPost() {
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
       author: {
-        "@type": "Organization",
-        name: "hired.video",
-        url: "https://hired.video",
+        "@type": "Person",
+        name: "Sean Hogg",
+        jobTitle: "Founder & CEO",
+        worksFor: { "@type": "Organization", name: "hired.video", url: "https://hired.video" },
       },
       publisher: {
         "@type": "Organization",

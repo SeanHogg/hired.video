@@ -1,4 +1,4 @@
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -57,6 +57,7 @@ const JOB_SITES = [
 
 export default function ChromeExtension() {
   useSEO("/chrome-extension");
+  useBreadcrumbs([{ name: "Chrome Extension", url: "/chrome-extension" }]);
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   return (

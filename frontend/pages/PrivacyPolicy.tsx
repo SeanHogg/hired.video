@@ -11,7 +11,7 @@ import {
   Globe,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useState } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -40,6 +40,7 @@ export default function PrivacyPolicy() {
 
   // SEO for privacy policy page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Privacy Policy", url: "/privacy-policy" }]);
   const { isAuthenticated } = useAuth();
 
   return (

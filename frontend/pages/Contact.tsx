@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -47,6 +47,7 @@ export default function Contact() {
 
   // SEO for contact page
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Contact", url: "/contact" }]);
   const { isAuthenticated } = useAuth();
   const [hubspotLoaded, setHubspotLoaded] = useState(false);
 

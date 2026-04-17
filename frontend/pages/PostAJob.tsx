@@ -4,7 +4,7 @@ import {
   Briefcase, Sparkles, CheckCircle2, ArrowRight, Zap,
   Users, BarChart3, Brain, Building2, Loader2,
 } from "lucide-react";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export default function PostAJob() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Post a Job", url: "/post-a-job" }]);
 
   const [jobTitle, setJobTitle] = useState("");
   const [company, setCompany] = useState("");

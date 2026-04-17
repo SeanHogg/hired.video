@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Flame, Upload, Download, Loader2, Share2, Send, Mail, ArrowRight, ArrowLeft, FileText } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,7 @@ const RoastResponseSchema = z.object({
 export default function ResumeRoast() {
   const location = useLocation();
   useSEO(location.pathname);
+  useBreadcrumbs([{ name: "Resume Roast", url: "/resume-roast" }]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();

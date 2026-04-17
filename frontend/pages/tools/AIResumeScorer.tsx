@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import Footer from "@/components/Footer";
+import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -828,6 +829,7 @@ export default function AIResumeScorer() {
               </div>
             </div>
           </div>
+          <ToolFooterSEO />
           <Footer />
         </div>
       </div>

@@ -2,7 +2,7 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
-import { useSEO } from "@/lib/seo";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function AffiliateProgram() {
   useSEO("/affiliate-program");
+  useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
   const { signup, isLoading } = useAuth();
