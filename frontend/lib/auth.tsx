@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
 import { authService, type UserProfile, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
+import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
@@ -609,10 +610,57 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType & { realUser: User | null } {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context;
+  // Non-throwing context read — useAuth can be called from components mounted
+  // outside PersonaPreviewProvider (e.g. during initial auth bootstrap).
+  const preview = useContext(PersonaPreviewContext);
+
+  const realUser = context.user;
+  const impersonationSession = context.impersonationSession;
+  const personaPreview = preview?.personaPreview ?? null;
+  const tierPreview = preview?.tierPreview ?? null;
+
+  // Memoize so consumers with `[user]` effect deps don't re-fire every render.
+  // Build an effective user whose role (and impersonation target fields) reflect
+  // the active impersonation or previewed role. isSuperAdmin stays on the REAL
+  // role — SA-only UI (EmulationBar, Admin Panel guards) keeps working while
+  // previewing as a non-SA role.
+  return React.useMemo<AuthContextType & { realUser: User | null }>(() => {
+    if (!realUser) return { ...context, realUser: null };
+
+    if (impersonationSession) {
+      return {
+        ...context,
+        user: {
+          ...realUser,
+          id: impersonationSession.targetUser.id,
+          email: impersonationSession.targetUser.email,
+          name: impersonationSession.targetUser.name,
+          role: impersonationSession.role as UserRole,
+        },
+        realUser,
+      };
+    }
+
+    if (personaPreview || tierPreview) {
+      const effectiveRole = (personaPreview ?? realUser.role) as UserRole;
+      const effectiveSubscription = tierPreview
+        ? (tierPreview as "free" | "pro")
+        : realUser.subscription;
+      if (effectiveRole === realUser.role && effectiveSubscription === realUser.subscription) {
+        return { ...context, realUser };
+      }
+      return {
+        ...context,
+        user: { ...realUser, role: effectiveRole, subscription: effectiveSubscription },
+        realUser,
+      };
+    }
+
+    return { ...context, realUser };
+  }, [context, realUser, impersonationSession, personaPreview, tierPreview]);
 }

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
+import { AITokenPill } from "@/components/AITokenPill";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 
 interface SidebarProps {
@@ -236,6 +237,11 @@ export default function Sidebar({
           <div className="border-t border-border p-4 space-y-2">
             {isAuthenticated && user ? (
               <>
+                {/* AI Token Budget Pill */}
+                <div className={cn(collapsed ? "mb-1" : "mb-3")}>
+                  <AITokenPill collapsed={collapsed} onNavigate={onClose} />
+                </div>
+
                 {/* Account Switcher */}
                 {!collapsed && (
                   <div className="mb-3">

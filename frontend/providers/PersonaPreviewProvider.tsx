@@ -14,7 +14,10 @@ interface PersonaPreviewContextValue {
   setPersonaPreview: (role: string | null, tier?: PreviewTier | null) => void;
 }
 
-const PersonaPreviewContext = createContext<PersonaPreviewContextValue | null>(null);
+// Exported so useAuth can consume it non-throwingly and override user.role
+// globally. Guarded by a null check because useAuth may run in components
+// mounted outside PersonaPreviewProvider (e.g. the provider itself).
+export const PersonaPreviewContext = createContext<PersonaPreviewContextValue | null>(null);
 
 function readStoredTier(): PreviewTier | null {
   try {
