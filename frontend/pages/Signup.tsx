@@ -410,51 +410,81 @@ export default function Signup() {
             </Card>
             </div>
 
-            {/* Marketing panel — hidden on mobile */}
+            {/* Marketing panel — hidden on mobile, updates with selected role */}
             <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-8">
               <div>
-                <h2 className="text-2xl font-bold tracking-tight">Start building your career with AI</h2>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {role === USER_ROLES.RECRUITER
+                    ? "Find top talent faster with AI"
+                    : role === USER_ROLES.EMPLOYER
+                      ? "Build your employer brand with AI"
+                      : "Start building your career with AI"}
+                </h2>
                 <p className="mt-3 text-muted-foreground">
-                  Join 50,000+ professionals using hired.video to create video resumes, score and optimize their resumes with AI, and connect with recruiters who are actively hiring.
+                  {role === USER_ROLES.RECRUITER
+                    ? "Join thousands of recruiters using hired.video to discover candidates through AI video resumes, score applicants instantly, and fill roles faster."
+                    : role === USER_ROLES.EMPLOYER
+                      ? "Showcase your company culture, post jobs, and attract top candidates with AI-powered employer branding and video job descriptions."
+                      : "Join 50,000+ professionals using hired.video to create video resumes, score and optimize their resumes with AI, and connect with recruiters who are actively hiring."}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-background rounded-xl p-4 shadow-sm">
-                  <p className="text-lg font-semibold">Free to start</p>
-                  <p className="text-sm text-muted-foreground">No credit card required</p>
-                </div>
-                <div className="bg-background rounded-xl p-4 shadow-sm">
-                  <p className="text-lg font-semibold">60 seconds</p>
-                  <p className="text-sm text-muted-foreground">To create a video resume</p>
-                </div>
-                <div className="bg-background rounded-xl p-4 shadow-sm">
-                  <p className="text-lg font-semibold">10+ AI tools</p>
-                  <p className="text-sm text-muted-foreground">Resume scorer, optimizer, tailor &amp; more</p>
-                </div>
-                <div className="bg-background rounded-xl p-4 shadow-sm">
-                  <p className="text-lg font-semibold">50K+ users</p>
-                  <p className="text-sm text-muted-foreground">Professionals and recruiters</p>
-                </div>
+                {(role === USER_ROLES.RECRUITER
+                  ? [
+                      { stat: "Free to start", desc: "No credit card required" },
+                      { stat: "AI matching", desc: "Candidate-job fit scoring" },
+                      { stat: "Video resumes", desc: "See candidates in action" },
+                      { stat: "50K+ users", desc: "Growing talent pool" },
+                    ]
+                  : role === USER_ROLES.EMPLOYER
+                    ? [
+                        { stat: "Free to start", desc: "No credit card required" },
+                        { stat: "Company page", desc: "Branded employer profile" },
+                        { stat: "AI job posts", desc: "Generate listings in seconds" },
+                        { stat: "50K+ users", desc: "Professionals and recruiters" },
+                      ]
+                    : [
+                        { stat: "Free to start", desc: "No credit card required" },
+                        { stat: "60 seconds", desc: "To create a video resume" },
+                        { stat: "10+ AI tools", desc: "Resume scorer, optimizer, tailor & more" },
+                        { stat: "50K+ users", desc: "Professionals and recruiters" },
+                      ]
+                ).map((item) => (
+                  <div key={item.stat} className="bg-background rounded-xl p-4 shadow-sm">
+                    <p className="text-lg font-semibold">{item.stat}</p>
+                    <p className="text-sm text-muted-foreground">{item.desc}</p>
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="text-sm">AI video resume in 60 seconds</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="text-sm">Free ATS resume scoring</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="text-sm">AI job-resume matching</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                  <span className="text-sm">Chrome extension for job boards</span>
-                </div>
+                {(role === USER_ROLES.RECRUITER
+                  ? [
+                      "AI candidate scoring and ranking",
+                      "Video resume screening",
+                      "Applicant tracking integration",
+                      "Chrome extension for LinkedIn sourcing",
+                    ]
+                  : role === USER_ROLES.EMPLOYER
+                    ? [
+                        "Branded company profile page",
+                        "AI-generated job descriptions",
+                        "Video job postings",
+                        "Candidate pipeline dashboard",
+                      ]
+                    : [
+                        "AI video resume in 60 seconds",
+                        "Free ATS resume scoring",
+                        "AI job-resume matching",
+                        "Chrome extension for job boards",
+                      ]
+                ).map((feature) => (
+                  <div key={feature} className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                    <span className="text-sm">{feature}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
