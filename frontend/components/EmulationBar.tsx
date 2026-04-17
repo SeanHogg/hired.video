@@ -25,6 +25,33 @@ const ROLES = [
   USER_ROLES.SUPER_ADMIN,
 ];
 
+// Admin/SA roles bypass all tier gates — tier preview is meaningful only for
+// the seat-paying roles.
+const TIERED_ROLES = new Set<string>([
+  USER_ROLES.JOB_SEEKER,
+  USER_ROLES.RECRUITER,
+  USER_ROLES.EMPLOYER,
+]);
+
+interface PreviewOption {
+  role: string;
+  tier: "free" | "pro" | null;
+  label: string;
+}
+
+function buildPreviewOptions(): PreviewOption[] {
+  const opts: PreviewOption[] = [];
+  for (const r of ROLES) {
+    if (TIERED_ROLES.has(r)) {
+      opts.push({ role: r, tier: "free", label: `${getRoleDisplayLabel(r)} (Free)` });
+      opts.push({ role: r, tier: "pro",  label: `${getRoleDisplayLabel(r)} (Pro)` });
+    } else {
+      opts.push({ role: r, tier: null, label: getRoleDisplayLabel(r) });
+    }
+  }
+  return opts;
+}
+
 // ── Session timer ─────────────────────────────────────────────────────────────
 function useElapsed(startedAt: string | null) {
   const [elapsed, setElapsed] = useState(0);
@@ -73,6 +100,8 @@ export function useEmulationStyle() {
   return null;
 }
 
+const PREVIEW_OPTIONS = buildPreviewOptions();
+
 // ── Unified header controls ───────────────────────────────────────────────────
 // Renders inside the header row for all SuperAdmin states.
 // Idle  → SuperAdmin badge + Preview role dropdown + Debug toggle.
@@ -85,7 +114,7 @@ export function EmulationHeaderControls() {
   } = useAuth();
   const { debugMode, toggleDebugMode, checks } = usePermissionDebugger();
   const { toast } = useToast();
-  const { personaPreview, setPersonaPreview } = usePersonaPreview();
+  const { personaPreview, tierPreview, setPersonaPreview } = usePersonaPreview();
   const elapsed = useElapsed(impersonationSession?.startedAt ?? null);
 
   useExpiryWarning(impersonationSession?.expiresAt ?? null, endImpersonation);
@@ -122,10 +151,13 @@ export function EmulationHeaderControls() {
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
               Preview as role
             </DropdownMenuLabel>
-            {ROLES.map((r) => (
-              <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
+            {PREVIEW_OPTIONS.map((opt) => (
+              <DropdownMenuItem
+                key={`${opt.role}-${opt.tier ?? "none"}`}
+                onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+              >
                 <Eye className="h-3.5 w-3.5 mr-2" />
-                {getRoleDisplayLabel(r)}
+                {opt.label}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -147,9 +179,12 @@ export function EmulationHeaderControls() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {ROLES.map((r) => (
-                <DropdownMenuItem key={r} onSelect={() => setPersonaPreview(r)}>
-                  {getRoleDisplayLabel(r)}
+              {PREVIEW_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={`${opt.role}-${opt.tier ?? "none"}`}
+                  onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+                >
+                  {opt.label}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -171,6 +206,11 @@ export function EmulationHeaderControls() {
 
   // ── Active: impersonating or role preview ────────────────────────────────
   const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? "";
+  const effectiveLabel = isImpersonating
+    ? getRoleDisplayLabel(effectiveRole)
+    : tierPreview
+      ? `${getRoleDisplayLabel(effectiveRole)} (${tierPreview === "pro" ? "Pro" : "Free"})`
+      : getRoleDisplayLabel(effectiveRole);
   const permCount = checks.size;
   const isAmber = isImpersonating;
 
@@ -229,18 +269,30 @@ export function EmulationHeaderControls() {
             size="sm"
             className={`h-7 text-xs gap-1 ${btnBorderCls}`}
           >
-            <span className="hidden sm:inline">Role:&nbsp;</span>{getRoleDisplayLabel(effectiveRole)}<ChevronDown className="h-3 w-3" />
+            <span className="hidden sm:inline">Role:&nbsp;</span>{effectiveLabel}<ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {ROLES.map((r) => (
-            <DropdownMenuItem
-              key={r}
-              onSelect={() => isImpersonating ? switchImpersonationRole(r) : setPersonaPreview(r)}
-            >
-              {getRoleDisplayLabel(r)} {r === effectiveRole && "✓"}
-            </DropdownMenuItem>
-          ))}
+          {isImpersonating
+            ? ROLES.map((r) => (
+                <DropdownMenuItem
+                  key={r}
+                  onSelect={() => switchImpersonationRole(r)}
+                >
+                  {getRoleDisplayLabel(r)} {r === effectiveRole && "✓"}
+                </DropdownMenuItem>
+              ))
+            : PREVIEW_OPTIONS.map((opt) => {
+                const active = opt.role === effectiveRole && opt.tier === tierPreview;
+                return (
+                  <DropdownMenuItem
+                    key={`${opt.role}-${opt.tier ?? "none"}`}
+                    onSelect={() => setPersonaPreview(opt.role, opt.tier)}
+                  >
+                    {opt.label} {active && "✓"}
+                  </DropdownMenuItem>
+                );
+              })}
         </DropdownMenuContent>
       </DropdownMenu>
 

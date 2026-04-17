@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { billingService, type TokenBudget } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
 import { useAuth } from "@/lib/auth";
+import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 
 /**
  * Derived state for the AITokenPill / banner / buy-more sheet. Wraps the
@@ -109,6 +110,7 @@ function deriveState(raw: TokenBudget, loading: boolean): TokenBudgetState {
  */
 export function useTokenBudget() {
   const { isAuthenticated } = useAuth();
+  const { tierPreview } = usePersonaPreview();
   const [state, setState] = useState<TokenBudgetState>(DEFAULTS);
 
   const refresh = useCallback(async () => {
@@ -130,7 +132,41 @@ export function useTokenBudget() {
     }
   }, [isAuthenticated, refresh]);
 
-  return { ...state, refresh };
+  // SA tier preview override — synthesize free/pro budget shape so the SA can
+  // see the token-pill / banner UI without impersonating. Frontend-only.
+  const effective: TokenBudgetState = tierPreview
+    ? tierPreview === "pro"
+      ? {
+          ...state,
+          planId: "pro",
+          isPro: true,
+          isUnlimited: false,
+          monthlyLimit: 1_000_000,
+          monthlyUsed: 0,
+          monthlyRemaining: 1_000_000,
+          packBalance: 0,
+          totalAvailable: 1_000_000,
+          percentUsed: 0,
+          isWarning: false,
+          isExhausted: false,
+        }
+      : {
+          ...state,
+          planId: "free",
+          isPro: false,
+          isUnlimited: false,
+          monthlyLimit: FREE_AI_MONTHLY_TOKENS,
+          monthlyUsed: 0,
+          monthlyRemaining: FREE_AI_MONTHLY_TOKENS,
+          packBalance: 0,
+          totalAvailable: FREE_AI_MONTHLY_TOKENS,
+          percentUsed: 0,
+          isWarning: false,
+          isExhausted: false,
+        }
+    : state;
+
+  return { ...effective, refresh };
 }
 
 /**

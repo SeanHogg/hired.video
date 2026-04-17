@@ -64,6 +64,32 @@ const MAX_LOG_ENTRIES = 10;
 let _logIdCounter = 0;
 const _recentApiRequests: ApiRequestLogEntry[] = [];
 
+// ============================================================================
+// IMPERSONATION (SuperAdmin X-Emulation-Token)
+// ============================================================================
+
+// Module-level getter populated by AuthProvider when an impersonation session
+// is active. Kept here (not in a React context) so the singleton apiClient can
+// read the current token on every request without prop-drilling.
+let _emulationTokenGetter: () => string | null = () => null;
+
+/** Called by AuthProvider whenever the impersonation session changes. */
+export function setEmulationTokenGetter(getter: () => string | null): void {
+  _emulationTokenGetter = getter;
+}
+
+// Admin endpoints require the real SA bearer; attaching an emulation token
+// makes superAdminMiddleware reject with 403 ("Impersonation tokens cannot
+// access SuperAdmin endpoints"). Skip the header for the /admin/ prefix.
+function shouldAttachEmulationToken(url: string): boolean {
+  try {
+    const path = /^https?:\/\//i.test(url) ? new URL(url).pathname : url;
+    return !/\/api\/admin\//i.test(path);
+  } catch {
+    return !/\/api\/admin\//i.test(url);
+  }
+}
+
 function pushApiLogEntry(entry: ApiRequestLogEntry): void {
   _recentApiRequests.push(entry);
   if (_recentApiRequests.length > MAX_LOG_ENTRIES) {
@@ -278,6 +304,12 @@ export class ApiClient {
         delete headers["Content-Type"];
       }
 
+      // Attach X-Emulation-Token for active impersonation sessions — but never
+      // to /api/admin/* endpoints (those require the real SA bearer).
+      const emuToken = _emulationTokenGetter();
+      if (emuToken && shouldAttachEmulationToken(url)) {
+        headers["X-Emulation-Token"] = emuToken;
+      }
 
       const response = await fetch(url, {
         method: config.method || "GET",

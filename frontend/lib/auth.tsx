@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
 import { authService, type UserProfile, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
-import { apiClient } from "./api-client";
+import { apiClient, setEmulationTokenGetter } from "./api-client";
 
 // Role constants to avoid hardcoded strings
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
@@ -130,6 +131,20 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
   // Impersonation session — stored in memory only (never localStorage)
   const [impersonationSession, setImpersonationSession] = useState<ImpersonationSession | null>(null);
+  const impersonationTokenRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Register a module-level getter so apiClient can read the current emulation
+  // token on each outgoing request. Stored in a ref so the getter identity is
+  // stable across re-renders.
+  useEffect(() => {
+    impersonationTokenRef.current = impersonationSession?.token ?? null;
+  }, [impersonationSession?.token]);
+
+  useEffect(() => {
+    setEmulationTokenGetter(() => impersonationTokenRef.current);
+    return () => setEmulationTokenGetter(() => null);
+  }, []);
 
   // Check auth consistency on every render - if we have a user but no auth token, clear the user
   useEffect(() => {
@@ -168,6 +183,32 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           } catch (err) {
             logger.warn?.("AuthProvider: failed to fetch verification status on init", err);
             setIsEmailVerified(undefined);
+          }
+
+          // Reclaim any orphaned impersonation session left behind by a page
+          // reload (emulation tokens are memory-only, so after a reload the
+          // backend row still exists but the frontend can no longer use it —
+          // ending it frees the SA to start a new session).
+          const storedForOrphanCheck = authService.getStoredUser();
+          if (storedForOrphanCheck?.role === USER_ROLES.SUPER_ADMIN) {
+            try {
+              const tok = authService.getToken();
+              const res = await fetch("/api/admin/impersonate/active", {
+                headers: { Authorization: `Bearer ${tok}` },
+              });
+              if (res.ok) {
+                const json = await res.json().catch(() => null);
+                const sessionId = json?.data?.id;
+                if (sessionId) {
+                  await fetch(`/api/admin/impersonate/${sessionId}/end`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${tok}` },
+                  });
+                }
+              }
+            } catch (err) {
+              logger.warn?.("AuthProvider: orphan impersonation cleanup failed", err);
+            }
           }
         } else {
           logger.info("AuthProvider: not authenticated; skipping user fetch");
@@ -494,6 +535,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       debuggerEnabled: enableDebugger,
     };
     setImpersonationSession(session);
+    impersonationTokenRef.current = session.token;
+    // Drop any cached admin-identity data so subsequent renders refetch as the
+    // emulated user.
+    queryClient.invalidateQueries();
     return session;
   };
 
@@ -509,6 +554,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       console.error("endImpersonation: failed to notify server", err);
     } finally {
       setImpersonationSession(null);
+      impersonationTokenRef.current = null;
+      queryClient.invalidateQueries();
     }
   };
 
@@ -528,6 +575,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     setImpersonationSession((prev) =>
       prev ? { ...prev, token: data.token, role: data.role } : null,
     );
+    impersonationTokenRef.current = data.token;
+    queryClient.invalidateQueries();
   };
 
   const value: AuthContextType = {
