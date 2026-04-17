@@ -26,15 +26,24 @@ export function useProfileResumeData(): UseProfileResumeDataReturn {
       // Get the user's resume list
       const resumes = await resumeService.getUserResumes();
 
-      // Find the master resume
-      const master = resumes.find((r) => r.isMaster === true);
+      // Find the master resume (API may return PascalCase or camelCase)
+      const master = resumes.find(
+        (r: any) => r.isMaster === true || r.IsMaster === true,
+      );
       if (!master) {
         setMasterResume(null);
         return;
       }
 
+      // Resolve ID (API may return PascalCase or camelCase)
+      const resumeId = (master as any).id || (master as any).Id;
+      if (!resumeId) {
+        setMasterResume(null);
+        return;
+      }
+
       // Fetch full resume data including Work, Education, Skills, etc.
-      const fullResume = await resumeService.getResumeById(master.id);
+      const fullResume = await resumeService.getResumeById(resumeId);
       setMasterResume(fullResume);
     } catch (err) {
       console.error("Failed to fetch master resume:", err);
