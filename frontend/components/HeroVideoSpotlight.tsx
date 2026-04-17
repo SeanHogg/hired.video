@@ -107,7 +107,7 @@ export default function HeroVideoSpotlight({
   return (
     <div ref={containerRef} className="relative">
       <div
-        className="group relative aspect-video lg:aspect-[4/5] w-full max-w-md lg:max-w-none mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 cursor-pointer"
+        className="group relative aspect-video w-full max-w-md lg:max-w-none mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 cursor-pointer"
         onClick={goToResume}
         role="button"
         aria-label={`Open video resume: ${current.title}`}

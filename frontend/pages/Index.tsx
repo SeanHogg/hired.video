@@ -557,9 +557,9 @@ export default function Index() {
             <div className="h-[400px] w-[800px] rounded-full bg-primary/5 blur-3xl" />
           </div>
 
-          <div className="relative max-w-7xl mx-auto grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          <div className="relative max-w-6xl mx-auto grid lg:grid-cols-5 gap-8 lg:gap-10 items-center">
             {/* Left column: AI CHRO prompt */}
-            <div className="lg:col-span-7 text-center lg:text-left">
+            <div className="lg:col-span-3 text-center lg:text-left">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
                 <Brain className="w-3.5 h-3.5" />
@@ -630,7 +630,8 @@ export default function Index() {
             </div>
 
             {/* Right column: video resume spotlight */}
-            <div className="lg:col-span-5">
+            {/* Right column: video resume spotlight */}
+            <div className="lg:col-span-2">
               <HeroVideoSpotlight videos={publicVideos} />
             </div>
           </div>
