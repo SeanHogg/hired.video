@@ -24,6 +24,7 @@ import {
   PenTool,
   Flame,
   GitMerge,
+  ClipboardPaste,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -819,6 +820,74 @@ export default function Tools() {
                           </div>
                           <Button className="w-full mt-4" variant="outline">
                             Tailor My Resume
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  {/* Application Form Autofill */}
+                  <Link to="/tools/form-autofill">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <ClipboardPaste className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">
+                                Form Autofill
+                              </CardTitle>
+                              <CardDescription>
+                                AI-powered job application form answers
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800"
+                          >
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-blue-600">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Generated
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">
+                                8+
+                              </div>
+                              <div className="text-muted-foreground">
+                                ATS Supported
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Paste questions or form URL
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Uses your profile & resume
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Chrome extension autofill
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Fill Application
                           </Button>
                         </div>
                       </CardContent>
@@ -1945,6 +2014,72 @@ export default function Tools() {
                         </div>
                         <Button className="w-full mt-4" variant="outline">
                           Tailor My Resume
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Application Form Autofill */}
+                <Link to="/tools/form-autofill">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <ClipboardPaste className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl">
+                              Form Autofill
+                            </CardTitle>
+                            <CardDescription>
+                              AI-powered job application form answers
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-100 text-blue-800"
+                        >
+                          New
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              AI
+                            </div>
+                            <div className="text-muted-foreground">Generated</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              8+
+                            </div>
+                            <div className="text-muted-foreground">
+                              ATS Supported
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Paste questions or form URL
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Uses your profile & resume
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Chrome extension autofill
+                          </div>
+                        </div>
+                        <Button className="w-full mt-4" variant="outline">
+                          Fill Application
                         </Button>
                       </div>
                     </CardContent>

@@ -4,7 +4,7 @@
 // managing the per-user answer cache.
 
 import { Hono } from "hono";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -17,7 +17,7 @@ import {
   normalizeQuestion,
 } from "../services/autofill.js";
 import { recordTokenUsage } from "../services/billing.js";
-import { resumeContentToText } from "../services/resume-parse.js";
+import type { FormField } from "../../shared/autofill.js";
 
 export const autofillRoutes = new Hono<{ Variables: Variables }>();
 
@@ -204,7 +204,7 @@ autofillRoutes.post("/generate", async (c) => {
   // Generate answers
   const result = await generateAnswers(
     apiKey,
-    fields as any,
+    fields as FormField[],
     profileData,
     resumeContent,
     jdText,
@@ -328,22 +328,21 @@ autofillRoutes.get("/history", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  // Enrich with job title/company
-  const enriched = [];
-  for (const row of rows) {
-    let jobTitle: string | undefined;
-    let company: string | undefined;
-    if (row.jobId) {
-      const [job] = await db.select({ title: schema.jobItems.title, company: schema.jobItems.company })
-        .from(schema.jobItems)
-        .where(eq(schema.jobItems.id, row.jobId))
-        .limit(1)
-        .catch(() => []);
-      jobTitle = job?.title;
-      company = job?.company ?? undefined;
-    }
-    enriched.push({ ...row, jobTitle, company });
+  // Batch-load job titles to avoid N+1 queries
+  const jobIds = [...new Set(rows.map((r) => r.jobId).filter(Boolean))] as string[];
+  const jobMap = new Map<string, { title: string; company?: string | null }>();
+  if (jobIds.length > 0) {
+    const jobs = await db.select({ id: schema.jobItems.id, title: schema.jobItems.title, company: schema.jobItems.company })
+      .from(schema.jobItems)
+      .where(inArray(schema.jobItems.id, jobIds))
+      .catch(() => []);
+    for (const job of jobs) jobMap.set(job.id, { title: job.title, company: job.company });
   }
+
+  const enriched = rows.map((row) => {
+    const job = row.jobId ? jobMap.get(row.jobId) : undefined;
+    return { ...row, jobTitle: job?.title, company: job?.company ?? undefined };
+  });
 
   return c.json(success(enriched), 200);
 });
