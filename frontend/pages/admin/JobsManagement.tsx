@@ -51,6 +51,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
+import { userService, type UserProfile } from "@/lib/services/user-service";
 
 const STATUS_COLORS: Record<string, string> = {
   Open:   "bg-green-100 text-green-800",
@@ -81,6 +82,7 @@ export default function JobsManagement() {
   const [bulkAction, setBulkAction] = useState<string>("");
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [users, setUsers] = useState<Record<string, UserProfile>>({});
   const { toast } = useToast();
   const { can } = useAdminPermissions();
 
@@ -112,6 +114,34 @@ export default function JobsManagement() {
   useEffect(() => {
     loadJobs();
   }, [loadJobs]);
+
+  // Load user profiles for jobs that have a creator we haven't fetched yet.
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        jobs
+          .map((j) => (j as any).createdBy as string | undefined)
+          .filter((id): id is string => !!id && !users[id]),
+      ),
+    );
+    if (ids.length === 0) return;
+    let cancelled = false;
+    Promise.allSettled(ids.map((id) => userService.getUserById(id))).then(
+      (results) => {
+        if (cancelled) return;
+        const next: Record<string, UserProfile> = {};
+        results.forEach((r, i) => {
+          if (r.status === "fulfilled") next[ids[i]] = r.value;
+        });
+        if (Object.keys(next).length > 0) {
+          setUsers((prev) => ({ ...prev, ...next }));
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [jobs, users]);
 
   // Debounce search
   useEffect(() => {
@@ -348,6 +378,7 @@ export default function JobsManagement() {
               <TableHead>Type</TableHead>
               <TableHead>Salary</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Posted By</TableHead>
               <TableHead>Posted</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -355,14 +386,14 @@ export default function JobsManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading jobs...
                 </TableCell>
               </TableRow>
             ) : jobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   No jobs match your filters.
                 </TableCell>
               </TableRow>
@@ -370,6 +401,13 @@ export default function JobsManagement() {
               jobs.map((job) => {
                 const status = (job as any).status ?? "Open";
                 const posted = job.postedDate ?? job.createdAt;
+                const creatorId = (job as any).createdBy as string | undefined;
+                const creator = creatorId ? users[creatorId] : undefined;
+                const creatorName = creator
+                  ? [creator.firstName, creator.lastName].filter(Boolean).join(" ").trim() ||
+                    creator.email ||
+                    "User"
+                  : null;
                 return (
                   <TableRow key={job.id} data-state={selectedIds.has(job.id) ? "selected" : undefined}>
                     <TableCell>
@@ -382,7 +420,12 @@ export default function JobsManagement() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
-                        <p className="font-medium text-sm">{job.title}</p>
+                        <Link
+                          to={`/jobs/${job.id}`}
+                          className="font-medium text-sm text-primary hover:underline"
+                        >
+                          {job.title}
+                        </Link>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{job.company ?? "—"}</TableCell>
@@ -411,6 +454,26 @@ export default function JobsManagement() {
                       >
                         {status}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {creatorId ? (
+                        creator ? (
+                          <Link
+                            to={
+                              creator.slug
+                                ? `/people/${creator.slug}`
+                                : `/people/${creatorId}`
+                            }
+                            className="text-primary hover:underline"
+                          >
+                            {creatorName}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Loading…</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {posted ? new Date(posted).toLocaleDateString() : "—"}

@@ -64,6 +64,7 @@ export const JobSummarySchema = z
     updatedAt: z.string().optional(),
     summary: z.string().optional(),
     userId: z.string().optional(),
+    createdBy: z.string().optional(),
     slug: z.string().optional(),
   })
   .passthrough();
