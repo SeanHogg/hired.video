@@ -515,11 +515,21 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
         const requirements = parseStringList(item.requirements ?? item.experienceRequirements);
         const benefits = parseStringList(item.jobBenefits ?? item.benefits);
 
-        // Apply URL: prefer directApply (explicit apply link) over url
-        // (canonical job page). Both are standard schema.org JobPosting fields.
+        // Apply URL priority:
+        //   1. JSON-LD directApply (explicit apply link)
+        //   2. JSON-LD url (canonical job page — often = the listing page,
+        //      which we treat as "no real apply link" downstream)
+        //   3. DOM heuristic: an <a> matching apply-button patterns
+        //      anywhere on the page. This catches Workday/Greenhouse/
+        //      Lever/Ashby forms the ATS links to from its careers site
+        //      (Home Depot's JSON-LD doesn't set directApply but the
+        //      listing page has an `<a href="...myworkdayjobs.com...">`
+        //      Apply button.)
+        //   4. The current request URL.
         const directApplyRaw = typeof item.directApply === "string" ? item.directApply.trim() : "";
         const urlRaw = typeof item.url === "string" ? item.url.trim() : "";
-        const applyUrl = directApplyRaw || urlRaw || url || undefined;
+        const domApplyUrl = findApplyLinkInHtml(html, url);
+        const applyUrl = directApplyRaw || urlRaw || domApplyUrl || url || undefined;
 
         return {
           title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
@@ -574,9 +584,78 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
     company: ogSite || undefined,
     location: undefined,
     isRemote: undefined,
-    applyUrl: url || undefined,
+    applyUrl: findApplyLinkInHtml(html, url) || url || undefined,
     confidence: "low",
   };
+}
+
+/**
+ * Scan raw HTML for an apply-button href. Run whenever the structured
+ * data didn't give us a direct-apply link — the listing page itself
+ * usually has a visible "Apply" button whose href points at the
+ * Workday/Greenhouse/Lever/Ashby/iCIMS form the employer actually wants
+ * applicants to land on. Keeps the user's "#3 Apply" CTA useful even
+ * when the JSON-LD is incomplete.
+ *
+ * Pure string scan (same rationale as the rest of this module — we're
+ * inside a Cloudflare Worker with no real DOM). Case-insensitive,
+ * handles single and double quotes.
+ */
+export function findApplyLinkInHtml(html: string, pageUrl?: string): string | undefined {
+  if (!html) return undefined;
+
+  const resolveHref = (href: string): string | undefined => {
+    if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:")) return undefined;
+    if (/^https?:\/\//i.test(href)) return href;
+    if (!pageUrl) return undefined; // can't resolve relative without a base
+    try {
+      return new URL(href, pageUrl).toString();
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Known ATS domains — if the listing page has ANY outbound link to
+  // one of these, it's almost certainly the apply form.
+  const ATS_DOMAIN_RE = /\b(?:myworkdayjobs\.com|workday\.com|greenhouse\.io|lever\.co|ashbyhq\.com|icims\.com|smartrecruiters\.com|jobvite\.com|bamboohr\.com|breezy\.hr|recruitee\.com|teamtailor\.com|workable\.com|successfactors\.com|taleo\.net|brassring\.com)\b/i;
+
+  const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  const hrefRe = /href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i;
+  const classRe = /class\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+  const idRe = /id\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+  const ariaRe = /aria-label\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+  // Pass 1: any anchor whose href is on an ATS domain.
+  // Pass 2: anchors where text / class / id / aria-label contains "apply".
+  const candidates: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = anchorRe.exec(html)) !== null) {
+    const attrs = match[1];
+    const inner = match[2];
+    const hrefM = hrefRe.exec(attrs);
+    const rawHref = hrefM?.[1] || hrefM?.[2] || hrefM?.[3];
+    const href = rawHref ? resolveHref(rawHref) : undefined;
+    if (!href) continue;
+
+    if (ATS_DOMAIN_RE.test(href)) {
+      candidates.unshift(href); // ATS domain wins outright
+      continue;
+    }
+
+    const inlineText = stripHtml(inner).toLowerCase();
+    const className = (classRe.exec(attrs)?.[1] || classRe.exec(attrs)?.[2] || "").toLowerCase();
+    const idValue = (idRe.exec(attrs)?.[1] || idRe.exec(attrs)?.[2] || "").toLowerCase();
+    const aria = (ariaRe.exec(attrs)?.[1] || ariaRe.exec(attrs)?.[2] || "").toLowerCase();
+
+    const isApply = /\bapply\s*(?:now|here|online|today|on|for|to|via)?\b/.test(inlineText)
+      || /\bapply\b/.test(className)
+      || /\bapply\b/.test(idValue)
+      || /\bapply\b/.test(aria);
+
+    if (isApply) candidates.push(href);
+  }
+
+  return candidates[0];
 }
 
 // ---- AI-backed classification ---------------------------------------

@@ -26,6 +26,7 @@ import {
   computeRefreshBackfill,
   deriveApplyUrl,
   extractAndClassifyJob,
+  findApplyLinkInHtml,
   isApplyUrlFallback,
 } from "../job.js";
 
@@ -521,6 +522,72 @@ describe("deriveApplyUrl", () => {
       }),
       "https://fb.example.com/",
     );
+  });
+});
+
+// =====================================================================
+// findApplyLinkInHtml — DOM-scan fallback for listings where JSON-LD
+// doesn't expose a directApply URL (Home Depot's careers site is the
+// canonical example)
+// =====================================================================
+describe("findApplyLinkInHtml", () => {
+  it("prefers an absolute ATS-domain link over everything else on the page", () => {
+    const html = `
+      <nav><a href="/careers/home">Careers</a></nav>
+      <a href="#content">Skip</a>
+      <a href="https://twitter.com/share" class="share-link">Share</a>
+      <a href="https://homedepot.wd5.myworkdayjobs.com/CareerDepot/job/apply/1234" class="primary-cta">Apply Now</a>
+      <a href="mailto:recruiter@homedepot.com">Contact</a>
+    `;
+    assert.equal(
+      findApplyLinkInHtml(html),
+      "https://homedepot.wd5.myworkdayjobs.com/CareerDepot/job/apply/1234",
+    );
+  });
+
+  it("falls back to text heuristic when no ATS domain link is present", () => {
+    const html = `
+      <a href="/about">About</a>
+      <a href="https://example.com/apply/engineer-42" class="btn">Apply Today</a>
+    `;
+    assert.equal(
+      findApplyLinkInHtml(html),
+      "https://example.com/apply/engineer-42",
+    );
+  });
+
+  it("uses class/id/aria attributes as apply signals", () => {
+    const html = `<a href="https://foo.com/x" class="apply-button">Click</a>`;
+    assert.equal(findApplyLinkInHtml(html), "https://foo.com/x");
+    const html2 = `<a href="https://foo.com/y" aria-label="Apply for this job">›</a>`;
+    assert.equal(findApplyLinkInHtml(html2), "https://foo.com/y");
+  });
+
+  it("resolves relative hrefs against the page URL when provided", () => {
+    const html = `<a href="/jobs/42/apply" class="apply-btn">Apply</a>`;
+    assert.equal(
+      findApplyLinkInHtml(html, "https://example.com/jobs/42"),
+      "https://example.com/jobs/42/apply",
+    );
+  });
+
+  it("ignores relative hrefs when no base URL is provided", () => {
+    const html = `<a href="/jobs/42/apply" class="apply-btn">Apply</a>`;
+    assert.equal(findApplyLinkInHtml(html), undefined);
+  });
+
+  it("ignores javascript:, mailto:, and anchor-only hrefs even when text matches", () => {
+    const html = `
+      <a href="javascript:void(0)" class="apply">Apply</a>
+      <a href="#apply">Apply</a>
+      <a href="mailto:x@y.com">Apply via email</a>
+    `;
+    assert.equal(findApplyLinkInHtml(html), undefined);
+  });
+
+  it("returns undefined when the page has no apply signals at all", () => {
+    const html = `<nav><a href="/home">Home</a></nav><footer><a href="/privacy">Privacy</a></footer>`;
+    assert.equal(findApplyLinkInHtml(html), undefined);
   });
 });
 
