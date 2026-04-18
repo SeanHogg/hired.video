@@ -230,11 +230,16 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
   const isPro = sub.isPremium && !isInternal;
 
   if (isInternal) {
+    // Internal users have no cap but we still record and surface their
+    // actual spend so they (and we) can audit consumption. `isUnlimited`
+    // stays true so the gate short-circuits and remaining/total render as
+    // ∞ — only `monthlyUsed` is authoritative for these accounts.
+    const monthlyUsed = await getMonthlyTokensUsed(userId);
     return {
       planId: sub.planId,
       isPro: false,
       monthlyLimit: Number.POSITIVE_INFINITY,
-      monthlyUsed: 0,
+      monthlyUsed,
       monthlyRemaining: Number.POSITIVE_INFINITY,
       packBalance: 0,
       totalAvailable: Number.POSITIVE_INFINITY,

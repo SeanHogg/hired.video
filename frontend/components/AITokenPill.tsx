@@ -77,7 +77,12 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
           </TooltipTrigger>
           <TooltipContent side="right" className="max-w-xs">
             {isUnlimited ? (
-              <span className="font-medium">Unlimited tokens (Admin)</span>
+              <div className="space-y-1 text-xs">
+                <div className="font-medium">Unlimited tokens (Admin)</div>
+                <div className="text-muted-foreground">
+                  {formatTokens(monthlyUsed)} used this month
+                </div>
+              </div>
             ) : (
               <div className="space-y-1 text-xs">
                 <div className="font-medium">
@@ -105,11 +110,16 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
       <Link
         to="/settings?tab=billing"
         onClick={onNavigate}
-        className="flex items-center gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/40 dark:to-amber-900/20 border border-amber-200/60 dark:border-amber-800/40 hover:opacity-90 transition-opacity"
+        className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/40 dark:to-amber-900/20 border border-amber-200/60 dark:border-amber-800/40 hover:opacity-90 transition-opacity"
       >
-        <Crown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-        <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
-          Unlimited tokens
+        <div className="flex items-center gap-2">
+          <Crown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+            Unlimited tokens
+          </span>
+        </div>
+        <span className="text-[11px] tabular-nums text-amber-800/80 dark:text-amber-200/70">
+          {formatTokens(monthlyUsed)} used
         </span>
       </Link>
     );
