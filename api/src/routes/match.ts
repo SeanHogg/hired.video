@@ -200,8 +200,12 @@ async function saveMatchScore(args: {
 }): Promise<void> {
   if (!args.jobId) return;
   const db = getDb();
-  await db
-    .insert(schema.resumeMatchScores)
+  // `as any` matches the codebase pattern (see billing.ts, dashboard.ts,
+  // advertising.ts, auth.ts etc.) — Drizzle's Insert-type inference drops
+  // columns with `.notNull().default(...)` from the accepted shape, so
+  // TS flags `recommendations`/`updatedAt` as unknown properties even
+  // though the runtime write is correct.
+  await (db.insert(schema.resumeMatchScores) as any)
     .values({
       userId: args.userId,
       jobId: args.jobId,

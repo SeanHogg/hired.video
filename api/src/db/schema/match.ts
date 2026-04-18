@@ -20,32 +20,28 @@ import { resumeInformation } from "./resumes.js";
  * (which scores talent-pool candidates). This table scores a user's
  * own resume against a job they've tracked.
  */
-export const resumeMatchScores = pgTable(
-  "resume_match_scores",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    jobId: uuid("job_id")
-      .notNull()
-      .references(() => jobItems.id, { onDelete: "cascade" }),
-    resumeId: uuid("resume_id")
-      .notNull()
-      .references(() => resumeInformation.id, { onDelete: "cascade" }),
-    score: integer("score").notNull(),
-    recommendations: text("recommendations").notNull().default(""),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    uniqueIndex("resume_match_scores_user_job_resume_idx").on(
-      t.userId,
-      t.jobId,
-      t.resumeId,
-    ),
-  ],
-);
+export const resumeMatchScores = pgTable("resume_match_scores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id")
+    .notNull()
+    .references(() => jobItems.id, { onDelete: "cascade" }),
+  resumeId: uuid("resume_id")
+    .notNull()
+    .references(() => resumeInformation.id, { onDelete: "cascade" }),
+  score: integer("score").notNull(),
+  recommendations: text("recommendations").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("resume_match_scores_user_job_resume_idx").on(
+    t.userId,
+    t.jobId,
+    t.resumeId,
+  ),
+]);
 
 export type ResumeMatchScore = typeof resumeMatchScores.$inferSelect;
 export type NewResumeMatchScore = typeof resumeMatchScores.$inferInsert;
