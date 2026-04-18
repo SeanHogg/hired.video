@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import VideoCard from "@/components/VideoCard";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
+import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
 import SearchBar from "@/components/SearchBar";
 
@@ -113,8 +114,10 @@ export default function Index() {
         return ["company"];
       case "people":
         return ["people"];
+      case "templates":
+        return ["template"];
       case "all":
-        return ["resume", "job", "company", "people"];
+        return ["resume", "job", "company", "people", "template"];
       default:
         return [];
     }
@@ -362,6 +365,7 @@ export default function Index() {
     { id: "companies", label: "Companies", icon: Building2 },
     { id: "resumes", label: "Resumes", icon: User },
     { id: "jobs", label: "Jobs", icon: Briefcase },
+    { id: "templates", label: "Templates", icon: Sparkles },
     { id: "media", label: "Media", icon: Play },
     { id: "voices", label: "Voices", icon: Mic },
   ];
@@ -702,6 +706,14 @@ export default function Index() {
                           />
                         );
                       }
+                      if ((item as any).type === "template" && (item as any).descriptor) {
+                        return (
+                          <TemplateCard
+                            key={item.id}
+                            descriptor={(item as any).descriptor}
+                          />
+                        );
+                      }
                       // Use the pre-created card renderer (it's a function, not an object)
                       return allSectionRenderer(item, index);
                     })}
@@ -754,6 +766,8 @@ export default function Index() {
                                         navigate(`/resumes/${item.id}`);
                                       else if (item.type === "job")
                                         navigate(`/jobs/${item.id}`);
+                                      else if ((item as any).type === "template")
+                                        navigate(`/resumes/VIEWER/sample?template=${item.id}`);
                                       else if (item.type === "media") {
                                         // For media items, navigate to the associated resume with the media reference
                                         const resumeId = (item as any).resumeId;
@@ -796,6 +810,8 @@ export default function Index() {
                                     navigate(`/resumes/${item.id}`);
                                   else if (item.type === "job")
                                     navigate(`/jobs/${(item as any).id}`);
+                                  else if ((item as any).type === "template")
+                                    navigate(`/resumes/VIEWER/sample?template=${item.id}`);
                                 }}
                                 className="min-h-[44px] flex-shrink-0"
                               >

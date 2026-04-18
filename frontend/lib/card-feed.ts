@@ -17,8 +17,9 @@ import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
+import { TEMPLATE_PRESETS } from "@/types/resume-template";
 
-export type CardFeedType = "resume" | "job" | "company" | "people";
+export type CardFeedType = "resume" | "job" | "company" | "people" | "template";
 
 export type CardFeedSort = "recent" | "featured" | "top";
 
@@ -49,7 +50,7 @@ export interface CardFeedResponse {
   hasPreviousPage: boolean;
 }
 
-const DEFAULT_TYPES: CardFeedType[] = ["resume", "job", "company", "people"];
+const DEFAULT_TYPES: CardFeedType[] = ["resume", "job", "company", "people", "template"];
 
 /**
  * Derive a common sort key from a normalized item so mixed feeds can be ordered
@@ -174,6 +175,32 @@ async function fetchCompanies(limit: number, page: number): Promise<SortableCard
   }
 }
 
+async function fetchTemplates(limit: number, page: number): Promise<SortableCard[]> {
+  // Templates are static frontend data (no backend endpoint). Paginate the
+  // in-memory preset list so mixed-type feeds still honor the page/limit.
+  const start = Math.max(0, (page - 1) * limit);
+  const slice = TEMPLATE_PRESETS.slice(start, start + limit);
+  // Stable synthetic createdAt so sort order is deterministic across reloads
+  // and templates don't all pile up at the exact same instant.
+  const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
+  return slice.map((descriptor, idx) => {
+    const createdAt = new Date(baseTime - idx * 60_000).toISOString();
+    const item: RawApiItem = {
+      type: "template",
+      id: descriptor.id,
+      name: descriptor.name,
+      title: descriptor.name,
+      industry: descriptor.industry,
+      summary: descriptor.description ?? "",
+      priceCents: descriptor.priceCents ?? 0,
+      descriptor,
+      views: 0,
+      createdAt,
+    } as RawApiItem;
+    return { ...item, sortKey: toSortKey(item) };
+  });
+}
+
 async function fetchPeople(limit: number, page: number): Promise<SortableCard[]> {
   try {
     const result = await userService.getPublicUsers({ page, limit });
@@ -216,6 +243,7 @@ export async function fetchCardFeed(
   if (types.includes("job")) tasks.push(fetchJobs(limitPerType, page));
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
   if (types.includes("people")) tasks.push(fetchPeople(limitPerType, page));
+  if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page));
 
   const results = await Promise.all(tasks);
   const merged = results.flat();
