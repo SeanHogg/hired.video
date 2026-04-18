@@ -5,12 +5,10 @@
 
 import { apiClient } from "../api-client";
 import type {
-  FormField,
   FormAnalysisRequest,
   FormAnalysisResponse,
   AnswerGenerationRequest,
   AnswerGenerationResponse,
-  FieldAnswer,
   SaveSubmissionRequest,
   SavedFormSubmission,
   CachedAnswer,
@@ -49,7 +47,7 @@ export const autofillService = {
       "/api/autofill/analyze",
       data
     );
-    return response;
+    return response.data as FormAnalysisResponse;
   },
 
   /**
@@ -62,7 +60,7 @@ export const autofillService = {
       "/api/autofill/generate",
       data
     );
-    return response;
+    return response.data as AnswerGenerationResponse;
   },
 
   /**
@@ -73,7 +71,7 @@ export const autofillService = {
       "/api/autofill/save",
       data
     );
-    return response;
+    return response.data as SaveResponse;
   },
 
   /**
@@ -92,7 +90,7 @@ export const autofillService = {
     const response = await apiClient.get<HistoryItem[]>(
       `/api/autofill/history${qs ? `?${qs}` : ""}`
     );
-    return response;
+    return (response.data ?? []) as HistoryItem[];
   },
 
   /**
@@ -102,7 +100,7 @@ export const autofillService = {
     const response = await apiClient.get<SavedFormSubmission>(
       `/api/autofill/history/${id}`
     );
-    return response;
+    return response.data as SavedFormSubmission;
   },
 
   /**
@@ -112,7 +110,7 @@ export const autofillService = {
     const response = await apiClient.get<CachedAnswer[]>(
       "/api/autofill/cache"
     );
-    return response;
+    return (response.data ?? []) as CachedAnswer[];
   },
 
   /**

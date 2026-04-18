@@ -629,11 +629,8 @@ export default function FormAutofill() {
           </div>
         </div>
 
+        <ToolFooterSEO />
         <Footer />
-        <ToolFooterSEO
-          toolName="Application Form Autofill"
-          description="AI-powered job application form filler that uses your profile and resume to generate accurate answers for any ATS platform."
-        />
       </div>
     </div>
   );
