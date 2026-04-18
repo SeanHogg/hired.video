@@ -1,5 +1,54 @@
 // Shared helper for extracting plain text from resume files in the browser.
-// Supports: .pdf, .docx, .txt, .md
+// Supports: .pdf, .docx, .txt, .md, .json
+
+/** Client-side JSON Resume normaliser — mirrors the backend
+ *  `normalizeJsonResume` so we can ship already-parsed content directly
+ *  to endpoints that accept `parsedContent`. Lowercases first letter of
+ *  every object key recursively; leaves values unchanged. */
+export function normalizeJsonResume(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== "object") return {};
+  return remapKeys(input as Record<string, unknown>) as Record<string, unknown>;
+}
+
+function toLowerFirst(key: string): string {
+  if (!key || key[0] === key[0].toLowerCase()) return key;
+  return key.charAt(0).toLowerCase() + key.slice(1);
+}
+
+function remapKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(remapKeys);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[toLowerFirst(k)] = remapKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** Detect + parse a JSON Resume file. Returns the normalised object when
+ *  the file is a JSON Resume, or null otherwise. Both PascalCase (legacy
+ *  hired.video exports) and canonical jsonresume.org lowercase accepted. */
+export async function parseJsonResumeFile(file: File): Promise<Record<string, unknown> | null> {
+  const name = file.name.toLowerCase();
+  const isJson = name.endsWith(".json") || file.type === "application/json";
+  if (!isJson) return null;
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const obj = parsed as Record<string, unknown>;
+    const RESUME_KEYS = [
+      "basics", "Basics", "work", "Work", "education", "Education",
+      "skills", "Skills", "volunteer", "Volunteer", "projects", "Projects",
+    ];
+    if (!RESUME_KEYS.some((k) => k in obj)) return null;
+    return normalizeJsonResume(obj);
+  } catch {
+    return null;
+  }
+}
 
 export async function extractTextFromPdf(file: File): Promise<string> {
   try {

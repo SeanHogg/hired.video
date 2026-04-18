@@ -8,7 +8,7 @@ import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
-import { extractTextFromFile } from "@/lib/extract-text";
+import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 
 // ============================================================================
 // SCHEMAS
@@ -572,21 +572,33 @@ export class ResumeService {
     name: string;
     data?: ResumeData;
     rawText?: string;
+    /** Pre-parsed JSON Resume content (canonical lowercase keys). When
+     *  provided, the server skips AI parsing and stores this directly. */
+    parsedContent?: Record<string, unknown>;
     privacy?: string;
     isMaster?: boolean;
     isActive?: boolean;
   }): Promise<Resume> {
+    // Structured content takes priority: if the caller supplied
+    // parsedContent OR data, use it as `content`. Only include rawText
+    // when we have no structured content — belt-and-suspenders so the
+    // server always prefers canonical structure over re-parsing.
+    const hasStructured = !!request.parsedContent || !!request.data;
+    const content: Record<string, unknown> =
+      request.parsedContent ??
+      ((request.data as unknown as Record<string, unknown>) ?? {});
+
     const response = await apiClient.request<Resume>(
       "/api/resumes/",
       {
         method: "POST",
         body: JSON.stringify({
           title: request.name,
-          content: (request.data as unknown as Record<string, unknown>) ?? {},
+          content,
           status: "draft",
           isMaster: request.isMaster ?? false,
           privacy: request.privacy ?? "private",
-          rawText: request.rawText,
+          ...(hasStructured ? {} : { rawText: request.rawText }),
         }),
         headers: {
           "Content-Type": "application/json",
@@ -604,9 +616,13 @@ export class ResumeService {
     data: ResumeData;
     confidence: number;
   }> {
-    // Extract text client-side (pdfjs-dist for PDFs, jszip for docx, etc.)
-    // so the CF Worker receives plain text instead of binary it can't parse.
-    const text = await extractTextFromFile(file);
+    // Prefer structured JSON Resume parsing when possible. Falls back to
+    // client-side text extraction (pdfjs-dist / jszip) for PDF/DOCX so
+    // the CF Worker receives plain text instead of binary it can't parse.
+    const jsonResume = await parseJsonResumeFile(file);
+    const payload: Record<string, unknown> = jsonResume
+      ? { parsedContent: jsonResume }
+      : { content: await extractTextFromFile(file) };
 
     const response = await apiClient.request<{
       result: string;
@@ -615,7 +631,7 @@ export class ResumeService {
       "/api/resumes/parse",
       {
         method: "POST",
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
       },
       z.object({
@@ -1546,10 +1562,19 @@ export class ResumeService {
   }
 
   async analyzeFileMerge(file: File, targetResumeId: string, useAI = true): Promise<FileMergeAnalysis> {
-    const text = await extractTextFromFile(file);
+    // Prefer structured JSON Resume parsing over text extraction. When the
+    // user uploads a .json export (either PascalCase hired.video format
+    // or canonical jsonresume.org), we send the already-parsed content
+    // directly — skips the lossy text->AI roundtrip and preserves dates,
+    // highlights arrays, etc. exactly as authored.
+    const jsonResume = await parseJsonResumeFile(file);
+    const body = jsonResume
+      ? { parsedContent: jsonResume, targetResumeId, useAI }
+      : { text: await extractTextFromFile(file), targetResumeId, useAI };
+
     const response = await apiClient.post<FileMergeAnalysis>(
       `/api/resumes/merge/from-file`,
-      { text, targetResumeId, useAI },
+      body,
       z.any(),
     );
     return response.data;

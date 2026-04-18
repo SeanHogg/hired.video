@@ -1,6 +1,6 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
 import { useState, useCallback, useMemo } from "react";
-import { extractTextFromFile } from "@/lib/extract-text";
+import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -212,16 +212,24 @@ export default function ResumeUpload({
     setUploadProgress(0);
 
     try {
-      // Extract text client-side (pdfjs-dist for PDFs, jszip for docx, etc.)
-      const rawText = await extractTextFromFile(file);
+      // If it's a JSON Resume export, parse structure client-side and
+      // send as `parsedContent` — preserves dates + highlights exactly
+      // as authored, skipping the lossy text->AI roundtrip.
+      const jsonResume = await parseJsonResumeFile(file);
 
-      // Single API call: sends rawText → API parses with LLM + creates resume
-      const savedResume = await resumeService.createResume({
-        name: name.trim(),
-        rawText,
-        privacy,
-        isMaster,
-      });
+      const savedResume = jsonResume
+        ? await resumeService.createResume({
+            name: name.trim(),
+            parsedContent: jsonResume,
+            privacy,
+            isMaster,
+          })
+        : await resumeService.createResume({
+            name: name.trim(),
+            rawText: await extractTextFromFile(file),
+            privacy,
+            isMaster,
+          });
 
       // Map the returned metaResume back to UI format for the success callback
       const meta = savedResume.metaResume;

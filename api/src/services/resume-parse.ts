@@ -18,6 +18,74 @@ export function ciProp(obj: Record<string, unknown>, key: string): unknown {
   return obj[key] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
 }
 
+// ─── JSON Resume normaliser ────────────────────────────────────────────────
+
+/**
+ * Normalise a JSON Resume object to canonical lowercase-key format.
+ *
+ * The JSON Resume spec (https://jsonresume.org/schema) uses lowercase keys
+ * ("basics", "work", "startDate"). Legacy hired.video exports use
+ * PascalCase ("Basics", "Work", "StartDate"). Both are valid input — this
+ * helper produces a single canonical shape so downstream code doesn't
+ * need to branch on casing.
+ *
+ * - Top-level section keys and nested field keys are lowercased to camelCase
+ *   (e.g. "Basics" -> "basics", "StartDate" -> "startDate", "Url" -> "url").
+ * - Arrays are mapped recursively; object properties are remapped.
+ * - Values are passed through unchanged (including null, empty strings,
+ *   dates, etc.) so non-obvious fields survive.
+ * - Unknown top-level keys are preserved (lowercased).
+ */
+export function normalizeJsonResume(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== "object") return {};
+  return remapKeys(input as Record<string, unknown>) as Record<string, unknown>;
+}
+
+function toLowerFirst(key: string): string {
+  if (!key) return key;
+  // Preserve already-lowercase keys; only transform if first char is uppercase
+  if (key[0] === key[0].toLowerCase()) return key;
+  return key.charAt(0).toLowerCase() + key.slice(1);
+}
+
+function remapKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(remapKeys);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[toLowerFirst(k)] = remapKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Detect whether a raw string looks like a JSON Resume document. Returns
+ * the parsed+normalised object when it does, or null otherwise. Accepts
+ * both PascalCase (hired.video legacy exports) and the canonical
+ * jsonresume.org lowercase shape.
+ */
+export function tryParseJsonResume(text: string): Record<string, unknown> | null {
+  if (!text || typeof text !== "string") return null;
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  // Heuristic: at least one recognised JSON Resume top-level key
+  const RESUME_KEYS = ["basics", "Basics", "work", "Work", "education", "Education", "skills", "Skills", "volunteer", "Volunteer", "projects", "Projects"];
+  if (!RESUME_KEYS.some((k) => k in obj)) return null;
+  return normalizeJsonResume(obj);
+}
+
 // ─── metaResume builder ────────────────────────────────────────────────────
 
 function ensureId(

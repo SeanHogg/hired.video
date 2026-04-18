@@ -12,6 +12,8 @@ import {
   isParseComplete as isParseCompleteUtil,
   parseResumeWithRegex as parseResumeWithRegexUtil,
   ciGet,
+  normalizeJsonResume,
+  tryParseJsonResume,
 } from "../services/resume-parse.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 
@@ -536,10 +538,16 @@ export const createResumeHandler = async (c: any) => {
   const parsed = CreateResumeSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
-  // If rawText is provided, parse it with AI to get structured content
-  let content = parsed.data.content;
+  // Resolve content with priority:
+  //   1. Explicit `content` object — normalise keys (client may send
+  //      PascalCase from a JSON Resume export).
+  //   2. `rawText` — try JSON Resume parse first, fall back to AI parse.
+  let content: Record<string, unknown> = parsed.data.content
+    ? normalizeJsonResume(parsed.data.content)
+    : {};
   if (parsed.data.rawText) {
-    content = await parseResumeTextWithAI(c, parsed.data.rawText);
+    const structured = tryParseJsonResume(parsed.data.rawText);
+    content = structured ?? (await parseResumeTextWithAI(c, parsed.data.rawText));
   }
 
   const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
@@ -714,14 +722,21 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   const contentType = c.req.header("Content-Type") ?? "";
 
   let resumeText = "";
+  let preParsed: Record<string, unknown> | null = null;
 
   // Multipart path — file upload
   if (contentType.includes("multipart/form-data")) {
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
     if (file) {
-      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      if (isPdf) {
+      const lower = file.name.toLowerCase();
+      const isPdf = file.type === "application/pdf" || lower.endsWith(".pdf");
+      const isJson = file.type === "application/json" || lower.endsWith(".json");
+      if (isJson) {
+        const raw = await file.text().catch(() => "");
+        preParsed = tryParseJsonResume(raw);
+        if (!preParsed) resumeText = raw;
+      } else if (isPdf) {
         const bytes = await file.arrayBuffer().catch(() => null);
         if (bytes) {
           resumeText = await extractPdfText(new Uint8Array(bytes));
@@ -733,18 +748,28 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   } else {
     // JSON path
     const body = await c.req.json().catch(() => ({}));
-    if (typeof body?.content === "string") {
+    // Accept an already-parsed JSON Resume envelope directly (e.g. Chrome
+    // extension paste of exported JSON)
+    if (body?.parsedContent && typeof body.parsedContent === "object") {
+      preParsed = normalizeJsonResume(body.parsedContent);
+    } else if (typeof body?.content === "string") {
       resumeText = body.content;
     } else if (typeof body?.text === "string") {
       resumeText = body.text;
     }
   }
 
-  if (!resumeText) {
+  if (!preParsed && !resumeText) {
     return c.json(fail("PARSE_FAILED", "Could not extract text from the uploaded file. Try a text-based PDF, DOCX, or paste the text directly."), 422);
   }
 
-  const parsed = await parseResumeTextWithAI(c, resumeText);
+  // Prefer structured JSON Resume over AI parsing when available — this
+  // preserves dates, highlights, and grouping exactly as authored.
+  if (!preParsed && resumeText) {
+    preParsed = tryParseJsonResume(resumeText);
+  }
+
+  const parsed = preParsed ?? (await parseResumeTextWithAI(c, resumeText));
   return c.json(ok({ result: JSON.stringify(parsed) }), 200);
 });
 
@@ -754,14 +779,43 @@ resumeRoutes.post("/createfromfile", async (c) => {
   const file = form?.get("file") as File | null;
   const text = file ? await file.text().catch(() => "") : "";
 
+  // If the upload is a JSON Resume export (PascalCase or lowercase), store
+  // the structured content directly instead of { raw: text } — the latter
+  // forces every downstream consumer (viewer, exporter, merge, scorer)
+  // through regex/AI re-parsing and loses all structure.
+  const lower = file?.name?.toLowerCase() ?? "";
+  const isJson = file?.type === "application/json" || lower.endsWith(".json");
+  const structured = isJson ? tryParseJsonResume(text) : null;
+
+  const content = structured ?? { raw: text };
+  const title = deriveTitleFromContent(content, file?.name) || "Uploaded Resume";
+
   const db = getDb();
   const [created] = await db
     .insert(resumes)
-    .values({ userId: user.sub, title: file?.name || "Uploaded Resume", content: { raw: text }, status: "draft" } as any)
+    .values({ userId: user.sub, title, content, status: "draft" } as any)
     .returning();
 
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
+
+/** Extract a human-friendly title from a JSON Resume content blob. Falls
+ *  back to the provided filename when no suitable title field is found. */
+function deriveTitleFromContent(content: Record<string, unknown> | unknown, filename?: string): string {
+  if (content && typeof content === "object") {
+    const c = content as Record<string, unknown>;
+    const basics = (c.basics ?? c.Basics) as Record<string, unknown> | undefined;
+    if (basics && typeof basics === "object") {
+      const name = basics.name ?? basics.Name;
+      const label = basics.label ?? basics.Label;
+      if (typeof name === "string" && name.trim()) {
+        return typeof label === "string" && label.trim() ? `${name} — ${label}` : name;
+      }
+    }
+  }
+  if (filename) return filename.replace(/\.[^/.]+$/, "");
+  return "";
+}
 
 /**
  * POST /api/resumes/createfromtext
@@ -802,13 +856,20 @@ resumeRoutes.post("/createfromtext", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Resume text is too short or empty. Please try a different file."), 422);
   }
 
+  // If the payload is a JSON Resume document, store it structured.
+  const structured = tryParseJsonResume(text);
+  const content = structured ?? { raw: text };
+  const finalTitle = structured
+    ? (deriveTitleFromContent(structured) || title)
+    : title;
+
   const db = getDb();
   const [created] = await db
     .insert(resumes)
     .values({
       userId: user.sub,
-      title,
-      content: { raw: text },
+      title: finalTitle,
+      content,
       status: "draft",
     } as any)
     .returning();
@@ -1508,9 +1569,15 @@ resumeRoutes.post("/merge/execute", async (c) => {
 });
 
 const MergeFromFileSchema = z.object({
-  text: z.string().min(1),
+  // Either `parsedContent` (pre-parsed JSON Resume, e.g. from a .json upload
+  // normalised client-side) OR raw `text` (PDF/DOCX/TXT extracted text that
+  // still needs AI parsing). Providing `parsedContent` skips the AI step.
+  text: z.string().optional(),
+  parsedContent: z.record(z.string(), z.unknown()).optional(),
   targetResumeId: z.string().uuid(),
   useAI: z.boolean().optional().default(true),
+}).refine((d) => (d.text && d.text.length > 0) || d.parsedContent, {
+  message: "Either text or parsedContent must be provided",
 });
 
 resumeRoutes.post("/merge/from-file", async (c) => {
@@ -1519,14 +1586,33 @@ resumeRoutes.post("/merge/from-file", async (c) => {
   const parsed = MergeFromFileSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
-  const { text, targetResumeId, useAI } = parsed.data;
+  const { text, parsedContent: providedContent, targetResumeId, useAI } = parsed.data;
 
   const db = getDb();
   const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
-  // Parse the uploaded text with AI (reuses existing function in this file)
-  const parsedContent = await parseResumeTextWithAI(c, text);
+  // Resolve parsed content — three paths, in order of fidelity:
+  //   1. Client sent `parsedContent` directly (e.g. .json upload parsed
+  //      client-side): normalise case and use it as-is.
+  //   2. `text` is a JSON Resume document (user pasted JSON or we missed
+  //      the client-side branch): try parsing before falling back to AI.
+  //   3. Raw text from PDF/DOCX/TXT: parse with AI.
+  let parseConfidence = 0.4;
+  let parsedContent: Record<string, unknown>;
+  if (providedContent) {
+    parsedContent = normalizeJsonResume(providedContent);
+    parseConfidence = 1.0; // pre-parsed JSON is canonical
+  } else {
+    const maybeJson = text ? tryParseJsonResume(text) : null;
+    if (maybeJson) {
+      parsedContent = maybeJson;
+      parseConfidence = 1.0;
+    } else {
+      parsedContent = await parseResumeTextWithAI(c, text ?? "");
+      parseConfidence = Object.keys(parsedContent).length > 2 ? 0.8 : 0.4;
+    }
+  }
 
   const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
   const analysis = await analyzeMerge(
@@ -1535,7 +1621,7 @@ resumeRoutes.post("/merge/from-file", async (c) => {
     apiKey || undefined,
   );
 
-  return c.json(ok({ parsedContent, analysis, parseConfidence: Object.keys(parsedContent).length > 2 ? 0.8 : 0.4 }), 200);
+  return c.json(ok({ parsedContent, analysis, parseConfidence }), 200);
 });
 
 resumeRoutes.all("*", (c) => c.json(fail("NOT_IMPLEMENTED", "Resume route not implemented"), 501));
