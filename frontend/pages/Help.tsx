@@ -7,17 +7,17 @@ import {
   Video,
   Users,
   Briefcase,
-  Shield,
-  CreditCard,
   Zap,
   BookOpen,
   ExternalLink,
   ArrowRight,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import { useAI } from "@/lib/ai-context";
 import {
   Accordion,
   AccordionContent,
@@ -53,6 +53,7 @@ export default function Help() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
+  const { openAIChat } = useAI();
   const [searchQuery, setSearchQuery] = useState("");
 
   const faqs = [
@@ -191,6 +192,7 @@ export default function Help() {
       description: "Chat with our support team",
       action: "Start Chat",
       available: "Mon-Fri, 9AM-6PM PST",
+      onClick: () => openAIChat(),
     },
     {
       icon: Mail,
@@ -198,6 +200,7 @@ export default function Help() {
       description: "Send us an email",
       action: "Send Email",
       available: "help@hired.video",
+      href: "mailto:help@hired.video",
     },
     {
       icon: Phone,
@@ -205,6 +208,7 @@ export default function Help() {
       description: "Call our support line",
       action: "Call Now",
       available: "+1 (555) 123-4567",
+      href: "tel:+15551234567",
     },
   ];
 
@@ -393,9 +397,11 @@ export default function Help() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <Button variant="outline" className="w-full gap-2">
-                          Read Guide
-                          <ExternalLink className="h-4 w-4" />
+                        <Button variant="outline" className="w-full gap-2" asChild>
+                          <Link to={resource.link}>
+                            Read Guide
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
                         </Button>
                       </CardContent>
                     </Card>
@@ -412,10 +418,12 @@ export default function Help() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Button className="gap-2">
-                      <Video className="h-4 w-4" />
-                      Watch Tutorials
-                      <ArrowRight className="h-4 w-4" />
+                    <Button className="gap-2" asChild>
+                      <Link to="/guides/tutorials">
+                        <Video className="h-4 w-4" />
+                        Watch Tutorials
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
                     </Button>
                   </CardContent>
                 </Card>
@@ -445,7 +453,15 @@ export default function Help() {
                         <p className="text-sm text-muted-foreground mb-4">
                           {option.available}
                         </p>
-                        <Button className="w-full">{option.action}</Button>
+                        {option.href ? (
+                          <Button className="w-full" asChild>
+                            <a href={option.href}>{option.action}</a>
+                          </Button>
+                        ) : (
+                          <Button className="w-full" onClick={option.onClick}>
+                            {option.action}
+                          </Button>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -463,9 +479,11 @@ export default function Help() {
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 bg-green-500 rounded-full" />
                       <span className="text-sm">All systems operational</span>
-                      <Button variant="link" className="ml-auto p-0 h-auto">
-                        View Status Page
-                        <ExternalLink className="h-3 w-3 ml-1" />
+                      <Button variant="link" className="ml-auto p-0 h-auto" asChild>
+                        <a href="https://status.hired.video" target="_blank" rel="noopener noreferrer">
+                          View Status Page
+                          <ExternalLink className="h-3 w-3 ml-1" />
+                        </a>
                       </Button>
                     </div>
                   </CardContent>

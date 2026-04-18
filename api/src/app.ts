@@ -65,6 +65,7 @@ import { passkeyRoutes } from "./routes/passkeys.js";
 import { atsRoutes } from "./routes/ats.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
+import { autofillRoutes } from "./routes/autofill.js";
 import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { serviceRoutes } from "./routes/services.js";
@@ -369,6 +370,7 @@ export function createApp() {
   app.route("/api/ats", atsRoutes);
   app.route("/api/assessments", assessmentRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
+  app.route("/api/autofill", autofillRoutes);
   app.route("/api/discovery", discoveryRoutes);
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api/services", serviceRoutes);

@@ -8,6 +8,10 @@
  * [vars] in wrangler.toml, or run `wrangler secret put CDN_BASE_URL`.
  */
 export function cdnUrl(key: string): string {
+  // Already an absolute URL — return as-is to avoid doubling the base
+  if (key.startsWith("http://") || key.startsWith("https://")) {
+    return key;
+  }
   const base =
     (globalThis as any).__ENV?.CDN_BASE_URL ||
     process?.env?.CDN_BASE_URL ||

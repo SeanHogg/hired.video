@@ -237,6 +237,16 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "Sign in to hired.video to access your AI video resumes, resume scoring history, job matches, and career dashboard. Sign in with Google, LinkedIn, GitHub, Microsoft, or email.",
     robots: "noindex, nofollow",
   },
+  "/forgot-password": {
+    title: "Reset Password — hired.video",
+    description: "Reset your hired.video password.",
+    robots: "noindex, nofollow",
+  },
+  "/reset-password": {
+    title: "Set New Password — hired.video",
+    description: "Set a new password for your hired.video account.",
+    robots: "noindex, nofollow",
+  },
   "/signup": {
     title: "Sign Up Free — hired.video | AI Video Resumes & Career Tools",
     description:
@@ -437,6 +447,36 @@ export const PAGE_SEO: Record<string, SEOData> = {
     description:
       "Find answers, browse guides, and contact support to get the most from hired.video.",
     keywords: "help, support, FAQ, user guide, customer service",
+  },
+  "/guides/getting-started": {
+    title: "Getting Started Guide - hired.video",
+    description:
+      "Step-by-step guide to creating your account, profile, resume, and first video resume on hired.video.",
+    keywords: "getting started, setup guide, video resume tutorial, profile setup",
+  },
+  "/guides/video-best-practices": {
+    title: "Video Resume Best Practices - hired.video",
+    description:
+      "Tips for creating compelling video resumes: lighting, audio, scripting, body language, and AI tools.",
+    keywords: "video resume tips, best practices, recording tips, video interview",
+  },
+  "/guides/networking": {
+    title: "Networking Tips - hired.video",
+    description:
+      "Build professional connections on hired.video. Tips for messaging, engagement, and outreach.",
+    keywords: "networking tips, professional connections, outreach, messaging",
+  },
+  "/guides/job-search": {
+    title: "Job Search Strategies - hired.video",
+    description:
+      "Proven job search strategies using hired.video tools: resume optimization, job alerts, AI coaching.",
+    keywords: "job search, job hunting, career strategy, resume optimization, interview prep",
+  },
+  "/guides/tutorials": {
+    title: "Video Tutorials - hired.video",
+    description:
+      "Watch step-by-step video tutorials to master hired.video features and tools.",
+    keywords: "tutorials, video guides, how-to, learn hired.video",
   },
   "/tools": {
     title: "Free AI Career Tools — Resume Scorer, Optimizer, Value Prop | hired.video",

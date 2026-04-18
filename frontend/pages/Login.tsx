@@ -129,10 +129,9 @@ export default function Login() {
         <div className="pt-16 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
-              <h1 className="text-2xl font-bold text-center mb-6">Sign in to hired.video</h1>
             <Card>
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Welcome back</CardTitle>
+                <h1 className="text-2xl font-semibold leading-none tracking-tight">Welcome back</h1>
                 <CardDescription>Sign in to your hired.video account</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">

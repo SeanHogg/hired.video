@@ -82,6 +82,11 @@ const ResumeConsolidator = lazy(() => import("./pages/tools/ResumeConsolidator")
 const Outreach = lazy(() => import("./pages/Outreach"));
 const PhoneDashboard = lazy(() => import("./pages/PhoneDashboard"));
 const Help = lazy(() => import("./pages/Help"));
+const GettingStartedGuide = lazy(() => import("./pages/guides/GettingStarted"));
+const VideoBestPracticesGuide = lazy(() => import("./pages/guides/VideoBestPractices"));
+const NetworkingTipsGuide = lazy(() => import("./pages/guides/NetworkingTips"));
+const JobSearchStrategiesGuide = lazy(() => import("./pages/guides/JobSearchStrategies"));
+const TutorialsGuide = lazy(() => import("./pages/guides/Tutorials"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
@@ -542,6 +547,11 @@ const App = () => (
 
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/help" element={<Help />} />
+                      <Route path="/guides/getting-started" element={<GettingStartedGuide />} />
+                      <Route path="/guides/video-best-practices" element={<VideoBestPracticesGuide />} />
+                      <Route path="/guides/networking" element={<NetworkingTipsGuide />} />
+                      <Route path="/guides/job-search" element={<JobSearchStrategiesGuide />} />
+                      <Route path="/guides/tutorials" element={<TutorialsGuide />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/contact-us" element={<Navigate to="/contact" replace />} />
                       <Route
