@@ -12,7 +12,7 @@ import {
   List,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
 import Footer from "@/components/Footer";
@@ -52,7 +52,16 @@ export default function Companies() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
   const { isAuthenticated, user } = useAuth();
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
+    urlQuery ? { search: urlQuery } : {},
+  );
+  useEffect(() => {
+    setSearchFilters((prev) =>
+      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
+    );
+  }, [urlQuery]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -229,6 +238,7 @@ export default function Companies() {
                     onSearch={handleSearch}
                     onFilterChange={handleFilterChange}
                     onClearFilters={handleClearFilters}
+                    hideSearchInput
                   />
                 </div>
                 <div className="flex items-center border rounded-md">

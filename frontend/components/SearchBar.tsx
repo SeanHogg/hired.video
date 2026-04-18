@@ -77,6 +77,11 @@ export interface SearchBarProps {
   onClearFilters?: () => void;
   viewMode?: "grid" | "list";
   onViewModeChange?: (_mode: "grid" | "list") => void;
+  /**
+   * When true, hides the inline text input (the header provides search).
+   * Filter/Advanced/view-mode controls remain visible.
+   */
+  hideSearchInput?: boolean;
 }
 
 const contextConfig = {
@@ -131,6 +136,7 @@ export default function SearchBar({
   onClearFilters,
   viewMode,
   onViewModeChange,
+  hideSearchInput = false,
 }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState(value);
   const [showFilters, setShowFilters] = useState(false);
@@ -504,15 +510,17 @@ export default function SearchBar({
     <div className={`space-y-4 ${className}`}>
       {/* Main Search Bar */}
       <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder={placeholder || config.placeholder}
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-10 min-h-[44px]"
-          />
-        </div>
+        {!hideSearchInput && (
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder={placeholder || config.placeholder}
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10 min-h-[44px]"
+            />
+          </div>
+        )}
 
         {/* Quick Filter Buttons */}
         <div className="flex gap-2 flex-shrink-0">

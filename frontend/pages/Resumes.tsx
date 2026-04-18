@@ -27,7 +27,7 @@ import {
   Power,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -168,7 +168,16 @@ export default function Resumes() {
     masterResumeId: "",
     masterResumeName: "",
   });
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
+    urlQuery ? { search: urlQuery } : {},
+  );
+  useEffect(() => {
+    setSearchFilters((prev) =>
+      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
+    );
+  }, [urlQuery]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(
@@ -1372,6 +1381,7 @@ export default function Resumes() {
                       onSearch={handleSearch}
                       onFilterChange={handleFilterChange}
                       onClearFilters={handleClearFilters}
+                      hideSearchInput
                     />
                   </div>
 

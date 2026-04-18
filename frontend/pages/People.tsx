@@ -139,7 +139,15 @@ export default function People() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "People", url: "/people" }]);
   const { isAuthenticated, user } = useAuth();
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  const urlQuery = searchParams.get("q") ?? "";
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
+    urlQuery ? { search: urlQuery } : {},
+  );
+  useEffect(() => {
+    setSearchFilters((prev) =>
+      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
+    );
+  }, [urlQuery]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -810,6 +818,7 @@ export default function People() {
                           onSearch={handleSearch}
                           onFilterChange={handleFilterChange}
                           onClearFilters={handleClearFilters}
+                          hideSearchInput
                         />
                       </div>
                       <div className="flex items-center border rounded-md">
@@ -1229,6 +1238,7 @@ export default function People() {
                         onSearch={handleSearch}
                         onFilterChange={handleFilterChange}
                         onClearFilters={handleClearFilters}
+                        hideSearchInput
                       />
                     </div>
                     <div className="flex items-center border rounded-md">

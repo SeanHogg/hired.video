@@ -20,6 +20,7 @@ import * as React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
+import FeaturedTools from "@/components/FeaturedTools";
 import Footer from "@/components/Footer";
 import LatestGuides from "@/components/LatestGuides";
 import Navigation from "@/components/Navigation";
@@ -903,6 +904,8 @@ export default function Index() {
             </div>
           </section>
         )}
+
+        <FeaturedTools />
 
         <LatestGuides />
 

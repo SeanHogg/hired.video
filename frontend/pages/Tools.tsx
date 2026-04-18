@@ -41,7 +41,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -59,15 +58,10 @@ export default function Tools() {
   // SEO for tools page
   useSEO(location.pathname);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const urlQuery = searchParams.get("q") ?? "";
-  const [toolQuery, setToolQuery] = useState(urlQuery);
+  const [searchParams] = useSearchParams();
+  const toolQuery = searchParams.get("q") ?? "";
   const toolsGridRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    setToolQuery(urlQuery);
-  }, [urlQuery]);
 
   useEffect(() => {
     const grid = toolsGridRef.current;
@@ -86,14 +80,6 @@ export default function Tools() {
     });
     setVisibleCount(q === "" ? null : shown);
   }, [toolQuery]);
-
-  const handleToolSearch = (value: string) => {
-    setToolQuery(value);
-    const next = new URLSearchParams(searchParams);
-    if (value.trim()) next.set("q", value);
-    else next.delete("q");
-    setSearchParams(next, { replace: true });
-  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -1386,28 +1372,18 @@ export default function Tools() {
               job search.
             </p>
 
-            {/* Tool search */}
-            <div className="mb-6 max-w-xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={toolQuery}
-                  onChange={(e) => handleToolSearch(e.target.value)}
-                  placeholder="Search tools (e.g. resume, salary, interview)"
-                  className="pl-9 h-10"
-                  aria-label="Search tools"
-                />
-              </div>
-              {visibleCount !== null && (
-                <p className="text-xs text-muted-foreground mt-2">
+            {/* Header search drives tool filtering via ?q= */}
+            {visibleCount !== null && (
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
                   {visibleCount} tool{visibleCount === 1 ? "" : "s"} match
                   {visibleCount === 1 ? "es" : ""}{" "}
                   <span className="font-medium text-foreground">
                     &quot;{toolQuery}&quot;
                   </span>
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Unified Tools Grid */}
             <div className="mb-8 sm:mb-12">

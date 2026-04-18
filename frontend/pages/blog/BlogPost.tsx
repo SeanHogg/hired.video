@@ -95,15 +95,19 @@ export default function BlogPost() {
   if (!post) return <Navigate to="/blog" replace />;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen bg-background">
       <Sidebar
         isOpen={sidebarOpen}
         collapsed={sidebarCollapsed}
         onClose={closeSidebar}
       />
-      <div className="flex-1 flex flex-col min-h-screen">
-        <Navigation onMenuClick={openSidebar} />
-        <article className="flex-1 container mx-auto px-4 pt-20 pb-8 max-w-3xl">
+      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
+        <Navigation
+          onMenuClick={openSidebar}
+          onSidebarToggle={toggleSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+        <article className="container mx-auto px-4 pt-20 pb-8 max-w-3xl">
           {/* Back link */}
           <Link
             to="/blog"
