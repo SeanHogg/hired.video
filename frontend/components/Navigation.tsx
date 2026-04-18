@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import HeaderSearch from "@/components/HeaderSearch";
 import ShoppingCart from "@/components/ShoppingCart";
 import CommunicationHub from "@/components/CommunicationHub";
 import { Badge } from "@/components/ui/badge";
@@ -184,6 +185,13 @@ export default function Navigation({
               </span>
             </Link>
           </div>
+
+          {/* Header search — hidden on the home page where the hero search is already prominent */}
+          {location.pathname !== "/" && (
+            <div className="flex-1 max-w-xl mx-4 hidden sm:block">
+              <HeaderSearch />
+            </div>
+          )}
 
           {/* Desktop Navigation - Hidden on mobile */}
           <div className="hidden md:flex items-center space-x-8">
