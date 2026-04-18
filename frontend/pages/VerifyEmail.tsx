@@ -57,9 +57,16 @@ export default function VerifyEmail(): JSX.Element {
     setTokenVerifying(true);
     apiClient
       .post("/api/auth/verify-email", { token: verifyToken })
-      .then(() => {
+      .then(async () => {
         setTokenVerified(true);
         setTokenVerifying(false);
+        // Refresh auth-context verification state before navigating so the
+        // global gate doesn't bounce the user back here on arrival.
+        try {
+          await getVerificationStatus();
+        } catch {
+          // no-op — gate will re-check on next request
+        }
         // Give the user a moment to see the success message, then redirect
         setTimeout(() => navigate(redirect, { replace: true }), 2500);
       })

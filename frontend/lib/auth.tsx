@@ -535,7 +535,12 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const getVerificationStatus = async (): Promise<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number }> => {
     try {
-      return await authService.getVerificationStatus();
+      const status = await authService.getVerificationStatus();
+      // Keep context state in sync so GlobalVerificationGate doesn't bounce
+      // the user back to /verify-email after they confirm on another device
+      // and click "I already verified".
+      setIsEmailVerified(status.emailConfirmed);
+      return status;
     } catch (error) {
       console.error("AuthContext.getVerificationStatus: failed", error);
       throw error;
