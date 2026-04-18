@@ -23,6 +23,7 @@ import {
   FolderOpen,
   Trophy,
   Play,
+  Edit,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
@@ -497,6 +498,18 @@ export default function ResumeDetail() {
                       </span>
                     </Badge>
                   </div>
+
+                  {isOwner && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigate(`/resumes/edit/${resume.id}`)}
+                      aria-label="Edit Resume"
+                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  )}
 
                   <ResumeActionsMenu
                     isOwner={isOwner}
