@@ -215,6 +215,21 @@ export default function Resumes() {
     }
   }, [id, isAuthenticated]);
 
+  // The Chrome extension's side panel can upload resumes into the same
+  // account while this page is open. The extension's auth-bridge content
+  // script forwards a window-level CustomEvent on successful upload —
+  // listen for it here and re-fetch so the new row appears without the
+  // user having to hit F5. No-op when the extension isn't installed.
+  useEffect(() => {
+    if (!isAuthenticated || id) return;
+    const onExtensionEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.type === 'resume-changed') loadResumes();
+    };
+    window.addEventListener('hired.video:extension-event', onExtensionEvent);
+    return () => window.removeEventListener('hired.video:extension-event', onExtensionEvent);
+  }, [isAuthenticated, id]);
+
   const loadResumes = async () => {
     setLoading(true);
     setError(null);
