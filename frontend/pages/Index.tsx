@@ -725,9 +725,9 @@ export default function Index() {
                     {paginatedItems.map((item) => (
                       <div
                         key={item.id}
-                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors overflow-hidden"
                       >
-                        <div className="flex items-start gap-4">
+                        <div className="flex items-start gap-4 min-w-0">
                           <div className="flex-shrink-0">
                             {item.type === "people" && item.avatar && (
                               <img
@@ -755,8 +755,8 @@ export default function Index() {
                               )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between">
-                              <div>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
                                 <h3 className="font-semibold text-lg truncate">
                                   <button
                                     onClick={() => {
@@ -786,15 +786,15 @@ export default function Index() {
                                         }
                                       }
                                     }}
-                                    className="text-left hover:text-primary transition-colors cursor-pointer"
+                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
                                   >
                                     {item.name ?? item.title ?? ""}
                                   </button>
                                 </h3>
-                                <p className="text-muted-foreground">
+                                <p className="text-muted-foreground truncate">
                                   {item.title}
                                 </p>
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-words">
                                   {item.summary}
                                 </p>
                               </div>

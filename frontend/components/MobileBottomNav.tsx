@@ -10,6 +10,7 @@ import {
   PlusSquare,
   Share2,
   Shield,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -21,6 +22,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  accent?: boolean;
 };
 
 /** Return the 5 footer items for the given role. Keeps Home first and the
@@ -30,9 +32,9 @@ function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] 
     return [
       { label: "Home", href: "/", icon: Home },
       { label: "Jobs", href: "/jobs", icon: Briefcase },
-      { label: "Resumes", href: "/resumes", icon: FileText },
+      { label: "Tools", href: "/tools", icon: Wrench },
       { label: "People", href: "/people", icon: Users },
-      { label: "Login", href: "/login", icon: LogIn },
+      { label: "Login", href: "/login", icon: LogIn, accent: true },
     ];
   }
 
@@ -107,11 +109,15 @@ export default function MobileBottomNav() {
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 py-2 px-2 text-xs",
                     "min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    item.accent
+                      ? "mx-1 my-1 rounded-lg bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-sm hover:opacity-90 font-semibold"
+                      : active
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className={cn("h-5 w-5", active && "text-primary")} />
+                  <Icon className={cn("h-5 w-5", active && !item.accent && "text-primary")} />
                   <span>{item.label}</span>
                 </Link>
               </li>
