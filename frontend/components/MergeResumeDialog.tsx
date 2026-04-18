@@ -165,13 +165,10 @@ export default function MergeResumeDialog({
         });
       }
 
-      // For file-based merge, we need a temporary resume created from the parsed content
-      // or we pass the source resume ID
-      const effectiveSourceId = sourceId;
-      if (!effectiveSourceId) {
+      if (!sourceId && !sourceContent) {
         toast({
           title: "Error",
-          description: "File-based merge execution requires creating a temporary resume first. Please use resume-to-resume merge.",
+          description: "No source resume or parsed content available for merging.",
           variant: "destructive",
         });
         setLoading(false);
@@ -179,7 +176,8 @@ export default function MergeResumeDialog({
       }
 
       const result: MergeResult = await resumeService.executeMerge({
-        sourceResumeId: effectiveSourceId,
+        // For file-based merges (no sourceId), send the parsed content inline
+        ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
         targetResumeId: targetId,
         decisions: allDecisions,
         basicDecisions,

@@ -1272,7 +1272,9 @@ resumeRoutes.post("/merge/analyze", async (c) => {
 });
 
 const MergeExecuteSchema = z.object({
-  sourceResumeId: z.string().uuid(),
+  // Source is either an existing resume ID or inline parsed content (file-based merges)
+  sourceResumeId: z.string().uuid().optional(),
+  sourceContent: z.record(z.string(), z.unknown()).optional(),
   targetResumeId: z.string().uuid(),
   decisions: z.array(z.object({
     sectionType: z.string(),
@@ -1284,6 +1286,8 @@ const MergeExecuteSchema = z.object({
   basicDecisions: z.record(z.string(), z.enum(["source", "target"])).optional(),
   createNew: z.boolean(),
   newTitle: z.string().optional(),
+}).refine((d) => d.sourceResumeId || d.sourceContent, {
+  message: "Either sourceResumeId or sourceContent must be provided",
 });
 
 resumeRoutes.post("/merge/execute", async (c) => {
@@ -1292,17 +1296,25 @@ resumeRoutes.post("/merge/execute", async (c) => {
   const parsed = MergeExecuteSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
-  const { sourceResumeId, targetResumeId, decisions, basicDecisions, createNew, newTitle } = parsed.data;
+  const { sourceResumeId, sourceContent, targetResumeId, decisions, basicDecisions, createNew, newTitle } = parsed.data;
 
   const db = getDb();
-  const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
   const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
-  if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
+
+  // Resolve source: either load from DB or use inline content
+  let resolvedSourceContent: Record<string, any>;
+  if (sourceResumeId) {
+    const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+    if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
+    resolvedSourceContent = (source.content ?? {}) as Record<string, any>;
+  } else {
+    resolvedSourceContent = (sourceContent ?? {}) as Record<string, any>;
+  }
 
   const mergedContent = executeMerge(
     (target.content ?? {}) as Record<string, any>,
-    (source.content ?? {}) as Record<string, any>,
+    resolvedSourceContent,
     decisions as MergeDecision[],
     basicDecisions,
   );

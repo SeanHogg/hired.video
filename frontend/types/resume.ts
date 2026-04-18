@@ -297,7 +297,9 @@ export interface MergeDecision {
 }
 
 export interface MergeRequest {
-  sourceResumeId: string;
+  // Either sourceResumeId (resume-to-resume) or sourceContent (file-based merge)
+  sourceResumeId?: string;
+  sourceContent?: Record<string, unknown>;
   targetResumeId: string;
   decisions: MergeDecision[];
   basicDecisions?: Record<string, "source" | "target">;

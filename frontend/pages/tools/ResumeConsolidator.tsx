@@ -173,7 +173,9 @@ export default function ResumeConsolidator() {
   }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel, isAuthenticated, snapshot]);
 
   const handleExecute = useCallback(async () => {
-    if (!targetId || !analysis || !sourceId) return;
+    if (!targetId || !analysis) return;
+    // Must have either an existing source resume OR parsed source content (file-based)
+    if (!sourceId && !sourceContent) return;
     setLoading(true);
     setError(null);
 
@@ -191,7 +193,8 @@ export default function ResumeConsolidator() {
       }
 
       const result: MergeResult = await resumeService.executeMerge({
-        sourceResumeId: sourceId,
+        // For file-based merges (no sourceId), send the parsed content inline
+        ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
         targetResumeId: targetId,
         decisions: allDecisions,
         basicDecisions,
@@ -218,7 +221,7 @@ export default function ResumeConsolidator() {
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch, clear]);
+  }, [targetId, sourceId, sourceContent, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch, clear]);
 
   // Anonymous users can't pick a target (empty saved-resume list) so
   // let them click Analyze with just a source — the soft-gate will
@@ -526,7 +529,7 @@ export default function ResumeConsolidator() {
                   size="lg"
                   className="w-full"
                   onClick={handleExecute}
-                  disabled={loading || !sourceId}
+                  disabled={loading || (!sourceId && !sourceContent)}
                 >
                   {loading ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Merging...</>
