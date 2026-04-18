@@ -376,8 +376,17 @@ const extractHandler = async (c: any) => {
         const db = getDb();
         await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
       }
-      const dedupApplyUrl = parsed.applyUrl || dedup.existingJob.sourceUrl || sourceUrl || undefined;
-      return c.json(success({ ...dedup.existingJob, applyUrl: dedupApplyUrl }), 200);
+      return c.json(
+        success({
+          ...dedup.existingJob,
+          applyUrl: jobService.deriveApplyUrl({
+            parsed,
+            job: dedup.existingJob,
+            fallbackUrl: sourceUrl,
+          }),
+        }),
+        200,
+      );
     }
 
     if (dedup.outcome === 'fuzzy' && dedup.existingJob) {
@@ -386,8 +395,17 @@ const extractHandler = async (c: any) => {
         const db = getDb();
         await db.insert(jobService.schema_savedJobs).values({ userId, jobId: dedup.existingJob.id }).onConflictDoNothing();
       }
-      const dedupApplyUrl = parsed.applyUrl || dedup.existingJob.sourceUrl || sourceUrl || undefined;
-      return c.json(success({ ...dedup.existingJob, applyUrl: dedupApplyUrl }), 200);
+      return c.json(
+        success({
+          ...dedup.existingJob,
+          applyUrl: jobService.deriveApplyUrl({
+            parsed,
+            job: dedup.existingJob,
+            fallbackUrl: sourceUrl,
+          }),
+        }),
+        200,
+      );
     }
 
     if (dedup.candidates && dedup.candidates.length > 0) {
@@ -435,11 +453,7 @@ const extractHandler = async (c: any) => {
     { track },
   );
 
-  // Attach applyUrl from the parsed data — this is the direct application
-  // link (e.g. Workday, Greenhouse) which may differ from the sourceUrl
-  // (where the job was found). Falls back to sourceUrl if none was extracted.
-  const applyUrl = parsed.applyUrl || sourceUrl || undefined;
-
+  const applyUrl = jobService.deriveApplyUrl({ parsed, fallbackUrl: sourceUrl });
   return c.json(success({ ...created, applyUrl }), 201);
 };
 jobRoutes.post("/Extract", extractHandler);
@@ -509,9 +523,18 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
     url,
     missingFields,
   });
+
   if (updatedFields.length === 0) {
     // Nothing to do — return the row as-is so the client can no-op gracefully.
-    return c.json(success({ ...row, updated: false, updatedFields: [] }), 200);
+    return c.json(
+      success({
+        ...row,
+        applyUrl: jobService.deriveApplyUrl({ parsed, job: row, fallbackUrl: url }),
+        updated: false,
+        updatedFields: [],
+      }),
+      200,
+    );
   }
 
   updates.updatedAt = new Date();
@@ -524,8 +547,7 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
   return c.json(
     success({
       ...updatedRow,
-      // applyUrl is derived (not a column) — mirror the /extract response shape.
-      applyUrl: parsed.applyUrl || updatedRow.sourceUrl || undefined,
+      applyUrl: jobService.deriveApplyUrl({ parsed, job: updatedRow, fallbackUrl: url }),
       updated: true,
       updatedFields,
     }),

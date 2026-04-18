@@ -24,6 +24,7 @@ import { strict as assert } from "node:assert";
 
 import {
   computeRefreshBackfill,
+  deriveApplyUrl,
   extractAndClassifyJob,
 } from "../job.js";
 
@@ -289,6 +290,69 @@ describe("computeRefreshBackfill", () => {
     });
     assert.deepEqual(updates, {});
     assert.deepEqual(updatedFields, []);
+  });
+});
+
+// =====================================================================
+// deriveApplyUrl — DRY helper used by /extract, /refresh, and dedup paths
+// =====================================================================
+describe("deriveApplyUrl", () => {
+  it("prefers parsed.applyUrl above all other signals", () => {
+    assert.equal(
+      deriveApplyUrl({
+        parsed: { applyUrl: "https://workday.example.com/apply/42" },
+        job: { sourceUrl: "https://careers.example.com/jobs/42" },
+        fallbackUrl: "https://example.com/",
+      }),
+      "https://workday.example.com/apply/42",
+    );
+  });
+
+  it("falls back to job.sourceUrl when parsed.applyUrl is missing", () => {
+    assert.equal(
+      deriveApplyUrl({
+        parsed: { applyUrl: undefined },
+        job: { sourceUrl: "https://careers.example.com/jobs/42" },
+        fallbackUrl: "https://example.com/",
+      }),
+      "https://careers.example.com/jobs/42",
+    );
+  });
+
+  it("falls back to fallbackUrl when both parsed.applyUrl and job.sourceUrl are missing", () => {
+    assert.equal(
+      deriveApplyUrl({
+        parsed: { applyUrl: undefined },
+        job: { sourceUrl: null },
+        fallbackUrl: "https://example.com/current-page",
+      }),
+      "https://example.com/current-page",
+    );
+  });
+
+  it("returns undefined when every signal is empty", () => {
+    assert.equal(deriveApplyUrl({}), undefined);
+    assert.equal(
+      deriveApplyUrl({ parsed: {}, job: { sourceUrl: "" }, fallbackUrl: "" }),
+      undefined,
+    );
+  });
+
+  it("treats null and empty-string stored sourceUrl as absent (keeps falling through)", () => {
+    assert.equal(
+      deriveApplyUrl({
+        job: { sourceUrl: null },
+        fallbackUrl: "https://fb.example.com/",
+      }),
+      "https://fb.example.com/",
+    );
+    assert.equal(
+      deriveApplyUrl({
+        job: { sourceUrl: "" },
+        fallbackUrl: "https://fb.example.com/",
+      }),
+      "https://fb.example.com/",
+    );
   });
 });
 

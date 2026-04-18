@@ -1228,6 +1228,41 @@ export async function updateJob(
 }
 
 /**
+ * Single source of truth for deriving the public "apply URL" that
+ * job-response payloads expose to the extension.
+ *
+ * Not a DB column — computed at response time from three signals, in
+ * priority order:
+ *
+ *   1. `parsed.applyUrl` — direct-apply link the extractor pulled from
+ *      JSON-LD (`directApply` / `url` field) or heuristics. Most
+ *      specific: the posting explicitly told us where to apply.
+ *   2. `job.sourceUrl` — the URL the job was tracked from. When the
+ *      posting doesn't carry a direct-apply link, the listing page
+ *      itself is the next-best destination.
+ *   3. `fallbackUrl` — the URL the client is currently on. Last
+ *      resort for the rare `/extract` path where we have neither of
+ *      the above.
+ *
+ * Previously inlined in five call sites inside /extract, /refresh,
+ * and the dedup branches — the formula drifted between them (one
+ * path forgot the fallbackUrl, my initial /refresh no-op path forgot
+ * to compute it at all). Centralising prevents that class of bug.
+ */
+export function deriveApplyUrl(args: {
+  parsed?: { applyUrl?: string | null };
+  job?: { sourceUrl?: string | null };
+  fallbackUrl?: string | null;
+}): string | undefined {
+  return (
+    args.parsed?.applyUrl ||
+    args.job?.sourceUrl ||
+    args.fallbackUrl ||
+    undefined
+  );
+}
+
+/**
  * Compute the backfill diff for `POST /api/jobs/:id/refresh`. Extracted
  * from the route so the merge policy is directly unit-testable.
  *
