@@ -28,6 +28,7 @@ import {
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { ExtensionsSettings } from "@/components/ExtensionsSettings";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -1416,6 +1417,11 @@ function SettingsContent() {
                   </CardContent>
                 </Card>
                 */}
+              </TabsContent>
+
+              {/* Chrome Extensions Tab */}
+              <TabsContent value="extensions" className="space-y-6">
+                <ExtensionsSettings />
               </TabsContent>
 
               {/* Security Tab */}

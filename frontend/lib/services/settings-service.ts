@@ -116,6 +116,29 @@ export const AllSettingsSchema = z.object({
   security: SecuritySettingsSchema,
 });
 
+// Shape mirrors the bundle persisted in account_preferences.extension_settings.
+// Both surfaces (jobseeker + recruiter sidepanels) and the web
+// /settings?tab=extensions page read/write this object.
+export const ExtensionJobseekerSettingsSchema = z.object({
+  autoDetect: z.boolean(),
+  autoScore: z.boolean(),
+  autoTailor: z.boolean(),
+  wizardMode: z.boolean(),
+  downloadFormat: z.string(),
+});
+
+export const ExtensionRecruiterSettingsSchema = z.object({
+  autoDetectJobs: z.boolean(),
+  autoDetectProfiles: z.boolean(),
+  autoDetectCompanies: z.boolean(),
+  autoScore: z.boolean(),
+});
+
+export const ExtensionSettingsSchema = z.object({
+  jobseeker: ExtensionJobseekerSettingsSchema,
+  recruiter: ExtensionRecruiterSettingsSchema,
+});
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -126,6 +149,14 @@ export type JobPreferences = z.infer<typeof JobPreferencesSchema>;
 export type AccountSettings = z.infer<typeof AccountSettingsSchema>;
 export type SecuritySettings = z.infer<typeof SecuritySettingsSchema>;
 export type AllSettings = z.infer<typeof AllSettingsSchema>;
+export type ExtensionSettings = z.infer<typeof ExtensionSettingsSchema>;
+export type ExtensionJobseekerSettings = z.infer<typeof ExtensionJobseekerSettingsSchema>;
+export type ExtensionRecruiterSettings = z.infer<typeof ExtensionRecruiterSettingsSchema>;
+
+// Deep-partial helper for patch-style updates to ExtensionSettings.
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
 
 // ============================================================================
 // SETTINGS SERVICE CLASS
