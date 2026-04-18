@@ -300,9 +300,6 @@ export default function ResumeViewerPreview() {
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="ghost" size="sm" onClick={() => navigate(`/resumes/${id}`)}>
-                  <ArrowLeft className="w-4 h-4 mr-2" />Back to Resume
-                </Button>
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <Eye className="w-3 h-3" />
                   Preview · <span className="font-mono">{descriptor.name}</span>
@@ -333,23 +330,6 @@ export default function ResumeViewerPreview() {
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
-                )}
-                {resume && (
-                  <ResumeActionsMenu
-                    isOwner={isOwner}
-                    isActive={resume.isActive}
-                    isMaster={resume.isMaster}
-                    parentId={resume.parentId}
-                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
-                    onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
-                    onDownload={handlePdf}
-                    onChangePrivacy={handleChangePrivacy}
-                    onPromoteToMaster={handlePromoteToMaster}
-                    onDelete={handleDelete}
-                    triggerVariant="outline"
-                    triggerClassName="h-7 px-2"
-                  />
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -404,6 +384,23 @@ export default function ResumeViewerPreview() {
                   <Code2 className="w-4 h-4 mr-1" />
                   {editorOpen ? "Hide JSON" : "Edit JSON"}
                 </Button>
+
+                {resume && (
+                  <ResumeActionsMenu
+                    isOwner={isOwner}
+                    isActive={resume.isActive}
+                    isMaster={resume.isMaster}
+                    parentId={resume.parentId}
+                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
+                    onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onDownload={handlePdf}
+                    onChangePrivacy={handleChangePrivacy}
+                    onPromoteToMaster={handlePromoteToMaster}
+                    onDelete={handleDelete}
+                    triggerVariant="outline"
+                  />
+                )}
               </div>
             </div>
           </div>
