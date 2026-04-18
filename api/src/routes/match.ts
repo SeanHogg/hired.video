@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
@@ -18,17 +18,15 @@ matchRoutes.use("*", attachTokenBudget());
 // =====================================================================
 
 /** Shared input shape for analyze + tailor. Accepts EITHER raw HTML
- *  (from the content-script capture) OR a jobId (DB rehydration).
- *  `priorRecommendations` lets the tailor endpoint receive the gap
- *  analysis from a previous /analyze call so the LLM can target those
- *  specific weaknesses when rewriting the resume. */
+ *  (from the content-script capture) OR a jobId (DB rehydration). The
+ *  backend derives `sourceUrl` from the jobItems row and
+ *  `priorRecommendations` from the match_scores cache — callers should
+ *  NOT echo either field back. */
 const MatchInputSchema = z
   .object({
     jobHtml: z.string().optional(),
     jobId: z.string().uuid().optional(),
     resumeId: z.string().uuid().optional(),
-    sourceUrl: z.string().optional(),
-    priorRecommendations: z.string().optional(),
   })
   .refine((v) => !!(v.jobHtml || v.jobId), {
     message: "Either jobHtml or jobId is required",
@@ -93,10 +91,14 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-/** Resolve job text from raw HTML or a DB row by ID. Returns capped text. */
-async function resolveJobText(input: { jobHtml?: string; jobId?: string }): Promise<string | null> {
+/** Resolve job text + metadata from raw HTML or a DB row by ID.
+ *  `sourceUrl` and `jobId` are only populated for the DB-row path — HTML
+ *  input is one-shot and doesn't correspond to a persisted job. */
+async function resolveJob(input: { jobHtml?: string; jobId?: string }): Promise<
+  { text: string; sourceUrl?: string; jobId?: string } | null
+> {
   if (input.jobHtml && input.jobHtml.trim().length > 0) {
-    return htmlToText(input.jobHtml).slice(0, TEXT_CAP);
+    return { text: htmlToText(input.jobHtml).slice(0, TEXT_CAP) };
   }
   if (!input.jobId) return null;
 
@@ -130,7 +132,11 @@ async function resolveJobText(input: { jobHtml?: string; jobId?: string }): Prom
     parts.push(`\nSkills: ${(row.skillsRequired as string[]).join(", ")}`);
   }
 
-  return parts.join("\n").slice(0, TEXT_CAP);
+  return {
+    text: parts.join("\n").slice(0, TEXT_CAP),
+    sourceUrl: row.sourceUrl ?? undefined,
+    jobId: row.id,
+  };
 }
 
 // resumeContentToText is imported from ../services/resume-parse.js and
@@ -183,6 +189,62 @@ function recordMatchUsage(userId: string, featureKey: string, usage: LLMUsage) {
   });
 }
 
+/** Upsert the latest /analyze result so /tailor can read priorRecommendations
+ *  server-side. No-op when we don't have a persisted jobId (HTML-only path). */
+async function saveMatchScore(args: {
+  userId: string;
+  jobId?: string;
+  resumeId: string;
+  score: number;
+  recommendations: string;
+}): Promise<void> {
+  if (!args.jobId) return;
+  const db = getDb();
+  await db
+    .insert(schema.resumeMatchScores)
+    .values({
+      userId: args.userId,
+      jobId: args.jobId,
+      resumeId: args.resumeId,
+      score: args.score,
+      recommendations: args.recommendations,
+    })
+    .onConflictDoUpdate({
+      target: [
+        schema.resumeMatchScores.userId,
+        schema.resumeMatchScores.jobId,
+        schema.resumeMatchScores.resumeId,
+      ],
+      set: {
+        score: args.score,
+        recommendations: args.recommendations,
+        updatedAt: sql`now()`,
+      },
+    });
+}
+
+/** Fetch the most recent /analyze recommendations for use by /tailor. */
+async function loadPriorRecommendations(args: {
+  userId: string;
+  jobId?: string;
+  resumeId: string;
+}): Promise<string | undefined> {
+  if (!args.jobId) return undefined;
+  const db = getDb();
+  const [row] = await db
+    .select({ recommendations: schema.resumeMatchScores.recommendations })
+    .from(schema.resumeMatchScores)
+    .where(
+      and(
+        eq(schema.resumeMatchScores.userId, args.userId),
+        eq(schema.resumeMatchScores.jobId, args.jobId),
+        eq(schema.resumeMatchScores.resumeId, args.resumeId),
+      ),
+    )
+    .limit(1);
+  return row?.recommendations || undefined;
+}
+
 // =====================================================================
 // Shared pipeline: auth → usage-check → parse → resolve → call LLM
 // =====================================================================
@@ -192,9 +254,11 @@ interface PipelineContext {
   jobText: string;
   resumeText: string;
   resumeId: string;
+  /** Populated only when input supplies jobId — derived from jobItems row. */
+  jobId?: string;
+  /** Derived from jobItems.sourceUrl — callers should not send this. */
   sourceUrl?: string;
   apiKey?: string;
-  priorRecommendations?: string;
 }
 
 /** Common auth + resolve logic for analyze/tailor/byid. Returns either
@@ -210,17 +274,25 @@ async function resolveMatchContext(c: Context<{ Variables: Variables }>): Promis
   const parsed = MatchInputSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const { jobHtml, jobId, resumeId, sourceUrl, priorRecommendations } = parsed.data;
+  const { jobHtml, jobId, resumeId } = parsed.data;
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "No resume found. Please create a resume first."), 404);
 
-  const jobText = await resolveJobText({ jobHtml, jobId });
-  if (!jobText) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
+  const job = await resolveJob({ jobHtml, jobId });
+  if (!job) return c.json(error("NOT_FOUND", "Job not found. Track the job before scoring."), 404);
 
   const resumeText = resumeContentToText(resume.content);
   const apiKey = getApiKey((c.env as any) ?? {});
 
-  return { userId, jobText, resumeText, resumeId: resume.id, sourceUrl, apiKey, priorRecommendations };
+  return {
+    userId,
+    jobText: job.text,
+    resumeText,
+    resumeId: resume.id,
+    jobId: job.jobId,
+    sourceUrl: job.sourceUrl,
+    apiKey,
+  };
 }
 
 function isResponse(val: PipelineContext | Response): val is Response {
@@ -256,6 +328,13 @@ Always return valid JSON with integer score 0-100 and actionable recommendations
       );
 
       recordMatchUsage(ctx.userId, "match_analyze", usage);
+      void saveMatchScore({
+        userId: ctx.userId,
+        jobId: ctx.jobId,
+        resumeId: ctx.resumeId,
+        score: result.score,
+        recommendations: result.summaryRecommendations,
+      });
       return c.json(success({ score: result.score, summaryRecommendations: result.summaryRecommendations, resumeId: ctx.resumeId, sourceUrl: ctx.sourceUrl }), 200);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -283,11 +362,17 @@ matchRoutes.post("/tailor", async (c) => {
 
   if (ctx.apiKey) {
     try {
-      // Build a targeted prompt — if prior score recommendations exist,
-      // inject them so the LLM specifically addresses identified gaps
-      // rather than doing a generic rewrite.
-      const priorSection = ctx.priorRecommendations
-        ? `\n\nPRIOR SCORE ANALYSIS (address these specific gaps):\n${ctx.priorRecommendations}\n`
+      // Pull prior recommendations from the resume_match_scores cache so the
+      // LLM targets the specific gaps identified by the most recent /analyze
+      // run instead of doing a generic rewrite. Falls back to a generic
+      // rewrite when no prior score exists for this (user, job, resume).
+      const priorRecommendations = await loadPriorRecommendations({
+        userId: ctx.userId,
+        jobId: ctx.jobId,
+        resumeId: ctx.resumeId,
+      });
+      const priorSection = priorRecommendations
+        ? `\n\nPRIOR SCORE ANALYSIS (address these specific gaps):\n${priorRecommendations}\n`
         : "";
 
       const { data: result, usage } = await callLLMJsonWithUsage(
@@ -298,7 +383,7 @@ matchRoutes.post("/tailor", async (c) => {
 2. Rewrite the resume in Markdown to better match the job requirements
 3. Score the rewritten resume (should be higher)
 4. Summarize the key changes made
-${ctx.priorRecommendations ? "\nIMPORTANT: A prior analysis identified specific gaps and recommendations (included below the resume). You MUST directly address each of these gaps in your rewrite. Prioritize fixing the identified weaknesses over generic improvements." : ""}
+${priorRecommendations ? "\nIMPORTANT: A prior analysis identified specific gaps and recommendations (included below the resume). You MUST directly address each of these gaps in your rewrite. Prioritize fixing the identified weaknesses over generic improvements." : ""}
 
 Rules:
 - Keep the same person's real experience — do not fabricate jobs or degrees
@@ -349,8 +434,8 @@ matchRoutes.post("/byid", async (c) => {
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "jobId and resumeId are required"), 400);
 
   const { jobId, resumeId } = parsed.data;
-  const jobText = await resolveJobText({ jobId });
-  if (!jobText) return c.json(error("NOT_FOUND", "Job not found"), 404);
+  const job = await resolveJob({ jobId });
+  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
 
   const resume = await resolveResume(userId, resumeId);
   if (!resume) return c.json(error("NOT_FOUND", "Resume not found"), 404);
@@ -364,20 +449,27 @@ matchRoutes.post("/byid", async (c) => {
         apiKey,
         {
           systemPrompt: "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
-          userMessage: `Job:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
+          userMessage: `Job:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
           responseFormat: "json_object",
           temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
       recordMatchUsage(userId, "match_byid", usage);
+      void saveMatchScore({
+        userId,
+        jobId: job.jobId,
+        resumeId: resume.id,
+        score: result.score,
+        recommendations: result.summaryRecommendations,
+      });
       return c.json(success({ ...result, jobId, resumeId }), 200);
     } catch (err) {
       console.error("[match/byid] LLM failed:", err instanceof Error ? err.message : err);
     }
   }
 
-  const { score, message } = keywordScore(jobText, resumeText);
+  const { score, message } = keywordScore(job.text, resumeText);
   return c.json(success({ score, summaryRecommendations: message, jobId, resumeId }), 200);
 });
 
