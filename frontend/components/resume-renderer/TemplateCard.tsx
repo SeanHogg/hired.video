@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart-context";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
-import { isTemplateUnlocked, unlockTemplate } from "@/lib/template-unlocks";
+import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 
 interface TemplateCardProps {
@@ -33,12 +33,10 @@ export default function TemplateCard({ descriptor }: TemplateCardProps) {
 
   const openPreview = () => navigate(`/resumes/VIEWER/sample?template=${descriptor.id}`);
 
+  // All templates — free or paid — route through the cart so the user can
+  // review the item and proceed to checkout. Unlocking happens after checkout
+  // completes (see Checkout.tsx), not at add-to-cart time.
   const handlePrimary = () => {
-    if (isFree) {
-      unlockTemplate(descriptor.id);
-      setUnlocked(true);
-      return;
-    }
     addItem({
       id: `template:${descriptor.id}`,
       name: descriptor.name,
@@ -103,8 +101,7 @@ export default function TemplateCard({ descriptor }: TemplateCardProps) {
             </Button>
           ) : (
             <Button size="sm" className="flex-1" onClick={handlePrimary}>
-              <ShoppingCart className="w-4 h-4 mr-1" />
-              {isFree ? "Use Free" : "Add to Cart"}
+              <ShoppingCart className="w-4 h-4 mr-1" />Add to Cart
             </Button>
           )}
         </div>

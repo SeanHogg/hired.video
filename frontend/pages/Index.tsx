@@ -4,8 +4,6 @@ import {
   User,
   Briefcase,
   Building2,
-  Grid,
-  List,
   Eye,
   Play,
   Sparkles,
@@ -650,6 +648,8 @@ export default function Index() {
                 onSearch={handleSearch}
                 onFilterChange={handleFilterChange}
                 onClearFilters={handleClearFilters}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
               />
 
               {/* Category Filters */}
@@ -678,60 +678,12 @@ export default function Index() {
           <div className="max-w-7xl mx-auto">
             {/* Results Header */}
             <div className="mb-4 sm:mb-6">
-              <div className="flex flex-col gap-0 sm:gap-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                    {searchFilters.sortBy === "recent" && "Recent "}
-                    {searchFilters.sortBy === "featured" && "Featured "}
-                    {searchFilters.sortBy === "top" && "Top "}
-                    {searchFilters.sortBy === "latest" && "Latest "}
-                    {selectedCategory === "all"
-                      ? "Content"
-                      : selectedCategory === "people"
-                        ? "People"
-                        : selectedCategory === "companies"
-                          ? "Companies"
-                          : selectedCategory === "resumes"
-                            ? "Resumes"
-                            : selectedCategory === "media"
-                              ? "Media"
-                              : selectedCategory === "jobs"
-                                ? "Jobs"
-                                : selectedCategory === "voices"
-                                  ? "Voices"
-                                  : "Content"}
-                  </h2>
-
-                  {/* View Toggle - Inline with heading */}
-                  <div className="flex rounded-md border">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className="rounded-r-none min-h-[44px]"
-                    >
-                      <Grid className="h-4 w-4" />
-                      <span className="ml-2 sm:hidden">Grid</span>
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="rounded-l-none min-h-[44px]"
-                    >
-                      <List className="h-4 w-4" />
-                      <span className="ml-2 sm:hidden">List</span>
-                    </Button>
-                  </div>
-                </div>
-
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
-                  {searchFilters.search && ` for "${searchFilters.search}"`}
-                  {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
-                    ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
-                </p>
-              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
+                {searchFilters.search && ` for "${searchFilters.search}"`}
+                {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
+                  ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
+              </p>
             </div>
 
             {/* Content Grid/List */}

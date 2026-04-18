@@ -38,6 +38,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { billingService } from "@/lib/services/billing-service";
+import { unlockTemplate } from "@/lib/template-unlocks";
 import { toast } from "sonner";
 
 export default function Checkout() {
@@ -98,11 +99,32 @@ export default function Checkout() {
     setBillingInfo((prev) => ({ ...prev, [field]: value }));
   };
 
+  const fulfillTemplates = () => {
+    for (const item of items) {
+      if (item.type === "template") {
+        // Cart item id is "template:<descriptorId>" (see TemplateCard.handlePrimary).
+        const templateId = item.id.startsWith("template:") ? item.id.slice("template:".length) : item.id;
+        unlockTemplate(templateId);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
     try {
+      // $0 cart (typically: only free templates) — skip payment entirely and
+      // fulfill inline. The payment provider rejects zero-amount sessions, and
+      // the user shouldn't need to enter card details for free goods.
+      if (getTotalPrice() === 0) {
+        fulfillTemplates();
+        clearCart();
+        toast.success("Templates unlocked — they're yours to use.");
+        navigate("/resumes");
+        return;
+      }
+
       const successUrl = `${window.location.origin}/checkout/success`;
       const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
 
@@ -117,6 +139,7 @@ export default function Checkout() {
       // Embedded flow (Stripe SetupIntent or Helcim checkoutToken)
       // The client secret / checkoutToken is used by the payment SDK on this page.
       // For now navigate to success; a real integration mounts the SDK widget here.
+      fulfillTemplates();
       clearCart();
       toast.success("Payment successful! Welcome to Premium! 🎉");
       navigate("/dashboard");
@@ -187,30 +210,39 @@ export default function Checkout() {
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h4 className="font-medium">{item.name}</h4>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Users className="h-4 w-4" />
-                              {item.users} user{item.users > 1 ? "s" : ""}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Calendar className="h-4 w-4" />
-                              {item.billingCycle === "annual"
-                                ? "Annual billing"
-                                : "Monthly billing"}
-                              {item.billingCycle === "annual" && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Save 20%
-                                </Badge>
-                              )}
-                            </div>
+                            {item.type === "template" ? (
+                              <div className="text-sm text-muted-foreground">
+                                One-time purchase · Resume template
+                              </div>
+                            ) : item.type === "service" || item.type === "voice_clone" ? (
+                              <div className="text-sm text-muted-foreground">One-time purchase</div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Users className="h-4 w-4" />
+                                  {item.users} user{item.users > 1 ? "s" : ""}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Calendar className="h-4 w-4" />
+                                  {item.billingCycle === "annual"
+                                    ? "Annual billing"
+                                    : "Monthly billing"}
+                                  {item.billingCycle === "annual" && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Save 20%
+                                    </Badge>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                           <div className="text-right">
                             <div className="font-medium">
-                              ${item.price.toFixed(2)}
-                              {item.billingCycle === "annual"
-                                ? "/year"
-                                : "/month"}
+                              {item.price > 0 ? `$${item.price.toFixed(2)}` : "Free"}
+                              {item.type === "plan" &&
+                                (item.billingCycle === "annual" ? "/year" : "/month")}
                             </div>
-                            {item.quantity > 1 && (
+                            {item.quantity > 1 && item.type === "plan" && (
                               <div className="text-sm text-muted-foreground">
                                 Qty: {item.quantity}
                               </div>
@@ -267,6 +299,22 @@ export default function Checkout() {
               {/* Payment Form */}
               <div className="lg:order-1">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {finalTotal === 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          No payment required
+                        </CardTitle>
+                        <CardDescription>
+                          Your order total is $0.00. Click below to claim your templates — they'll be ready to apply immediately.
+                        </CardDescription>
+                      </CardHeader>
+                    </Card>
+                  )}
+
+                  {finalTotal > 0 && (
+                    <>
                   {/* Billing Information */}
                   <Card>
                     <CardHeader>
@@ -487,6 +535,8 @@ export default function Checkout() {
                       </div>
                     </CardContent>
                   </Card>
+                    </>
+                  )}
 
                   {/* Submit Button */}
                   <Button
@@ -503,7 +553,9 @@ export default function Checkout() {
                     ) : (
                       <>
                         <DollarSign className="mr-2 h-4 w-4" />
-                        {paymentMethod === "us_bank_account"
+                        {finalTotal === 0
+                          ? "Complete Free Order"
+                          : paymentMethod === "us_bank_account"
                           ? `Set Up Bank Account - $${finalTotal.toFixed(2)}`
                           : `Complete Purchase - $${finalTotal.toFixed(2)}`
                         }

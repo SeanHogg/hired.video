@@ -13,6 +13,8 @@ import {
   Clock,
   Sparkles,
   TrendingUp,
+  Grid,
+  List,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +75,8 @@ export interface SearchBarProps {
   onSearch?: (_query: string) => void;
   onFilterChange?: (_filters: SearchFilters) => void;
   onClearFilters?: () => void;
+  viewMode?: "grid" | "list";
+  onViewModeChange?: (_mode: "grid" | "list") => void;
 }
 
 const contextConfig = {
@@ -125,6 +129,8 @@ export default function SearchBar({
   onSearch,
   onFilterChange,
   onClearFilters,
+  viewMode,
+  onViewModeChange,
 }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState(value);
   const [showFilters, setShowFilters] = useState(false);
@@ -540,6 +546,29 @@ export default function SearchBar({
                 className={`w-3 h-3 transition-transform ${showAdvancedFilters ? "rotate-180" : ""}`}
               />
             </Button>
+          )}
+
+          {viewMode && onViewModeChange && (
+            <div className="flex rounded-md border">
+              <Button
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => onViewModeChange("grid")}
+                className="rounded-r-none min-h-[44px]"
+                aria-label="Grid view"
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => onViewModeChange("list")}
+                className="rounded-l-none min-h-[44px]"
+                aria-label="List view"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
       </div>

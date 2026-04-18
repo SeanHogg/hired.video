@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { resumeService } from "@/lib/services/resume-service";
-import { isTemplateUnlocked, unlockTemplate } from "@/lib/template-unlocks";
+import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 
 interface Props {
@@ -62,12 +62,9 @@ export default function SampleTemplatePurchase({ descriptor }: Props) {
     };
   }, [isAuthenticated]);
 
+  // All templates — free or paid — route through the cart for a consistent
+  // checkout review step. Unlocking happens after checkout completes.
   const handlePurchase = () => {
-    if (isFree) {
-      unlockTemplate(descriptor.id);
-      setUnlocked(true);
-      return;
-    }
     addItem({
       id: `template:${descriptor.id}`,
       name: descriptor.name,
@@ -121,7 +118,7 @@ export default function SampleTemplatePurchase({ descriptor }: Props) {
       ) : (
         <Button size="sm" className="w-full" onClick={handlePurchase}>
           <ShoppingCart className="w-4 h-4 mr-1" />
-          {isFree ? "Use this template" : `Purchase — ${priceLabel(descriptor.priceCents)}`}
+          Add to Cart — {priceLabel(descriptor.priceCents)}
         </Button>
       )}
 

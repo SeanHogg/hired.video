@@ -6,6 +6,7 @@ import {
   CreditCard,
   Users,
   Briefcase,
+  FileType,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -62,8 +63,11 @@ export default function ShoppingCart() {
   const itemCount = getItemCount();
   const totalPrice = getTotalPrice();
 
-  const planItems = items.filter((i) => i.type !== "service");
   const serviceItems = items.filter((i) => i.type === "service");
+  const templateItems = items.filter((i) => i.type === "template");
+  // Plans = everything that isn't a service or template (keeps voice_clone
+  // alongside subscription plans, matching prior behavior).
+  const planItems = items.filter((i) => i.type !== "service" && i.type !== "template");
 
   return (
     <Sheet
@@ -148,10 +152,42 @@ export default function ShoppingCart() {
                 </div>
               )}
 
+              {templateItems.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    <FileType className="h-3.5 w-3.5" />
+                    Resume Templates
+                  </div>
+                  {templateItems.map((item) => (
+                    <Card key={item.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium truncate">{item.name}</h4>
+                            <p className="text-xs text-muted-foreground">One-time purchase</p>
+                            <p className="text-sm font-semibold mt-1 text-violet-600">
+                              {item.price > 0 ? formatServicePrice(item.price) : "Free"}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.id)}
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
               {/* Plan Items */}
               {planItems.length > 0 && (
                 <div className="space-y-3">
-                  {serviceItems.length > 0 && (
+                  {(serviceItems.length > 0 || templateItems.length > 0) && (
                     <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                       <CreditCard className="h-3.5 w-3.5" />
                       Plans
