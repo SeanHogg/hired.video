@@ -24,6 +24,7 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -453,6 +454,11 @@ function HomeMarketingPage({
             </div>
           </div>
 
+          {/* Resume Templates */}
+          <div className="max-w-6xl mx-auto px-4">
+            <TemplateGallery />
+          </div>
+
           {/* FAQ */}
           <MarketingFAQ
             schemaId="home"
@@ -678,6 +684,11 @@ export default function Home() {
         />
 
         <div className="pt-16 pb-20">
+          {/* ── Resume Templates section ── */}
+          <div className="max-w-6xl mx-auto px-4 pt-6">
+            <TemplateGallery compact />
+          </div>
+
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
             <div className="mb-6">

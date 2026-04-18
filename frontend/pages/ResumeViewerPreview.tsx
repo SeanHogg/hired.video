@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord } from "@/lib/resume-exporters";
+import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
@@ -112,6 +113,22 @@ export default function ResumeViewerPreview() {
 
   useEffect(() => {
     if (!id) return;
+    // Sample mode — /resumes/VIEWER/sample renders the showcase resume with
+    // whichever preset is requested via ?template=<id>. Skips API calls so
+    // anonymous users can browse templates from the home gallery.
+    if (id === "sample") {
+      setResume(SAMPLE_RESUME);
+      setStudioVideos([]);
+      const requested = searchParams.get("template");
+      const match = TEMPLATE_PRESETS.find((t) => t.id === requested);
+      if (match) {
+        setDescriptor(match);
+        setEditorText(JSON.stringify(match, null, 2));
+      }
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     (async () => {
       try {
@@ -135,7 +152,7 @@ export default function ResumeViewerPreview() {
         setStudioVideos(v.data ?? []);
       } catch {}
     })();
-  }, [id]);
+  }, [id, searchParams]);
 
   const applyPreset = (preset: ResumeTemplateDescriptor) => {
     setDescriptor(preset);

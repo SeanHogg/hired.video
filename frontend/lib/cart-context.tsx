@@ -11,8 +11,9 @@ export interface CartItem {
    * "plan"        = subscription upgrade
    * "service"     = provider service offering
    * "voice_clone" = creator-owned voice from the Voice Marketplace
+   * "template"    = resume template from the Template Gallery
    */
-  type: "plan" | "service" | "voice_clone";
+  type: "plan" | "service" | "voice_clone" | "template";
   // Plan-specific (optional for service items)
   billingCycle?: "monthly" | "annual";
   users?: number;
@@ -74,7 +75,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         // Service and voice-clone items: one license per cart slot — never
         // increment quantity, since you can't "buy two licenses" for the
         // same voice or service.
-        if (action.payload.type === "service" || action.payload.type === "voice_clone") {
+        if (action.payload.type === "service" || action.payload.type === "voice_clone" || action.payload.type === "template") {
           return { ...state, items: state.items };
         }
         return {

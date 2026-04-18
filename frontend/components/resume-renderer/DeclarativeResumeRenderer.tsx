@@ -520,15 +520,27 @@ function TwoColumnBody(props: BodyProps) {
 // Section renderer
 // -----------------------------------------------------------------------------
 
-interface SectionRendererProps extends BodyProps {
-  section: ResumeTemplateDescriptor["sections"][number];
+interface BlockRendererProps extends BodyProps {
+  block: ResumeBlock;
 }
 
-function SectionRenderer({ section, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density }: SectionRendererProps) {
-  const { data } = resume;
-  const Icon = ICONS[section.icon ?? "star"] ?? Star;
-  const title = section.title ?? section.key;
-  const sectionBody = renderSectionBody(section.key, section, data, theme, density);
+function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density }: BlockRendererProps) {
+  // Component block — render the registered widget, optionally under a heading.
+  if (block.kind === "component") {
+    const render = COMPONENT_REGISTRY[block.component];
+    if (!render) return null;
+    const body = render({ resume, props: block.props });
+    if (!body) return null;
+    if (!block.title) return <section>{body}</section>;
+    const Icon = ICONS[block.icon ?? "star"] ?? Star;
+    const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} />;
+    return <section>{heading}{body}</section>;
+  }
+
+  // Section block — data-backed slice of the resume.
+  const Icon = ICONS[block.icon ?? "star"] ?? Star;
+  const title = block.title ?? block.key;
+  const sectionBody = renderSectionBody(block.key, block, resume.data, theme, density);
   if (!sectionBody) return null;
 
   const heading = (
@@ -536,7 +548,6 @@ function SectionRenderer({ section, descriptor, resume, theme, cardStyle, headin
   );
 
   if (descriptor.documentMode === "print") {
-    // Print mode: no card wrapper, tighter.
     return (
       <section>
         {heading}
@@ -557,7 +568,7 @@ function SectionRenderer({ section, descriptor, resume, theme, cardStyle, headin
 
 function renderSectionBody(
   key: ResumeSectionKey,
-  section: ResumeTemplateDescriptor["sections"][number],
+  section: import("@/types/resume-template").SectionBlock,
   data: Resume["data"],
   theme: ThemeStyles,
   density: { section: string; entry: string },

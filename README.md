@@ -1635,7 +1635,33 @@ Before building any marketplace, we need the renderer. Reference resume: `91b07d
 | Card style | `elevated` / `flat` / `bordered` / `ghost` |
 | Section title size | `sm` / `md` / `lg` / `xl` |
 
-### Descriptor schema (v1.1)
+### Descriptor schema (v1.2)
+
+v1.2 adds **component blocks** — any reusable React component (e.g. `ResumeTimelines`) can be dropped into the descriptor's `sections` array alongside data-backed section blocks. Adding a new component to the registry is a one-line change in `frontend/lib/resume-template-components.ts`.
+
+```ts
+type ResumeBlock = SectionBlock | ComponentBlock;
+
+interface ComponentBlock {
+  kind: "component";
+  component: "career-timeline";    // whitelist key
+  enabled: boolean;
+  id?: string;                     // for sidebar referencing; defaults to component key
+  title?: string;                  // optional heading; omit for headless widget
+  icon?: TemplateIconKey;
+  props?: Record<string, unknown>; // component-specific options
+}
+```
+
+Sidebar referencing (`layout.sidebar`) is now `string[]` of block ids — accepts either a section key (`"skills"`) or a component id (`"career-timeline"`), so components can live in the sidebar just like sections.
+
+Currently registered components:
+
+| Key | Backed by | Purpose |
+|---|---|---|
+| `career-timeline` | `ResumeTimelines` | Cross-section Overview / Work / Volunteer / Education / Certificates tabs with totals |
+
+
 
 After reviewing competitor template galleries (Resume-Now, Kickresume, Canva), v1's pure layout toggles weren't enough — industry templates differ by **named style bundles**: font family, heading style, color palette, document vs. hero mode, single vs. two-column. v1.1 adds these dimensions:
 
@@ -1700,6 +1726,19 @@ interface ResumeTemplateDescriptor {
 | `creative-minimal` | Creative / Product | print | minimal-slate | mono | plain | 1 |
 
 The `hired-default` reproduces the current `ResumeDetail` pixel-close (gradient hero, timeline sections, split video). Print-mode presets render a paper-style document (centered name + contact line, no gradient, section headings per theme style).
+
+### Sample resume + Template Gallery
+
+A canonical showcase resume lives at [frontend/lib/sample-resume.ts](hired.video/frontend/lib/sample-resume.ts) — real content derived from a user-submitted JsonResume file, enriched across every section (Skills / Languages / Certificates / Projects / Awards / Interests) so every template block renders meaningfully regardless of which preset is applied. This file is the single source-of-truth for all template previews.
+
+**Template Gallery** on Home ([components/resume-renderer/TemplateGallery.tsx](hired.video/frontend/components/resume-renderer/TemplateGallery.tsx)) — grid of `TemplateCard`s, each rendering a miniature live preview of the sample resume in that template (via a scaled `DeclarativeResumeRenderer`, not a static image, so previews stay in sync with descriptor changes). Mounted on both authenticated and marketing variants of Home.
+
+Each card offers:
+- **Preview** → `/resumes/VIEWER/sample?template=:id` — opens the viewer with the sample resume and pre-selected preset
+- **Use Free** (when `priceCents === 0`) → unlocks immediately via `unlockTemplate()` in [lib/template-unlocks.ts](hired.video/frontend/lib/template-unlocks.ts)
+- **Add to Cart** (when `priceCents > 0`) → pushes a `type: "template"` item into the existing cart context; standard checkout flow applies
+
+Unlocks are tracked client-side in `localStorage` as a first pass; server-backed ownership (`templateLicenses` table) lands with the marketplace phase.
 
 ### Preview route
 

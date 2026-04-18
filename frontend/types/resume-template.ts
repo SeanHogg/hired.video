@@ -43,9 +43,7 @@ export type TemplateIconKey =
   | "award"
   | "book-open"
   | "lightbulb"
-  | "user-check"
-  | "calendar"
-  | "chart-bar";
+  | "user-check";
 
 // Whitelisted platform components that a template can drop into its section
 // list. New components must be registered in DeclarativeResumeRenderer's
@@ -85,6 +83,8 @@ export interface ResumeTemplateDescriptor {
   id: string;
   name: string;
   industry?: string;                  // display-only label, e.g. "Payroll / Finance"
+  priceCents?: number;                // 0 or undefined = free; >0 = paid (future marketplace)
+  description?: string;               // short copy for template gallery cards
   version: "1.0" | "1.1" | "1.2";
   documentMode: DocumentMode;         // "hero" = gradient + video resume · "print" = paper-style document
   theme: {
@@ -114,7 +114,15 @@ export interface ResumeTemplateDescriptor {
 // Default + industry presets
 // -----------------------------------------------------------------------------
 
-const baseSections: ResumeTemplateDescriptor["sections"] = [
+// Career timeline component block — shown on the default hired.video viewer
+// above the Work Experience section (matches current ResumeDetail).
+const CAREER_TIMELINE_BLOCK: ComponentBlock = {
+  kind: "component",
+  component: "career-timeline",
+  enabled: true,
+};
+
+const baseSections: SectionBlock[] = [
   { key: "work", enabled: true, title: "Work Experience", icon: "building", layout: "timeline", showHighlights: true, sortBy: "date_desc" },
   { key: "education", enabled: true, title: "Education", icon: "graduation-cap", layout: "timeline", sortBy: "date_desc" },
   { key: "volunteer", enabled: true, title: "Volunteer Experience", icon: "heart", layout: "timeline", showHighlights: true, sortBy: "date_desc" },
@@ -133,7 +141,9 @@ export const DEFAULT_DESCRIPTOR: ResumeTemplateDescriptor = {
   id: "hired-default",
   name: "Hired Video (Default)",
   industry: "All",
-  version: "1.1",
+  priceCents: 0,
+  description: "Signature hired.video layout — gradient hero with embedded video resume, timeline work history, and cross-section career overview.",
+  version: "1.2",
   documentMode: "hero",
   theme: {
     themeKey: "hired-purple",
@@ -152,7 +162,7 @@ export const DEFAULT_DESCRIPTOR: ResumeTemplateDescriptor = {
     showSummary: true,
     showVideo: true,
   },
-  sections: baseSections,
+  sections: [CAREER_TIMELINE_BLOCK, ...baseSections],
 };
 
 // Helper to create a print-mode preset with minimal boilerplate.
@@ -192,6 +202,8 @@ export const PAYROLL_IRON_GRAY: ResumeTemplateDescriptor = printPreset({
   id: "payroll-iron-gray",
   name: "Payroll & Finance — Iron Gray",
   industry: "Finance / Payroll",
+  priceCents: 0,
+  description: "Classic two-column print layout with sober serif headings — ATS-friendly for payroll, accounting, and financial analyst roles.",
   theme: {
     themeKey: "iron-gray",
     fontFamily: "serif",
@@ -208,6 +220,8 @@ export const RISK_ASPHALT: ResumeTemplateDescriptor = printPreset({
   id: "risk-asphalt",
   name: "Risk & Consulting — Asphalt",
   industry: "Risk / Consulting",
+  priceCents: 0,
+  description: "Dark, assertive two-column layout with ALL-CAPS headings — signals gravitas for risk, audit, compliance, and consulting.",
   theme: {
     themeKey: "assertive-asphalt",
     fontFamily: "sans",
@@ -224,6 +238,8 @@ export const EXECUTIVE_TAUPE: ResumeTemplateDescriptor = printPreset({
   id: "executive-taupe",
   name: "Executive — Trusted Taupe",
   industry: "Executive / C-Suite",
+  priceCents: 0,
+  description: "Spacious single-column serif layout with elegant divider headings — built for CXO, VP, and Director-level narratives.",
   theme: {
     themeKey: "trusted-taupe",
     fontFamily: "serif",
@@ -240,6 +256,8 @@ export const INTERN_EDUCATION_FIRST: ResumeTemplateDescriptor = printPreset({
   id: "intern-education-first",
   name: "New Grad — Education First",
   industry: "Intern / New Grad",
+  priceCents: 0,
+  description: "Education leads, projects and coursework shine — optimized for interns, recent grads, and anyone with limited work history.",
   theme: {
     themeKey: "balanced-blue",
     fontFamily: "sans",
@@ -266,6 +284,8 @@ export const HOSPITALITY_AMBER: ResumeTemplateDescriptor = printPreset({
   id: "hospitality-amber",
   name: "Hospitality — Warm Amber",
   industry: "Hospitality / Retail",
+  priceCents: 0,
+  description: "Warm, approachable amber palette with ALL-CAPS headings — suited to hospitality, retail, customer success, and service roles.",
   theme: {
     themeKey: "warm-amber",
     fontFamily: "sans",
@@ -282,6 +302,8 @@ export const CREATIVE_MINIMAL: ResumeTemplateDescriptor = printPreset({
   id: "creative-minimal",
   name: "Creative — Minimal Slate",
   industry: "Creative / Product",
+  priceCents: 0,
+  description: "Ultra-minimal monospace layout with generous whitespace — product designers, creative directors, and indie makers.",
   theme: {
     themeKey: "minimal-slate",
     fontFamily: "mono",
