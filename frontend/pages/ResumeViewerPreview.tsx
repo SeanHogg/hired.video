@@ -25,6 +25,7 @@ import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord }
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
+import SampleTemplatePurchase from "@/components/resume-renderer/SampleTemplatePurchase";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import { DEFAULT_DESCRIPTOR, TEMPLATE_PRESETS, type ResumeTemplateDescriptor } from "@/types/resume-template";
@@ -235,7 +236,8 @@ export default function ResumeViewerPreview() {
     exportResumePdf(`/resumes/VIEWER/${id}?print=1`);
   };
 
-  const isOwner = !!user && !!resume && user.id === resume.userId;
+  const isSample = id === "sample";
+  const isOwner = !!user && !!resume && user.id === resume.userId && !isSample;
 
   const refreshResume = async () => {
     if (!resume?.id) return;
@@ -322,17 +324,17 @@ export default function ResumeViewerPreview() {
                   <Eye className="w-3 h-3" />
                   Preview · <span className="font-mono">{descriptor.name}</span>
                 </Badge>
-                {resume?.isActive && (
+                {!isSample && resume?.isActive && (
                   <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
                     <Target className="w-3 h-3" />Active
                   </Badge>
                 )}
-                {resume?.isMaster && (
+                {!isSample && resume?.isMaster && (
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
                     <Star className="w-3 h-3" />Master
                   </Badge>
                 )}
-                {resume && (
+                {!isSample && resume && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     {privacyIcon(resume.privacy)}
                     {privacyLabel(resume.privacy)}
@@ -468,6 +470,12 @@ export default function ResumeViewerPreview() {
                   videoSlot={descriptor.hero.showVideo ? <VideoSlot items={videoItems} /> : null}
                 />
               </div>
+
+              {isSample && !editorOpen && (
+                <aside className="hidden lg:block w-[320px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
+                  <SampleTemplatePurchase descriptor={descriptor} />
+                </aside>
+              )}
 
               {editorOpen && (
                 <aside className="w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
