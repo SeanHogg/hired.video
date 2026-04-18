@@ -22,11 +22,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DENSITY_CLASS,
+  FONT_FAMILY_CLASS,
+  THEMES,
+  type ThemeStyles,
+} from "@/lib/resume-template-themes";
 import type { Resume } from "@/types/resume";
 import type {
   CardStyle,
+  ResumeSectionKey,
   ResumeTemplateDescriptor,
-  SectionLayout,
   SectionTitleSize,
   TemplateIconKey,
 } from "@/types/resume-template";
@@ -34,8 +40,8 @@ import type {
 interface DeclarativeResumeRendererProps {
   resume: Resume;
   descriptor: ResumeTemplateDescriptor;
-  embedded?: boolean;          // when true, removes hero video + outer page gradient
-  videoSlot?: React.ReactNode; // host-provided video (Studio merge) — rendered when hero.showVideo
+  embedded?: boolean;
+  videoSlot?: React.ReactNode;
 }
 
 const ICONS: Record<TemplateIconKey, React.ComponentType<any>> = {
@@ -53,9 +59,9 @@ const ICONS: Record<TemplateIconKey, React.ComponentType<any>> = {
 };
 
 const TITLE_SIZE_CLASS: Record<SectionTitleSize, string> = {
-  sm: "text-xl",
-  md: "text-2xl",
-  lg: "text-3xl",
+  sm: "text-lg",
+  md: "text-xl",
+  lg: "text-2xl",
   xl: "text-3xl md:text-4xl",
 };
 
@@ -75,7 +81,7 @@ function dateRange(start?: string, end?: string) {
   return `${s} - ${e}`;
 }
 
-function sortByDate<T extends { StartDate?: string; EndDate?: string }>(items: T[], order: "date_desc" | "date_asc" | "manual") {
+function sortByDate<T extends { StartDate?: string }>(items: T[], order: "date_desc" | "date_asc" | "manual") {
   if (order === "manual") return items;
   const dir = order === "date_desc" ? -1 : 1;
   return [...items].sort((a, b) => {
@@ -116,6 +122,64 @@ function gridColsClass(cols: 1 | 2 | 3 | 4 = 3): string {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Section heading — renders per descriptor.theme.headingStyle
+// -----------------------------------------------------------------------------
+
+interface SectionHeadingProps {
+  title: string;
+  Icon: React.ComponentType<any>;
+  theme: ThemeStyles;
+  style: "underlined" | "divider" | "caps" | "plain";
+  size: SectionTitleSize;
+  showIcon?: boolean;
+}
+
+function SectionHeading({ title, Icon, theme, style, size, showIcon = true }: SectionHeadingProps) {
+  const sizeClass = TITLE_SIZE_CLASS[size];
+  const body = (
+    <>
+      {showIcon && (
+        <div className={`w-10 h-10 ${theme.accentBgSoft} rounded-full flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${theme.accentText}`} />
+        </div>
+      )}
+      <h2 className={`${sizeClass} font-bold ${theme.nameText} ${style === "caps" ? "uppercase tracking-widest" : ""}`}>
+        {title}
+      </h2>
+    </>
+  );
+
+  if (style === "underlined") {
+    return (
+      <div className="mb-4">
+        <div className="flex items-center gap-3 mb-1">{body}</div>
+        <div className={`border-b-2 ${theme.accentBorder}`} />
+      </div>
+    );
+  }
+  if (style === "divider") {
+    return (
+      <div className="mb-4 flex items-center gap-3">
+        {body}
+        <div className={`flex-1 border-t ${theme.accentBorder}`} />
+      </div>
+    );
+  }
+  if (style === "caps") {
+    return (
+      <div className="mb-4 flex items-center gap-3">{body}</div>
+    );
+  }
+  return (
+    <div className="mb-6 flex items-center gap-3">{body}</div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Entry primitives
+// -----------------------------------------------------------------------------
+
 interface TimelineItemProps {
   title: string;
   subtitle: string;
@@ -125,7 +189,7 @@ interface TimelineItemProps {
   highlights?: string[];
   icon: React.ComponentType<any>;
   isLast?: boolean;
-  defaultExpanded?: boolean;
+  theme: ThemeStyles;
 }
 
 function TimelineItem({
@@ -137,23 +201,23 @@ function TimelineItem({
   highlights,
   icon: Icon,
   isLast,
-  defaultExpanded,
+  theme,
 }: TimelineItemProps) {
-  const [expanded, setExpanded] = useState(!!defaultExpanded);
+  const [expanded, setExpanded] = useState(false);
   const range = dateRange(startDate, endDate);
 
   return (
     <div className="relative">
-      {!isLast && <div className="absolute left-6 top-12 w-0.5 h-full bg-gradient-to-b from-primary to-primary/20" />}
+      {!isLast && <div className={`absolute left-6 top-12 w-0.5 h-full ${theme.accentBgSoft}`} />}
       <div className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
-        <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center relative z-10">
-          <Icon className="w-6 h-6 text-primary" />
+        <div className={`flex-shrink-0 w-12 h-12 ${theme.accentBgSoft} rounded-full flex items-center justify-center relative z-10`}>
+          <Icon className={`w-6 h-6 ${theme.accentText}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="font-semibold text-lg leading-tight">{title}</h3>
-              <p className="text-primary font-medium">{subtitle}</p>
+              <p className={`${theme.accentText} font-medium`}>{subtitle}</p>
             </div>
             <div className="text-right">
               {range && (
@@ -174,7 +238,7 @@ function TimelineItem({
               <ul className="space-y-2">
                 {highlights.map((h, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                    <div className={`w-1.5 h-1.5 ${theme.accentBorder} border rounded-full mt-2 flex-shrink-0`} />
                     <span>{h}</span>
                   </li>
                 ))}
@@ -187,45 +251,30 @@ function TimelineItem({
   );
 }
 
-function CompactEntry({ title, subtitle, startDate, endDate, description }: TimelineItemProps) {
+function ListEntry({ title, subtitle, startDate, endDate, description, highlights, theme }: Omit<TimelineItemProps, "icon" | "isLast">) {
   const range = dateRange(startDate, endDate);
   return (
-    <div className="py-2 border-b last:border-b-0">
-      <div className="flex justify-between gap-4">
-        <div>
-          <span className="font-semibold">{title}</span>
-          {subtitle && <span className="text-primary ml-2">· {subtitle}</span>}
+    <div className="py-3 border-b last:border-b-0">
+      <div className="flex justify-between items-baseline gap-4">
+        <div className="min-w-0">
+          <div className="font-semibold">{title}</div>
+          {subtitle && <div className={`text-sm ${theme.accentText}`}>{subtitle}</div>}
         </div>
-        {range && <span className="text-sm text-muted-foreground whitespace-nowrap">{range}</span>}
+        {range && <div className="text-sm text-muted-foreground whitespace-nowrap">{range}</div>}
       </div>
       {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+      {highlights && highlights.length > 0 && (
+        <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+          {highlights.map((h, i) => <li key={i}>{h}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
 
-interface SectionShellProps {
-  title: string;
-  Icon: React.ComponentType<any>;
-  cardStyle?: CardStyle;
-  titleSize: SectionTitleSize;
-  children: React.ReactNode;
-}
-
-function SectionShell({ title, Icon, cardStyle, titleSize, children }: SectionShellProps) {
-  return (
-    <section>
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-          <Icon className="w-5 h-5 text-primary" />
-        </div>
-        <h2 className={`${TITLE_SIZE_CLASS[titleSize]} font-bold`}>{title}</h2>
-      </div>
-      <Card className={cardClass(cardStyle)}>
-        <CardContent className="p-6">{children}</CardContent>
-      </Card>
-    </section>
-  );
-}
+// -----------------------------------------------------------------------------
+// Main renderer
+// -----------------------------------------------------------------------------
 
 export default function DeclarativeResumeRenderer({
   resume,
@@ -233,339 +282,106 @@ export default function DeclarativeResumeRenderer({
   embedded = false,
   videoSlot,
 }: DeclarativeResumeRendererProps) {
-  const { data } = resume;
-  const titleSize = descriptor.theme.sectionTitleSize ?? "xl";
-  const cardStyle = descriptor.theme.cardStyle ?? "elevated";
+  const theme = THEMES[descriptor.theme.themeKey] ?? THEMES["hired-purple"];
+  const fontFamily = FONT_FAMILY_CLASS[descriptor.theme.fontFamily] ?? FONT_FAMILY_CLASS.sans;
+  const density = DENSITY_CLASS[descriptor.theme.density] ?? DENSITY_CLASS.comfortable;
 
-  // Tailwind JIT can't resolve dynamic class strings, so descriptor.theme.heroGradient
-  // picks a pre-baked preset rather than interpolating color tokens.
-  const heroGradientKey = descriptor.theme.heroGradient?.[0] ?? "primary";
-  const heroGradientClass =
-    heroGradientKey === "foreground" || heroGradientKey === "muted-foreground"
-      ? "bg-gradient-to-br from-foreground via-muted-foreground to-foreground text-background"
-      : "bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground";
-  const heroClass = embedded
-    ? "bg-card border-b"
-    : `relative ${heroGradientClass}`;
+  const headingProps = {
+    theme,
+    style: descriptor.theme.headingStyle,
+    size: descriptor.theme.sectionTitleSize ?? "md",
+  };
+
+  const cardStyle = descriptor.theme.cardStyle ?? (descriptor.documentMode === "print" ? "ghost" : "elevated");
+
+  const showIconInHeading = descriptor.documentMode === "hero";
+
+  const rootClass = descriptor.documentMode === "print" ? `${theme.pageBg} ${theme.baseText} ${fontFamily}` : fontFamily;
 
   return (
-    <div className="w-full">
+    <div className={`w-full ${rootClass}`}>
       {descriptor.hero.enabled && (
-        <div className={heroClass}>
-          {!embedded && <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />}
-          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-            {descriptor.hero.layout === "split" ? (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <HeroContent descriptor={descriptor} resume={resume} embedded={embedded} />
-                {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
-              </div>
-            ) : descriptor.hero.layout === "stacked" ? (
-              <div className="space-y-6">
-                <HeroContent descriptor={descriptor} resume={resume} embedded={embedded} />
-                {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
-              </div>
-            ) : (
-              <HeroCompact descriptor={descriptor} resume={resume} embedded={embedded} />
-            )}
-          </div>
-        </div>
+        <Hero descriptor={descriptor} resume={resume} theme={theme} embedded={embedded} videoSlot={videoSlot} />
       )}
 
-      <div className={`max-w-6xl mx-auto px-6 ${embedded ? "py-6 space-y-8" : "py-12 space-y-12"}`}>
-        {descriptor.sections
-          .filter((s) => s.enabled)
-          .map((section) => {
-            const Icon = ICONS[section.icon ?? "star"] ?? Star;
-            const title = section.title ?? section.key;
-
-            switch (section.key) {
-              case "work": {
-                const items = data.Work ?? [];
-                if (items.length === 0) return null;
-                const sorted = sortByDate(items, section.sortBy ?? "date_desc");
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {sorted.map((w, idx) =>
-                        section.layout === "compact" ? (
-                          <CompactEntry key={idx} title={w.Position || ""} subtitle={w.Name || ""} startDate={w.StartDate} endDate={w.EndDate || "Present"} description={w.Summary} icon={Icon} />
-                        ) : (
-                          <TimelineItem
-                            key={idx}
-                            title={w.Position || ""}
-                            subtitle={w.Name || ""}
-                            startDate={w.StartDate}
-                            endDate={w.EndDate || "Present"}
-                            description={w.Summary}
-                            highlights={section.showHighlights ? w.Highlights : undefined}
-                            icon={Icon}
-                            isLast={idx === sorted.length - 1}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "education": {
-                const items = data.Education ?? [];
-                if (items.length === 0) return null;
-                const sorted = sortByDate(items, section.sortBy ?? "date_desc");
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {sorted.map((e, idx) =>
-                        section.layout === "compact" ? (
-                          <CompactEntry key={idx} title={`${e.StudyType || ""} in ${e.Area || ""}`} subtitle={e.Institution || ""} startDate={e.StartDate} endDate={e.EndDate} description={e.Score ? `GPA: ${e.Score}` : undefined} icon={Icon} />
-                        ) : (
-                          <TimelineItem
-                            key={idx}
-                            title={`${e.StudyType || ""} in ${e.Area || ""}`}
-                            subtitle={e.Institution || ""}
-                            startDate={e.StartDate}
-                            endDate={e.EndDate}
-                            description={e.Score ? `GPA: ${e.Score}` : undefined}
-                            icon={Icon}
-                            isLast={idx === sorted.length - 1}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "volunteer": {
-                const items = data.Volunteer ?? [];
-                if (items.length === 0) return null;
-                const sorted = sortByDate(items, section.sortBy ?? "date_desc");
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {sorted.map((v, idx) =>
-                        section.layout === "compact" ? (
-                          <CompactEntry key={idx} title={v.Position || ""} subtitle={v.Organization || ""} startDate={v.StartDate} endDate={v.EndDate || "Present"} description={v.Summary} icon={Icon} />
-                        ) : (
-                          <TimelineItem
-                            key={idx}
-                            title={v.Position || ""}
-                            subtitle={v.Organization || ""}
-                            startDate={v.StartDate}
-                            endDate={v.EndDate || "Present"}
-                            description={v.Summary}
-                            highlights={section.showHighlights ? v.Highlights ?? undefined : undefined}
-                            icon={Icon}
-                            isLast={idx === sorted.length - 1}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "skills": {
-                const items = data.Skills ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
-                      {items.map((skill, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg mb-2">{skill.Name}</h3>
-                          {skill.Level && <p className="text-sm text-muted-foreground mb-2">Level: {skill.Level}</p>}
-                          {skill.Keywords && skill.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {skill.Keywords.map((kw, ki) => (
-                                <span key={ki} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">{kw}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "languages": {
-                const items = data.Languages ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
-                      {items.map((lang, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg">{lang.Language}</h3>
-                          {lang.Fluency && <p className="text-sm text-muted-foreground">{lang.Fluency}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "projects": {
-                const items = data.Projects ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-6">
-                      {items.map((p, idx) => (
-                        <div key={idx} className="border-b pb-6 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{p.Name}</h3>
-                            {p.Url && (
-                              <a href={p.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-                          {(p.StartDate || p.EndDate) && <p className="text-sm text-muted-foreground mb-2">{p.StartDate} - {p.EndDate || "Present"}</p>}
-                          {p.Entity && <p className="text-sm text-muted-foreground mb-2">{p.Entity}</p>}
-                          {p.Description && <p className="text-sm mb-3">{p.Description}</p>}
-                          {p.Highlights && p.Highlights.length > 0 && (
-                            <ul className="list-disc list-inside text-sm mb-3 space-y-1">
-                              {p.Highlights.map((h, hi) => <li key={hi}>{h}</li>)}
-                            </ul>
-                          )}
-                          {p.Keywords && p.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {p.Keywords.map((k, ki) => (
-                                <span key={ki} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">{k}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "awards": {
-                const items = data.Awards ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {items.map((a, idx) => (
-                        <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <h3 className="font-semibold text-lg">{a.Title}</h3>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            {a.Awarder && <span>{a.Awarder}</span>}
-                            {a.Date && <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{a.Date}</span>}
-                          </div>
-                          {a.Summary && <p className="text-sm">{a.Summary}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "certificates": {
-                const items = data.Certificates ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {items.map((c, idx) => (
-                        <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{c.Name}</h3>
-                            {c.Url && (
-                              <a href={c.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            {c.Issuer && <span>{c.Issuer}</span>}
-                            {c.Date && <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{c.Date}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "publications": {
-                const items = data.Publications ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {items.map((p, idx) => (
-                        <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{p.Name}</h3>
-                            {p.Url && (
-                              <a href={p.Url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            {p.Publisher && <span>{p.Publisher}</span>}
-                            {p.ReleaseDate && <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{p.ReleaseDate}</span>}
-                          </div>
-                          {p.Summary && <p className="text-sm">{p.Summary}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "interests": {
-                const items = data.Interests ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
-                      {items.map((i, idx) => (
-                        <div key={idx} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg mb-2">{i.Name}</h3>
-                          {i.Keywords && i.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {i.Keywords.map((kw, ki) => (
-                                <span key={ki} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded">{kw}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              case "references": {
-                const items = data.References ?? [];
-                if (items.length === 0) return null;
-                return (
-                  <SectionShell key={section.key} title={title} Icon={Icon} cardStyle={cardStyle} titleSize={titleSize}>
-                    <div className="space-y-4">
-                      {items.map((r, idx) => (
-                        <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <h3 className="font-semibold text-lg">{r.Name}</h3>
-                          {r.Reference && <p className="text-sm text-muted-foreground">{r.Reference}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </SectionShell>
-                );
-              }
-              default:
-                return null;
-            }
-          })}
+      <div
+        className={
+          descriptor.documentMode === "print"
+            ? `max-w-[880px] mx-auto ${theme.paperBg} shadow-sm my-6 px-8 md:px-12 py-8 ${density.section}`
+            : `max-w-6xl mx-auto px-6 ${embedded ? "py-6" : "py-12"} ${density.section}`
+        }
+      >
+        {descriptor.layout.columns === 2 ? (
+          <TwoColumnBody
+            descriptor={descriptor}
+            resume={resume}
+            theme={theme}
+            cardStyle={cardStyle}
+            headingProps={headingProps}
+            showIconInHeading={showIconInHeading}
+            density={density}
+          />
+        ) : (
+          <OneColumnBody
+            descriptor={descriptor}
+            resume={resume}
+            theme={theme}
+            cardStyle={cardStyle}
+            headingProps={headingProps}
+            showIconInHeading={showIconInHeading}
+            density={density}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function HeroContent({ descriptor, resume, embedded }: { descriptor: ResumeTemplateDescriptor; resume: Resume; embedded: boolean }) {
-  const basics = resume.data?.Basics;
-  const nameColor = embedded ? "" : "text-primary-foreground";
-  const btnClass = embedded
-    ? ""
-    : "bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30";
+// -----------------------------------------------------------------------------
+// Hero
+// -----------------------------------------------------------------------------
 
-  return (
+function Hero({
+  descriptor,
+  resume,
+  theme,
+  embedded,
+  videoSlot,
+}: {
+  descriptor: ResumeTemplateDescriptor;
+  resume: Resume;
+  theme: ThemeStyles;
+  embedded: boolean;
+  videoSlot?: React.ReactNode;
+}) {
+  // Print mode: plain centered header with name + contact line.
+  if (descriptor.documentMode === "print") {
+    const basics = resume.data?.Basics;
+    const contactBits = [basics?.Email, basics?.Phone, basics?.Url].filter(Boolean) as string[];
+    return (
+      <div className={`${theme.pageBg} pt-6`}>
+        <div className={`max-w-[880px] mx-auto ${theme.paperBg} shadow-sm px-8 md:px-12 pt-10 pb-6 text-center`}>
+          <h1 className={`text-4xl font-bold ${theme.nameText} ${descriptor.theme.headingStyle === "caps" ? "uppercase tracking-widest" : ""}`}>
+            {basics?.Name || resume.name || "Untitled Resume"}
+          </h1>
+          {basics?.Label && <p className={`text-lg mt-1 ${theme.accentText}`}>{basics.Label}</p>}
+          {contactBits.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-3">{contactBits.join(" · ")}</p>
+          )}
+          {descriptor.hero.showSummary && basics?.Summary && (
+            <p className="text-sm mt-4 max-w-2xl mx-auto">{basics.Summary}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Hero mode: gradient header with avatar, contact buttons, and optional video.
+  const basics = resume.data?.Basics;
+  const heroClass = embedded ? "bg-card border-b" : `relative ${theme.heroGradient} ${theme.heroForeground}`;
+  const btnClass = embedded ? "" : "bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30";
+
+  const heroContent = (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         {descriptor.hero.showAvatar && (
@@ -577,11 +393,10 @@ function HeroContent({ descriptor, resume, embedded }: { descriptor: ResumeTempl
           </Avatar>
         )}
         <div>
-          <h1 className={`text-4xl font-bold ${nameColor}`}>{basics?.Name || resume.name || "Untitled Resume"}</h1>
+          <h1 className="text-4xl font-bold">{basics?.Name || resume.name || "Untitled Resume"}</h1>
           <p className={`text-xl ${embedded ? "text-muted-foreground" : "opacity-90"}`}>{basics?.Label || ""}</p>
         </div>
       </div>
-
       {descriptor.hero.showContactButtons && (
         <div className="flex flex-wrap gap-3">
           {basics?.Email && (
@@ -604,36 +419,468 @@ function HeroContent({ descriptor, resume, embedded }: { descriptor: ResumeTempl
           </Button>
         </div>
       )}
-
       {descriptor.hero.showSummary && basics?.Summary && (
         <p className={`text-lg leading-relaxed ${embedded ? "" : "opacity-95"}`}>{basics.Summary}</p>
       )}
     </div>
   );
-}
 
-function HeroCompact({ descriptor, resume, embedded }: { descriptor: ResumeTemplateDescriptor; resume: Resume; embedded: boolean }) {
-  const basics = resume.data?.Basics;
-  return (
-    <div className={`flex items-center gap-4 ${embedded ? "" : "text-primary-foreground"}`}>
-      {descriptor.hero.showAvatar && (
-        <Avatar className="w-16 h-16">
-          <AvatarImage src={basics?.Image || ""} />
-          <AvatarFallback>{basics?.Name?.split(" ").map((n) => n[0]).join("") || "??"}</AvatarFallback>
-        </Avatar>
-      )}
-      <div className="flex-1">
-        <h1 className="text-2xl font-bold">{basics?.Name || resume.name}</h1>
-        <p className="text-sm opacity-80">{basics?.Label || ""}</p>
-        {descriptor.hero.showSummary && basics?.Summary && (
-          <p className="text-sm mt-2 line-clamp-2 opacity-90">{basics.Summary}</p>
-        )}
-      </div>
-      {descriptor.hero.showContactButtons && (
-        <div className="flex gap-2">
+  if (descriptor.hero.layout === "compact") {
+    return (
+      <div className={heroClass}>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center gap-4">
+          {descriptor.hero.showAvatar && (
+            <Avatar className="w-16 h-16">
+              <AvatarImage src={basics?.Image || ""} />
+              <AvatarFallback>{basics?.Name?.split(" ").map((n) => n[0]).join("") || "??"}</AvatarFallback>
+            </Avatar>
+          )}
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{basics?.Name || resume.name}</h1>
+            <p className="text-sm opacity-80">{basics?.Label || ""}</p>
+          </div>
           {basics?.Email && <Badge variant="secondary">{basics.Email}</Badge>}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={heroClass}>
+      {!embedded && <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />}
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {descriptor.hero.layout === "split" ? (
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            {heroContent}
+            {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {heroContent}
+            {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+// -----------------------------------------------------------------------------
+// Body layouts (1-col vs 2-col)
+// -----------------------------------------------------------------------------
+
+interface BodyProps {
+  descriptor: ResumeTemplateDescriptor;
+  resume: Resume;
+  theme: ThemeStyles;
+  cardStyle: CardStyle;
+  headingProps: { theme: ThemeStyles; style: "underlined" | "divider" | "caps" | "plain"; size: SectionTitleSize };
+  showIconInHeading: boolean;
+  density: { section: string; entry: string };
+}
+
+function OneColumnBody(props: BodyProps) {
+  return (
+    <>
+      {props.descriptor.sections
+        .filter((s) => s.enabled)
+        .map((section) => (
+          <SectionRenderer key={section.key} section={section} {...props} />
+        ))}
+    </>
+  );
+}
+
+function TwoColumnBody(props: BodyProps) {
+  const sidebarKeys = new Set(props.descriptor.layout.sidebar ?? []);
+  const enabled = props.descriptor.sections.filter((s) => s.enabled);
+  const sidebarSections = enabled.filter((s) => sidebarKeys.has(s.key));
+  const mainSections = enabled.filter((s) => !sidebarKeys.has(s.key));
+
+  return (
+    <div className="grid md:grid-cols-[1fr_2fr] gap-8">
+      <aside className={props.density.section}>
+        {sidebarSections.map((section) => (
+          <SectionRenderer key={section.key} section={section} {...props} />
+        ))}
+      </aside>
+      <main className={props.density.section}>
+        {mainSections.map((section) => (
+          <SectionRenderer key={section.key} section={section} {...props} />
+        ))}
+      </main>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Section renderer
+// -----------------------------------------------------------------------------
+
+interface SectionRendererProps extends BodyProps {
+  section: ResumeTemplateDescriptor["sections"][number];
+}
+
+function SectionRenderer({ section, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density }: SectionRendererProps) {
+  const { data } = resume;
+  const Icon = ICONS[section.icon ?? "star"] ?? Star;
+  const title = section.title ?? section.key;
+  const sectionBody = renderSectionBody(section.key, section, data, theme, density);
+  if (!sectionBody) return null;
+
+  const heading = (
+    <SectionHeading title={title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} />
+  );
+
+  if (descriptor.documentMode === "print") {
+    // Print mode: no card wrapper, tighter.
+    return (
+      <section>
+        {heading}
+        {sectionBody}
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      {heading}
+      <Card className={cardClass(cardStyle)}>
+        <CardContent className="p-6">{sectionBody}</CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function renderSectionBody(
+  key: ResumeSectionKey,
+  section: ResumeTemplateDescriptor["sections"][number],
+  data: Resume["data"],
+  theme: ThemeStyles,
+  density: { section: string; entry: string },
+): React.ReactNode {
+  const layout = section.layout;
+
+  switch (key) {
+    case "work": {
+      const items = data.Work ?? [];
+      if (items.length === 0) return null;
+      const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      if (layout === "timeline") {
+        return (
+          <div className={density.entry}>
+            {sorted.map((w, idx) => (
+              <TimelineItem
+                key={idx}
+                title={w.Position || ""}
+                subtitle={w.Name || ""}
+                startDate={w.StartDate}
+                endDate={w.EndDate || "Present"}
+                description={w.Summary}
+                highlights={section.showHighlights ? w.Highlights : undefined}
+                icon={Building}
+                isLast={idx === sorted.length - 1}
+                theme={theme}
+              />
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div>
+          {sorted.map((w, idx) => (
+            <ListEntry
+              key={idx}
+              title={w.Position || ""}
+              subtitle={w.Name || ""}
+              startDate={w.StartDate}
+              endDate={w.EndDate || "Present"}
+              description={w.Summary}
+              highlights={section.showHighlights ? w.Highlights : undefined}
+              theme={theme}
+            />
+          ))}
+        </div>
+      );
+    }
+    case "education": {
+      const items = data.Education ?? [];
+      if (items.length === 0) return null;
+      const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      if (layout === "timeline") {
+        return (
+          <div className={density.entry}>
+            {sorted.map((e, idx) => (
+              <TimelineItem
+                key={idx}
+                title={`${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim()}
+                subtitle={e.Institution || ""}
+                startDate={e.StartDate}
+                endDate={e.EndDate}
+                description={e.Score ? `GPA: ${e.Score}` : undefined}
+                icon={GraduationCap}
+                isLast={idx === sorted.length - 1}
+                theme={theme}
+              />
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div>
+          {sorted.map((e, idx) => (
+            <ListEntry
+              key={idx}
+              title={`${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim()}
+              subtitle={e.Institution || ""}
+              startDate={e.StartDate}
+              endDate={e.EndDate}
+              description={e.Score ? `GPA: ${e.Score}` : undefined}
+              theme={theme}
+            />
+          ))}
+        </div>
+      );
+    }
+    case "volunteer": {
+      const items = data.Volunteer ?? [];
+      if (items.length === 0) return null;
+      const sorted = sortByDate(items, section.sortBy ?? "date_desc");
+      if (layout === "timeline") {
+        return (
+          <div className={density.entry}>
+            {sorted.map((v, idx) => (
+              <TimelineItem
+                key={idx}
+                title={v.Position || ""}
+                subtitle={v.Organization || ""}
+                startDate={v.StartDate}
+                endDate={v.EndDate || "Present"}
+                description={v.Summary}
+                highlights={section.showHighlights ? v.Highlights ?? undefined : undefined}
+                icon={Heart}
+                isLast={idx === sorted.length - 1}
+                theme={theme}
+              />
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div>
+          {sorted.map((v, idx) => (
+            <ListEntry
+              key={idx}
+              title={v.Position || ""}
+              subtitle={v.Organization || ""}
+              startDate={v.StartDate}
+              endDate={v.EndDate || "Present"}
+              description={v.Summary}
+              highlights={section.showHighlights ? v.Highlights ?? undefined : undefined}
+              theme={theme}
+            />
+          ))}
+        </div>
+      );
+    }
+    case "skills": {
+      const items = data.Skills ?? [];
+      if (items.length === 0) return null;
+      if (layout === "grid") {
+        return (
+          <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
+            {items.map((skill, idx) => (
+              <div key={idx} className="p-3 border rounded-lg">
+                <h3 className="font-semibold mb-1">{skill.Name}</h3>
+                {skill.Level && <p className="text-xs text-muted-foreground mb-1">{skill.Level}</p>}
+                {skill.Keywords && skill.Keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {skill.Keywords.map((kw, ki) => (
+                      <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{kw}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      // list / compact
+      return (
+        <ul className="space-y-2 text-sm">
+          {items.map((skill, idx) => (
+            <li key={idx} className="flex flex-wrap gap-2 items-baseline">
+              <span className="font-semibold">{skill.Name}</span>
+              {skill.Level && <span className="text-xs text-muted-foreground">· {skill.Level}</span>}
+              {skill.Keywords && skill.Keywords.length > 0 && (
+                <span className="text-muted-foreground">· {skill.Keywords.join(", ")}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "languages": {
+      const items = data.Languages ?? [];
+      if (items.length === 0) return null;
+      if (layout === "grid") {
+        return (
+          <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
+            {items.map((lang, idx) => (
+              <div key={idx} className="p-3 border rounded-lg">
+                <h3 className="font-semibold">{lang.Language}</h3>
+                {lang.Fluency && <p className="text-sm text-muted-foreground">{lang.Fluency}</p>}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return (
+        <ul className="space-y-1 text-sm">
+          {items.map((l, i) => (
+            <li key={i}>
+              <span className="font-semibold">{l.Language}</span>
+              {l.Fluency && <span className="text-muted-foreground"> · {l.Fluency}</span>}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "projects": {
+      const items = data.Projects ?? [];
+      if (items.length === 0) return null;
+      return (
+        <div className="space-y-4">
+          {items.map((p, idx) => (
+            <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-semibold">{p.Name}</h3>
+                {p.Url && (
+                  <a href={p.Url} target="_blank" rel="noopener noreferrer" className={`${theme.accentText} hover:underline flex items-center gap-1`}>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              {(p.StartDate || p.EndDate) && <p className="text-xs text-muted-foreground mb-1">{p.StartDate} - {p.EndDate || "Present"}</p>}
+              {p.Entity && <p className="text-xs text-muted-foreground mb-1">{p.Entity}</p>}
+              {p.Description && <p className="text-sm mb-2">{p.Description}</p>}
+              {p.Highlights && p.Highlights.length > 0 && (
+                <ul className="list-disc list-inside text-sm mb-2 space-y-1">
+                  {p.Highlights.map((h, hi) => <li key={hi}>{h}</li>)}
+                </ul>
+              )}
+              {p.Keywords && p.Keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {p.Keywords.map((k, ki) => (
+                    <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{k}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    case "awards": {
+      const items = data.Awards ?? [];
+      if (items.length === 0) return null;
+      return (
+        <div className="space-y-3">
+          {items.map((a, idx) => (
+            <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
+              <h3 className="font-semibold">{a.Title}</h3>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground mb-1">
+                {a.Awarder && <span>{a.Awarder}</span>}
+                {a.Date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{a.Date}</span>}
+              </div>
+              {a.Summary && <p className="text-sm">{a.Summary}</p>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    case "certificates": {
+      const items = data.Certificates ?? [];
+      if (items.length === 0) return null;
+      return (
+        <ul className="space-y-2 text-sm">
+          {items.map((c, idx) => (
+            <li key={idx} className="flex justify-between gap-4">
+              <div>
+                <span className="font-semibold">{c.Name}</span>
+                {c.Issuer && <span className="text-muted-foreground"> · {c.Issuer}</span>}
+              </div>
+              {c.Date && <span className="text-xs text-muted-foreground whitespace-nowrap">{c.Date}</span>}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "publications": {
+      const items = data.Publications ?? [];
+      if (items.length === 0) return null;
+      return (
+        <div className="space-y-3 text-sm">
+          {items.map((p, idx) => (
+            <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
+              <div className="flex justify-between gap-4">
+                <span className="font-semibold">{p.Name}</span>
+                {p.ReleaseDate && <span className="text-xs text-muted-foreground whitespace-nowrap">{p.ReleaseDate}</span>}
+              </div>
+              {p.Publisher && <p className="text-xs text-muted-foreground">{p.Publisher}</p>}
+              {p.Summary && <p className="mt-1">{p.Summary}</p>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    case "interests": {
+      const items = data.Interests ?? [];
+      if (items.length === 0) return null;
+      if (layout === "grid") {
+        return (
+          <div className={`grid gap-3 ${gridColsClass(section.columns)}`}>
+            {items.map((i, idx) => (
+              <div key={idx} className="p-3 border rounded-lg">
+                <h3 className="font-semibold mb-1">{i.Name}</h3>
+                {i.Keywords && i.Keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {i.Keywords.map((kw, ki) => (
+                      <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{kw}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return (
+        <ul className="text-sm space-y-1">
+          {items.map((i, idx) => (
+            <li key={idx}>
+              <span className="font-semibold">{i.Name}</span>
+              {i.Keywords && i.Keywords.length > 0 && <span className="text-muted-foreground"> — {i.Keywords.join(", ")}</span>}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case "references": {
+      const items = data.References ?? [];
+      if (items.length === 0) return null;
+      return (
+        <div className="space-y-3 text-sm">
+          {items.map((r, idx) => (
+            <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
+              <div className="font-semibold">{r.Name}</div>
+              {r.Reference && <p className="text-muted-foreground">{r.Reference}</p>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
 }

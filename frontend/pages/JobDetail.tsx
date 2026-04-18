@@ -26,6 +26,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
+import Markdown from "@/components/Markdown";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -579,9 +580,7 @@ export default function JobDetail() {
                     <CardTitle>About This Role</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="whitespace-pre-line">
-                      {job.data.description}
-                    </p>
+                    <Markdown>{job.data.description ?? ""}</Markdown>
                   </CardContent>
                 </Card>
 

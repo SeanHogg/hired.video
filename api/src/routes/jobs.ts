@@ -7,6 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job.js";
 import { getApiKey } from "../services/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
+import { extractPdfText } from "../utils/pdf-extract.js";
 
 // ============================================================================
 // SCHEMAS
@@ -210,12 +211,11 @@ jobRoutes.delete("/alerts/:id", async (c) => {
 /**
  * Shared payload extractor for the createFromFile handlers. Accepts either
  * a multipart upload (`file` + optional `location`) or a JSON body
- * (`{ title?, description?, location? }`) and returns the fields the job
- * aggregate's create operation needs. Pure — does not touch the DB.
+ * (`{ title?, description?, location? }`) and returns the raw text content
+ * of the upload along with the display filename. Pure — does not touch the DB.
  *
- * Extracted so `/CreateFromFile` (multipart-aware, Chrome extension) and
- * `/createfromfile` (JSON-only, legacy route) share exactly one code path
- * — previously they were two drifting near-duplicates (roadmap #149).
+ * PDF uploads are decoded via the shared `extractPdfText` helper so the
+ * downstream extractor sees plain text, not compressed PDF bytes.
  */
 export async function extractCreateFromFilePayload(c: AppContext): Promise<{
   title: string;
@@ -231,8 +231,16 @@ export async function extractCreateFromFilePayload(c: AppContext): Promise<{
     const form = await c.req.formData().catch(() => null);
     const file = form?.get("file") as File | null;
     if (file) {
-      title = file.name || title;
-      description = await file.text().catch(() => "");
+      // Strip the extension — we'll use the filename as a fallback title
+      // when the AI extractor can't find one in the content itself.
+      title = (file.name || title).replace(/\.(pdf|docx?|txt|md|html?)$/i, "");
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        const bytes = await file.arrayBuffer().catch(() => null);
+        if (bytes) description = await extractPdfText(new Uint8Array(bytes));
+      } else {
+        description = await file.text().catch(() => "");
+      }
     }
     if (form?.has("location")) {
       location = String(form.get("location"));
@@ -253,15 +261,69 @@ export async function extractCreateFromFilePayload(c: AppContext): Promise<{
  * POST /api/Job/CreateFromFile (multipart or JSON)
  * POST /api/job/createfromfile (JSON alias for legacy callers)
  *
- * Both routes point at the same handler so the branching logic lives in a
- * single place. See `extractCreateFromFilePayload` for the dispatch.
+ * Runs the uploaded content through the same extractAndClassifyJob +
+ * createTrackedJob pipeline the browser-extension ingress uses, so every
+ * job — regardless of ingress path — lands in the DB with the same
+ * structured shape (jobType, experienceLevel, salary, skills,
+ * responsibilities, requirements, qualifications, benefits, applyUrl).
+ *
+ * Markdown-first description: the extractor converts whatever input
+ * (HTML, PDF-extracted text, plain text) into Markdown before storing,
+ * so the frontend can render formatted job descriptions consistently.
  */
 const createFromFileHandler = async (c: AppContext) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const payload = await extractCreateFromFilePayload(c);
-  const created = await jobService.createJob(payload, userId);
+  if (!payload.description.trim()) {
+    return c.json(error("VALIDATION_ERROR", "File contained no readable text"), 400);
+  }
+
+  // Feed the file text through the unified extraction pipeline. No JSON-LD
+  // will match (it's not HTML), so this routes straight to the LLM
+  // classifier which returns the structured ParsedJob shape.
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  const result = await jobService.extractAndClassifyJob({
+    html: payload.description,
+    apiKey,
+  });
+
+  // If the LLM rejects the content (e.g. a resume was uploaded instead of a
+  // job), keep the user's content anyway — we still have their filename as
+  // a title and the raw text as a description. The extension-path does the
+  // same "fall open" on extractor failure.
+  const parsed = result.parsed ?? {
+    title: payload.title,
+    description: payload.description,
+    confidence: "low" as const,
+  };
+  if (!parsed.title || /^tracked job$/i.test(parsed.title) || /^job from /i.test(parsed.title)) {
+    parsed.title = payload.title;
+  }
+  if (payload.location && !parsed.location) parsed.location = payload.location;
+
+  const created = await jobService.createTrackedJob(
+    {
+      title: parsed.title,
+      description: parsed.description,
+      company: parsed.company,
+      location: parsed.location,
+      isRemote: parsed.isRemote,
+      jobType: parsed.jobType,
+      experienceLevel: parsed.experienceLevel,
+      salaryMin: parsed.salaryMin,
+      salaryMax: parsed.salaryMax,
+      salaryCurrency: parsed.salaryCurrency,
+      skills: parsed.skills,
+      responsibilities: parsed.responsibilities,
+      requirements: parsed.requirements,
+      qualifications: parsed.qualifications,
+      benefits: parsed.benefits,
+    },
+    userId,
+    { track: true },
+  );
   return c.json(success(created), 201);
 };
 jobRoutes.post("/CreateFromFile", createFromFileHandler);

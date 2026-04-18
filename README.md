@@ -1635,21 +1635,34 @@ Before building any marketplace, we need the renderer. Reference resume: `91b07d
 | Card style | `elevated` / `flat` / `bordered` / `ghost` |
 | Section title size | `sm` / `md` / `lg` / `xl` |
 
-### Descriptor schema (v1)
+### Descriptor schema (v1.1)
+
+After reviewing competitor template galleries (Resume-Now, Kickresume, Canva), v1's pure layout toggles weren't enough — industry templates differ by **named style bundles**: font family, heading style, color palette, document vs. hero mode, single vs. two-column. v1.1 adds these dimensions:
 
 ```ts
 type SectionKey = "work" | "education" | "volunteer" | "skills" | "languages"
   | "projects" | "awards" | "certificates" | "publications" | "interests" | "references";
 
+type ThemeKey = "hired-purple" | "iron-gray" | "balanced-blue" | "trusted-taupe"
+  | "assertive-asphalt" | "warm-amber" | "executive-navy" | "minimal-slate";
+
 interface ResumeTemplateDescriptor {
   id: string;
   name: string;
-  version: "1.0";
+  industry?: string;                                     // display label
+  version: "1.1";
+  documentMode: "hero" | "print";                        // gradient header vs. paper document
   theme: {
-    accentClass?: string;           // tailwind: "primary" | "blue-600" | ...
-    heroGradient?: [string, string];
+    themeKey: ThemeKey;                                  // named palette (pre-baked Tailwind classes)
+    fontFamily: "sans" | "serif" | "mono";
+    headingStyle: "underlined" | "divider" | "caps" | "plain";
+    density: "compact" | "comfortable" | "spacious";
     cardStyle?: "elevated" | "flat" | "bordered" | "ghost";
     sectionTitleSize?: "sm" | "md" | "lg" | "xl";
+  };
+  layout: {
+    columns: 1 | 2;                                      // 2 = sidebar + main
+    sidebar?: SectionKey[];                              // which sections go in the sidebar
   };
   hero: {
     enabled: boolean;
@@ -1663,7 +1676,7 @@ interface ResumeTemplateDescriptor {
     key: SectionKey;
     enabled: boolean;
     title?: string;
-    icon?: string;                  // whitelist key
+    icon?: string;                                       // whitelist key
     layout: "timeline" | "cards" | "grid" | "list" | "compact";
     columns?: 1 | 2 | 3 | 4;
     showHighlights?: boolean;
@@ -1672,17 +1685,47 @@ interface ResumeTemplateDescriptor {
 }
 ```
 
-The **default descriptor** reproduces the current `ResumeDetail` output pixel-close (timeline for work/education/volunteer, 3-col grid for skills/languages/interests, cards for projects/awards/certificates/publications/references, gradient-hero split layout with video).
+**Themes are pre-baked** Tailwind class bundles — not dynamic interpolation — since Tailwind JIT can't see template strings. Registry: `frontend/lib/resume-template-themes.ts`.
+
+### Industry presets shipped
+
+| ID | Industry | Document mode | Theme | Font | Headings | Columns |
+|---|---|---|---|---|---|---|
+| `hired-default` | All | hero | hired-purple | sans | plain | 1 |
+| `payroll-iron-gray` | Finance / Payroll | print | iron-gray | serif | divider | 2 (sidebar: skills/edu/certs/lang) |
+| `risk-asphalt` | Risk / Consulting | print | assertive-asphalt | sans | caps | 2 (sidebar: skills/lang/certs) |
+| `executive-taupe` | Executive / C-Suite | print | trusted-taupe | serif | divider | 1 |
+| `intern-education-first` | Intern / New Grad | print | balanced-blue | sans | underlined | 1 (education first) |
+| `hospitality-amber` | Hospitality / Retail | print | warm-amber | sans | caps | 1 |
+| `creative-minimal` | Creative / Product | print | minimal-slate | mono | plain | 1 |
+
+The `hired-default` reproduces the current `ResumeDetail` pixel-close (gradient hero, timeline sections, split video). Print-mode presets render a paper-style document (centered name + contact line, no gradient, section headings per theme style).
 
 ### Preview route
 
 - `GET /resumes/VIEWER/:id` — first-pass preview page:
   - Loads the same resume via the three fallback endpoints (`getResumeById` → `getResumeForEmbed` → `getPublicResume`)
   - Renders `<DeclarativeResumeRenderer resume descriptor />` against a default descriptor that matches `ResumeDetail`
+  - "Template" dropdown lists all industry presets
+  - "Export" dropdown offers PDF, Word (.doc), Plain Text, Raw JSON
   - Right-side drawer with a live descriptor JSON editor — tweak and re-render instantly
-  - Presets button: "Default", "Compact", "Two-column", "Monochrome"
   - Retains platform chrome (Sidebar, Navigation, Footer, AuthOverlay for logged-out)
+- `GET /resumes/VIEWER/:id?print=1` — bare print variant:
+  - No chrome, no toolbar — just the rendered resume
+  - Auto-calls `window.print()` 400ms after load
+  - Reads descriptor from `sessionStorage` under `resume-descriptor:{id}` so the caller's selected template survives the new-window hop
 - The same `<DeclarativeResumeRenderer>` will later back `ResumeDetail`, `EmbeddedResume` (compact variant), and marketplace previews — one renderer, three hosts.
+
+### Export formats
+
+| Format | Mechanism | Bundle impact |
+|---|---|---|
+| **PDF** | Opens `?print=1` in a new window → auto-triggers browser print-to-PDF | zero |
+| **Word (.doc)** | Emits Word-compatible HTML with MS Office XML namespaces, served as `application/msword` — Word opens it as a fully-styled document. True `.docx` would need a library (docx/html-docx-js); skipping for first pass. | zero |
+| **Plain Text (.txt)** | JS serializer walking `ResumeData` — bulleted sections, headings, date ranges | zero |
+| **Raw JSON (.json)** | `JSON.stringify(resume.data, null, 2)` | zero |
+
+All four are implemented in `frontend/lib/resume-exporters.ts`. PDF export stashes the current descriptor in `sessionStorage` before opening the print window so the template selection survives the new-tab hop.
 
 ### Open questions (decide before Phase 1)
 

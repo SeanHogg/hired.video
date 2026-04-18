@@ -1,6 +1,6 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, Code2, Eye, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Code2, Download, Eye, FileJson, FileText, FileType, Printer, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import Footer from "@/components/Footer";
@@ -9,8 +9,16 @@ import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord } from "@/lib/resume-exporters";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import type { Resume, ResumeSectionMeta } from "@/types/resume";
@@ -67,6 +75,8 @@ function VideoSlot({ items }: { items: ResumeSectionMeta[] }) {
 export default function ResumeViewerPreview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const printMode = searchParams.get("print") === "1";
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated } = useAuth();
 
@@ -135,6 +145,53 @@ export default function ResumeViewerPreview() {
     }
   };
 
+  // When launched with ?print=1 the window auto-opens the browser print dialog
+  // once the resume finishes loading — user then saves as PDF.
+  // Descriptor is passed via sessionStorage (keyed on resume id) because URL
+  // query params can't reliably carry arbitrary JSON.
+  useEffect(() => {
+    if (printMode && id) {
+      try {
+        const stashed = sessionStorage.getItem(`resume-descriptor:${id}`);
+        if (stashed) setDescriptor(JSON.parse(stashed));
+      } catch {}
+    }
+  }, [printMode, id]);
+
+  useEffect(() => {
+    if (printMode && resume && !loading) {
+      const t = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [printMode, resume, loading]);
+
+  // Bare print layout: no chrome, no toolbar — just the rendered resume so the
+  // browser's print-to-PDF produces a clean document.
+  if (printMode) {
+    if (loading || !resume) {
+      return <div className="p-8 text-center text-muted-foreground">Preparing resume for print…</div>;
+    }
+    return (
+      <div className="print:bg-white">
+        <style>{`
+          @media print {
+            @page { margin: 0.5in; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        `}</style>
+        <DeclarativeResumeRenderer resume={resume} descriptor={descriptor} />
+      </div>
+    );
+  }
+
+  const handlePdf = () => {
+    if (!id) return;
+    try {
+      sessionStorage.setItem(`resume-descriptor:${id}`, JSON.stringify(descriptor));
+    } catch {}
+    exportResumePdf(`/resumes/VIEWER/${id}?print=1`);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
@@ -156,16 +213,53 @@ export default function ResumeViewerPreview() {
                 </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {TEMPLATE_PRESETS.map((preset) => (
-                  <Button
-                    key={preset.id}
-                    size="sm"
-                    variant={descriptor.id === preset.id ? "default" : "outline"}
-                    onClick={() => applyPreset(preset)}
-                  >
-                    {preset.name}
-                  </Button>
-                ))}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <FileType className="w-4 h-4 mr-1" />
+                      Template
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    {TEMPLATE_PRESETS.map((preset) => (
+                      <DropdownMenuItem
+                        key={preset.id}
+                        onClick={() => applyPreset(preset)}
+                        className={descriptor.id === preset.id ? "bg-accent" : ""}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{preset.name}</span>
+                          {preset.industry && <span className="text-xs text-muted-foreground">{preset.industry}</span>}
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="w-4 h-4 mr-1" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
+                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => resume && exportResumeWord(resume)} disabled={!resume}>
+                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => resume && exportResumeText(resume)} disabled={!resume}>
+                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => resume && exportResumeJson(resume)} disabled={!resume}>
+                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <Button size="sm" variant="outline" onClick={() => setEditorOpen((v) => !v)}>
                   <Code2 className="w-4 h-4 mr-1" />
                   {editorOpen ? "Hide JSON" : "Edit JSON"}
