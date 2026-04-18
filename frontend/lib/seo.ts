@@ -148,12 +148,12 @@ export const PAGE_SEO: Record<string, SEOData> = {
       ],
     },
   },
-  "/home": {
-    title: "Your Career Home — hired.video",
+  "/dashboard": {
+    title: "Your Dashboard — hired.video",
     description:
       "Your unified career command center — track resumes, applications, outreach, and your professional network, and share wins with the hired.video community.",
     keywords:
-      "career dashboard, job search tracker, career community, resume tracking, professional network, career home",
+      "career dashboard, job search tracker, career community, resume tracking, professional network",
   },
   "/studio": {
     title: "AI Video Resume Studio — hired.video",

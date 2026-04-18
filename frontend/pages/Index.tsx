@@ -27,6 +27,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import VideoCard from "@/components/VideoCard";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
@@ -896,6 +897,13 @@ export default function Index() {
         </section>
 
 
+
+        {/* Resume Templates Section */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
+          <div className="max-w-7xl mx-auto">
+            <TemplateGallery />
+          </div>
+        </section>
 
         {/* Public Video Resumes Section */}
         {publicVideos.length > 0 && (

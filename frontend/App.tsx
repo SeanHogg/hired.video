@@ -408,9 +408,9 @@ const App = () => (
                         element={<PersonaSelection />}
                       />
                       <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
-                      <Route path="/home" element={<Home />} />
-                      <Route path="/dashboard" element={<Navigate to="/home" replace />} />
-                      <Route path="/feed" element={<Navigate to="/home" replace />} />
+                      <Route path="/dashboard" element={<Home />} />
+                      <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/onboarding" element={<RequireVerified><Onboarding /></RequireVerified>} />
                       <Route
                         path="/features"

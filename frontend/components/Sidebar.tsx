@@ -44,8 +44,8 @@ export default function Sidebar({
   // Main navigation items - shown to all users
   const navigation = [
     {
-      name: "Home",
-      href: "/home",
+      name: "Dashboard",
+      href: "/dashboard",
       icon: TrendingUp,
       exactMatch: false,
     },
