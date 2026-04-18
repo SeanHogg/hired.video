@@ -186,7 +186,7 @@ const VERIFICATION_ALLOWED_PREFIXES = [
 
 // Any authenticated route is blocked until email is verified. Runs once for the
 // whole app so individual <Route> entries don't each need <RequireVerified>.
-function GlobalVerificationGate({ children }: { children: React.ReactNode }) {
+function GlobalVerificationGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
   const location = useLocation();
 
