@@ -583,8 +583,14 @@ export class ApiClient {
         return new AuthenticationError(error.message, error.details);
       case "AUTHORIZATION_ERROR":
         return new AuthorizationError(error.message, error.details);
+      case "NOT_FOUND":
       case "NOT_FOUND_ERROR":
-        return new NotFoundError(error.message, error.details);
+      case "RESUME_PRIVATE": {
+        // Preserve the server-sent code in context so callers can distinguish
+        // "doesn't exist" from "exists but restricted" (e.g. private resumes).
+        const detailsObj = error.details && typeof error.details === "object" ? error.details : {};
+        return new NotFoundError(error.message, { ...detailsObj, serverCode: error.code });
+      }
       default:
         return new NetworkError(error.message, undefined, error.details);
     }

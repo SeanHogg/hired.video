@@ -86,6 +86,7 @@ export default function ResumeViewerPreview() {
   const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [metadataModal, setMetadataModal] = useState<{ open: boolean; initialMetadata: ResumeSectionMeta[] }>({
     open: false,
     initialMetadata: [],
@@ -130,14 +131,31 @@ export default function ResumeViewerPreview() {
     }
 
     setLoading(true);
+    setIsPrivate(false);
     (async () => {
+      // Treat RESUME_PRIVATE as a terminal signal — the resume exists but the
+      // caller has no access. Falling through to /embedded or /public would
+      // produce the same result and waste a round-trip.
+      const isPrivateErr = (e: unknown) =>
+        typeof e === "object" && e !== null && (e as any).context?.serverCode === "RESUME_PRIVATE";
+
       try {
         const r = await resumeService.getResumeById(id);
         setResume(r);
-      } catch {
+      } catch (e1) {
+        if (isPrivateErr(e1)) {
+          setIsPrivate(true);
+          setLoading(false);
+          return;
+        }
         try {
           setResume(await resumeService.getResumeForEmbed(id));
-        } catch {
+        } catch (e2) {
+          if (isPrivateErr(e2)) {
+            setIsPrivate(true);
+            setLoading(false);
+            return;
+          }
           try {
             setResume(await resumeService.getPublicResume(id));
           } catch {
@@ -415,7 +433,25 @@ export default function ResumeViewerPreview() {
             </div>
           )}
 
-          {!loading && !resume && (
+          {!loading && !resume && isPrivate && (
+            <div className="max-w-xl mx-auto px-6 py-16 text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h1 className="text-2xl font-bold mb-3">This resume is private</h1>
+              <p className="text-muted-foreground mb-6">
+                The owner hasn't made this resume public. Ask them to change its visibility or share it with you directly.
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                  Copy link to send owner
+                </Button>
+                <Button onClick={() => navigate("/resumes")}>Back to Resumes</Button>
+              </div>
+            </div>
+          )}
+
+          {!loading && !resume && !isPrivate && (
             <div className="max-w-6xl mx-auto px-6 py-12 text-center">
               <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
               <p className="text-muted-foreground mb-6">Could not load resume <code>{id}</code>.</p>

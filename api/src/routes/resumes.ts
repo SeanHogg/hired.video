@@ -697,8 +697,14 @@ resumeRoutes.get("/embedded/:identifier", async (c) => {
   const isOwner = !!callerSub && row.userId === callerSub;
   const isPublic = row.privacyLevel === 0;
   if (!isOwner && !isPublic) {
-    // recruiter_only / connections / private — don't leak existence to non-owners.
-    return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+    // Resume exists but caller has no access. We intentionally surface this as
+    // distinct from NOT_FOUND — owners share links and need people to be told
+    // "private, ask me to share it" rather than "doesn't exist". Status stays
+    // 404 so crawlers don't index restricted content.
+    return c.json(
+      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
+      404,
+    );
   }
 
   return c.json(ok(rowToLegacyResume(row)), 200);
@@ -920,7 +926,9 @@ resumeRoutes.post("/unwatch/:id", async (c) => {
 // Dynamic routes below static routes
 // Mounted under optionalAuthMiddleware via PUBLIC_RESUME_DETAIL_ROUTE in app.ts.
 // Access policy: owner always wins; anyone else only sees public resumes.
-// Returns 404 (not 403) on privacy denial so we don't leak existence.
+// Privacy-blocked requests return 404 with code="RESUME_PRIVATE" so that when
+// owners share a link, the recipient is told the resume is private (prompting
+// them to ask for access) rather than seeing a generic "doesn't exist" error.
 resumeRoutes.get("/:id", async (c) => {
   const callerSub = c.var.user?.sub ?? null;
   const id = c.req.param("id");
@@ -934,7 +942,10 @@ resumeRoutes.get("/:id", async (c) => {
   const isOwner = !!callerSub && row.userId === callerSub;
   const isPublic = row.privacyLevel === 0;
   if (!isOwner && !isPublic) {
-    return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+    return c.json(
+      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
+      404,
+    );
   }
 
   return c.json(ok(rowToLegacyResume(row)), 200);
