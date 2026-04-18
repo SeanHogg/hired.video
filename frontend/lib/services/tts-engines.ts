@@ -335,7 +335,7 @@ function playPcm(
     }
     const ctx = activeWebAudioCtx;
     const buf = ctx.createBuffer(1, pcm.length, sampleRate);
-    buf.copyToChannel(pcm, 0, 0);
+    buf.getChannelData(0).set(pcm);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(ctx.destination);
