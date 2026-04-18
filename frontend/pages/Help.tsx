@@ -12,8 +12,8 @@ import {
   ExternalLink,
   ArrowRight,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -33,7 +33,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -54,7 +53,8 @@ export default function Help() {
   useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
   const { openAIChat } = useAI();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get("q") ?? "";
 
   const faqs = [
     {
@@ -285,18 +285,18 @@ export default function Help() {
               </p>
             </div>
 
-            {/* Search */}
-            <div className="max-w-2xl mx-auto">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                <Input
-                  placeholder="Search for help topics, features, or questions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 text-lg"
-                />
+            {/* Active search query indicator */}
+            {searchQuery && (
+              <div className="max-w-2xl mx-auto text-center">
+                <p className="text-sm text-muted-foreground">
+                  Showing results for{" "}
+                  <span className="font-medium text-foreground">
+                    &quot;{searchQuery}&quot;
+                  </span>{" "}
+                  — use the header search to refine.
+                </p>
               </div>
-            </div>
+            )}
 
             {/* Main Content */}
             <Tabs defaultValue="faq" className="space-y-6">

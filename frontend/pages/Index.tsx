@@ -21,6 +21,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import ActionsModal from "@/components/ActionsModal";
 import Footer from "@/components/Footer";
+import LatestGuides from "@/components/LatestGuides";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -902,6 +903,8 @@ export default function Index() {
             </div>
           </section>
         )}
+
+        <LatestGuides />
 
         <Footer />
       </div>

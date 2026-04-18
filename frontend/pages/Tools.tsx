@@ -26,8 +26,8 @@ import {
   GitMerge,
   ClipboardPaste,
 } from "lucide-react";
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -41,6 +41,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -57,6 +58,42 @@ export default function Tools() {
 
   // SEO for tools page
   useSEO(location.pathname);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") ?? "";
+  const [toolQuery, setToolQuery] = useState(urlQuery);
+  const toolsGridRef = useRef<HTMLDivElement | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    setToolQuery(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => {
+    const grid = toolsGridRef.current;
+    if (!grid) {
+      setVisibleCount(null);
+      return;
+    }
+    const q = toolQuery.trim().toLowerCase();
+    const cards = grid.querySelectorAll<HTMLElement>(":scope > a");
+    let shown = 0;
+    cards.forEach((card) => {
+      const text = (card.textContent ?? "").toLowerCase();
+      const match = q === "" || text.includes(q);
+      card.style.display = match ? "" : "none";
+      if (match) shown++;
+    });
+    setVisibleCount(q === "" ? null : shown);
+  }, [toolQuery]);
+
+  const handleToolSearch = (value: string) => {
+    setToolQuery(value);
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) next.set("q", value);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -1344,14 +1381,40 @@ export default function Tools() {
         <div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold mb-6">AI-Powered Career Tools</h1>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-muted-foreground mb-6">
               Access powerful AI tools to enhance your career and optimize your
               job search.
             </p>
 
+            {/* Tool search */}
+            <div className="mb-6 max-w-xl">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={toolQuery}
+                  onChange={(e) => handleToolSearch(e.target.value)}
+                  placeholder="Search tools (e.g. resume, salary, interview)"
+                  className="pl-9 h-10"
+                  aria-label="Search tools"
+                />
+              </div>
+              {visibleCount !== null && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {visibleCount} tool{visibleCount === 1 ? "" : "s"} match
+                  {visibleCount === 1 ? "es" : ""}{" "}
+                  <span className="font-medium text-foreground">
+                    &quot;{toolQuery}&quot;
+                  </span>
+                </p>
+              )}
+            </div>
+
             {/* Unified Tools Grid */}
             <div className="mb-8 sm:mb-12">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              <div
+                ref={toolsGridRef}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8"
+              >
                 {/* Resume Optimizer */}
                 <Link to="/Tools/ResumeOptimizer">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">

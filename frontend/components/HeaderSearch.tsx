@@ -8,10 +8,11 @@ import {
   Briefcase,
   Sparkles,
   Check,
+  Wrench,
+  HelpCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { SearchContext } from "@/components/SearchBar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,8 +31,17 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+export type HeaderSearchContext =
+  | "all"
+  | "people"
+  | "companies"
+  | "resumes"
+  | "jobs"
+  | "tools"
+  | "help";
+
 type ContextOption = {
-  value: SearchContext;
+  value: HeaderSearchContext;
   label: string;
   icon: typeof Sparkles;
   path: string;
@@ -74,13 +84,31 @@ const CONTEXT_OPTIONS: ContextOption[] = [
     path: "/jobs",
     placeholder: "Search jobs, companies, or skills...",
   },
+  {
+    value: "tools",
+    label: "Tools",
+    icon: Wrench,
+    path: "/tools",
+    placeholder: "Search AI career tools (resume, salary, interview...)",
+  },
+  {
+    value: "help",
+    label: "Help & Docs",
+    icon: HelpCircle,
+    path: "/help",
+    placeholder: "Search help topics, features, or questions...",
+  },
 ];
 
-function contextFromPath(pathname: string): SearchContext {
-  if (pathname.startsWith("/people")) return "people";
-  if (pathname.startsWith("/companies")) return "companies";
-  if (pathname.startsWith("/resumes")) return "resumes";
-  if (pathname.startsWith("/jobs")) return "jobs";
+function contextFromPath(pathname: string): HeaderSearchContext {
+  const p = pathname.toLowerCase();
+  if (p.startsWith("/people")) return "people";
+  if (p.startsWith("/companies")) return "companies";
+  if (p.startsWith("/resumes")) return "resumes";
+  if (p.startsWith("/jobs")) return "jobs";
+  if (p.startsWith("/tools")) return "tools";
+  if (p.startsWith("/help") || p.startsWith("/guides") || p.startsWith("/blog"))
+    return "help";
   return "all";
 }
 
@@ -89,7 +117,7 @@ export default function HeaderSearch() {
   const navigate = useNavigate();
 
   const derivedContext = contextFromPath(location.pathname);
-  const [overrideContext, setOverrideContext] = useState<SearchContext | null>(null);
+  const [overrideContext, setOverrideContext] = useState<HeaderSearchContext | null>(null);
   const context = overrideContext ?? derivedContext;
 
   const [query, setQuery] = useState("");
@@ -114,7 +142,7 @@ export default function HeaderSearch() {
     navigate(qs ? `${current.path}?${qs}` : current.path);
   };
 
-  const handleContextSelect = (value: SearchContext) => {
+  const handleContextSelect = (value: HeaderSearchContext) => {
     setOverrideContext(value);
   };
 
