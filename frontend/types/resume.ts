@@ -321,3 +321,12 @@ export interface FileMergeAnalysis {
   analysis: MergeAnalysis;
   parseConfidence: number;
 }
+
+export interface MergePreview {
+  mergedContent: Record<string, unknown>;
+  stats: {
+    mergedSections: number;
+    skippedSections: number;
+    newSections: number;
+  };
+}

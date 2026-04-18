@@ -1,6 +1,7 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ResumePrivacy } from "@/types/resume";
+import { inlineRunnableTools } from "@/lib/resume-tools/registry";
 
 interface ResumeActionsMenuProps {
   isOwner?: boolean;
@@ -35,6 +37,8 @@ interface ResumeActionsMenuProps {
   onTrack?: () => void;
   /** Contact resume owner — for non-owners (recruiters / business owners) */
   onContactOwner?: () => void;
+  /** Called when the user picks a tool from the "Run Tool" submenu. Receives the tool id from the resume-tool registry. */
+  onRunTool?: (toolId: string) => void;
   /** Pass a className to override the trigger button style (e.g. for hero header on detail page) */
   triggerClassName?: string;
   /** Button variant for the trigger */
@@ -66,10 +70,11 @@ export function ResumeActionsMenu({
   isTracked = false,
   onTrack,
   onContactOwner,
+  onRunTool,
   triggerVariant = "ghost",
   align = "end",
 }: ResumeActionsMenuProps) {
-  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || onDelete);
+  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onRunTool);
   const hasPublicActions = onView || onShare || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -128,6 +133,30 @@ export function ResumeActionsMenu({
             <Download className="w-4 h-4 mr-2" />
             Download
           </DropdownMenuItem>
+        )}
+
+        {/* Run Tool submenu — owner only. Runs a resume-input tool against this resume and records the run to history. */}
+        {isOwner && onRunTool && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Wand2 className="w-4 h-4 mr-2" />
+                Run Tool
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {inlineRunnableTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <DropdownMenuItem key={tool.id} onClick={() => onRunTool(tool.id)}>
+                      <Icon className="w-4 h-4 mr-2" />
+                      {tool.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
         )}
 
         {/* Privacy submenu — owner only */}

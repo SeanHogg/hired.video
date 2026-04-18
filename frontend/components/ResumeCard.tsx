@@ -51,6 +51,7 @@ interface ResumeCardProps {
   onDelete?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
+  onRunTool?: (toolId: string) => void;
 }
 
 export default function ResumeCard({
@@ -82,6 +83,7 @@ export default function ResumeCard({
   onDelete,
   onTrack,
   onContactOwner,
+  onRunTool,
 }: ResumeCardProps) {
   const isOwner = ownership === "owned";
 
@@ -240,6 +242,7 @@ export default function ResumeCard({
             isTracked={ownership === "tracked"}
             onTrack={onTrack}
             onContactOwner={onContactOwner}
+            onRunTool={onRunTool}
           />
         </div>
       ) : (

@@ -61,6 +61,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
+import { ResumeToolDialog } from "@/components/ResumeToolDialog";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
@@ -202,6 +203,14 @@ export default function Resumes() {
     isOpen: false,
     targetResumeId: null,
   });
+
+  // Run-Tool dialog state (opened from the resume "..." menu "Run Tool" submenu)
+  const [toolDialog, setToolDialog] = useState<{ open: boolean; toolId: string | null; resumeId?: string; resumeName?: string }>({
+    open: false,
+    toolId: null,
+  });
+  const openRunTool = (toolId: string, resume: { id: string; name: string }) =>
+    setToolDialog({ open: true, toolId, resumeId: resume.id, resumeName: resume.name });
 
   // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
@@ -1523,6 +1532,7 @@ export default function Resumes() {
                                 onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
                                 onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                                 onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                                onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
                               />
                             ))}
                           </div>
@@ -1573,6 +1583,7 @@ export default function Resumes() {
                                     onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
                                     onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                                     onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                                    onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
                                   />
                                 </div>
                               </div>
@@ -1813,6 +1824,15 @@ export default function Resumes() {
         open={uploadSheetOpen}
         onOpenChange={setUploadSheetOpen}
         onSuccess={handleUploadSuccess}
+      />
+
+      {/* Run-Tool dialog — opened from a resume's "..." context menu */}
+      <ResumeToolDialog
+        open={toolDialog.open}
+        onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
+        toolId={toolDialog.toolId}
+        resumeId={toolDialog.resumeId}
+        resumeName={toolDialog.resumeName}
       />
     </div>
   );

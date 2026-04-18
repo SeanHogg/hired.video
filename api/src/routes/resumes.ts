@@ -1531,6 +1531,54 @@ const MergeExecuteSchema = z.object({
   message: "Either sourceResumeId or sourceContent must be provided",
 });
 
+/**
+ * POST /api/resumes/merge/preview
+ *
+ * Run `executeMerge` without persisting. Returns the merged content so
+ * the client can render a preview (ResumeViewer + JSON) before the user
+ * commits. Uses the same schema and resolution logic as /merge/execute —
+ * same decisions in means same output; just no DB write.
+ */
+resumeRoutes.post("/merge/preview", async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  // Preview doesn't need createNew/newTitle — ignore those fields even
+  // if the client echoes the full execute payload.
+  const parsed = MergeExecuteSchema.safeParse(body);
+  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+
+  const { sourceResumeId, sourceContent, targetResumeId, decisions, basicDecisions } = parsed.data;
+
+  const db = getDb();
+  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
+
+  let resolvedSourceContent: Record<string, any>;
+  if (sourceResumeId) {
+    const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+    if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
+    resolvedSourceContent = (source.content ?? {}) as Record<string, any>;
+  } else {
+    resolvedSourceContent = (sourceContent ?? {}) as Record<string, any>;
+  }
+
+  const mergedContent = executeMerge(
+    (target.content ?? {}) as Record<string, any>,
+    resolvedSourceContent,
+    decisions as MergeDecision[],
+    basicDecisions,
+  );
+
+  const mergedCount = decisions.filter((d) => d.action === "merge" || d.action === "replace").length;
+  const skippedCount = decisions.filter((d) => d.action === "skip").length;
+  const newCount = decisions.filter((d) => d.action === "add").length;
+
+  return c.json(ok({
+    mergedContent,
+    stats: { mergedSections: mergedCount, skippedSections: skippedCount, newSections: newCount },
+  }), 200);
+});
+
 resumeRoutes.post("/merge/execute", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);

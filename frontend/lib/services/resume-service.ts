@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 
@@ -1555,6 +1555,20 @@ export class ResumeService {
   async executeMerge(request: MergeRequest): Promise<MergeResult> {
     const response = await apiClient.post<MergeResult>(
       `/api/resumes/merge/execute`,
+      request,
+      z.any(),
+    );
+    return response.data;
+  }
+
+  /**
+   * Run the merge without saving — returns the merged content so the UI
+   * can render a preview before the user commits. Same inputs as
+   * executeMerge; `createNew`/`newTitle` are ignored by the server.
+   */
+  async previewMerge(request: MergeRequest): Promise<MergePreview> {
+    const response = await apiClient.post<MergePreview>(
+      `/api/resumes/merge/preview`,
       request,
       z.any(),
     );

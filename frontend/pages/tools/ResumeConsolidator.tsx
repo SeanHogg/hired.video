@@ -9,6 +9,10 @@ import {
   AlertTriangle,
   SkipForward,
   Plus,
+  Eye,
+  Code,
+  Download,
+  Copy,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -37,11 +41,13 @@ import type {
   MergeDecision,
   MergeResult,
   Resume as FrontendResume,
+  ResumeData,
 } from "@/types/resume";
 import MergeAnalysisView from "@/components/merge/MergeAnalysisView";
 import ResumeViewer from "@/components/ResumeViewer";
+import { mapContentToResumeData } from "@/lib/resume-shape";
 
-type Step = "select" | "review" | "result";
+type Step = "select" | "review" | "preview" | "result";
 
 export default function ResumeConsolidator() {
   const location = useLocation();
@@ -117,6 +123,10 @@ export default function ResumeConsolidator() {
   const [mergedResume, setMergedResume] = useState<FrontendResume | null>(null);
   const [mergeResult, setMergeResult] = useState<MergeResult | null>(null);
 
+  // Preview state — populated by /merge/preview, shown in the "preview" step
+  const [previewContent, setPreviewContent] = useState<Record<string, any> | null>(null);
+  const [previewStats, setPreviewStats] = useState<{ mergedSections: number; skippedSections: number; newSections: number } | null>(null);
+
   const getResumeLabel = useCallback((r: any) => {
     return r.Name || r.name || "Untitled Resume";
   }, []);
@@ -178,31 +188,63 @@ export default function ResumeConsolidator() {
     }
   }, [targetId, sourceId, sourceFile, filteredResumes, getResumeId, getResumeLabel, isAuthenticated, snapshot]);
 
-  const handleExecute = useCallback(async () => {
+  /** Build the complete decision list (matches + new-item "add"s) the
+   *  preview/execute endpoints expect. Shared so preview and save
+   *  can't drift. */
+  const buildFinalDecisions = useCallback((): MergeDecision[] => {
+    const all: MergeDecision[] = [...decisions];
+    for (const [key, included] of newItemDecisions) {
+      if (!included) continue;
+      const [sectionType, sourceIndexStr] = key.split(":");
+      all.push({
+        sectionType,
+        sourceIndex: parseInt(sourceIndexStr),
+        targetIndex: null,
+        action: "add",
+      });
+    }
+    return all;
+  }, [decisions, newItemDecisions]);
+
+  /** Run preview: compute merged content server-side without saving,
+   *  then transition to the preview step where the user can inspect
+   *  the rendered resume + JSON before committing. */
+  const handlePreview = useCallback(async () => {
     if (!targetId || !analysis) return;
-    // Must have either an existing source resume OR parsed source content (file-based)
     if (!sourceId && !sourceContent) return;
     setLoading(true);
     setError(null);
 
     try {
-      const allDecisions: MergeDecision[] = [...decisions];
-      for (const [key, included] of newItemDecisions) {
-        if (!included) continue;
-        const [sectionType, sourceIndexStr] = key.split(":");
-        allDecisions.push({
-          sectionType,
-          sourceIndex: parseInt(sourceIndexStr),
-          targetIndex: null,
-          action: "add",
-        });
-      }
-
-      const result: MergeResult = await resumeService.executeMerge({
-        // For file-based merges (no sourceId), send the parsed content inline
+      const preview = await resumeService.previewMerge({
         ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
         targetResumeId: targetId,
-        decisions: allDecisions,
+        decisions: buildFinalDecisions(),
+        basicDecisions,
+        createNew,
+        newTitle: createNew ? newTitle : undefined,
+      });
+      setPreviewContent(preview.mergedContent as Record<string, any>);
+      setPreviewStats(preview.stats);
+      setStep("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Preview failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, buildFinalDecisions]);
+
+  const handleExecute = useCallback(async () => {
+    if (!targetId || !analysis) return;
+    if (!sourceId && !sourceContent) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result: MergeResult = await resumeService.executeMerge({
+        ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
+        targetResumeId: targetId,
+        decisions: buildFinalDecisions(),
         basicDecisions,
         createNew,
         newTitle: createNew ? newTitle : undefined,
@@ -213,7 +255,6 @@ export default function ResumeConsolidator() {
         description: `Merged ${result.mergedSections} sections, added ${result.newSections} new items.`,
       });
 
-      // Load the freshly merged resume so we can render it below the merge button
       try {
         const merged = await resumeService.getResumeById(result.resumeId);
         setMergedResume(merged);
@@ -229,7 +270,7 @@ export default function ResumeConsolidator() {
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, sourceContent, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch, clear]);
+  }, [targetId, sourceId, sourceContent, analysis, basicDecisions, createNew, newTitle, toast, refetch, clear, buildFinalDecisions]);
 
   const handleStartOver = useCallback(() => {
     setStep("select");
@@ -244,6 +285,8 @@ export default function ResumeConsolidator() {
     setBasicDecisions({});
     setMergedResume(null);
     setMergeResult(null);
+    setPreviewContent(null);
+    setPreviewStats(null);
     setError(null);
   }, []);
 
@@ -513,36 +556,6 @@ export default function ResumeConsolidator() {
                   </CardContent>
                 </Card>
 
-                {/* Execution options */}
-                <Card>
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="create-new" className="text-sm">
-                        Create new resume (instead of updating target)
-                      </Label>
-                      <Switch
-                        id="create-new"
-                        checked={createNew}
-                        onCheckedChange={setCreateNew}
-                      />
-                    </div>
-                    {createNew && (
-                      <div>
-                        <Label htmlFor="new-title" className="text-xs text-muted-foreground">
-                          New resume title
-                        </Label>
-                        <Input
-                          id="new-title"
-                          value={newTitle}
-                          onChange={(e) => setNewTitle(e.target.value)}
-                          placeholder="Merged Resume"
-                          className="mt-1"
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
@@ -552,16 +565,31 @@ export default function ResumeConsolidator() {
                 <Button
                   size="lg"
                   className="w-full"
-                  onClick={handleExecute}
+                  onClick={handlePreview}
                   disabled={loading || (!sourceId && !sourceContent)}
                 >
                   {loading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Merging...</>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Building preview...</>
                   ) : (
-                    <><GitMerge className="h-4 w-4 mr-2" />Execute Merge</>
+                    <><Eye className="h-4 w-4 mr-2" />Preview Merged Resume</>
                   )}
                 </Button>
               </div>
+            )}
+
+            {step === "preview" && previewContent && (
+              <PreviewStep
+                previewContent={previewContent}
+                previewStats={previewStats}
+                createNew={createNew}
+                setCreateNew={setCreateNew}
+                newTitle={newTitle}
+                setNewTitle={setNewTitle}
+                loading={loading}
+                error={error}
+                onBack={() => setStep("review")}
+                onConfirm={handleExecute}
+              />
             )}
 
             {step === "result" && mergeResult && (
@@ -644,3 +672,205 @@ function buildNewItemDecisions(a: MergeAnalysis): Map<string, boolean> {
   }
   return map;
 }
+
+// ── PreviewStep ──────────────────────────────────────────────────────────────
+// Shows the merged resume server-computed output via /merge/preview in two
+// views: a rendered ResumeViewer and the raw JSON. User confirms here to
+// trigger /merge/execute and actually persist the result.
+
+interface PreviewStepProps {
+  previewContent: Record<string, any>;
+  previewStats: { mergedSections: number; skippedSections: number; newSections: number } | null;
+  createNew: boolean;
+  setCreateNew: (v: boolean) => void;
+  newTitle: string;
+  setNewTitle: (v: string) => void;
+  loading: boolean;
+  error: string | null;
+  onBack: () => void;
+  onConfirm: () => void;
+}
+
+function PreviewStep({
+  previewContent,
+  previewStats,
+  createNew,
+  setCreateNew,
+  newTitle,
+  setNewTitle,
+  loading,
+  error,
+  onBack,
+  onConfirm,
+}: PreviewStepProps) {
+  const [tab, setTab] = useState<"preview" | "json">("preview");
+  const [copied, setCopied] = useState(false);
+
+  // Shape-coerce the lowercase JSON Resume into the PascalCase ResumeData
+  // ResumeViewer expects.
+  const resumeForViewer: FrontendResume = useMemo(
+    () => ({
+      id: "preview",
+      slug: "preview",
+      name: newTitle || "Merged Resume",
+      data: mapContentToResumeData(previewContent),
+      privacy: "private" as const,
+      isMaster: false,
+      isActive: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      views: 0,
+      userId: "",
+    }),
+    [previewContent, newTitle],
+  );
+
+  const jsonString = useMemo(
+    () => JSON.stringify(previewContent, null, 2),
+    [previewContent],
+  );
+
+  const handleCopyJson = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — silently ignore */
+    }
+  }, [jsonString]);
+
+  const handleDownloadJson = useCallback(() => {
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(newTitle || "merged-resume").replace(/[^\w.-]+/g, "_")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [jsonString, newTitle]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Preview Merged Resume</h2>
+          {previewStats && (
+            <p className="text-sm text-muted-foreground">
+              {previewStats.mergedSections} merged
+              {previewStats.newSections > 0 && `, ${previewStats.newSections} added`}
+              {previewStats.skippedSections > 0 && `, ${previewStats.skippedSections} skipped`}
+              {" — nothing has been saved yet."}
+            </p>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={onBack} disabled={loading}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Review
+        </Button>
+      </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "preview" | "json")}>
+        <TabsList>
+          <TabsTrigger value="preview">
+            <Eye className="h-4 w-4 mr-2" />
+            Rendered
+          </TabsTrigger>
+          <TabsTrigger value="json">
+            <Code className="h-4 w-4 mr-2" />
+            JSON
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="preview" className="mt-4">
+          <Card>
+            <CardContent className="p-6">
+              <ResumeViewer
+                resume={resumeForViewer}
+                onUpdate={() => {}}
+                canEdit={false}
+                showToolbar={false}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="json" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Merged JSON Resume</CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopyJson}>
+                  {copied ? (
+                    <><CheckCircle2 className="h-4 w-4 mr-2" />Copied</>
+                  ) : (
+                    <><Copy className="h-4 w-4 mr-2" />Copy</>
+                  )}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDownloadJson}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <pre className="bg-muted/40 border rounded-md p-4 overflow-auto max-h-[600px] text-xs font-mono whitespace-pre">
+                {jsonString}
+              </pre>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="create-new" className="text-sm">
+              Save as new resume (instead of updating target)
+            </Label>
+            <Switch id="create-new" checked={createNew} onCheckedChange={setCreateNew} />
+          </div>
+          {createNew && (
+            <div>
+              <Label htmlFor="new-title" className="text-xs text-muted-foreground">
+                New resume title
+              </Label>
+              <Input
+                id="new-title"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Merged Resume"
+                className="mt-1"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onBack} disabled={loading}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <Button size="lg" className="flex-1" onClick={onConfirm} disabled={loading}>
+          {loading ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
+          ) : createNew ? (
+            <><GitMerge className="h-4 w-4 mr-2" />Save as New Resume</>
+          ) : (
+            <><GitMerge className="h-4 w-4 mr-2" />Update Target Resume</>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
