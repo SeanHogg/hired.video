@@ -138,7 +138,8 @@ export interface ResumeData {
   References: Reference[];
   Projects: Project[];
   Meta?: {
-    template?: string;
+    template?: string;          // descriptor id applied at /resumes/:id
+    embeddedTemplate?: string;  // descriptor id applied at /embedded/resumes/:id
     version?: string;
     lastModified?: string;
   };

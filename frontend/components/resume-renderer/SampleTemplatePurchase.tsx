@@ -75,7 +75,7 @@ export default function SampleTemplatePurchase({ descriptor }: Props) {
   };
 
   const applyHref = masterResumeId
-    ? `/resumes/VIEWER/${masterResumeId}?template=${descriptor.id}`
+    ? `/resumes/${masterResumeId}?template=${descriptor.id}`
     : "/resumes";
   const applyLabel = masterResumeId ? "View on my resume" : "Go to my resumes";
 

@@ -8,6 +8,37 @@
 
 import { z } from "zod";
 import { callLLMJson, getApiKey } from "./ai.js";
+import { normalizeJsonResume } from "./resume-parse.js";
+
+/**
+ * Coerce a skills/keywords/etc entry into a canonical `{ name, keywords[] }`
+ * object shape. Callers sometimes ship skills as plain strings
+ * (["JavaScript","React"]) — the merge scorer expects objects, so we
+ * widen the input here instead of branching on shape throughout the
+ * scoring code.
+ */
+function coerceSkillShape(item: unknown): Record<string, any> {
+  if (typeof item === "string") return { name: item, level: "", keywords: [] };
+  if (item && typeof item === "object") return item as Record<string, any>;
+  return { name: "", level: "", keywords: [] };
+}
+
+/**
+ * Normalise a resume content blob ahead of merge analysis/execution:
+ *   - Lowercase every key via `normalizeJsonResume` (handles PascalCase exports).
+ *   - Coerce scalar skills to the `{name, keywords}` object shape.
+ * Always returns a fresh object — never mutates the caller's data.
+ */
+function normalizeContentForMerge(content: unknown): Record<string, any> {
+  const normalized = normalizeJsonResume(content);
+  if (Array.isArray(normalized.skills)) {
+    normalized.skills = (normalized.skills as unknown[]).map(coerceSkillShape);
+  }
+  if (Array.isArray(normalized.interests)) {
+    normalized.interests = (normalized.interests as unknown[]).map(coerceSkillShape);
+  }
+  return normalized;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -385,15 +416,24 @@ export async function analyzeMerge(
   targetContent: Record<string, any>,
   apiKey?: string,
 ): Promise<MergeAnalysis> {
-  const basics = analyzeBasics(sourceContent.basics, targetContent.basics);
-  const { matches, newSections } = analyzeSections(sourceContent, targetContent);
+  // Normalise BOTH sides to canonical lowercase keys before comparing —
+  // otherwise `source.name` vs `target.Name` both read undefined and
+  // every entry looks "new" even when re-uploading identical content.
+  const source = normalizeContentForMerge(sourceContent);
+  const target = normalizeContentForMerge(targetContent);
 
-  // Optionally refine ambiguous matches with AI
+  const basics = analyzeBasics(source.basics, target.basics);
+  const { matches, newSections } = analyzeSections(source, target);
+
+  // Refine any non-trivial matches with AI — the user's workflow is to
+  // re-upload their own resume, so most matches are actually identical.
+  // Heuristic above 0.95 is already safe (exact company+position+dates);
+  // below 0.95 but above 0.3 is where AI confirmation earns its keep.
   if (apiKey) {
-    const ambiguous = matches.filter((m) => m.confidence >= 0.3 && m.confidence <= 0.85);
+    const ambiguous = matches.filter((m) => m.confidence >= 0.3 && m.confidence < 0.95);
     if (ambiguous.length > 0) {
       try {
-        const refined = await refineMatchesWithAI(ambiguous, sourceContent, targetContent, apiKey);
+        const refined = await refineMatchesWithAI(ambiguous, source, target, apiKey);
         for (const r of refined) {
           const idx = matches.findIndex(
             (m) => m.sectionType === r.sectionType && m.sourceIndex === r.sourceIndex && m.targetIndex === r.targetIndex,
@@ -441,20 +481,69 @@ async function refineMatchesWithAI(
   targetContent: Record<string, any>,
   apiKey: string,
 ): Promise<Array<{ sectionType: string; sourceIndex: number; targetIndex: number; confidence: number; reasoning: string }>> {
+  // Strip items down to the identity-relevant fields only. Highlights
+  // vary between versions of the same role; sending them wastes tokens
+  // and can confuse the matcher. Keep company/position/dates for work
+  // and volunteer, institution/area/dates for education, name+keywords
+  // for skills/projects.
+  const identityFieldsFor = (sectionType: string, item: any) => {
+    if (!item || typeof item !== "object") return item;
+    switch (sectionType) {
+      case "work":
+        return { name: item.name, position: item.position, startDate: item.startDate, endDate: item.endDate };
+      case "volunteer":
+        return { organization: item.organization, position: item.position, startDate: item.startDate, endDate: item.endDate };
+      case "education":
+        return { institution: item.institution, area: item.area, studyType: item.studyType, startDate: item.startDate, endDate: item.endDate };
+      case "projects":
+        return { name: item.name, startDate: item.startDate, endDate: item.endDate };
+      case "skills":
+      case "interests":
+        return { name: item.name };
+      case "awards":
+        return { title: item.title, date: item.date, awarder: item.awarder };
+      case "certificates":
+        return { name: item.name, issuer: item.issuer, date: item.date };
+      case "publications":
+        return { name: item.name, publisher: item.publisher, releaseDate: item.releaseDate };
+      case "languages":
+        return { language: item.language };
+      case "references":
+        return { name: item.name };
+      default:
+        return item;
+    }
+  };
+
   const pairs = ambiguousMatches.map((m) => ({
     sectionType: m.sectionType,
     sourceIndex: m.sourceIndex,
     targetIndex: m.targetIndex!,
-    sourceItem: (sourceContent[m.sectionType] ?? [])[m.sourceIndex],
-    targetItem: (targetContent[m.sectionType] ?? [])[m.targetIndex!],
+    sourceItem: identityFieldsFor(m.sectionType, (sourceContent[m.sectionType] ?? [])[m.sourceIndex]),
+    targetItem: identityFieldsFor(m.sectionType, (targetContent[m.sectionType] ?? [])[m.targetIndex!]),
   }));
 
   const result = await callLLMJson(
     apiKey,
     {
-      systemPrompt: `You are a resume section matcher. For each pair of resume entries, determine if they represent the same job, education, skill, etc.
-Return a JSON object with a "matches" array. Each entry has: sectionType, sourceIndex, targetIndex, confidence (0-1), reasoning (brief explanation).
-Confidence guide: 1.0 = definitely same entry, 0.8+ = very likely same, 0.5-0.8 = possibly same, <0.5 = probably different entries.`,
+      systemPrompt: [
+        "You are an identity matcher for resume entries. For each pair, decide whether the source and target represent the SAME underlying record (same job, same education, same skill, etc.), not whether their content is identical.",
+        "",
+        "RULES:",
+        "  - Work: same role at the same company is a MATCH even if titles are rephrased ('Senior Dev' vs 'Sr. Developer'), company has suffix differences ('Acme Inc' vs 'Acme Corporation'), or date formats differ. Different roles at the same company are NOT a match.",
+        "  - Volunteer: same role at the same organization is a MATCH. Different organizations are NOT.",
+        "  - Education: same degree at the same institution is a MATCH. 'Bachelor of Science in Psychology' and 'Bachelor in Psychology' match. Two different degrees at the same institution (e.g. B.S. Computer Science vs B.S. Psychology) are SEPARATE entries, not a match.",
+        "  - Skills / Languages / Interests: same name (case-insensitive, ignoring minor typos) is a MATCH.",
+        "  - Certificates / Publications / Awards: same title/name + same issuer/publisher/awarder is a MATCH.",
+        "",
+        "CONFIDENCE:",
+        "  - 1.0 = definitely the same record (identical or near-identical identity fields)",
+        "  - 0.85-0.95 = very likely same (normalised names match, dates overlap)",
+        "  - 0.5-0.85 = possibly same (some fields match, others ambiguous)",
+        "  - < 0.5 = probably different records",
+        "",
+        'Return ONLY a JSON object with shape: { "matches": [{ "sectionType": "", "sourceIndex": 0, "targetIndex": 0, "confidence": 0.0, "reasoning": "short explanation" }] }',
+      ].join("\n"),
       userMessage: JSON.stringify(pairs.map((p) => ({
         sectionType: p.sectionType,
         sourceIndex: p.sourceIndex,
@@ -463,6 +552,7 @@ Confidence guide: 1.0 = definitely same entry, 0.8+ = very likely same, 0.5-0.8 
         target: p.targetItem,
       }))),
       responseFormat: "json_object",
+      temperature: 0.1,
     },
     AiMatchResultSchema,
   );
@@ -561,25 +651,33 @@ export function executeMerge(
   decisions: MergeDecision[],
   basicDecisions?: Record<string, "source" | "target">,
 ): Record<string, any> {
-  const result: Record<string, any> = { ...targetContent };
+  // Normalise both sides to canonical lowercase keys. The merged output
+  // is therefore canonical too — progressively migrates any lingering
+  // PascalCase content in storage to the lowercase JSON Resume shape.
+  const source = normalizeContentForMerge(sourceContent);
+  const target = normalizeContentForMerge(targetContent);
+
+  const result: Record<string, any> = { ...target };
 
   // Merge basics
-  result.basics = mergeBasics(sourceContent.basics, targetContent.basics, basicDecisions);
+  result.basics = mergeBasics(source.basics, target.basics, basicDecisions);
 
-  // Group decisions by section type
+  // Group decisions by section type (normalise section keys too, in
+  // case a client still sends PascalCase section names)
   const bySectionType = new Map<string, MergeDecision[]>();
   for (const d of decisions) {
-    const arr = bySectionType.get(d.sectionType) ?? [];
-    arr.push(d);
-    bySectionType.set(d.sectionType, arr);
+    const sectionKey = (d.sectionType || "").toLowerCase();
+    const arr = bySectionType.get(sectionKey) ?? [];
+    arr.push({ ...d, sectionType: sectionKey });
+    bySectionType.set(sectionKey, arr);
   }
 
   for (const sectionType of SECTION_KEYS) {
     const sectionDecisions = bySectionType.get(sectionType) ?? [];
     if (sectionDecisions.length === 0) continue;
 
-    const sourceArr: Record<string, any>[] = sourceContent[sectionType] ?? [];
-    const targetArr: Record<string, any>[] = [...(targetContent[sectionType] ?? [])];
+    const sourceArr: Record<string, any>[] = source[sectionType] ?? [];
+    const targetArr: Record<string, any>[] = [...(target[sectionType] ?? [])];
 
     // Apply decisions that modify existing target items (merge/replace)
     for (const d of sectionDecisions) {
@@ -604,7 +702,7 @@ export function executeMerge(
   }
 
   // Preserve meta if present
-  if (targetContent.meta) result.meta = { ...targetContent.meta, lastModified: new Date().toISOString() };
+  if (target.meta) result.meta = { ...target.meta, lastModified: new Date().toISOString() };
 
   return result;
 }

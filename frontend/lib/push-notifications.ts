@@ -37,11 +37,12 @@ export async function requestPushPermission(): Promise<boolean> {
 }
 
 /** Convert a URL-safe base64 string to a Uint8Array (for VAPID key) */
-function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
-  const arr = new Uint8Array(raw.length);
+  const buf = new ArrayBuffer(raw.length);
+  const arr = new Uint8Array(buf);
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
 }
@@ -58,7 +59,7 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
   try {
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
     });
 
     // Persist to backend

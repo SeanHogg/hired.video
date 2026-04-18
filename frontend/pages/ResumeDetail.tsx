@@ -1,310 +1,306 @@
 import {
   ArrowLeft,
-  Calendar,
-  Mail,
-  Phone,
-  ExternalLink,
-  Building,
-  GraduationCap,
-  Heart,
-  Award,
-  Download,
   ChevronLeft,
   ChevronRight,
-  Target,
-  Globe,
-  Users,
-  Lock,
-  Star,
-  BookOpen,
-  Languages,
-  Lightbulb,
-  UserCheck,
-  FolderOpen,
-  Trophy,
-  Play,
+  Code2,
+  Download,
   Edit,
+  Eye,
+  FileJson,
+  FileText,
+  FileType,
+  Globe,
+  Lock,
+  Monitor,
+  Printer,
+  RotateCcw,
+  Share2,
+  Star,
+  Target,
+  Users,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import Footer from "@/components/Footer";
+import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
+import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import Sidebar from "@/components/Sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { resumeService } from "@/lib/services/resume-service";
-import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import type { Resume , ResumeSectionMeta } from "@/types/resume";
+import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord } from "@/lib/resume-exporters";
+import { SAMPLE_RESUME } from "@/lib/sample-resume";
+import { resumeService } from "@/lib/services/resume-service";
+import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
+import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
-import ResumeTimelines from "@/components/ResumeTimelines";
-import { MetaBadge } from "@/components/MetaBadge";
-import MetadataModal from "@/components/MetadataModal";
+import {
+  DEFAULT_DESCRIPTOR,
+  TEMPLATE_PRESETS,
+  getTemplateById,
+  type ResumeTemplateDescriptor,
+} from "@/types/resume-template";
 
-
-interface TimelineItemProps {
-  title: string;
-  subtitle: string;
-  startDate: string;
-  endDate: string;
-  description?: string;
-  highlights?: string[];
-  icon: React.ComponentType<any>;
-  isLast?: boolean;
+function youTubeEmbed(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtu.be")) {
+      const id = u.pathname.split("/").filter(Boolean)[0];
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (u.hostname.includes("youtube.com")) {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube.com/embed/${v}`;
+    }
+  } catch {}
+  return url;
 }
 
-function TimelineItem({
-  title,
-  subtitle,
-  startDate,
-  endDate,
-  description,
-  highlights,
-  icon: Icon,
-  isLast = false,
-}: TimelineItemProps) {
-  const [expanded, setExpanded] = useState(false);
-
-
-  const formatDate = (dateString: string) => {
-    if (dateString === "Present") return "Present";
-    if (!dateString) return "No date";
-    const dateObj = new Date(dateString);
-    if (isNaN(dateObj.getTime())) return "Invalid date";
-    return dateObj.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-    });
-  };
-
-  const formattedStart = formatDate(startDate);
-  const formattedEnd = formatDate(endDate);
-  const showDateRange = !(formattedStart === "No date" && formattedEnd === "No date");
-  const dateText = formattedStart === "No date" && formattedEnd !== "No date"
-    ? formattedEnd
-    : `${formattedStart} - ${formattedEnd}`;
-
-
+function VideoSlot({ items }: { items: ResumeSectionMeta[] }) {
+  const [idx, setIdx] = useState(0);
+  if (items.length === 0) return null;
+  const current = items[idx];
   return (
-    <div className="relative">
-      {!isLast && (
-        <div className="absolute left-6 top-12 w-0.5 h-full bg-gradient-to-b from-primary to-primary/20" />
-      )}
-
-      <div
-        className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center relative z-10">
-          <Icon className="w-6 h-6 text-primary" />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg leading-tight">{title}</h3>
-              <p className="text-primary font-medium">{subtitle}</p>
-            </div>
-            <div className="text-right">
-              {showDateRange && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  <span>{dateText}</span>
-                </div>
-              )}
-              <ChevronRight
-                className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
-              />
-            </div>
-          </div>
-
-          {description && (
-            <p className="text-muted-foreground mt-2">{description}</p>
+    <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
+      <CardContent className="p-6">
+        <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
+          {items.length > 1 && (
+            <>
+              <button type="button" aria-label="Previous" className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}>
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button type="button" aria-label="Next" className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p + 1) % items.length)}>
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
           )}
-
-          {expanded && highlights && highlights.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                Key Achievements
-              </h4>
-              <ul className="space-y-2">
-                {highlights.map((highlight, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>{highlight}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {current.metaType === MetaType.YouTube ? (
+            <iframe className="absolute inset-0 w-full h-full" src={youTubeEmbed(current.url)} title={current.name || "Video Resume"} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+          ) : (
+            <video className="absolute inset-0 w-full h-full" controls>
+              <source src={current.url} type={current.metaType === MetaType.VideoWebM ? "video/webm" : "video/mp4"} />
+            </video>
           )}
         </div>
-      </div>
-    </div>
+        <div className="mt-4 text-xs opacity-80 text-center">Video {idx + 1} / {items.length}</div>
+      </CardContent>
+    </Card>
   );
 }
 
 export default function ResumeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
+  const [searchParams] = useSearchParams();
+  const printMode = searchParams.get("print") === "1";
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
-  const [studioVideos, setStudioVideos] = useState<ResumeVideo[]>([]);
-
-  // Metadata modal state
-  const [metadataModal, setMetadataModal] = useState<{
-    open: boolean;
-    initialMetadata: ResumeSectionMeta[];
-  }>({
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [metadataModal, setMetadataModal] = useState<{ open: boolean; initialMetadata: ResumeSectionMeta[] }>({
     open: false,
     initialMetadata: [],
   });
+  const [studioVideos, setStudioVideos] = useState<ResumeVideo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [descriptor, setDescriptor] = useState<ResumeTemplateDescriptor>(DEFAULT_DESCRIPTOR);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
+  const [editorError, setEditorError] = useState<string | null>(null);
 
-  // Merge metadata videos + studio videos into a unified list
-  const videoMetaItems = useMemo<ResumeSectionMeta[]>(() => {
+  const videoItems = useMemo<ResumeSectionMeta[]>(() => {
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    const fromMeta: ResumeSectionMeta[] = resume?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
+    const fromMeta = resume?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
     const fromStudio: ResumeSectionMeta[] = studioVideos.map((v) => ({
       id: v.id,
+      userId: "",
       referenceId: id ?? "",
       name: v.title || "Studio Video Resume",
       url: v.youtubeUrl ?? v.videoUrl ?? "",
       metaType: v.youtubeUrl ? MetaType.YouTube : MetaType.VideoMP4,
-    } as ResumeSectionMeta));
+    }));
     return [...fromMeta, ...fromStudio];
   }, [resume, studioVideos, id]);
 
-  const [videoIndex, setVideoIndex] = useState<number>(0);
-  useEffect(() => {
-    if (videoIndex >= videoMetaItems.length) setVideoIndex(0);
-  }, [videoMetaItems.length, videoIndex]);
-
-  const currentVideoMeta = videoMetaItems.length > 0 ? videoMetaItems[videoIndex] : null;
-
-  const youTubeEmbed = (url: string): string => {
-    try {
-      const u = new URL(url);
-      if (u.hostname.includes("youtu.be")) {
-        const id = u.pathname.split("/").filter(Boolean)[0];
-        if (id) return `https://www.youtube.com/embed/${id}`;
-      }
-      if (u.hostname.includes("youtube.com")) {
-        const v = u.searchParams.get("v");
-        if (v) return `https://www.youtube.com/embed/${v}`;
-        const parts = u.pathname.split("/").filter(Boolean);
-        const embedIdx = parts.indexOf("embed");
-        if (embedIdx >= 0 && parts[embedIdx + 1]) return `https://www.youtube.com/embed/${parts[embedIdx + 1]}`;
-      }
-    } catch {}
-    return url;
+  // Pick initial template: URL ?template= wins (preview), otherwise the resume's
+  // saved default (resume.data.Meta.template), otherwise DEFAULT_DESCRIPTOR.
+  const pickInitialDescriptor = (loaded: Resume | null): ResumeTemplateDescriptor => {
+    const requested = searchParams.get("template");
+    const urlMatch = getTemplateById(requested);
+    if (urlMatch) return urlMatch;
+    const saved = getTemplateById(loaded?.data?.Meta?.template);
+    if (saved) return saved;
+    return DEFAULT_DESCRIPTOR;
   };
 
-
   useEffect(() => {
-    const loadResume = async () => {
-      if (!id) return;
+    if (!id) return;
+    // Sample mode — /resumes/sample renders the showcase resume with whichever
+    // preset is requested via ?template=<id>. Skips API calls so anonymous
+    // users can browse templates from the home gallery.
+    if (id === "sample") {
+      setResume(SAMPLE_RESUME);
+      setStudioVideos([]);
+      const initial = pickInitialDescriptor(SAMPLE_RESUME);
+      setDescriptor(initial);
+      setEditorText(JSON.stringify(initial, null, 2));
+      setLoading(false);
+      return;
+    }
 
-      setLoading(true);
+    setLoading(true);
+    setIsPrivate(false);
+    (async () => {
+      // Treat RESUME_PRIVATE as a terminal signal — the resume exists but the
+      // caller has no access. Falling through to /embedded or /public would
+      // produce the same result and waste a round-trip.
+      const isPrivateErr = (e: unknown) =>
+        typeof e === "object" && e !== null && (e as any).context?.serverCode === "RESUME_PRIVATE";
+
+      let loaded: Resume | null = null;
       try {
-        // Primary: standard endpoint (respects privacy/auth, supports UUID + slug)
-        const foundResume = await resumeService.getResumeById(id);
-        setResume(foundResume);
-      } catch (error) {
+        loaded = await resumeService.getResumeById(id);
+      } catch (e1) {
+        if (isPrivateErr(e1)) {
+          setIsPrivate(true);
+          setLoading(false);
+          return;
+        }
         try {
-          // Fallback 1: embedded endpoint (auth required, supports slug)
-          const embedded = await resumeService.getResumeForEmbed(id);
-          setResume(embedded);
-        } catch {
+          loaded = await resumeService.getResumeForEmbed(id);
+        } catch (e2) {
+          if (isPrivateErr(e2)) {
+            setIsPrivate(true);
+            setLoading(false);
+            return;
+          }
           try {
-            // Fallback 2: public endpoint (no auth, public resumes only)
-            const publicResume = await resumeService.getPublicResume(id);
-            setResume(publicResume);
+            loaded = await resumeService.getPublicResume(id);
           } catch {
-            console.error("Failed to load resume with identifier:", id);
+            loaded = null;
           }
         }
-      } finally {
-        setLoading(false);
       }
-    };
 
-    const loadStudioVideos = async () => {
-      if (!id) return;
+      setResume(loaded);
+      if (loaded) {
+        const initial = pickInitialDescriptor(loaded);
+        setDescriptor(initial);
+        setEditorText(JSON.stringify(initial, null, 2));
+      }
+      setLoading(false);
+
       try {
-        const res = await studioService.getVideosForResume(id);
-        setStudioVideos(res.data ?? []);
-      } catch {
-        // Non-critical — silently ignore
-      }
-    };
+        const v = await studioService.getVideosForResume(id);
+        setStudioVideos(v.data ?? []);
+      } catch {}
+    })();
+  }, [id, searchParams]);
 
-    loadResume();
-    loadStudioVideos();
-  }, [id]);
-
-  // Handle URL fragments to open specific media content
-  useEffect(() => {
-    if (location.hash && resume?.metaData) {
-      const mediaId = location.hash.substring(1); // Remove the # symbol
-      const mediaItem = resume.metaData.find(m => m.referenceId === mediaId || m.id === mediaId);
-      if (mediaItem) {
-        setSelectedMediaId(mediaItem.id);
-      }
-    }
-  }, [location.hash, resume?.metaData]);
-
-  const isOwner = user?.id === resume?.userId;
-
-  const handleAddMedia = () => {
-    if (!resume) return;
-    setMetadataModal({
-      open: true,
-      initialMetadata: resume.metaData || [],
-    });
+  const applyPreset = (preset: ResumeTemplateDescriptor) => {
+    setDescriptor(preset);
+    setEditorText(JSON.stringify(preset, null, 2));
+    setEditorError(null);
   };
 
-  const handleDownload = () => {
-    toast({ title: "Download started", description: "Your resume download has started." });
-  };
-
-  const handleChangePrivacy = async (privacy: "public" | "recruiter_only" | "connections" | "private") => {
-    if (!resume?.id) return;
+  const applyEditor = () => {
     try {
-      const ok = await resumeService.setResumePrivacy(resume.id, privacy);
-      if (!ok) throw new Error("Server rejected privacy change");
+      const parsed = JSON.parse(editorText) as ResumeTemplateDescriptor;
+      setDescriptor(parsed);
+      setEditorError(null);
+    } catch (e) {
+      setEditorError((e as Error).message);
+    }
+  };
+
+  // Print mode — bare resume, no chrome, auto-prints for PDF export.
+  useEffect(() => {
+    if (printMode && id) {
+      try {
+        const stashed = sessionStorage.getItem(`resume-descriptor:${id}`);
+        if (stashed) setDescriptor(JSON.parse(stashed));
+      } catch {}
+    }
+  }, [printMode, id]);
+
+  useEffect(() => {
+    if (printMode && resume && !loading) {
+      const t = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [printMode, resume, loading]);
+
+  if (printMode) {
+    if (loading || !resume) {
+      return <div className="p-8 text-center text-muted-foreground">Preparing resume for print…</div>;
+    }
+    return (
+      <div className="print:bg-white">
+        <style>{`
+          @media print {
+            @page { margin: 0.5in; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        `}</style>
+        <DeclarativeResumeRenderer resume={resume} descriptor={descriptor} />
+      </div>
+    );
+  }
+
+  const handlePdf = () => {
+    if (!id) return;
+    try {
+      sessionStorage.setItem(`resume-descriptor:${id}`, JSON.stringify(descriptor));
+    } catch {}
+    exportResumePdf(`/resumes/${id}?print=1`);
+  };
+
+  const isOwner = !!user && !!resume && user.id === resume.userId;
+  const isSample = id === "sample";
+
+  const refreshResume = async () => {
+    if (!resume?.id || isSample) return;
+    try {
       const updated = await resumeService.getResumeById(resume.id);
       setResume(updated);
+    } catch {}
+  };
+
+  const handleChangePrivacy = async (privacy: ResumePrivacy) => {
+    if (!resume?.id) return;
+    try {
+      const okResp = await resumeService.setResumePrivacy(resume.id, privacy);
+      if (!okResp) throw new Error("Server rejected privacy change");
+      await refreshResume();
       toast({ title: "Privacy updated", description: `Visibility set to ${privacy.replace("_", " ")}.` });
-    } catch (error) {
-      toast({ title: "Failed to update privacy", description: (error as Error)?.message || "Please try again.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Failed to update privacy", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
     }
   };
 
   const handlePromoteToMaster = async () => {
     if (!resume?.id) return;
     try {
-      const ok = await resumeService.promoteVariantToMaster(resume.id);
-      if (ok) {
+      const okResp = await resumeService.promoteVariantToMaster(resume.id);
+      if (okResp) {
         toast({ title: "Promoted", description: "Variant promoted to master." });
-        const updated = await resumeService.getResumeById(resume.id);
-        setResume(updated);
+        await refreshResume();
       } else {
         toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
       }
@@ -319,1018 +315,289 @@ export default function ResumeDetail() {
       await resumeService.deleteResume(resume.id);
       toast({ title: "Deleted", description: "Resume deleted successfully." });
       navigate("/resumes");
-    } catch (error) {
-      toast({ title: "Delete failed", description: (error as Error)?.message || "Please try again.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Delete failed", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
     }
   };
 
   const handleSaveMetadata = async (metadata: ResumeSectionMeta[]) => {
     if (!resume?.id) return;
+    await resumeService.updateResumeMetadata(resume.id, metadata);
+    await refreshResume();
+  };
 
+  // Save the currently-selected descriptor as the resume's default view OR
+  // embedded view. Persists to resume.data.Meta.{template|embeddedTemplate}.
+  const saveTemplateAssignment = async (slot: "template" | "embeddedTemplate") => {
+    if (!resume?.id || isSample) return;
+    const nextData = {
+      ...resume.data,
+      Meta: { ...(resume.data?.Meta ?? {}), [slot]: descriptor.id },
+    };
     try {
-      await resumeService.updateResumeMetadata(resume.id, metadata);
-      // Refresh the resume data
-      const updatedResume = await resumeService.getResumeById(resume.id);
-      setResume(updatedResume);
-    } catch (error) {
-      console.error("Failed to save metadata:", error);
-      throw error; // Re-throw to prevent modal from closing
+      const updated = await resumeService.updateResumeData(resume.id, { data: nextData });
+      setResume(updated);
+      toast({
+        title: "Template assigned",
+        description: slot === "template"
+          ? `"${descriptor.name}" is now the default view for this resume.`
+          : `"${descriptor.name}" is now the embedded view for this resume.`,
+      });
+    } catch (e) {
+      toast({ title: "Could not save template", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
     }
   };
 
-  const getPrivacyIcon = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return <Globe className="w-4 h-4" />;
+  const assignedDefaultId = resume?.data?.Meta?.template ?? null;
+  const assignedEmbeddedId = resume?.data?.Meta?.embeddedTemplate ?? null;
+
+  const privacyIcon = (p?: string) => {
+    switch (p) {
+      case "public": return <Globe className="w-3 h-3" />;
       case "recruiter_only":
-        return <Users className="w-4 h-4" />;
-      case "connections":
-        return <Users className="w-4 h-4" />;
-      case "private":
-        return <Lock className="w-4 h-4" />;
-      default:
-        return <Lock className="w-4 h-4" />;
+      case "connections": return <Users className="w-3 h-3" />;
+      default: return <Lock className="w-3 h-3" />;
     }
   };
-
-  const getPrivacyText = (privacy: string) => {
-    switch (privacy) {
-      case "public":
-        return "Public";
-      case "recruiter_only":
-        return "Recruiter Only";
-      case "connections":
-        return "Connections";
-      case "private":
-        return "Private";
-      default:
-        return "Private";
+  const privacyLabel = (p?: string) => {
+    switch (p) {
+      case "public": return "Public";
+      case "recruiter_only": return "Recruiter Only";
+      case "connections": return "Connections";
+      default: return "Private";
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="animate-pulse space-y-4 sm:space-y-6">
-                <div className="h-6 sm:h-8 bg-muted rounded w-1/3" />
-                <div className="h-48 sm:h-64 bg-muted rounded" />
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="h-3 sm:h-4 bg-muted rounded w-3/4" />
-                  <div className="h-3 sm:h-4 bg-muted rounded w-1/2" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!resume) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-xl sm:text-2xl font-bold mb-4">Resume Not Found</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mb-6">
-                The resume you're looking for doesn't exist or has been removed.
-              </p>
-              <Button onClick={() => navigate("/resumes")} className="min-h-[44px]">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Resumes
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Remove the editing view since we now have a separate edit page
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
+        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
         <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay
-              contentType="resume"
-              title={resume?.data?.Basics?.Name || resume?.name || "Resume"}
-            />
-          )}
-          {/* Header with Video */}
-          <div className="relative bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground">
-            <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />
-            <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-              {/* Navigation */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate("/resumes")}
-                  className="self-start min-h-[44px] text-primary-foreground hover:bg-primary-foreground/10"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Resumes
+          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.data?.Basics?.Name || resume?.name || "Resume"} />}
+
+          <div className="bg-muted/30 border-b">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Eye className="w-3 h-3" />
+                  <span className="font-mono">{descriptor.name}</span>
+                </Badge>
+                {resume?.isActive && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
+                    <Target className="w-3 h-3" />Active
+                  </Badge>
+                )}
+                {resume?.isMaster && (
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                    <Star className="w-3 h-3" />Master
+                  </Badge>
+                )}
+                {resume && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    {privacyIcon(resume.privacy)}
+                    {privacyLabel(resume.privacy)}
+                  </Badge>
+                )}
+                {isOwner && resume && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => navigate(`/resumes/edit/${resume.id}`)}
+                    aria-label="Edit Resume"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <FileType className="w-4 h-4 mr-1" />
+                      Template
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                      Preview a template
+                    </DropdownMenuLabel>
+                    {TEMPLATE_PRESETS.map((preset) => {
+                      const isCurrent = descriptor.id === preset.id;
+                      const isAssignedDefault = assignedDefaultId === preset.id;
+                      const isAssignedEmbedded = assignedEmbeddedId === preset.id;
+                      return (
+                        <DropdownMenuItem
+                          key={preset.id}
+                          onClick={() => applyPreset(preset)}
+                          className={isCurrent ? "bg-accent" : ""}
+                        >
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="font-medium truncate">{preset.name}</span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-2">
+                              {preset.industry}
+                              {isAssignedDefault && <span className="text-primary">· default</span>}
+                              {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    {isOwner && !isSample && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                          Assign "{descriptor.name}"
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => saveTemplateAssignment("template")}
+                          disabled={assignedDefaultId === descriptor.id}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Set as default view
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => saveTemplateAssignment("embeddedTemplate")}
+                          disabled={assignedEmbeddedId === descriptor.id}
+                        >
+                          <Monitor className="w-4 h-4 mr-2" />
+                          Set as embedded view
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Download className="w-4 h-4 mr-1" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
+                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => resume && exportResumeWord(resume)} disabled={!resume}>
+                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => resume && exportResumeText(resume)} disabled={!resume}>
+                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => resume && exportResumeJson(resume)} disabled={!resume}>
+                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button size="sm" variant="outline" onClick={() => setEditorOpen((v) => !v)}>
+                  <Code2 className="w-4 h-4 mr-1" />
+                  {editorOpen ? "Hide JSON" : "Edit JSON"}
                 </Button>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    {resume.isActive && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-100 text-green-800"
-                      >
-                        <Target className="w-3 h-3 mr-1" />
-                        Active
-                      </Badge>
-                    )}
-                    {resume.isMaster && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-yellow-100 text-yellow-800"
-                      >
-                        <Star className="w-3 h-3 mr-1" />
-                        Master
-                      </Badge>
-                    )}
-                    <Badge
-                      variant="secondary"
-                      className="bg-white/20 text-primary-foreground"
-                    >
-                      {getPrivacyIcon(resume.privacy)}
-                      <span className="ml-1">
-                        {getPrivacyText(resume.privacy)}
-                      </span>
-                    </Badge>
-                  </div>
-
-                  {isOwner && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => navigate(`/resumes/edit/${resume.id}`)}
-                      aria-label="Edit Resume"
-                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  )}
-
+                {resume && !isSample && (
                   <ResumeActionsMenu
                     isOwner={isOwner}
                     isActive={resume.isActive}
                     isMaster={resume.isMaster}
                     parentId={resume.parentId}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                    onAddMedia={handleAddMedia}
-                    onShare={() => navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href)}
-                    onDownload={handleDownload}
+                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
+                    onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onDownload={handlePdf}
                     onChangePrivacy={handleChangePrivacy}
                     onPromoteToMaster={handlePromoteToMaster}
                     onDelete={handleDelete}
-                    triggerVariant="secondary"
-                    triggerClassName="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30 h-8 px-2"
+                    triggerVariant="outline"
                   />
-                </div>
-              </div>
-
-              {/* Video Resume Header */}
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="w-20 h-20 border-4 border-white/30">
-                      <AvatarImage
-                        src={resume?.data?.Basics?.Image || ""}
-                      />
-                      <AvatarFallback className="text-2xl bg-white/20">
-                        {resume?.data?.Basics?.Name
-                          ?.split(" ")
-                          .map((n: string) => n[0])
-                          .join("") || "??"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h1 className="text-4xl font-bold">
-                        {resume?.data?.Basics?.Name || resume?.name || "Untitled Resume"}
-                      </h1>
-                      <p className="text-xl opacity-90">
-                        {resume?.data?.Basics?.Label || ""}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    {resume?.data?.Basics?.Email && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          window.open(
-                            `mailto:${resume.data.Basics.Email}`,
-                          )
-                        }
-                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                      >
-                        <Mail className="w-4 h-4 mr-2" />
-                        Email
-                      </Button>
-                    )}
-                    {resume?.data?.Basics?.Phone && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          window.open(
-                            `tel:${resume.data.Basics.Phone}`,
-                          )
-                        }
-                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                      >
-                        <Phone className="w-4 h-4 mr-2" />
-                        Call
-                      </Button>
-                    )}
-                    {resume?.data?.Basics?.Url && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          window.open(
-                            resume.data.Basics.Url,
-                            "_blank",
-                          )
-                        }
-                        className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Portfolio
-                      </Button>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download PDF
-                    </Button>
-                  </div>
-
-                  <p className="text-lg leading-relaxed opacity-95">
-                    {resume?.data?.Basics?.Summary || ""}
-                  </p>
-
-                      {resume.metaData && resume.data?.Basics?.Id && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {resume.metaData
-                            .filter((m) => m.referenceId === resume.data.Basics.Id)
-                            .map((m) => (
-                              <MetaBadge key={m.id} meta={m} />
-                            ))}
-                        </div>
-                      )}
-
-                </div>
-
-                {/* Featured Video (from metadata or Studio) */}
-                {currentVideoMeta ? (
-                  <div className="relative">
-                    <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
-                      <CardContent className="p-6">
-                        <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
-                          {/* Prev control */}
-                          {videoMetaItems.length > 1 && (
-                            <button
-                              type="button"
-                              aria-label="Previous video"
-                              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
-                              onClick={() => setVideoIndex((prev) => (prev - 1 + videoMetaItems.length) % videoMetaItems.length)}
-                            >
-                              <ChevronLeft className="w-5 h-5" />
-                            </button>
-                          )}
-
-                          {/* Next control */}
-                          {videoMetaItems.length > 1 && (
-                            <button
-                              type="button"
-                              aria-label="Next video"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2"
-                              onClick={() => setVideoIndex((prev) => (prev + 1) % videoMetaItems.length)}
-                            >
-                              <ChevronRight className="w-5 h-5" />
-                            </button>
-                          )}
-
-                          {currentVideoMeta.metaType === MetaType.YouTube ? (
-                            <iframe
-                              className="absolute inset-0 w-full h-full"
-                              src={youTubeEmbed(currentVideoMeta.url)}
-                              title={currentVideoMeta.name || "Video Resume"}
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                          ) : (
-                            <video className="absolute inset-0 w-full h-full" controls>
-                              <source
-                                src={currentVideoMeta.url}
-                                type={
-                                  currentVideoMeta.metaType === MetaType.VideoWebM
-                                    ? "video/webm"
-                                    : "video/mp4"
-                                }
-                              />
-                              Your browser does not support the video tag.
-                            </video>
-                          )}
-                        </div>
-
-                        {/* Footer controls */}
-                        <div className="mt-4 flex flex-col items-center gap-2">
-                          <div className="text-xs opacity-80">
-                            Video {videoIndex + 1} / {videoMetaItems.length}
-                          </div>
-                          {videoMetaItems.length > 1 && (
-                            <div className="flex flex-wrap gap-2 justify-center">
-                              {videoMetaItems.map((m, idx) => (
-                                <button
-                                  key={m.id || `${m.referenceId}-${idx}`}
-                                  type="button"
-                                  className={`px-2 py-1 rounded text-xs border ${idx === videoIndex ? "bg-primary text-primary-foreground border-primary" : "bg-secondary/30 text-foreground border-border"}`}
-                                  onClick={() => setVideoIndex(idx)}
-                                >
-                                  {m.name || `Video ${idx + 1}`}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : isOwner ? (
-                  <div className="relative">
-                    <Card className="bg-white/10 border-white/30 backdrop-blur-sm border-dashed">
-                      <CardContent className="p-6 flex flex-col items-center justify-center text-center gap-4 min-h-[200px]">
-                        <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-                          <Play className="w-7 h-7 text-primary-foreground" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-primary-foreground text-lg">No video resume yet</p>
-                          <p className="text-sm opacity-80 mt-1">Create an AI-generated video resume to stand out</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30"
-                          onClick={() => navigate("/studio")}
-                        >
-                          Create Video Resume →
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : null}
+                )}
               </div>
             </div>
           </div>
 
-          {/* Content */}
-          <div className="max-w-6xl mx-auto px-6 py-12 space-y-12">
-            {/* Resume Timeline */}
-            <ResumeTimelines resumeData={resume.data} />
+          {loading && (
+            <div className="max-w-6xl mx-auto px-6 py-12">
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 bg-muted rounded w-1/3" />
+                <div className="h-48 bg-muted rounded" />
+                <div className="h-4 bg-muted rounded w-3/4" />
+              </div>
+            </div>
+          )}
 
-            {/* Work Experience Timeline */}
-            {resume?.data?.Work &&
-              resume.data.Work.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <Building className="w-5 h-5 text-primary" />
+          {!loading && !resume && isPrivate && (
+            <div className="max-w-xl mx-auto px-6 py-16 text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h1 className="text-2xl font-bold mb-3">This resume is private</h1>
+              <p className="text-muted-foreground mb-6">
+                The owner hasn't made this resume public. Ask them to change its visibility or share it with you directly.
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" onClick={() => navigator.clipboard.writeText(window.location.href)}>
+                  <Share2 className="w-4 h-4 mr-1" />Copy link to send owner
+                </Button>
+                <Button onClick={() => navigate("/resumes")}>Back to Resumes</Button>
+              </div>
+            </div>
+          )}
+
+          {!loading && !resume && !isPrivate && (
+            <div className="max-w-6xl mx-auto px-6 py-12 text-center">
+              <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
+              <p className="text-muted-foreground mb-6">Could not load resume <code>{id}</code>.</p>
+              <Button onClick={() => navigate("/resumes")}><ArrowLeft className="w-4 h-4 mr-2" />Back to Resumes</Button>
+            </div>
+          )}
+
+          {resume && (
+            <div className="flex">
+              <div className="flex-1 min-w-0">
+                <DeclarativeResumeRenderer
+                  resume={resume}
+                  descriptor={descriptor}
+                  videoSlot={descriptor.hero.showVideo ? <VideoSlot items={videoItems} /> : null}
+                />
+              </div>
+
+              {editorOpen && (
+                <aside className="w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">Descriptor JSON</h3>
+                      <Button size="sm" variant="ghost" onClick={() => applyPreset(DEFAULT_DESCRIPTOR)}>
+                        <RotateCcw className="w-4 h-4 mr-1" />Reset
+                      </Button>
                     </div>
-                    <h2 className="text-3xl font-bold">Work Experience</h2>
+                    <textarea
+                      className="w-full h-[60vh] font-mono text-xs p-3 border rounded bg-background"
+                      value={editorText}
+                      onChange={(e) => setEditorText(e.target.value)}
+                    />
+                    {editorError && <div className="text-sm text-destructive">{editorError}</div>}
+                    <Button size="sm" className="w-full" onClick={applyEditor}>Apply</Button>
+                    <p className="text-xs text-muted-foreground">
+                      Edits are local to this view — use "Set as default view" in the Template menu to save.
+                    </p>
                   </div>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {resume.data.Work
-                          .sort((a, b) => {
-                            const aIsCurrent = !a.EndDate || a.EndDate === "" || a.EndDate === "Present";
-                            const bIsCurrent = !b.EndDate || b.EndDate === "" || b.EndDate === "Present";
-
-                            if (aIsCurrent && !bIsCurrent) return -1;
-                            if (!aIsCurrent && bIsCurrent) return 1;
-
-                            // If both not current, sort by end date desc when valid
-                            if (!aIsCurrent && !bIsCurrent) {
-                              const aEnd = new Date(a.EndDate || "");
-                              const bEnd = new Date(b.EndDate || "");
-                              if (!isNaN(aEnd.getTime()) && !isNaN(bEnd.getTime())) {
-                                return bEnd.getTime() - aEnd.getTime();
-                              }
-                            }
-
-                            // Otherwise sort by start date desc when valid
-                            const aStart = new Date(a.StartDate || "");
-                            const bStart = new Date(b.StartDate || "");
-                            if (!isNaN(aStart.getTime()) && !isNaN(bStart.getTime())) {
-                              return bStart.getTime() - aStart.getTime();
-                            }
-                            return 0;
-                          })
-                          .map((work, index) => (
-                            <div key={index} className="pb-2">
-                              <TimelineItem
-                                title={work.Position || ""}
-                                subtitle={work.Name || ""}
-                                startDate={work.StartDate || ""}
-                                endDate={work.EndDate || "Present"}
-                                description={work.Summary || ""}
-                                highlights={work.Highlights}
-                                icon={Building}
-                                isLast={index === resume.data.Work.length - 1}
-                              />
-                              {resume.metaData && work.Id && (
-                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
-                                  {resume.metaData
-                                    .filter((m) => m.referenceId === work.Id)
-                                    .map((m) => (
-                                      <MetaBadge key={m.id} meta={m} />
-                                    ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </section>
+                </aside>
               )}
-
-            {/* Education Timeline */}
-            {resume?.data?.Education &&
-              resume.data.Education.length > 0 && (
-                <>
-                <section>
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <GraduationCap className="w-5 h-5 text-primary" />
-                    </div>
-                    <h2 className="text-3xl font-bold">Education</h2>
-                  </div>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {resume.data.Education
-                          .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
-                          )
-                          .map((edu, index) => (
-                            <div key={index}>
-                              <TimelineItem
-                                title={`${edu.StudyType || ""} in ${edu.Area || ""}`}
-                                subtitle={edu.Institution || ""}
-                                startDate={edu.StartDate || ""}
-                                endDate={edu.EndDate || ""}
-                                description={
-                                  edu.Score ? `GPA: ${edu.Score}` : undefined
-                                }
-                                icon={GraduationCap}
-                                isLast={index === resume.data.Education.length - 1}
-                              />
-                              {resume.metaData && edu.Id && (
-                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
-                                  {resume.metaData
-                                    .filter((m) => m.referenceId === edu.Id)
-                                    .map((m) => (
-                                      <MetaBadge key={m.id} meta={m} />
-                                    ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </section>
-
-	                      {/* Metadata for Education entries */}
-	                      {resume.metaData && (
-	                        <div className="mt-2">
-	                          {resume.data.Education.map((edu, eidx) => (
-	                            edu.Id ? (
-	                              <div key={eidx} className="mt-2">
-	                                <div className="flex flex-wrap gap-2">
-	                                  {resume.metaData
-	                                    .filter((m) => m.referenceId === edu.Id)
-	                                    .map((m) => (
-	                                      <MetaBadge key={m.id} meta={m} />
-	                                    ))}
-	                                </div>
-	                              </div>
-	                            ) : null
-	                          ))}
-	                        </div>
-	                      )}
-
-                </>
-              )}
-
-            {/* Volunteer Experience Timeline */}
-            {resume?.data?.Volunteer &&
-              resume.data.Volunteer.length > 0 && (
-                <section>
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <Heart className="w-5 h-5 text-primary" />
-                    </div>
-                    <h2 className="text-3xl font-bold">Volunteer Experience</h2>
-                  </div>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {resume.data.Volunteer
-                          .sort(
-                            (a, b) =>
-                              new Date(b.StartDate || "").getTime() -
-                              new Date(a.StartDate || "").getTime(),
-                          )
-                          .map((volunteer, index) => (
-                            <div key={index}>
-                              <TimelineItem
-                                title={volunteer.Position || ""}
-                                subtitle={volunteer.Organization || ""}
-                                startDate={volunteer.StartDate || ""}
-                                endDate={volunteer.EndDate || "Present"}
-                                description={volunteer.Summary || ""}
-                                highlights={volunteer.Highlights || undefined}
-                                icon={Heart}
-                                isLast={index === resume.data.Volunteer.length - 1}
-                              />
-                              {resume.metaData && volunteer.Id && (
-                                <div className="mt-2 ml-16 flex flex-wrap gap-2">
-                                  {resume.metaData
-                                    .filter((m) => m.referenceId === volunteer.Id)
-                                    .map((m) => (
-                                      <MetaBadge key={m.id} meta={m} />
-                                    ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </section>
-              )}
-
-            {/* Skills */}
-            {resume?.data?.Skills && resume.data.Skills.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Star className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Skills</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {resume.data.Skills.map((skill, index) => (
-                        <div key={index} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg mb-2">
-                            {skill.Name}
-                          </h3>
-                          {skill.Level && (
-                            <p className="text-sm text-muted-foreground mb-2">
-                              Level: {skill.Level}
-                            </p>
-                          )}
-                          {skill.Keywords && skill.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {skill.Keywords.map((keyword, keywordIndex) => (
-                                <span
-                                  key={keywordIndex}
-                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
-                                >
-                                  {keyword}
-
-	                {/* Metadata for Volunteer entries */}
-	                {resume.metaData && (
-	                  <div className="mt-2">
-	                    {resume.data.Volunteer.map((vol, vidx) => (
-	                      vol.Id ? (
-	                        <div key={vidx} className="mt-2">
-	                          <div className="flex flex-wrap gap-2">
-	                            {resume.metaData
-	                              .filter((m) => m.referenceId === vol.Id)
-	                              .map((m) => (
-	                                <MetaBadge key={m.id} meta={m} />
-	                              ))}
-	                          </div>
-	                        </div>
-	                      ) : null
-	                    ))}
-	                  </div>
-	                )}
-
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Languages */}
-            {resume?.data?.Languages && resume.data.Languages.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Languages className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Languages</h2>
-                </div>
-
-
-	                {/* Metadata for Skills */}
-	                {resume.metaData && (
-	                  <div className="mt-2">
-	                    {resume.data.Skills.map((skill, sidx) => (
-	                      skill.Id ? (
-	                        <div key={sidx} className="mt-2">
-	                          <div className="flex flex-wrap gap-2">
-	                            {resume.metaData
-	                              .filter((m) => m.referenceId === skill.Id)
-	                              .map((m) => (
-	                                <MetaBadge key={m.id} meta={m} />
-	                              ))}
-	                          </div>
-	                        </div>
-	                      ) : null
-	                    ))}
-	                  </div>
-	                )}
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {resume.data.Languages.map((language, index) => (
-                        <div key={index} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg">
-                            {language.Language}
-                          </h3>
-                          {language.Fluency && (
-                            <p className="text-sm text-muted-foreground">
-                              {language.Fluency}
-                            </p>
-                          )}
-                        </div>
-
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Projects */}
-            {resume?.data?.Projects && resume.data.Projects.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <FolderOpen className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Projects</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-6">
-                      {resume.data.Projects.map((project, index) => (
-                        <div key={index} className="border-b pb-6 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">
-                              {project.Name}
-                            </h3>
-                            {project.Url && (
-                              <a
-                                href={project.Url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-
-                          {(project.StartDate || project.EndDate) && (
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {project.StartDate} - {project.EndDate || "Present"}
-                            </p>
-                          )}
-
-                          {project.Entity && (
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {project.Entity}
-                            </p>
-                          )}
-
-                          {project.Description && (
-                            <p className="text-sm mb-3">{project.Description}</p>
-                          )}
-
-                          {project.Highlights && project.Highlights.length > 0 && (
-                            <ul className="list-disc list-inside text-sm mb-3 space-y-1">
-                              {project.Highlights.map((highlight, highlightIndex) => (
-                                <li key={highlightIndex}>{highlight}</li>
-                              ))}
-                            </ul>
-                          )}
-
-	                          {resume.metaData && project.Id && (
-	                            <div className="mt-2 flex flex-wrap gap-2">
-	                              {resume.metaData
-	                                .filter((m) => m.referenceId === project.Id)
-	                                .map((m) => (
-	                                  <MetaBadge key={m.id} meta={m} />
-	                                ))}
-	                            </div>
-	                          )}
-
-
-                          {project.Keywords && project.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {project.Keywords.map((keyword, keywordIndex) => (
-                                <span
-                                  key={keywordIndex}
-                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
-                                >
-                                  {keyword}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Awards */}
-            {resume?.data?.Awards && resume.data.Awards.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Trophy className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Awards</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {resume.data.Awards.map((award, index) => (
-                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <h3 className="font-semibold text-lg">{award.Title}</h3>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            {award.Awarder && <span>{award.Awarder}</span>}
-                            {award.Date && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                {award.Date}
-                              </span>
-                            )}
-                          </div>
-                          {award.Summary && (
-                            <p className="text-sm">{award.Summary}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Certificates */}
-            {resume?.data?.Certificates && resume.data.Certificates.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Award className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Certificates</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {resume.data.Certificates.map((certificate, index) => (
-                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{certificate.Name}</h3>
-                            {certificate.Url && (
-                              <a
-                                href={certificate.Url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            {certificate.Issuer && <span>{certificate.Issuer}</span>}
-                            {certificate.Date && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                {certificate.Date}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Publications */}
-            {resume?.data?.Publications && resume.data.Publications.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Publications</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {resume.data.Publications.map((publication, index) => (
-                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{publication.Name}</h3>
-                            {publication.Url && (
-                              <a
-                                href={publication.Url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            {publication.Publisher && <span>{publication.Publisher}</span>}
-                            {publication.ReleaseDate && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                {publication.ReleaseDate}
-                              </span>
-                            )}
-                          </div>
-                          {publication.Summary && (
-                            <p className="text-sm">{publication.Summary}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* Interests */}
-            {resume?.data?.Interests && resume.data.Interests.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Lightbulb className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">Interests</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {resume.data.Interests.map((interest, index) => (
-                        <div key={index} className="p-4 border rounded-lg">
-                          <h3 className="font-semibold text-lg mb-2">
-                            {interest.Name}
-                          </h3>
-                          {interest.Keywords && interest.Keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {interest.Keywords.map((keyword, keywordIndex) => (
-                                <span
-                                  key={keywordIndex}
-                                  className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
-                                >
-                                  {keyword}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-
-            {/* References */}
-            {resume?.data?.References && resume.data.References.length > 0 && (
-              <section>
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <UserCheck className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold">References</h2>
-                </div>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {resume.data.References.map((reference, index) => (
-                        <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-                          <h3 className="font-semibold text-lg">{reference.Name}</h3>
-                          {reference.Reference && (
-                            <p className="text-sm text-muted-foreground">
-                              {reference.Reference}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            )}
-          </div>
+            </div>
+          )}
 
           <Footer />
         </div>
       </div>
 
-      {/* Metadata Modal */}
-      {resume && (
+      {resume && !isSample && (
         <MetadataModal
           open={metadataModal.open}
-          onOpenChange={(open) => setMetadataModal(prev => ({ ...prev, open }))}
+          onOpenChange={(open) => setMetadataModal((prev) => ({ ...prev, open }))}
           resumeId={resume.id}
           initialMetadata={metadataModal.initialMetadata}
           onSave={handleSaveMetadata}

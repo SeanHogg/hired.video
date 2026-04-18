@@ -769,7 +769,7 @@ export default function Index() {
                                       else if (item.type === "job")
                                         navigate(`/jobs/${item.id}`);
                                       else if ((item as any).type === "template")
-                                        navigate(`/resumes/VIEWER/sample?template=${item.id}`);
+                                        navigate(`/resumes/sample?template=${item.id}`);
                                       else if (item.type === "media") {
                                         // For media items, navigate to the associated resume with the media reference
                                         const resumeId = (item as any).resumeId;
@@ -813,7 +813,7 @@ export default function Index() {
                                   else if (item.type === "job")
                                     navigate(`/jobs/${(item as any).id}`);
                                   else if ((item as any).type === "template")
-                                    navigate(`/resumes/VIEWER/sample?template=${item.id}`);
+                                    navigate(`/resumes/sample?template=${item.id}`);
                                 }}
                                 className="min-h-[44px] flex-shrink-0"
                               >

@@ -2,7 +2,7 @@ import "./global.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GlobalErrorHandler from "@/components/GlobalErrorHandler";
@@ -101,7 +101,15 @@ const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
-const ResumeViewerPreview = lazy(() => import("./pages/ResumeViewerPreview"));
+
+// Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
+// viewer became the default at /resumes/:id. Old links redirect in-place.
+function LegacyViewerRedirect() {
+  const { id } = useParams<{ id: string }>();
+  const [search] = useSearchParams();
+  const qs = search.toString();
+  return <Navigate to={`/resumes/${id}${qs ? "?" + qs : ""}`} replace />;
+}
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
@@ -449,7 +457,7 @@ const App = () => (
                         path="/resumes/edit/:id"
                         element={<ResumeEditPage />}
                       />
-                      <Route path="/resumes/VIEWER/:id" element={<ResumeViewerPreview />} />
+                      <Route path="/resumes/VIEWER/:id" element={<LegacyViewerRedirect />} />
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />

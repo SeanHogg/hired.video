@@ -10,7 +10,8 @@ import { userService } from "@/lib/services/user-service";
 import { resumeService } from "@/lib/services/resume-service";
 import type { UserProfile } from "@/lib/services/user-service";
 import type { Resume } from "@/types/resume";
-import ResumeViewer from "@/components/ResumeViewer";
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import { DEFAULT_DESCRIPTOR, getTemplateById } from "@/types/resume-template";
 
 export default function EmbeddedResume() {
   const { identifier } = useParams<{ identifier: string }>();
@@ -163,10 +164,21 @@ export default function EmbeddedResume() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Resume Content (uses consolidated ResumeViewer) */}
+      {/* Resume Content — rendered via the declarative template engine in
+          embedded mode (no gradient hero, no platform chrome). Template is
+          picked from resume.data.Meta.embeddedTemplate with fallback to the
+          resume's regular default, then DEFAULT_DESCRIPTOR. */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {resume ? (
-          <ResumeViewer resume={resume} onUpdate={() => {}} canEdit={false} />
+          <DeclarativeResumeRenderer
+            resume={resume}
+            descriptor={
+              getTemplateById(resume.data?.Meta?.embeddedTemplate)
+              ?? getTemplateById(resume.data?.Meta?.template)
+              ?? DEFAULT_DESCRIPTOR
+            }
+            embedded
+          />
         ) : (
           <Card>
             <CardContent className="p-6 text-center">

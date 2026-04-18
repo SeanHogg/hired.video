@@ -324,3 +324,8 @@ export const TEMPLATE_PRESETS: ResumeTemplateDescriptor[] = [
   HOSPITALITY_AMBER,
   CREATIVE_MINIMAL,
 ];
+
+export function getTemplateById(id: string | null | undefined): ResumeTemplateDescriptor | null {
+  if (!id) return null;
+  return TEMPLATE_PRESETS.find((t) => t.id === id) ?? null;
+}
