@@ -9,7 +9,7 @@ import type {
   FormFieldType,
   FieldCategory,
   FieldAnswer,
-} from "../../shared/autofill.js";
+} from "../../../shared/autofill.js";
 
 // ============================================================================
 // FORM FIELD ANALYSIS
@@ -315,7 +315,7 @@ export async function analyzeForm(
   // Detect ATS provider from URL
   let atsProvider: string | undefined;
   if (url) {
-    const { detectAtsProvider: detect } = await import("../../shared/autofill.js");
+    const { detectAtsProvider: detect } = await import("../../../shared/autofill.js");
     atsProvider = detect(url) ?? undefined;
   }
 

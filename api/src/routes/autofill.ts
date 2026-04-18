@@ -17,7 +17,7 @@ import {
   normalizeQuestion,
 } from "../services/autofill.js";
 import { recordTokenUsage } from "../services/billing.js";
-import type { FormField } from "../../shared/autofill.js";
+import type { FormField } from "../../../shared/autofill.js";
 
 export const autofillRoutes = new Hono<{ Variables: Variables }>();
 
@@ -237,7 +237,7 @@ autofillRoutes.post("/generate", async (c) => {
           timesUsed: sql`${schema.answerCache.timesUsed} + 1`,
           lastUsedAt: new Date(),
           updatedAt: new Date(),
-        },
+        } as any,
       }).catch(() => {}); // Non-critical — don't fail the request
     } catch { /* ignore cache errors */ }
   }
@@ -285,7 +285,7 @@ autofillRoutes.post("/save", async (c) => {
         appliedAt: new Date(),
         statusChangedAt: new Date(),
         updatedAt: new Date(),
-      })
+      } as any)
       .where(and(
         eq(schema.savedJobs.id, savedJobId),
         eq(schema.savedJobs.userId, userId),
@@ -424,7 +424,7 @@ autofillRoutes.put("/cache/:id", async (c) => {
 
   const db = getDb();
   const [updated] = await db.update(schema.answerCache)
-    .set({ answer: parsed.data.answer, updatedAt: new Date() })
+    .set({ answer: parsed.data.answer, updatedAt: new Date() } as any)
     .where(and(eq(schema.answerCache.id, id), eq(schema.answerCache.userId, userId)))
     .returning({ id: schema.answerCache.id });
 
