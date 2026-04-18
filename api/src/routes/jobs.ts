@@ -472,7 +472,6 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
   const missingFields: string[] | null = Array.isArray(body?.missingFields)
     ? body.missingFields.filter((f: unknown) => typeof f === "string")
     : null;
-  const allowField = (col: string) => missingFields === null || missingFields.includes(col);
   if (!html) return c.json(error("VALIDATION_ERROR", "html is required"), 400);
 
   const db = getDb();
